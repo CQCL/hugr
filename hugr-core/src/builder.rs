@@ -261,8 +261,8 @@ pub(crate) mod test {
 
     use super::handle::BuildHandle;
     use super::{
-        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID,
-        FunctionBuilder, ModuleBuilder,
+        BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, FuncID, FunctionBuilder,
+        ModuleBuilder,
     };
     use super::{DataflowSubContainer, HugrBuilder};
 

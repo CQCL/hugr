@@ -149,13 +149,14 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use hugr_core::Hugr;
+    use hugr_core::builder::DataflowHugr;
     use hugr_core::extension::SignatureFunc;
     use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::std_extensions::arithmetic::float_ops::FloatOps;
     use hugr_core::types::TypeRow;
     use hugr_core::{
-        builder::{Dataflow, DataflowSubContainer},
+        builder::Dataflow,
         std_extensions::arithmetic::float_types::{ConstF64, float64_type},
     };
     use rstest::rstest;
@@ -184,7 +185,7 @@ mod test {
                     .add_dataflow_op(op, builder.input_wires())
                     .unwrap()
                     .outputs();
-                builder.finish_with_outputs(outputs).unwrap()
+                builder.finish_hugr_with_outputs(outputs).unwrap()
             })
     }
 
@@ -196,7 +197,7 @@ mod test {
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let c = builder.add_load_value(ConstF64::new(3.12));
-                builder.finish_with_outputs([c]).unwrap()
+                builder.finish_hugr_with_outputs([c]).unwrap()
             });
         check_emission!(hugr, llvm_ctx);
     }

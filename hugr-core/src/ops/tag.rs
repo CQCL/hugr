@@ -57,6 +57,8 @@ pub enum OpTag {
     /// A function load operation.
     LoadFunc,
     /// A definition that could be at module level or inside a DSG.
+    /// Note that this means only Constants, as all other defn/decls
+    /// must be at Module level.
     ScopedDefn,
     /// A tail-recursive loop.
     TailLoop,
@@ -112,8 +114,8 @@ impl OpTag {
             OpTag::Input => &[OpTag::DataflowChild],
             OpTag::Output => &[OpTag::DataflowChild],
             OpTag::Function => &[OpTag::ModuleOp, OpTag::StaticOutput],
-            OpTag::Alias => &[OpTag::ScopedDefn],
-            OpTag::FuncDefn => &[OpTag::Function, OpTag::ScopedDefn, OpTag::DataflowParent],
+            OpTag::Alias => &[OpTag::ModuleOp],
+            OpTag::FuncDefn => &[OpTag::Function, OpTag::DataflowParent],
             OpTag::DataflowBlock => &[OpTag::ControlFlowChild, OpTag::DataflowParent],
             OpTag::BasicBlockExit => &[OpTag::ControlFlowChild],
             OpTag::Case => &[OpTag::Any, OpTag::DataflowParent],

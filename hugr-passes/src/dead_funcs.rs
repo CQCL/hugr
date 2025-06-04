@@ -141,9 +141,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{
-        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
-    };
+    use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
     use super::remove_dead_funcs;

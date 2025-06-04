@@ -16,13 +16,13 @@ use crate::{Hugr, Node};
 use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().entrypoint()
+        self.0.as_ref().module_root()
     }
 
     #[inline]
@@ -39,13 +39,7 @@ impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl Default for ModuleBuilder<Hugr> {
-    fn default() -> Self {
-        Self::new()
+        Self::default()
     }
 }
 
@@ -110,6 +104,33 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         );
 
         Ok(declare_n.into())
+    }
+
+    /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
+    /// body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    pub fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
@@ -203,31 +224,6 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
-
-    #[test]
-    fn local_def() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let mut f_build = module_builder.define_function(
-                "main",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let local_build = f_build.define_function(
-                "local",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let [wire] = local_build.input_wires_arr();
-            let f_id = local_build.finish_with_outputs([wire, wire])?;
-
-            let call = f_build.call(f_id.handle(), &[], f_build.input_wires())?;
-
-            f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));

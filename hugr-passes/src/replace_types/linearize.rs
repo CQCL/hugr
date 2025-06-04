@@ -367,8 +367,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, inout_sig,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
@@ -800,7 +800,8 @@ mod test {
         // A simple Hugr that discards a usize_t, with a "drop" function
         let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
-            let mut fb = dfb
+            let mut mb = dfb.module_root_builder();
+            let mut fb = mb
                 .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
                 .unwrap();
             let ins = fb.input_wires();
@@ -815,12 +816,11 @@ mod test {
         let backup = dfb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
-        // The `copy_fn` here will break completely, but we don't use it
         lower_discard_to_call
             .linearizer()
             .register_simple(
                 lin_ct.clone(),
-                NodeTemplate::Call(backup.entrypoint(), vec![]),
+                NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
                 NodeTemplate::Call(discard_fn, vec![]),
             )
             .unwrap();
@@ -834,18 +834,20 @@ mod test {
             assert_eq!(h.output_neighbours(discard_fn).count(), 1);
         }
 
-        // But if we lower usize_t to array<lin_t>, the call will fail
+        // But if we lower usize_t to array<lin_t>, the call will fail.
         lower_discard_to_call.replace_type(
             usize_t().as_extension().unwrap().clone(),
             value_array_type(4, lin_ct.into()),
         );
         let r = lower_discard_to_call.run(&mut backup.clone());
+        // Note the error (or success) can be quite fragile, according to what the `discard_fn`
+        // Node points at in the (hidden here) inner Hugr built by the array linearization helper.
         assert!(matches!(
             r,
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    BuildError::NodeNotFound { node }
+                    BuildError::NodeNotFound { node } // Note `..` would be somewhat less fragile
                 )
             )) if nested_t == lin_t && node == discard_fn
         ));
