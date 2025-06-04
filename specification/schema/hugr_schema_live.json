@@ -761,6 +761,29 @@
             "title": "Input",
             "type": "object"
         },
+        "ListArg": {
+            "additionalProperties": true,
+            "properties": {
+                "tya": {
+                    "const": "List",
+                    "default": "List",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "elems": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Elems",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "elems"
+            ],
+            "title": "ListArg",
+            "type": "object"
+        },
         "ListParam": {
             "additionalProperties": true,
             "properties": {
@@ -1171,29 +1194,6 @@
             "title": "RowVar",
             "type": "object"
         },
-        "SequenceArg": {
-            "additionalProperties": true,
-            "properties": {
-                "tya": {
-                    "const": "Sequence",
-                    "default": "Sequence",
-                    "title": "Tya",
-                    "type": "string"
-                },
-                "elems": {
-                    "items": {
-                        "$ref": "#/$defs/TypeArg"
-                    },
-                    "title": "Elems",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "elems"
-            ],
-            "title": "SequenceArg",
-            "type": "object"
-        },
         "SerialHugr": {
             "additionalProperties": true,
             "description": "A serializable representation of a Hugr.",
@@ -1483,6 +1483,29 @@
             "title": "TailLoop",
             "type": "object"
         },
+        "TupleArg": {
+            "additionalProperties": true,
+            "properties": {
+                "tya": {
+                    "const": "Tuple",
+                    "default": "Tuple",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "elems": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Elems",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "elems"
+            ],
+            "title": "TupleArg",
+            "type": "object"
+        },
         "TupleParam": {
             "additionalProperties": true,
             "properties": {
@@ -1581,8 +1604,9 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
-                    "Sequence": "#/$defs/SequenceArg",
+                    "List": "#/$defs/ListArg",
                     "String": "#/$defs/StringArg",
+                    "Tuple": "#/$defs/TupleArg",
                     "Type": "#/$defs/TypeTypeArg",
                     "Variable": "#/$defs/VariableArg"
                 },
@@ -1599,7 +1623,10 @@
                     "$ref": "#/$defs/StringArg"
                 },
                 {
-                    "$ref": "#/$defs/SequenceArg"
+                    "$ref": "#/$defs/ListArg"
+                },
+                {
+                    "$ref": "#/$defs/TupleArg"
                 },
                 {
                     "$ref": "#/$defs/VariableArg"

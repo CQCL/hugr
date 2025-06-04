@@ -175,7 +175,7 @@ pub fn bool_t() -> Type {
 /// Name of the prelude panic operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [`TypeArg::Sequence`]s representing these. The first input to the
+/// with two [`TypeArg::List`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
@@ -189,7 +189,7 @@ pub const PANIC_OP_ID: OpName = OpName::new_inline("panic");
 /// Name of the prelude exit operation.
 ///
 /// This operation can have any input and any output wires; it is instantiated
-/// with two [`TypeArg::Sequence`]s representing these. The first input to the
+/// with two [`TypeArg::List`]s representing these. The first input to the
 /// operation is always an error type; the remaining inputs correspond to the
 /// first sequence of types in its instantiation; the outputs correspond to the
 /// second sequence of types in its instantiation. Note that the inputs and
@@ -678,7 +678,7 @@ impl MakeExtensionOp for MakeTuple {
         if def != TupleOpDef::MakeTuple {
             return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
-        let [TypeArg::Sequence { elems }] = ext_op.args() else {
+        let [TypeArg::List { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
@@ -692,7 +692,7 @@ impl MakeExtensionOp for MakeTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Sequence {
+        vec![TypeArg::List {
             elems: self
                 .0
                 .iter()
@@ -739,7 +739,7 @@ impl MakeExtensionOp for UnpackTuple {
         if def != TupleOpDef::UnpackTuple {
             return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
-        let [TypeArg::Sequence { elems }] = ext_op.args() else {
+        let [TypeArg::List { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
@@ -753,7 +753,7 @@ impl MakeExtensionOp for UnpackTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Sequence {
+        vec![TypeArg::List {
             elems: self
                 .0
                 .iter()
@@ -969,7 +969,7 @@ impl MakeExtensionOp for Barrier {
     {
         let _def = BarrierDef::from_def(ext_op.def())?;
 
-        let [TypeArg::Sequence { elems }] = ext_op.args() else {
+        let [TypeArg::List { elems }] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
@@ -985,7 +985,7 @@ impl MakeExtensionOp for Barrier {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Sequence {
+        vec![TypeArg::List {
             elems: self
                 .type_row
                 .iter()
@@ -1132,7 +1132,7 @@ mod test {
 
         let err = b.add_load_value(error_val);
 
-        const TYPE_ARG_NONE: TypeArg = TypeArg::Sequence { elems: vec![] };
+        const TYPE_ARG_NONE: TypeArg = TypeArg::List { elems: vec![] };
         let op = PRELUDE
             .instantiate_extension_op(&EXIT_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
             .unwrap();
@@ -1147,7 +1147,7 @@ mod test {
     fn test_panic_with_io() {
         let error_val = ConstError::new(42, "PANIC");
         let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::Sequence {
+        let type_arg_2q: TypeArg = TypeArg::List {
             elems: vec![type_arg_q.clone(), type_arg_q],
         };
         let panic_op = PRELUDE

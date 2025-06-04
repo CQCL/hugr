@@ -548,8 +548,8 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn seq1ty(t: TypeRV) -> TypeArg {
-    TypeArg::Sequence {
+fn list1ty(t: TypeRV) -> TypeArg {
+    TypeArg::List {
         elems: vec![t.into()],
     }
 }
@@ -578,7 +578,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
+        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;
