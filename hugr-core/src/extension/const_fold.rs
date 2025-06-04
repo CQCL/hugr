@@ -6,7 +6,8 @@ use crate::types::{SumType, TypeArg};
 use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
 
 /// Representation of values used for constant folding.
-/// See [ConstFold], which is used as `dyn` so we cannot parametrize by [HugrNode]
+/// See [ConstFold], which is used as `dyn` so we cannot parametrize by
+/// [HugrNode](crate::core::HugrNode).
 // Should we be non-exhaustive??
 #[derive(Clone, Debug, PartialEq, Default)]
 pub enum FoldVal {

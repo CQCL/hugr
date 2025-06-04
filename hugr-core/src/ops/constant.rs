@@ -207,7 +207,7 @@ mod inner {
     /// A value that can be stored as a static constant. Representing core types and
     /// extension types.
     pub enum Value {
-        /// An extension constant value, that can check it is of a given [CustomType].
+        /// An extension constant value
         Extension {
             #[serde(flatten)]
             /// The custom constant value.
