@@ -115,10 +115,12 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         let [i, o] = h.get_io(cases[TailLoop::CONTINUE_TAG]).unwrap();
         // Inputs to original TailLoop are fed to DFG; TailLoop now takes inputs from Case(.Input)
         for inport in h.node_inputs(self.0).collect::<Vec<_>>() {
+            let cond_inport = (inport == order_inport)
+                .then_some(h.get_optype(cond_n).other_input_port().unwrap());
             for (src_n, src_p) in h.linked_outputs(self.0, inport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, dfg, inport);
-                if inport == order_inport {
-                    // ALAN is inport the right port here?
+                // Order edges for nonlocal edges must go to both Conditional & DFG (siblings)
+                if let Some(inport) = cond_inport {
                     h.connect(src_n, src_p, cond_n, inport);
                 }
             }
@@ -189,7 +191,7 @@ mod test {
                 "helper",
                 Signature::new(
                     vec![bool_t(), usize_t(), i32_t()],
-                    vec![Type::new_sum([vec![bool_t()], vec![]]), usize_t()],
+                    vec![Type::new_sum([vec![bool_t(); 2], vec![]]), usize_t()],
                 )
                 .into(),
             )
@@ -197,9 +199,13 @@ mod test {
         let [b, u, i] = fb.input_wires_arr();
         let (tl, call) = {
             let mut tlb = fb
-                .tail_loop_builder([(bool_t(), b)], [(usize_t(), u)], TypeRow::new())
+                .tail_loop_builder(
+                    [(bool_t(), b), (bool_t(), b)],
+                    [(usize_t(), u)],
+                    TypeRow::new(),
+                )
                 .unwrap();
-            let [b, u] = tlb.input_wires_arr();
+            let [b, _, u] = tlb.input_wires_arr();
             // Static edge from FuncDecl, and 'ext' edge from function Input:
             let c = tlb.call(&helper, &[], [b, u, i]).unwrap();
             let [pred, other] = c.outputs_arr();
