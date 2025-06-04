@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -207,8 +207,8 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         """
         new_n = self.hugr.add_node(op, self.parent_node, metadata=metadata)
         self._wire_up(new_n, args)
-
-        return replace(new_n, _num_out_ports=op.num_out)
+        new_n._num_out_ports = op.num_out
+        return new_n
 
     def add(self, com: ops.Command, *, metadata: dict[str, Any] | None = None) -> Node:
         """Add a command (holding a dataflow operation and the incoming wires)

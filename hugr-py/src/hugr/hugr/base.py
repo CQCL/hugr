@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from queue import Queue
 from typing import (
     TYPE_CHECKING,
@@ -98,7 +98,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     """The core HUGR datastructure.
 
     Args:
-        entrypoint_op: The operation for the entrypoint node. Defaults to a Module.
+        entrypoint_op: The operation for the entrypoint node. Defaults to a Module
+        (which will then also be the root).
 
     Examples:
         >>> h = Hugr()
@@ -290,7 +291,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         else:
             node = Node(len(self._nodes), {})
             self._nodes.append(node_data)
-        node = replace(node, _num_out_ports=num_outs, _metadata=node_data.metadata)
+        node._num_out_ports = num_outs
+        node._metadata = node_data.metadata
         if parent:
             self[parent].children.append(node)
 
@@ -322,11 +324,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             self[node]._num_inps = num_inps
         if num_outs is not None:
             self[node]._num_outs = num_outs
-            node = replace(node, _num_out_ports=num_outs)
-            parent = self[node].parent
-            if parent is not None:
-                pos = self[parent].children.index(node)
-                self[parent].children[pos] = node
+            node._num_out_ports = num_outs
 
         if node.idx == self.entrypoint.idx:
             self.entrypoint = node
@@ -412,7 +410,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
 
         # Free up the metadata dictionary
-        node = replace(node, _metadata={})
+        node._metadata = {}
 
         self._free_nodes.append(node)
         return weight

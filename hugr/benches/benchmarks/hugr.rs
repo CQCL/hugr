@@ -9,7 +9,7 @@ use hugr::envelope::{EnvelopeConfig, EnvelopeFormat};
 use hugr::std_extensions::STD_REG;
 use std::hint::black_box;
 
-pub use examples::{circuit, simple_cfg_hugr, simple_dfg_hugr};
+pub use examples::{BENCH_EXTENSIONS, circuit, simple_cfg_hugr, simple_dfg_hugr};
 
 trait Serializer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8>;
@@ -28,7 +28,7 @@ impl Serializer for JsonSer {
         bytes
     }
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        Hugr::load(bytes, None).unwrap()
+        Hugr::load(bytes, Some(&BENCH_EXTENSIONS)).unwrap()
     }
 }
 
@@ -46,7 +46,7 @@ impl Serializer for CapnpSer {
     }
 
     fn deserialize(&self, bytes: &[u8]) -> Hugr {
-        Hugr::load(bytes, None).unwrap()
+        Hugr::load(bytes, Some(&BENCH_EXTENSIONS)).unwrap()
     }
 }
 
