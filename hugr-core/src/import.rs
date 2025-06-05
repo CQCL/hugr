@@ -30,7 +30,7 @@ use crate::{
 use fxhash::FxHashMap;
 use hugr_model::v0 as model;
 use hugr_model::v0::table;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
@@ -1070,10 +1070,15 @@ impl<'a> Context<'a> {
             return Ok(TypeParam::List { param });
         }
 
-        if let Some([_]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
+        if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
             // At present `hugr-model` has no way to express that the item
             // types of a tuple must be copyable. Therefore we import it as `Any`.
-            todo!("import tuple type");
+            let params = self
+                .import_closed_list(item_types)?
+                .into_iter()
+                .map(|item_type| self.import_type_param(item_type, TypeBound::Any))
+                .try_collect()?;
+            return Ok(TypeParam::Tuple { params });
         }
 
         match self.get_term(term_id)? {
@@ -1171,19 +1176,18 @@ impl<'a> Context<'a> {
                 // PERFORMANCE: Can we do this without the additional allocation?
                 let parts: Vec<_> = parts
                     .iter()
-                    .map(|part| self.import_list_part(part))
-                    .collect::<Result<_, _>>()?;
+                    .map(|part| self.import_seq_part(part))
+                    .try_collect()?;
                 Ok(TypeArg::new_list_from_parts(parts))
             }
 
-            table::Term::Tuple { .. } => {
-                let elems = self
-                    .import_closed_list(term_id)?
+            table::Term::Tuple(parts) => {
+                // PERFORMANCE: Can we do this without the additional allocation?
+                let parts: Vec<_> = parts
                     .iter()
-                    .map(|item| self.import_type_arg(*item))
-                    .collect::<Result<_, _>>()?;
-
-                Ok(TypeArg::Tuple { elems })
+                    .map(|part| self.import_seq_part(part))
+                    .try_collect()?;
+                Ok(TypeArg::new_tuple_from_parts(parts))
             }
 
             table::Term::Literal(model::Literal::Str(value)) => Ok(TypeArg::String {
@@ -1209,7 +1213,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn import_list_part(
+    fn import_seq_part(
         &mut self,
         seq_part: &'a table::SeqPart,
     ) -> Result<SeqPart<TypeArg>, ImportError> {
