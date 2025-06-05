@@ -8,6 +8,7 @@ use itertools::Itertools;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use smallvec::{SmallVec, smallvec};
+use std::iter::FusedIterator;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
@@ -454,11 +455,11 @@ impl TypeArg {
         for part in parts {
             match part {
                 SeqPart::Item(item) => items.push(item),
-                SeqPart::Splice(list) => {
+                SeqPart::Splice(seq) => {
                     if !items.is_empty() {
                         seqs.push(make_items(std::mem::take(&mut items)));
                     }
-                    seqs.push(list);
+                    seqs.push(seq);
                 }
             }
         }
@@ -509,7 +510,7 @@ impl TypeArg {
     /// ```
     pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
-            parts.into_iter().flat_map(|part| part.into_list_parts()),
+            parts.into_iter().flat_map(ListPartIter::new),
             |elems| TypeArg::List { elems },
             |lists| TypeArg::ListConcat { lists },
         )
@@ -597,7 +598,7 @@ impl TypeArg {
     /// Analogous to [`TypeArg::new_list_from_parts`].
     pub fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
-            parts.into_iter().flat_map(|part| part.into_tuple_parts()),
+            parts.into_iter().flat_map(TuplePartIter::new),
             |elems| TypeArg::Tuple { elems },
             |tuples| TypeArg::TupleConcat { tuples },
         )
@@ -751,18 +752,6 @@ pub enum SeqPart<T> {
     Splice(T),
 }
 
-impl SeqPart<TypeArg> {
-    #[inline]
-    fn into_list_parts(self) -> ListPartIter {
-        ListPartIter::new(self)
-    }
-
-    #[inline]
-    fn into_tuple_parts(self) -> TuplePartIter {
-        TuplePartIter::new(self)
-    }
-}
-
 /// Iterator created by [`TypeArg::into_list_parts`].
 #[derive(Debug, Clone)]
 pub struct ListPartIter {
@@ -796,6 +785,8 @@ impl Iterator for ListPartIter {
     }
 }
 
+impl FusedIterator for ListPartIter {}
+
 /// Iterator created by [`TypeArg::into_tuple_parts`].
 #[derive(Debug, Clone)]
 pub struct TuplePartIter {
@@ -828,6 +819,8 @@ impl Iterator for TuplePartIter {
         }
     }
 }
+
+impl FusedIterator for TuplePartIter {}
 
 #[cfg(test)]
 mod test {
