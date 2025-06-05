@@ -282,7 +282,7 @@ class FloatArg(TypeArg):
         return stys.FloatArg(value=self.value)
 
     def __str__(self) -> str:
-        return f'{self.value}'
+        return f"{self.value}"
 
     def to_model(self) -> model.Term:
         return model.Literal(self.value)
@@ -397,8 +397,7 @@ class Sum(Type):
 
     def to_model(self) -> model.Term:
         variants = model.List(
-            [model.List([typ.to_model() for typ in row])
-             for row in self.variant_rows]
+            [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
         )
         return model.Apply("core.adt", [variants])
 
