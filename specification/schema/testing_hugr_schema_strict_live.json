@@ -130,6 +130,27 @@
             "title": "BoundedNatParam",
             "type": "object"
         },
+        "BytesArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "Bytes",
+                    "default": "Bytes",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "value": {
+                    "format": "binary",
+                    "title": "Value",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "value"
+            ],
+            "title": "BytesArg",
+            "type": "object"
+        },
         "BytesParam": {
             "additionalProperties": false,
             "properties": {
@@ -577,6 +598,26 @@
                 "hugr"
             ],
             "title": "FixedHugr",
+            "type": "object"
+        },
+        "FloatArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "Float",
+                    "default": "Float",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "value": {
+                    "title": "Value",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "value"
+            ],
+            "title": "FloatArg",
             "type": "object"
         },
         "FloatParam": {
@@ -1708,6 +1749,8 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
+                    "Bytes": "#/$defs/BytesArg",
+                    "Float": "#/$defs/FloatArg",
                     "List": "#/$defs/ListArg",
                     "String": "#/$defs/StringArg",
                     "Tuple": "#/$defs/TupleArg",
@@ -1725,6 +1768,12 @@
                 },
                 {
                     "$ref": "#/$defs/StringArg"
+                },
+                {
+                    "$ref": "#/$defs/BytesArg"
+                },
+                {
+                    "$ref": "#/$defs/FloatArg"
                 },
                 {
                     "$ref": "#/$defs/ListArg"
