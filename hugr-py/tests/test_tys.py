@@ -39,6 +39,10 @@ from hugr.tys import (
     USize,
     Variable,
     VariableArg,
+    FloatParam,
+    BytesParam,
+    FloatArg,
+    BytesArg,
 )
 
 
@@ -90,6 +94,8 @@ def test_tys_sum_str(ty: Type, string: str, repr_str: str):
         (BoundedNatParam(3), "Nat(3)"),
         (BoundedNatParam(None), "Nat"),
         (StringParam(), "String"),
+        (FloatParam(), "Float"),
+        (BytesParam(), "Bytes"),
         (
             TupleParam([TypeTypeParam(TypeBound.Any), BoundedNatParam(3)]),
             "(Any, Nat(3))",
@@ -106,6 +112,8 @@ def test_params_str(param: TypeParam, string: str):
     [
         (TypeTypeArg(Bool), "Type(Bool)"),
         (BoundedNatArg(3), "3"),
+        (FloatArg(3.141), "3.141"),
+        (BytesArg(b"0"), "bytes"),
         (StringArg("hello"), '"hello"'),
         (
             ListArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
@@ -134,7 +142,8 @@ def test_args_str(arg: TypeArg, string: str):
         (INT_T, "int<5>"),
         (FLOAT_T, "float64"),
         (Alias("Foo", TypeBound.Copyable), "Foo"),
-        (FunctionType([Bool, Qubit], [Qubit, Bool]), "Bool, Qubit -> Qubit, Bool"),
+        (FunctionType([Bool, Qubit], [Qubit, Bool]),
+         "Bool, Qubit -> Qubit, Bool"),
         (
             PolyFuncType(
                 [TypeTypeParam(TypeBound.Any), BoundedNatParam(7)],
