@@ -1,0 +1,22 @@
+---
+source: hugr-core/src/hugr/views/render.rs
+expression: h.mermaid_string_with_formatter(config)
+---
+graph LR
+    subgraph 0 ["(node_0) Module"]
+        direction LR
+        subgraph 1 ["(node_1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(node_2) Input"]
+            3["(node_3) Output"]
+            subgraph 4 ["(node_4) [**DFG**]"]
+                direction LR
+                style 4 stroke:#832561,stroke-width:3px
+                5["(node_5) Input"]
+                6["(node_6) Output"]
+                5--"0:0<br>Bool"-->6
+            end
+            2--"0:0<br>Bool"-->4
+            4--"0:0<br>Bool"-->3
+        end
+    end
