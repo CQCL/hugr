@@ -113,10 +113,17 @@ impl TypeParam {
         }
     }
 
-    /// Make a new `TypeParam::List` (an arbitrary-length homogeneous list)
+    /// Make a new [`TypeParam::List`] (an arbitrary-length homogeneous list)
     pub fn new_list(elem: impl Into<TypeParam>) -> Self {
         Self::List {
             param: Box::new(elem.into()),
+        }
+    }
+
+    /// Make a new [`TypeParam::Tuple`].
+    pub fn new_tuple(elems: impl IntoIterator<Item = TypeParam>) -> Self {
+        Self::Tuple {
+            params: elems.into_iter().collect(),
         }
     }
 
@@ -475,39 +482,6 @@ impl TypeArg {
     }
 
     /// Creates a new list from a sequence of [`SeqPart`]s.
-    ///
-    /// # Examples
-    ///
-    /// When all parts are [`SeqPart::Item`]s, a closed list is created:
-    /// ```
-    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
-    /// # let a = TypeArg::new_string("a");
-    /// # let b = TypeArg::new_string("b");
-    /// assert_eq!(
-    ///     TypeArg::new_list_from_parts([SeqPart::Item(a.clone()), SeqPart::Item(b.clone())]),
-    ///     TypeArg::new_list([a, b])
-    /// );
-    /// ```
-    ///
-    /// Otherwise the result is a concatenation of lists, flattened as much as possible:
-    /// ```
-    /// # use hugr_core::types::type_param::{TypeParam, TypeArg, SeqPart};
-    /// # let a = TypeArg::new_string("a");
-    /// # let b = TypeArg::new_string("b");
-    /// # let c = TypeArg::new_string("c");
-    /// # let d = TypeArg::new_string("d");
-    /// # let var = TypeArg::new_var_use(0, TypeParam::new_list(TypeParam::String));
-    /// let parts = [
-    ///     SeqPart::Splice(TypeArg::new_list([a.clone(), b.clone()])),
-    ///     SeqPart::Splice(TypeArg::new_list_concat([TypeArg::new_list([c.clone()])])),
-    ///     SeqPart::Item(d.clone()),
-    ///     SeqPart::Splice(var.clone())
-    /// ];
-    /// assert_eq!(
-    ///     TypeArg::new_list_from_parts(parts),
-    ///     TypeArg::new_list_concat([TypeArg::new_list([a, b, c, d]), var])
-    /// );
-    /// ```
     pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(ListPartIter::new),
@@ -828,7 +802,65 @@ mod test {
 
     use super::{Substitution, TypeArg, TypeParam, check_type_arg};
     use crate::extension::prelude::{bool_t, usize_t};
+    use crate::types::type_param::SeqPart;
     use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
+
+    #[test]
+    fn new_list_from_parts_items() {
+        let a = TypeArg::new_string("a");
+        let b = TypeArg::new_string("b");
+
+        let parts = [SeqPart::Item(a.clone()), SeqPart::Item(b.clone())];
+        let items = [a, b];
+
+        assert_eq!(
+            TypeArg::new_list_from_parts(parts.clone()),
+            TypeArg::new_list(items.clone())
+        );
+
+        assert_eq!(
+            TypeArg::new_tuple_from_parts(parts),
+            TypeArg::new_tuple(items)
+        );
+    }
+
+    #[test]
+    fn new_list_from_parts_flatten() {
+        let a = TypeArg::new_string("a");
+        let b = TypeArg::new_string("b");
+        let c = TypeArg::new_string("c");
+        let d = TypeArg::new_string("d");
+        let var = TypeArg::new_var_use(0, TypeParam::new_list(TypeParam::String));
+        let parts = [
+            SeqPart::Splice(TypeArg::new_list([a.clone(), b.clone()])),
+            SeqPart::Splice(TypeArg::new_list_concat([TypeArg::new_list([c.clone()])])),
+            SeqPart::Item(d.clone()),
+            SeqPart::Splice(var.clone()),
+        ];
+        assert_eq!(
+            TypeArg::new_list_from_parts(parts),
+            TypeArg::new_list_concat([TypeArg::new_list([a, b, c, d]), var])
+        );
+    }
+
+    #[test]
+    fn new_tuple_from_parts_flatten() {
+        let a = TypeArg::new_string("a");
+        let b = TypeArg::new_string("b");
+        let c = TypeArg::new_string("c");
+        let d = TypeArg::new_string("d");
+        let var = TypeArg::new_var_use(0, TypeParam::new_tuple([TypeParam::String]));
+        let parts = [
+            SeqPart::Splice(TypeArg::new_tuple([a.clone(), b.clone()])),
+            SeqPart::Splice(TypeArg::new_tuple_concat([TypeArg::new_tuple([c.clone()])])),
+            SeqPart::Item(d.clone()),
+            SeqPart::Splice(var.clone()),
+        ];
+        assert_eq!(
+            TypeArg::new_tuple_from_parts(parts),
+            TypeArg::new_tuple_concat([TypeArg::new_tuple([a, b, c, d]), var])
+        );
+    }
 
     #[test]
     fn type_arg_fits_param() {
