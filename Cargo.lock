@@ -1267,6 +1267,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "smallvec",
  "smol_str",
  "static_assertions",
  "strum",
