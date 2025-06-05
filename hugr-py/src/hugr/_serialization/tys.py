@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import inspect
 import sys
 from abc import ABC, abstractmethod
@@ -7,7 +9,6 @@ from enum import Enum
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import (
-    Base64Bytes,
     BaseModel,
     ConfigDict,
     Field,
@@ -189,7 +190,27 @@ class FloatArg(BaseTypeArg):
 
 class BytesArg(BaseTypeArg):
     tya: Literal["Bytes"] = "Bytes"
-    value: Base64Bytes
+    value: bytes
+
+    @classmethod
+    def parse(cls, data: dict) -> BytesArg:
+        try:
+            decoded = base64.b64decode(data["value"])
+        except (binascii.Error, ValueError) as e:
+            raise ValidationError(
+                [
+                    {
+                        "loc": ("value",),
+                        "msg": f"Invalid base64 encoding: {e}",
+                        "type": "value_error.base64",
+                    }
+                ],
+                cls,
+            ) from e
+        return cls(value=decoded)
+
+    def serialize(self) -> dict:
+        return {"tya": self.tya, "value": base64.b64encode(self.value).decode()}
 
     def deserialize(self) -> tys.BytesArg:
         return tys.BytesArg(value=bytes(self.value))
@@ -224,7 +245,14 @@ class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg | BoundedNatArg | StringArg | ListArg | TupleArg | VariableArg,
+        TypeTypeArg
+        | BoundedNatArg
+        | StringArg
+        | BytesArg
+        | FloatArg
+        | ListArg
+        | TupleArg
+        | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
