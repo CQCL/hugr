@@ -134,8 +134,7 @@ def test_args_str(arg: TypeArg, string: str):
         (INT_T, "int<5>"),
         (FLOAT_T, "float64"),
         (Alias("Foo", TypeBound.Copyable), "Foo"),
-        (FunctionType([Bool, Qubit], [Qubit, Bool]),
-         "Bool, Qubit -> Qubit, Bool"),
+        (FunctionType([Bool, Qubit], [Qubit, Bool]), "Bool, Qubit -> Qubit, Bool"),
         (
             PolyFuncType(
                 [TypeTypeParam(TypeBound.Any), BoundedNatParam(7)],
