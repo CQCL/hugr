@@ -712,6 +712,16 @@ mod test {
         );
     }
 
+    #[test]
+    fn bytes_json_roundtrip() {
+        let bytes_arg = TypeArg::Bytes {
+            value: vec![0, 1, 2, 3, 255, 254, 253, 252].into(),
+        };
+        let serialized = serde_json::to_string(&bytes_arg).unwrap();
+        let deserialized: TypeArg = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized, bytes_arg);
+    }
+
     mod proptest {
 
         use proptest::prelude::*;
@@ -737,6 +747,9 @@ mod test {
                 use prop::collection::vec;
                 use prop::strategy::Union;
                 let mut strat = Union::new([
+                    Just(Self::String).boxed(),
+                    Just(Self::Bytes).boxed(),
+                    Just(Self::Float).boxed(),
                     Just(Self::String).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
                     any::<UpperBound>()
@@ -767,6 +780,16 @@ mod test {
                 let mut strat = Union::new([
                     any::<u64>().prop_map(|n| Self::BoundedNat { n }).boxed(),
                     any::<String>().prop_map(|arg| Self::String { arg }).boxed(),
+                    any::<Vec<u8>>()
+                        .prop_map(|bytes| Self::Bytes {
+                            value: bytes.into(),
+                        })
+                        .boxed(),
+                    any::<f64>()
+                        .prop_map(|value| Self::Float {
+                            value: value.into(),
+                        })
+                        .boxed(),
                     any_with::<Type>(depth)
                         .prop_map(|ty| Self::Type { ty })
                         .boxed(),
