@@ -276,7 +276,8 @@ class ListConcatArg(TypeArg):
         return ListConcatArg([arg.resolve(registry) for arg in self.lists])
 
     def __str__(self) -> str:
-        return f"[{comma_sep_str(f"... {list}" for list in self.lists)}]"
+        lists = comma_sep_str(f"... {list}" for list in self.lists)
+        return f"[{lists}]"
 
     def to_model(self) -> model.Term:
         return model.List(
@@ -316,7 +317,8 @@ class TupleConcatArg(TypeArg):
         return TupleConcatArg([arg.resolve(registry) for arg in self.tuples])
 
     def __str__(self) -> str:
-        return f"({comma_sep_str(f"... {tuple}" for tuple in self.tuples)})"
+        tuples = comma_sep_str(f"... {tuple}" for tuple in self.tuples)
+        return f"({tuples})"
 
     def to_model(self) -> model.Term:
         return model.Tuple(
