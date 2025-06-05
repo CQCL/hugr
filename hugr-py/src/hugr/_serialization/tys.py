@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import binascii
 import inspect
 import sys
 from abc import ABC, abstractmethod
@@ -190,30 +189,14 @@ class FloatArg(BaseTypeArg):
 
 class BytesArg(BaseTypeArg):
     tya: Literal["Bytes"] = "Bytes"
-    value: bytes
-
-    @classmethod
-    def parse(cls, data: dict) -> BytesArg:
-        try:
-            decoded = base64.b64decode(data["value"])
-        except (binascii.Error, ValueError) as e:
-            raise ValidationError(
-                [
-                    {
-                        "loc": ("value",),
-                        "msg": f"Invalid base64 encoding: {e}",
-                        "type": "value_error.base64",
-                    }
-                ],
-                cls,
-            ) from e
-        return cls(value=decoded)
-
-    def serialize(self) -> dict:
-        return {"tya": self.tya, "value": base64.b64encode(self.value).decode()}
+    value: str = Field(
+        description="Base64-encoded byte string",
+        json_schema_extra={"contentEncoding": "base64"},
+    )
 
     def deserialize(self) -> tys.BytesArg:
-        return tys.BytesArg(value=bytes(self.value))
+        value = base64.b64decode(self.value)
+        return tys.BytesArg(value=value)
 
 
 class ListArg(BaseTypeArg):

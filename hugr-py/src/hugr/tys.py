@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
@@ -295,7 +296,8 @@ class BytesArg(TypeArg):
     value: bytes
 
     def _to_serial(self) -> stys.BytesArg:
-        return stys.BytesArg(value=self.value)
+        value = base64.b64encode(self.value).decode()
+        return stys.BytesArg(value=value)
 
     def __str__(self) -> str:
         return "bytes"

@@ -140,7 +140,8 @@
                     "type": "string"
                 },
                 "value": {
-                    "format": "binary",
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded byte string",
                     "title": "Value",
                     "type": "string"
                 }
