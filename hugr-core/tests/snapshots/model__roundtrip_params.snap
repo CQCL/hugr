@@ -6,9 +6,19 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
 
 (mod)
 
-(import core.fn)
+(import core.bytes)
+
+(import core.nat)
+
+(import core.call)
 
 (import core.type)
+
+(import core.fn)
+
+(import core.str)
+
+(import core.float)
 
 (define-func
   example.swap
@@ -16,3 +26,24 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   (param ?1 core.type)
   (core.fn [?0 ?1] [?1 ?0])
   (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))
+
+(declare-func
+  example.literals
+  (param ?0 core.str)
+  (param ?1 core.nat)
+  (param ?2 core.bytes)
+  (param ?3 core.float)
+  (core.fn [] []))
+
+(define-func example.call_literals (core.fn [] [])
+  (dfg
+    (signature (core.fn [] []))
+    ((core.call
+        []
+        []
+        (example.literals
+          "string"
+          42
+          (bytes "SGVsbG8gd29ybGQg8J+Yig==")
+          6.023e23))
+      (signature (core.fn [] [])))))

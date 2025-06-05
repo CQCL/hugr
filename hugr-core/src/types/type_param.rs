@@ -469,6 +469,8 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         }
 
         (TypeArg::String { .. }, TypeParam::String) => Ok(()),
+        (TypeArg::Bytes { .. }, TypeParam::Bytes) => Ok(()),
+        (TypeArg::Float { .. }, TypeParam::Float) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),
