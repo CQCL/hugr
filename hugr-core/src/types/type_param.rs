@@ -195,6 +195,7 @@ impl Term {
                 b1.contains(b2)
             }
             (Term::StringType, Term::StringType) => true,
+            (Term::StaticType, Term::StaticType) => true,
             (Term::ListType { param: e1 }, Term::ListType { param: e2 }) => e1.contains(e2),
             (Term::TupleType { params: es1 }, Term::TupleType { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
@@ -819,6 +820,13 @@ mod test {
                 }
 
                 strat.boxed()
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn term_contains_itself(term: Term) {
+                assert!(term.contains(&term));
             }
         }
     }
