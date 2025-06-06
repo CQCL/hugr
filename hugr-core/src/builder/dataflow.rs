@@ -301,20 +301,21 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 #[cfg(test)]
 pub(crate) mod test {
     use cool_asserts::assert_matches;
-    use ops::OpParent;
     use rstest::rstest;
     use serde_json::json;
+    use std::collections::HashMap;
 
     use crate::builder::build_traits::DataflowHugr;
+    use crate::builder::test::dfg_calling_defn_decl;
     use crate::builder::{
         BuilderWiringError, DataflowSubContainer, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::SignatureError;
     use crate::extension::prelude::Noop;
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
+    use crate::hugr::hugrmut::InsertDefnMode;
     use crate::hugr::validate::InterGraphEdgeError;
-    use crate::ops::{OpTag, handle::NodeHandle};
-    use crate::ops::{OpTrait, Value};
+    use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
 
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
@@ -507,7 +508,7 @@ pub(crate) mod test {
     }
 
     #[test]
-    fn insert_hugr() -> Result<(), BuildError> {
+    fn add_hugr() -> Result<(), BuildError> {
         // Create a simple DFG
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
@@ -536,6 +537,54 @@ pub(crate) mod test {
         assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
 
         Ok(())
+    }
+
+    #[rstest]
+    fn add_hugr_with_defns(#[values(false, true)] replace: bool) {
+        let mut fb = FunctionBuilder::new("main", Signature::new_endo(bool_t())).unwrap();
+        let my_decl = fb
+            .module_root_builder()
+            .declare("func1", Signature::new_endo(bool_t()).into())
+            .unwrap();
+        let (insert, ins_defn, ins_decl) = dfg_calling_defn_decl();
+        let ins_defn_name = insert
+            .get_optype(ins_defn.node())
+            .as_func_defn()
+            .unwrap()
+            .func_name()
+            .clone();
+        let ins_decl_name = insert
+            .get_optype(ins_decl.node())
+            .as_func_decl()
+            .unwrap()
+            .func_name()
+            .clone();
+        let decl_mode = if replace {
+            InsertDefnMode::Replace(my_decl.node())
+        } else {
+            InsertDefnMode::Add
+        };
+        let link_spec = HashMap::from([
+            (ins_defn.node(), InsertDefnMode::Add),
+            (ins_decl.node(), decl_mode),
+        ]);
+        let inserted = fb.add_hugr_with_wires_defns(insert, [], link_spec).unwrap();
+        let h = fb.finish_hugr_with_outputs(inserted.outputs()).unwrap();
+        let defn_names = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_func_defn().map(FuncDefn::func_name))
+            .collect_vec();
+        assert_eq!(defn_names, [&"main".to_string(), &ins_defn_name]);
+        let decl_names = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_func_decl().map(FuncDecl::func_name))
+            .cloned()
+            .collect_vec();
+        let mut expected_decl_names = vec!["func1".to_string()];
+        if !replace {
+            expected_decl_names.push(ins_decl_name)
+        }
+        assert_eq!(decl_names, expected_decl_names);
     }
 
     #[test]
