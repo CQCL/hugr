@@ -1389,11 +1389,11 @@ impl<'a> Context<'a> {
                     Ok(TypeArg::BoundedNat { n: *value })
                 }
 
-                table::Term::Literal(model::Literal::Bytes(_)) => {
-                    Err(error_unsupported!("`(bytes ..)` as `TypeArg`"))
-                }
-                table::Term::Literal(model::Literal::Float(_)) => {
-                    Err(error_unsupported!("float literal as `TypeArg`"))
+                table::Term::Literal(model::Literal::Bytes(value)) => Ok(TypeArg::Bytes {
+                    value: value.clone(),
+                }),
+                table::Term::Literal(model::Literal::Float(value)) => {
+                    Ok(TypeArg::Float { value: *value })
                 }
                 table::Term::Func { .. } => {
                     Err(error_unsupported!("function constant as `TypeArg`"))
