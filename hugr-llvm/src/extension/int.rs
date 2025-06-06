@@ -668,7 +668,9 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             ])
         }),
         IntOpDef::inarrow_s => {
-            let Some(TypeArg::BoundedNat { value: out_log_width }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat {
+                value: out_log_width,
+            }) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_s wasn't a Nat");
             };
@@ -686,7 +688,9 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::inarrow_u => {
-            let Some(TypeArg::BoundedNat { value: out_log_width }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat {
+                value: out_log_width,
+            }) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_u wasn't a Nat");
             };
