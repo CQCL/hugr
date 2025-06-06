@@ -815,17 +815,19 @@ mod test {
                     any_with::<Type>(depth)
                         .prop_map(|ty| Self::Type { ty })
                         .boxed(),
-                    // TODO this is a bit dodgy, TypeArgVariables are supposed
-                    // to be constructed from TypeArg::new_var_use. We are only
-                    // using this instance for serialization now, but if we want
-                    // to generate valid TypeArgs this will need to change.
-                    any_with::<TypeArgVariable>(depth)
-                        .prop_map(|v| Self::Variable { v })
-                        .boxed(),
                 ]);
                 if !depth.leaf() {
                     // we descend here because we these constructors contain Terms
                     strat = strat
+                        .or(
+                            // TODO this is a bit dodgy, TypeArgVariables are supposed
+                            // to be constructed from TypeArg::new_var_use. We are only
+                            // using this instance for serialization now, but if we want
+                            // to generate valid TypeArgs this will need to change.
+                            any_with::<TypeArgVariable>(depth.descend())
+                                .prop_map(|v| Self::Variable { v })
+                                .boxed(),
+                        )
                         .or(any_with::<Self>(depth.descend())
                             .prop_map(|x| Self::ListType { param: Box::new(x) })
                             .boxed())
