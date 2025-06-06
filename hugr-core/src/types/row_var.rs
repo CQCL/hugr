@@ -70,7 +70,7 @@ impl MaybeRV for RowVariable {
     }
 
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        check_typevar_decl(var_decls, self.0, &TypeParam::new_list(self.1))
+        check_typevar_decl(var_decls, self.0, &TypeParam::new_list_type(self.1))
     }
 
     #[allow(private_interfaces)]

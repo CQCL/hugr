@@ -75,81 +75,29 @@ pub enum TypeParam {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
     })]
-    BoundedNat {
+    BoundedNatType {
         /// Upper bound for the Nat parameter.
         bound: UpperBound,
     },
     /// Argument is a [`TypeArg::String`].
-    String,
+    StringType,
     /// Argument is a [`TypeArg::Bytes`].
-    Bytes,
+    BytesType,
     /// Argument is a [`TypeArg::Float`].
-    Float,
+    FloatType,
     /// Argument is a [`TypeArg::List`]. A list of indeterminate size containing
     /// parameters all of the (same) specified element type.
-    #[display("List[{param}]")]
-    List {
+    #[display("ListType[{param}]")]
+    ListType {
         /// The [`TypeParam`] describing each element of the list.
         param: Box<TypeParam>,
     },
     /// Argument is a [`TypeArg::Tuple`]. A tuple of parameters.
-    #[display("Tuple[{}]", params.iter().map(std::string::ToString::to_string).join(", "))]
-    Tuple {
+    #[display("TupleType[{}]", params.iter().map(std::string::ToString::to_string).join(", "))]
+    TupleType {
         /// The [`TypeParam`]s contained in the tuple.
         params: Vec<TypeParam>,
     },
-}
-
-impl TypeParam {
-    /// [`TypeParam::BoundedNat`] with the maximum bound (`u64::MAX` + 1)
-    #[must_use]
-    pub const fn max_nat() -> Self {
-        Self::BoundedNat {
-            bound: UpperBound(None),
-        }
-    }
-
-    /// [`TypeParam::BoundedNat`] with the stated upper bound (non-exclusive)
-    #[must_use]
-    pub const fn bounded_nat(upper_bound: NonZeroU64) -> Self {
-        Self::BoundedNat {
-            bound: UpperBound(Some(upper_bound)),
-        }
-    }
-
-    /// Make a new `TypeParam::List` (an arbitrary-length homogeneous list)
-    pub fn new_list(elem: impl Into<TypeParam>) -> Self {
-        Self::List {
-            param: Box::new(elem.into()),
-        }
-    }
-
-    fn contains(&self, other: &TypeParam) -> bool {
-        match (self, other) {
-            (TypeParam::Type { b: b1 }, TypeParam::Type { b: b2 }) => b1.contains(*b2),
-            (TypeParam::BoundedNat { bound: b1 }, TypeParam::BoundedNat { bound: b2 }) => {
-                b1.contains(b2)
-            }
-            (TypeParam::String, TypeParam::String) => true,
-            (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
-            (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
-            }
-            _ => false,
-        }
-    }
-}
-
-impl From<TypeBound> for TypeParam {
-    fn from(bound: TypeBound) -> Self {
-        Self::Type { b: bound }
-    }
-}
-
-impl From<UpperBound> for TypeParam {
-    fn from(bound: UpperBound) -> Self {
-        Self::BoundedNat { bound }
-    }
 }
 
 /// A statically-known argument value to an operation.
@@ -219,11 +167,67 @@ pub enum TypeArg {
     },
 }
 
+impl TypeParam {
+    /// [`TypeParam::BoundedNatType`] with the maximum bound (`u64::MAX` + 1)
+    #[must_use]
+    pub const fn max_nat_type() -> Self {
+        Self::BoundedNatType {
+            bound: UpperBound(None),
+        }
+    }
+
+    /// [`TypeParam::BoundedNatType`] with the stated upper bound (non-exclusive)
+    #[must_use]
+    pub const fn bounded_nat_type(upper_bound: NonZeroU64) -> Self {
+        Self::BoundedNatType {
+            bound: UpperBound(Some(upper_bound)),
+        }
+    }
+
+    /// Make a new [`TypeParam::ListType`] (an arbitrary-length homogeneous list)
+    pub fn new_list_type(elem: impl Into<TypeParam>) -> Self {
+        Self::ListType {
+            param: Box::new(elem.into()),
+        }
+    }
+
+    fn contains(&self, other: &TypeParam) -> bool {
+        match (self, other) {
+            (TypeParam::Type { b: b1 }, TypeParam::Type { b: b2 }) => b1.contains(*b2),
+            (TypeParam::BoundedNatType { bound: b1 }, TypeParam::BoundedNatType { bound: b2 }) => {
+                b1.contains(b2)
+            }
+            (TypeParam::StringType, TypeParam::StringType) => true,
+            (TypeParam::ListType { param: e1 }, TypeParam::ListType { param: e2 }) => {
+                e1.contains(e2)
+            }
+            (TypeParam::TupleType { params: es1 }, TypeParam::TupleType { params: es2 }) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+            }
+            _ => false,
+        }
+    }
+}
+
+impl From<TypeBound> for TypeParam {
+    fn from(bound: TypeBound) -> Self {
+        Self::Type { b: bound }
+    }
+}
+
+impl From<UpperBound> for TypeParam {
+    fn from(bound: UpperBound) -> Self {
+        Self::BoundedNatType { bound }
+    }
+}
+
 impl<RV: MaybeRV> From<TypeBase<RV>> for TypeArg {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
             Ok(ty) => TypeArg::Type { ty },
-            Err(RowVariable(idx, bound)) => TypeArg::new_var_use(idx, TypeParam::new_list(bound)),
+            Err(RowVariable(idx, bound)) => {
+                TypeArg::new_var_use(idx, TypeParam::new_list_type(bound))
+            }
         }
     }
 }
@@ -414,7 +418,7 @@ impl TypeArgVariable {
     /// the [`TypeBound`] of the individual types it might stand for.
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let TypeParam::List { param } = &self.cached_decl {
+        if let TypeParam::ListType { param } = &self.cached_decl {
             if let TypeParam::Type { b } = **param {
                 return Some(b);
             }
@@ -437,7 +441,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
         {
             Ok(())
         }
-        (TypeArg::List { elems }, TypeParam::List { param }) => {
+        (TypeArg::List { elems }, TypeParam::ListType { param }) => {
             elems.iter().try_for_each(|arg| {
                 // Also allow elements that are RowVars if fitting into a List of Types
                 if let (TypeArg::Variable { v }, TypeParam::Type { b: param_bound }) =
@@ -452,7 +456,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                 check_type_arg(arg, param)
             })
         }
-        (TypeArg::Tuple { elems: items }, TypeParam::Tuple { params: types }) => {
+        (TypeArg::Tuple { elems: items }, TypeParam::TupleType { params: types }) => {
             if items.len() != types.len() {
                 return Err(TypeArgError::WrongNumberTuple(items.len(), types.len()));
             }
@@ -462,15 +466,15 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                 .zip(types.iter())
                 .try_for_each(|(arg, param)| check_type_arg(arg, param))
         }
-        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNat { bound })
+        (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNatType { bound })
             if bound.valid_value(*val) =>
         {
             Ok(())
         }
 
-        (TypeArg::String { .. }, TypeParam::String) => Ok(()),
-        (TypeArg::Bytes { .. }, TypeParam::Bytes) => Ok(()),
-        (TypeArg::Float { .. }, TypeParam::Float) => Ok(()),
+        (TypeArg::String { .. }, TypeParam::StringType) => Ok(()),
+        (TypeArg::Bytes { .. }, TypeParam::BytesType) => Ok(()),
+        (TypeArg::Float { .. }, TypeParam::FloatType) => Ok(()),
         _ => Err(TypeArgError::TypeMismatch {
             arg: arg.clone(),
             param: param.clone(),
@@ -564,7 +568,7 @@ mod test {
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
-        let seq_param = TypeParam::new_list(TypeBound::Copyable);
+        let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &seq_param).unwrap_err();
         check_seq(&[usize_t()], &TypeBound::Any.into()).unwrap_err();
 
@@ -579,7 +583,7 @@ mod test {
                 usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
-            &TypeParam::new_list(TypeBound::Any),
+            &TypeParam::new_list_type(TypeBound::Any),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
@@ -600,9 +604,9 @@ mod test {
         .unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
-        check(5, &TypeParam::max_nat()).unwrap();
-        check_seq(&[5], &TypeParam::max_nat()).unwrap_err();
-        let list_of_nat = TypeParam::new_list(TypeParam::max_nat());
+        check(5, &TypeParam::max_nat_type()).unwrap();
+        check_seq(&[5], &TypeParam::max_nat_type()).unwrap_err();
+        let list_of_nat = TypeParam::new_list_type(TypeParam::max_nat_type());
         check(5, &list_of_nat).unwrap_err();
         check_seq(&[5], &list_of_nat).unwrap();
         check(TypeArg::new_var_use(0, list_of_nat.clone()), &list_of_nat).unwrap();
@@ -614,8 +618,8 @@ mod test {
         .unwrap_err();
 
         // TypeParam::Tuples require a TypeArg::Tuple of the same number of elems
-        let usize_and_ty = TypeParam::Tuple {
-            params: vec![TypeParam::max_nat(), TypeBound::Copyable.into()],
+        let usize_and_ty = TypeParam::TupleType {
+            params: vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()],
         };
         check(
             TypeArg::Tuple {
@@ -631,7 +635,7 @@ mod test {
             &usize_and_ty,
         )
         .unwrap_err(); // Wrong way around
-        let two_types = TypeParam::Tuple {
+        let two_types = TypeParam::TupleType {
             params: vec![TypeBound::Any.into(), TypeBound::Any.into()],
         };
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
@@ -641,13 +645,13 @@ mod test {
 
     #[test]
     fn type_arg_subst_row() {
-        let row_param = TypeParam::new_list(TypeBound::Copyable);
+        let row_param = TypeParam::new_list_type(TypeBound::Copyable);
         let row_arg: TypeArg = vec![bool_t().into(), TypeArg::UNIT].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
-        let outer_param = TypeParam::new_list(TypeBound::Any);
+        let outer_param = TypeParam::new_list_type(TypeBound::Any);
         let outer_arg = TypeArg::List {
             elems: vec![
                 TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
@@ -668,8 +672,8 @@ mod test {
 
     #[test]
     fn subst_list_list() {
-        let outer_param = TypeParam::new_list(TypeParam::new_list(TypeBound::Any));
-        let row_var_decl = TypeParam::new_list(TypeBound::Copyable);
+        let outer_param = TypeParam::new_list_type(TypeParam::new_list_type(TypeBound::Any));
+        let row_var_decl = TypeParam::new_list_type(TypeBound::Copyable);
         let row_var_use = TypeArg::new_var_use(0, row_var_decl.clone());
         let good_arg = TypeArg::List {
             elems: vec![
@@ -691,7 +695,7 @@ mod test {
             Err(TypeArgError::TypeMismatch {
                 arg: usize_t().into(),
                 // The error reports the type expected for each element of the list:
-                param: TypeParam::new_list(TypeBound::Any)
+                param: TypeParam::new_list_type(TypeBound::Any)
             })
         );
 
@@ -747,23 +751,23 @@ mod test {
                 use prop::collection::vec;
                 use prop::strategy::Union;
                 let mut strat = Union::new([
-                    Just(Self::String).boxed(),
-                    Just(Self::Bytes).boxed(),
-                    Just(Self::Float).boxed(),
-                    Just(Self::String).boxed(),
+                    Just(Self::StringType).boxed(),
+                    Just(Self::BytesType).boxed(),
+                    Just(Self::FloatType).boxed(),
+                    Just(Self::StringType).boxed(),
                     any::<TypeBound>().prop_map(|b| Self::Type { b }).boxed(),
                     any::<UpperBound>()
-                        .prop_map(|bound| Self::BoundedNat { bound })
+                        .prop_map(|bound| Self::BoundedNatType { bound })
                         .boxed(),
                 ]);
                 if !depth.leaf() {
                     // we descend here because we these constructors contain TypeParams
                     strat = strat
                         .or(any_with::<Self>(depth.descend())
-                            .prop_map(|x| Self::List { param: Box::new(x) })
+                            .prop_map(|x| Self::ListType { param: Box::new(x) })
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(|params| Self::Tuple { params })
+                            .prop_map(|params| Self::TupleType { params })
                             .boxed());
                 }
 

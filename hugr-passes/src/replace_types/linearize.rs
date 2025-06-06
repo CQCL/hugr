@@ -412,7 +412,7 @@ mod test {
         }
 
         fn static_params(&self) -> &[TypeParam] {
-            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
             JUST_NAT
         }
     }

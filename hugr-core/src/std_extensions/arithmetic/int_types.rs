@@ -69,7 +69,7 @@ pub const LOG_WIDTH_BOUND: u8 = LOG_WIDTH_MAX + 1;
 
 /// Type parameter for the log width of the integer.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_type({
     assert!(LOG_WIDTH_BOUND > 0);
     NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
 });

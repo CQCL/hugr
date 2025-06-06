@@ -749,7 +749,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
+        debug_assert!(check_type_arg(arg, &TypeParam::new_list_type(bound)).is_ok());
         match arg {
             TypeArg::List { elems } => elems
                 .iter()
@@ -977,7 +977,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -1001,7 +1001,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list(TypeBound::Copyable)],
+                vec![TypeParam::new_list_type(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,

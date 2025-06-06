@@ -975,15 +975,15 @@ impl<'a> Context<'a> {
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
             // This ignores the bound on the natural for now.
-            TypeParam::BoundedNat { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
-            TypeParam::String => self.make_term_apply(model::CORE_STR_TYPE, &[]),
-            TypeParam::Bytes => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
-            TypeParam::Float => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
-            TypeParam::List { param } => {
+            TypeParam::BoundedNatType { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            TypeParam::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            TypeParam::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            TypeParam::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
+            TypeParam::ListType { param } => {
                 let item_type = self.export_type_param(param, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            TypeParam::Tuple { params } => {
+            TypeParam::TupleType { params } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     params
                         .iter()

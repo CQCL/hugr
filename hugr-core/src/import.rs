@@ -1208,19 +1208,19 @@ impl<'a> Context<'a> {
     ) -> Result<TypeParam, ImportError> {
         (|| {
             if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(TypeParam::String);
+                return Ok(TypeParam::StringType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Ok(TypeParam::max_nat());
+                return Ok(TypeParam::max_nat_type());
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(TypeParam::Bytes);
+                return Ok(TypeParam::BytesType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(TypeParam::Float);
+                return Ok(TypeParam::FloatType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
@@ -1252,7 +1252,7 @@ impl<'a> Context<'a> {
                     self.import_type_param(item_type, TypeBound::Any)
                         .map_err(|err| error_context!(err, "item type of list type"))?,
                 );
-                return Ok(TypeParam::List { param });
+                return Ok(TypeParam::ListType { param });
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
@@ -1265,7 +1265,7 @@ impl<'a> Context<'a> {
                         .collect::<Result<_, _>>()
                 })()
                 .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::Tuple { params });
+                return Ok(TypeParam::TupleType { params });
             }
 
             match self.get_term(term_id)? {

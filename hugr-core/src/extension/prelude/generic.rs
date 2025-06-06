@@ -74,7 +74,7 @@ impl MakeOpDef for LoadNatDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let usize_t: Type = usize_custom_t(_extension_ref).into();
-        let params = vec![TypeParam::max_nat()];
+        let params = vec![TypeParam::max_nat_type()];
         PolyFuncTypeRV::new(params, FuncValueType::new(type_row![], vec![usize_t])).into()
     }
 
