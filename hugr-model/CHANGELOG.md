@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.1...hugr-model-v0.21.0) - 2025-06-06
+
+### New Features
+
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.0...hugr-model-v0.20.0) - 2025-05-14
 
 ### New Features
