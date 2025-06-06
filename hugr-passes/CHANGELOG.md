@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.21.0) - 2025-06-06
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0...hugr-passes-v0.20.1) - 2025-06-03
 
 ### Bug Fixes

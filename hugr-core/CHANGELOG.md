@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.1...hugr-core-v0.21.0) - 2025-06-06
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- Add serial data types for SimpleReplacement and PersistentHugr ([#2300](https://github.com/CQCL/hugr/pull/2300))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.0...hugr-core-v0.20.1) - 2025-06-03
 
 ### Bug Fixes
