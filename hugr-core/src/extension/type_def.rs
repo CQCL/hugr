@@ -251,7 +251,7 @@ mod test {
         let def = TypeDef {
             name: "MyType".into(),
             params: vec![TypeParam::RuntimeType {
-                b: TypeBound::Copyable,
+                bound: TypeBound::Copyable,
             }],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.

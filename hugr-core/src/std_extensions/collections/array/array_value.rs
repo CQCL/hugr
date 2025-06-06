@@ -94,7 +94,7 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }]
+            [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }]
                 if *n as usize == self.values.len() =>
             {
                 ty

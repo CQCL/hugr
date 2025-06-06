@@ -158,7 +158,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayClone<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
-            TypeArg::BoundedNat { n: self.size },
+            TypeArg::BoundedNat { value: self.size },
             self.elem_ty.clone().into(),
         ]
     }
@@ -183,7 +183,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayCloneDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] if ty.copyable() => {
+            [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }] if ty.copyable() => {
                 Ok(GenericArrayClone::new(ty.clone(), *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

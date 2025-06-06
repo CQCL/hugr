@@ -380,7 +380,7 @@ fn invalid_types() {
         "MyContainer",
         vec![
             TypeArg::Type { ty: usize_t() },
-            TypeArg::BoundedNat { n: 3 },
+            TypeArg::BoundedNat { value: 3 },
         ],
         EXT_ID,
         TypeBound::Any,
@@ -459,7 +459,7 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
     const BOUND: TypeParam = TypeParam::RuntimeType {
-        b: TypeBound::Copyable,
+        bound: TypeBound::Copyable,
     };
     let list_of_var = Type::new_extension(
         list::EXTENSION

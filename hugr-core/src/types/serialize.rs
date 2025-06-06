@@ -123,7 +123,7 @@ pub(super) enum TermSer {
 impl From<Term> for TermSer {
     fn from(value: Term) -> Self {
         match value {
-            Term::RuntimeType { b } => TermSer::TypeParam(TypeParamSer::Type { b }),
+            Term::RuntimeType { bound: b } => TermSer::TypeParam(TypeParamSer::Type { b }),
             Term::StaticType => TermSer::TypeParam(TypeParamSer::StaticType),
             Term::BoundedNatType { bound } => {
                 TermSer::TypeParam(TypeParamSer::BoundedNat { bound })
@@ -131,13 +131,15 @@ impl From<Term> for TermSer {
             Term::StringType => TermSer::TypeParam(TypeParamSer::String),
             Term::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
             Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
-            Term::ListType { param } => TermSer::TypeParam(TypeParamSer::List {
-                param: Box::new(*param),
+            Term::ListType { item_type } => TermSer::TypeParam(TypeParamSer::List {
+                param: Box::new(*item_type),
             }),
-            Term::TupleType { params } => TermSer::TypeParam(TypeParamSer::Tuple { params }),
+            Term::TupleType { item_types: params } => {
+                TermSer::TypeParam(TypeParamSer::Tuple { params })
+            }
             Term::Type { ty } => TermSer::TypeArg(TypeArgSer::Type { ty }),
-            Term::BoundedNat { n } => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
-            Term::String { arg } => TermSer::TypeArg(TypeArgSer::String { arg }),
+            Term::BoundedNat { value: n } => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
+            Term::String { value: arg } => TermSer::TypeArg(TypeArgSer::String { arg }),
             Term::Bytes { value } => TermSer::TypeArg(TypeArgSer::Bytes { value }),
             Term::Float { value } => TermSer::TypeArg(TypeArgSer::Float { value }),
             Term::List { elems } => TermSer::TypeArg(TypeArgSer::List { elems }),
@@ -151,19 +153,19 @@ impl From<TermSer> for Term {
     fn from(value: TermSer) -> Self {
         match value {
             TermSer::TypeParam(param) => match param {
-                TypeParamSer::Type { b } => Term::RuntimeType { b },
+                TypeParamSer::Type { b } => Term::RuntimeType { bound: b },
                 TypeParamSer::StaticType => Term::StaticType,
                 TypeParamSer::BoundedNat { bound } => Term::BoundedNatType { bound },
                 TypeParamSer::String => Term::StringType,
                 TypeParamSer::Bytes => Term::BytesType,
                 TypeParamSer::Float => Term::FloatType,
-                TypeParamSer::List { param } => Term::ListType { param },
-                TypeParamSer::Tuple { params } => Term::TupleType { params },
+                TypeParamSer::List { param: item_type } => Term::ListType { item_type },
+                TypeParamSer::Tuple { params } => Term::TupleType { item_types: params },
             },
             TermSer::TypeArg(arg) => match arg {
                 TypeArgSer::Type { ty } => Term::Type { ty },
-                TypeArgSer::BoundedNat { n } => Term::BoundedNat { n },
-                TypeArgSer::String { arg } => Term::String { arg },
+                TypeArgSer::BoundedNat { n } => Term::BoundedNat { value: n },
+                TypeArgSer::String { arg } => Term::String { value: arg },
                 TypeArgSer::Bytes { value } => Term::Bytes { value },
                 TypeArgSer::Float { value } => Term::Float { value },
                 TypeArgSer::List { elems } => Term::List { elems },

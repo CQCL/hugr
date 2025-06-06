@@ -393,7 +393,7 @@ mod test {
 
         assert_eq!(o.instantiate(&[]), Ok(o.clone()));
         assert_eq!(
-            o.instantiate(&[TypeArg::BoundedNat { n: 1 }]),
+            o.instantiate(&[TypeArg::BoundedNat { value: 1 }]),
             Err(OpLoadError::InvalidArgs(SignatureError::InvalidTypeArgs))
         );
     }

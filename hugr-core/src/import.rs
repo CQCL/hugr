@@ -1228,7 +1228,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeType { b: bound });
+                return Ok(TypeParam::RuntimeType { bound });
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1246,24 +1246,24 @@ impl<'a> Context<'a> {
             if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // type of a list must be copyable. Therefore we import it as `Any`.
-                let param = Box::new(
+                let item_type = Box::new(
                     self.import_term(item_type)
                         .map_err(|err| error_context!(err, "item type of list type"))?,
                 );
-                return Ok(TypeParam::ListType { param });
+                return Ok(TypeParam::ListType { item_type });
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // types of a tuple must be copyable. Therefore we import it as `Any`.
-                let params = (|| {
+                let item_types = (|| {
                     self.import_closed_list(item_types)?
                         .into_iter()
                         .map(|param| self.import_term(param))
                         .collect::<Result<_, _>>()
                 })()
                 .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::TupleType { params });
+                return Ok(TypeParam::TupleType { item_types });
             }
 
             match self.get_term(term_id)? {
@@ -1303,11 +1303,11 @@ impl<'a> Context<'a> {
                 }
 
                 table::Term::Literal(model::Literal::Str(value)) => Ok(TypeArg::String {
-                    arg: value.to_string(),
+                    value: value.to_string(),
                 }),
 
                 table::Term::Literal(model::Literal::Nat(value)) => {
-                    Ok(TypeArg::BoundedNat { n: *value })
+                    Ok(TypeArg::BoundedNat { value: *value })
                 }
 
                 table::Term::Literal(model::Literal::Bytes(value)) => Ok(TypeArg::Bytes {

@@ -389,7 +389,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
         move |context, args| {
             let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;
             let v = match load_nat.get_nat() {
-                TypeArg::BoundedNat { n } => pcg
+                TypeArg::BoundedNat { value: n } => pcg
                     .usize_type(&context.typing_session())
                     .const_int(n, false),
                 arg => bail!("Unexpected type arg for LoadNat: {}", arg),
@@ -635,7 +635,7 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
-                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { n: 42 }), vec![])
+                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { value: 42 }), vec![])
                     .unwrap()
                     .out_wire(0);
                 builder.finish_hugr_with_outputs([v]).unwrap()
