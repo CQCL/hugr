@@ -363,4 +363,33 @@ pub(crate) mod test {
         );
         hugr
     }
+
+    /// A DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
+    /// to a FuncDefn and a FuncDecl each bool_t->bool_t, and their handles.
+    pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
+        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+        let new_defn = {
+            let mut mb = dfb.module_root_builder();
+            let fb = mb
+                .define_function("helper_id", Signature::new_endo(bool_t()))
+                .unwrap();
+            let [f_inp] = fb.input_wires_arr();
+            fb.finish_with_outputs([f_inp]).unwrap()
+        };
+        let new_decl = dfb
+            .module_root_builder()
+            .declare("helper2", Signature::new_endo(bool_t()).into())
+            .unwrap();
+        let cst = dfb.add_load_value(ops::Value::true_val());
+        let [c1] = dfb
+            .call(new_defn.handle(), &[], [cst])
+            .unwrap()
+            .outputs_arr();
+        let [c2] = dfb.call(&new_decl, &[], [c1]).unwrap().outputs_arr();
+        (
+            dfb.finish_hugr_with_outputs([c2]).unwrap(),
+            *new_defn.handle(),
+            new_decl,
+        )
+    }
 }

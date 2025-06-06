@@ -784,12 +784,11 @@ fn insert_hugr_nodes<H: HugrView>(
 mod test {
     use itertools::Itertools;
 
-    use crate::builder::test::simple_dfg_hugr;
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
+    use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::extension::PRELUDE;
-    use crate::extension::prelude::{Noop, bool_t, usize_t};
+    use crate::extension::prelude::{Noop, usize_t};
     use crate::hugr::ValidationError;
-    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::handle::NodeHandle;
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
     use crate::types::Signature;
 
@@ -872,37 +871,10 @@ mod test {
     }
 
     // Tests of insert_{hugr,from_view}(_with_defns) ====================================
-    fn inserted_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
-        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
-        let new_defn = {
-            let mut mb = dfb.module_root_builder();
-            let fb = mb
-                .define_function("helper_id", Signature::new_endo(bool_t()))
-                .unwrap();
-            let [f_inp] = fb.input_wires_arr();
-            fb.finish_with_outputs([f_inp]).unwrap()
-        };
-        let new_decl = dfb
-            .module_root_builder()
-            .declare("helper2", Signature::new_endo(bool_t()).into())
-            .unwrap();
-        let cst = dfb.add_load_value(ops::Value::true_val());
-        let [c1] = dfb
-            .call(new_defn.handle(), &[], [cst])
-            .unwrap()
-            .outputs_arr();
-        let [c2] = dfb.call(&new_decl, &[], [c1]).unwrap().outputs_arr();
-        (
-            dfb.finish_hugr_with_outputs([c2]).unwrap(),
-            *new_defn.handle(),
-            new_decl,
-        )
-    }
-
     #[test]
     fn test_insert_with_defns_add() {
         let mut h = simple_dfg_hugr();
-        let (insert, _, _) = inserted_defn_decl();
+        let (insert, _, _) = dfg_calling_defn_decl();
 
         // Defaults
         h.insert_from_view(h.entrypoint(), &insert);
@@ -914,7 +886,7 @@ mod test {
 
         // Specify which decls to transfer
         for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
-            let (insert, defn, decl) = inserted_defn_decl();
+            let (insert, defn, decl) = dfg_calling_defn_decl();
             let mod_children = HashMap::from_iter(
                 call1
                     .then_some((defn.node(), InsertDefnMode::Add))
@@ -972,7 +944,7 @@ mod test {
 
     #[test]
     fn insert_with_defns_replace() {
-        let (insert, defn, decl) = inserted_defn_decl();
+        let (insert, defn, decl) = dfg_calling_defn_decl();
         let mut chmap = HashMap::from([defn.node(), decl.node()].map(|n| (n, InsertDefnMode::Add)));
         let (h, res) = {
             let mut h = simple_dfg_hugr();
@@ -1025,7 +997,7 @@ mod test {
         let backup = simple_dfg_hugr();
         let mut h = backup.clone();
 
-        let (insert, defn, decl) = inserted_defn_decl();
+        let (insert, defn, decl) = dfg_calling_defn_decl();
         let (defn, decl) = (defn.node(), decl.node());
 
         let epp = insert.get_parent(insert.entrypoint()).unwrap();
