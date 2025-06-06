@@ -493,7 +493,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list(TypeBound::Any);
+    let rowp = TypeParam::new_list_type(TypeBound::Any);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
@@ -563,7 +563,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list(TypeBound::Any)],
+            [TypeParam::new_list_type(TypeBound::Any)],
             Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;
