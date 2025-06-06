@@ -1204,17 +1204,11 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_BYTES_TYPE
-                ));
+                return Ok(TypeParam::Bytes);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_FLOAT_TYPE
-                ));
+                return Ok(TypeParam::Float);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
