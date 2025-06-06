@@ -61,7 +61,10 @@ pub type TypeParam = Term;
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
-#[serde(tag = "t")]
+#[serde(
+    from = "crate::types::serialize::TermSer",
+    into = "crate::types::serialize::TermSer"
+)]
 pub enum Term {
     /// The type of runtime types.
     #[display("Type{}", match b {
@@ -124,7 +127,6 @@ pub enum Term {
     #[display("bytes")]
     Bytes {
         /// The value of the literal.
-        #[serde(with = "base64")]
         value: Arc<[u8]>,
     },
     /// A 64-bit floating point number. Instance of [`Term::FloatType`].
@@ -556,29 +558,6 @@ pub enum TypeArgError {
     /// Invalid value
     #[error("Invalid value of type argument")]
     InvalidValue(TypeArg),
-}
-
-/// Helper for to serialize and deserialize the byte string in `TypeArg::Bytes` via base64.
-mod base64 {
-    use std::sync::Arc;
-
-    use base64::Engine as _;
-    use base64::prelude::BASE64_STANDARD;
-    use serde::{Deserialize, Serialize};
-    use serde::{Deserializer, Serializer};
-
-    pub fn serialize<S: Serializer>(v: &Arc<[u8]>, s: S) -> Result<S::Ok, S::Error> {
-        let base64 = BASE64_STANDARD.encode(v);
-        base64.serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<[u8]>, D::Error> {
-        let base64 = String::deserialize(d)?;
-        BASE64_STANDARD
-            .decode(base64.as_bytes())
-            .map(|v| v.into())
-            .map_err(serde::de::Error::custom)
-    }
 }
 
 #[cfg(test)]
