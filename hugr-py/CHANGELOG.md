@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.2...hugr-py-v0.13.0) (2025-06-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* Added `TypeParam`s and `TypeArg`s corresponding to floats and bytes.
+* `TypeArg::Sequence` needs to be replaced with
+* FuncDefns must be moved to beneath Module. `Container::define_function` is gone, use `HugrBuilder::module_root_builder`; similarly in hugr-py `DefinitionBuilder` (`define_function` -> `module_root_builder().define_function`). In hugr-llvm, some uses of
+
+### Features
+
+* Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/issues/2289)) ([e9c5e91](https://github.com/CQCL/hugr/commit/e9c5e914d4fd9ee270dee8e43875d8a413b02926))
+* No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/issues/2256)) ([214b8df](https://github.com/CQCL/hugr/commit/214b8df837537b8ac15c3b60845350c3818a6ac7))
+* Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/issues/2140)) ([cc4997f](https://github.com/CQCL/hugr/commit/cc4997f12dad4dfecc37be564712cae18dfce159))
+
 ## [0.12.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.1...hugr-py-v0.12.2) (2025-06-03)
 
 
