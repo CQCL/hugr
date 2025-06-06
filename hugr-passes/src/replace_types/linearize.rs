@@ -404,7 +404,7 @@ mod test {
             arg_values: &[TypeArg],
             _def: &'o OpDef,
         ) -> Result<PolyFuncTypeRV, SignatureError> {
-            let [TypeArg::BoundedNat { n }] = arg_values else {
+            let [TypeArg::BoundedNat { value: n }] = arg_values else {
                 panic!()
             };
             let outs = vec![self.0.clone(); *n as usize];

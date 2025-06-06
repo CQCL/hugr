@@ -148,7 +148,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
-            TypeArg::BoundedNat { n: self.size },
+            TypeArg::BoundedNat { value: self.size },
             self.elem_ty.clone().into(),
         ]
     }
@@ -173,7 +173,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
+            [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }] => {
                 Ok(GenericArrayRepeat::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

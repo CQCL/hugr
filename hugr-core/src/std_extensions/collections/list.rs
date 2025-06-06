@@ -167,7 +167,9 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::RuntimeType { b: TypeBound::Any };
+    const TP: TypeParam = TypeParam::RuntimeType {
+        bound: TypeBound::Any,
+    };
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -419,7 +421,7 @@ mod test {
 
         assert!(
             list_def
-                .instantiate([TypeArg::BoundedNat { n: 3 }])
+                .instantiate([TypeArg::BoundedNat { value: 3 }])
                 .is_err()
         );
 

@@ -185,7 +185,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
-            TypeArg::BoundedNat { n: self.size },
+            TypeArg::BoundedNat { value: self.size },
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
             TypeArg::List {
@@ -215,7 +215,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
             [
-                TypeArg::BoundedNat { n },
+                TypeArg::BoundedNat { value: n },
                 TypeArg::Type { ty: src_ty },
                 TypeArg::Type { ty: tgt_ty },
                 TypeArg::List { elems: acc_tys },
