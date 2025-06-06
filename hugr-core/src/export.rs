@@ -385,7 +385,7 @@ impl<'a> Context<'a> {
                 let node = self.connected_function(node).unwrap();
                 let symbol = self.node_to_id[&node];
                 let mut args = BumpVec::new_in(self.bump);
-                args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
+                args.extend(call.type_args.iter().map(|arg| self.export_term(arg, None)));
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
 
@@ -401,7 +401,7 @@ impl<'a> Context<'a> {
                 let node = self.connected_function(node).unwrap();
                 let symbol = self.node_to_id[&node];
                 let mut args = BumpVec::new_in(self.bump);
-                args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
+                args.extend(load.type_args.iter().map(|arg| self.export_term(arg, None)));
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
                 let runtime_type = self.make_term(table::Term::Wildcard);
@@ -464,7 +464,7 @@ impl<'a> Context<'a> {
                 let node = self.export_opdef(op.def());
                 let params = self
                     .bump
-                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
+                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_term(arg, None)));
                 let operation = self.make_term(table::Term::Apply(node, params));
                 table::Operation::Custom(operation)
             }
@@ -473,7 +473,7 @@ impl<'a> Context<'a> {
                 let node = self.make_named_global_ref(op.extension(), op.unqualified_id());
                 let params = self
                     .bump
-                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
+                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_term(arg, None)));
                 let operation = self.make_term(table::Term::Apply(node, params));
                 table::Operation::Custom(operation)
             }
@@ -806,7 +806,7 @@ impl<'a> Context<'a> {
 
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param, Some((scope, i as _)));
+            let r#type = self.export_term(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
             params.push(param);
         }
@@ -854,37 +854,9 @@ impl<'a> Context<'a> {
 
         let args = self
             .bump
-            .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
+            .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_term(p, None)));
         let term = table::Term::Apply(symbol, args);
         self.make_term(term)
-    }
-
-    pub fn export_type_arg(&mut self, t: &TypeArg) -> table::TermId {
-        match t {
-            TypeArg::Type { ty } => self.export_type(ty),
-            TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
-            TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
-            TypeArg::Float { value } => self.make_term(model::Literal::Float(*value).into()),
-            TypeArg::Bytes { value } => self.make_term(model::Literal::Bytes(value.clone()).into()),
-            TypeArg::List { elems } => {
-                // For now we assume that the sequence is meant to be a list.
-                let parts = self.bump.alloc_slice_fill_iter(
-                    elems
-                        .iter()
-                        .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
-                );
-                self.make_term(table::Term::List(parts))
-            }
-            TypeArg::Tuple { elems } => {
-                let parts = self.bump.alloc_slice_fill_iter(
-                    elems
-                        .iter()
-                        .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
-                );
-                self.make_term(table::Term::Tuple(parts))
-            }
-            TypeArg::Variable { v } => self.export_type_arg_var(v),
-        }
     }
 
     pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> table::TermId {
@@ -959,13 +931,13 @@ impl<'a> Context<'a> {
     /// type of a parameter to a polymorphic definition. In that case we can
     /// generate a `nonlinear` constraint for the type of runtime types marked as
     /// `TypeBound::Copyable`.
-    pub fn export_type_param(
+    pub fn export_term(
         &mut self,
         t: &TypeParam,
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
         match t {
-            TypeParam::Type { b } => {
+            TypeParam::RuntimeType { b } => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);
@@ -980,18 +952,41 @@ impl<'a> Context<'a> {
             TypeParam::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
             TypeParam::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
             TypeParam::ListType { param } => {
-                let item_type = self.export_type_param(param, None);
+                let item_type = self.export_term(param, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
             TypeParam::TupleType { params } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     params
                         .iter()
-                        .map(|param| table::SeqPart::Item(self.export_type_param(param, None))),
+                        .map(|param| table::SeqPart::Item(self.export_term(param, None))),
                 );
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
+            TypeArg::Type { ty } => self.export_type(ty),
+            TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
+            TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
+            TypeArg::Float { value } => self.make_term(model::Literal::Float(*value).into()),
+            TypeArg::Bytes { value } => self.make_term(model::Literal::Bytes(value.clone()).into()),
+            TypeArg::List { elems } => {
+                // For now we assume that the sequence is meant to be a list.
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::List(parts))
+            }
+            TypeArg::Tuple { elems } => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::Tuple(parts))
+            }
+            TypeArg::Variable { v } => self.export_type_arg_var(v),
         }
     }
 

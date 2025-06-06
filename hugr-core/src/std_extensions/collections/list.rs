@@ -167,7 +167,7 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    const TP: TypeParam = TypeParam::RuntimeType { b: TypeBound::Any };
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
