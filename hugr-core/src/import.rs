@@ -1027,29 +1027,12 @@ impl<'a> Context<'a> {
             return Ok(TypeParam::max_nat());
         }
 
-        if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeParam`",
-                model::CORE_BYTES_TYPE
-            ));
-        }
-
-        if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeParam`",
-                model::CORE_FLOAT_TYPE
-            ));
-        }
-
         if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
             return Ok(TypeParam::Type { b: bound });
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeParam`",
-                model::CORE_STATIC
-            ));
+            return Ok(TypeParam::Static);
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1102,35 +1085,23 @@ impl<'a> Context<'a> {
     /// Import a `TypeArg` from a term that represents a static type or value.
     fn import_type_arg(&mut self, term_id: table::TermId) -> Result<TypeArg, ImportError> {
         if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeArg`",
-                model::CORE_STR_TYPE
-            ));
+            return Ok(TypeParam::String.into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeArg`",
-                model::CORE_NAT_TYPE
-            ));
+            return Ok(TypeParam::max_nat().into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeArg`",
-                model::CORE_BYTES_TYPE
-            ));
+            return Ok(TypeParam::Bytes.into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeArg`",
-                model::CORE_FLOAT_TYPE
-            ));
+            return Ok(TypeParam::Float.into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_TYPE));
+            return Ok(TypeParam::Type { b: TypeBound::Any }.into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1141,7 +1112,7 @@ impl<'a> Context<'a> {
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-            return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_STATIC));
+            return Ok(TypeParam::Static.into());
         }
 
         if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
@@ -1155,11 +1126,9 @@ impl<'a> Context<'a> {
             return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_CONST));
         }
 
-        if let Some([]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
-            return Err(error_unsupported!(
-                "`{}` as `TypeArg`",
-                model::CORE_LIST_TYPE
-            ));
+        if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
+            let param = Box::new(self.import_type_param(item_type, TypeBound::Any)?);
+            return Ok(TypeParam::List { param }.into());
         }
 
         match self.get_term(term_id)? {

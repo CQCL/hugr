@@ -883,6 +883,7 @@ impl<'a> Context<'a> {
                 self.make_term(table::Term::Tuple(parts))
             }
             TypeArg::Variable { v } => self.export_type_arg_var(v),
+            TypeArg::Param { param } => self.export_type_param(param, None),
         }
     }
 
@@ -991,6 +992,7 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
+            TypeParam::Static => self.make_term_apply(model::CORE_STATIC, &[]),
         }
     }
 

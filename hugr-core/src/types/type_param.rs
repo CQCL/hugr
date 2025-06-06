@@ -98,6 +98,8 @@ pub enum TypeParam {
         /// The [`TypeParam`]s contained in the tuple.
         params: Vec<TypeParam>,
     },
+    /// The type of static types.
+    Static,
 }
 
 impl TypeParam {
@@ -131,6 +133,9 @@ impl TypeParam {
                 b1.contains(b2)
             }
             (TypeParam::String, TypeParam::String) => true,
+            (TypeParam::Float, TypeParam::Float) => true,
+            (TypeParam::Bytes, TypeParam::Bytes) => true,
+            (TypeParam::Static, TypeParam::Static) => true,
             (TypeParam::List { param: e1 }, TypeParam::List { param: e2 }) => e1.contains(e2),
             (TypeParam::Tuple { params: es1 }, TypeParam::Tuple { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
@@ -217,6 +222,11 @@ pub enum TypeArg {
         #[serde(flatten)]
         v: TypeArgVariable,
     },
+    /// A static type passed as a parameter.
+    Param {
+        /// The static type.
+        param: Box<TypeParam>,
+    },
 }
 
 impl<RV: MaybeRV> From<TypeBase<RV>> for TypeArg {
@@ -251,6 +261,14 @@ impl From<&str> for TypeArg {
 impl From<Vec<TypeArg>> for TypeArg {
     fn from(elems: Vec<TypeArg>) -> Self {
         Self::List { elems }
+    }
+}
+
+impl From<TypeParam> for TypeArg {
+    fn from(param: TypeParam) -> Self {
+        Self::Param {
+            param: Box::new(param),
+        }
     }
 }
 
@@ -339,6 +357,10 @@ impl TypeArg {
 
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
+            TypeArg::Param { .. } => {
+                // TODO: Is there a validate method for this?
+                Ok(())
+            }
         }
     }
 
@@ -384,6 +406,10 @@ impl TypeArg {
             TypeArg::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
+            TypeArg::Param { .. } => {
+                // TODO: There needs to be a substitute method on `TypeParam`s.
+                todo!()
+            }
         }
     }
 }
@@ -399,6 +425,10 @@ impl Transformable for TypeArg {
             | TypeArg::Variable { .. }
             | TypeArg::Float { .. }
             | TypeArg::Bytes { .. } => Ok(false),
+            TypeArg::Param { param } => {
+                // TODO: There needs to a be transform method on `TypeParam`s.
+                todo!()
+            }
         }
     }
 }
