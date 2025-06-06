@@ -766,15 +766,15 @@ mod test {
 
         use proptest::prelude::*;
 
-        use super::super::{TypeArg, TypeArgVariable, TypeParam, UpperBound};
+        use super::super::{TypeArgVariable, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{Type, TypeBound};
+        use crate::types::{Term, Type, TypeBound};
 
         impl Arbitrary for TypeArgVariable {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                (any::<usize>(), any_with::<TypeParam>(depth))
+                (any::<usize>(), any_with::<Term>(depth))
                     .prop_map(|(idx, cached_decl)| Self {
                         idx,
                         cached_decl: Box::new(cached_decl),
@@ -783,7 +783,7 @@ mod test {
             }
         }
 
-        impl Arbitrary for TypeParam {
+        impl Arbitrary for Term {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
