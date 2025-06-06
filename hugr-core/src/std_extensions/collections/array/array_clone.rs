@@ -51,8 +51,8 @@ impl<AK: ArrayKind> FromStr for GenericArrayCloneDef<AK> {
 impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
-        let size = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let element_ty = Type::new_var_use(1, TypeBound::Copyable);
         let array_ty = AK::instantiate_ty(array_def, size, element_ty)
             .expect("Array type instantiation failed");

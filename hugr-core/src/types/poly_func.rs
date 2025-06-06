@@ -217,9 +217,9 @@ pub(crate) mod test {
 
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
-        let size_var = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let ty_var = TypeArg::new_var_use(1, TypeBound::Any.into());
-        let type_params = [TypeParam::max_nat(), TypeBound::Any.into()];
+        let type_params = [TypeParam::max_nat_type(), TypeBound::Any.into()];
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
@@ -277,12 +277,12 @@ pub(crate) mod test {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
-            TypeParam::List {
-                param: Box::new(TypeParam::max_nat()),
+            TypeParam::ListType {
+                param: Box::new(TypeParam::max_nat_type()),
             },
-            TypeParam::String,
-            TypeParam::Tuple {
-                params: vec![TypeBound::Any.into(), TypeParam::max_nat()],
+            TypeParam::StringType,
+            TypeParam::TupleType {
+                params: vec![TypeBound::Any.into(), TypeParam::max_nat_type()],
             },
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
@@ -366,7 +366,7 @@ pub(crate) mod test {
             &[TypeBound::Any.into()],
         )?;
 
-        let list_of_tys = |b: TypeBound| TypeParam::List {
+        let list_of_tys = |b: TypeBound| TypeParam::ListType {
             param: Box::new(b.into()),
         };
         decl_accepts_rejects_var(
@@ -376,14 +376,14 @@ pub(crate) mod test {
         )?;
 
         decl_accepts_rejects_var(
-            TypeParam::max_nat(),
-            &[TypeParam::bounded_nat(NonZeroU64::new(5).unwrap())],
+            TypeParam::max_nat_type(),
+            &[TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap())],
             &[],
         )?;
         decl_accepts_rejects_var(
-            TypeParam::bounded_nat(NonZeroU64::new(10).unwrap()),
-            &[TypeParam::bounded_nat(NonZeroU64::new(5).unwrap())],
-            &[TypeParam::max_nat()],
+            TypeParam::bounded_nat_type(NonZeroU64::new(10).unwrap()),
+            &[TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap())],
+            &[TypeParam::max_nat_type()],
         )?;
         Ok(())
     }
@@ -392,7 +392,7 @@ pub(crate) mod test {
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
-        let decl = TypeParam::List {
+        let decl = TypeParam::ListType {
             param: Box::new(TP_ANY),
         };
         let e = PolyFuncTypeBase::new_validated(
@@ -405,7 +405,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(actual, decl);
-            assert_eq!(cached, TypeParam::List {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
+            assert_eq!(cached, TypeParam::ListType {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -423,7 +423,7 @@ pub(crate) mod test {
     fn row_variables() {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncTypeBase::new_validated(
-            [TypeParam::new_list(TP_ANY)],
+            [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(
                 vec![usize_t().into(), rty.clone()],
                 vec![TypeRV::new_tuple(rty)],
@@ -458,7 +458,7 @@ pub(crate) mod test {
             TypeBound::Copyable,
         )));
         let pf = PolyFuncTypeBase::new_validated(
-            [TypeParam::List {
+            [TypeParam::ListType {
                 param: Box::new(TypeParam::Type {
                     b: TypeBound::Copyable,
                 }),

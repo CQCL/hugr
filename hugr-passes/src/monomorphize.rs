@@ -410,7 +410,7 @@ mod test {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
         let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
-        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
+        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
         let sa = |n| TypeArg::BoundedNat { n };
         let n: u64 = 5;
         let mut outer = FunctionBuilder::new(
@@ -440,7 +440,7 @@ mod test {
 
         let pf2 = {
             let pf2t = PolyFuncType::new(
-                [TypeParam::max_nat(), TypeBound::Copyable.into()],
+                [TypeParam::max_nat_type(), TypeBound::Copyable.into()],
                 Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
             );
             let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
@@ -457,7 +457,7 @@ mod test {
         };
 
         let pf1t = PolyFuncType::new(
-            [TypeParam::max_nat()],
+            [TypeParam::max_nat_type()],
             Signature::new(
                 ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
                 usize_t(),
@@ -596,7 +596,7 @@ mod test {
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
     #[case::sequence(vec![TypeArg::Tuple { elems: vec![0.into(), Type::UNIT.into()] }], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
-    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringType)],
                             "$foo$$v(1)")]
     #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
     fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {

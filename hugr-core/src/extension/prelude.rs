@@ -101,7 +101,7 @@ lazy_static! {
                     PANIC_OP_ID,
                     "Panic with input error".to_string(),
                     PolyFuncTypeRV::new(
-                        [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                        [TypeParam::new_list_type(TypeBound::Any), TypeParam::new_list_type(TypeBound::Any)],
                         FuncValueType::new(
                             vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Any)],
                             vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
@@ -115,7 +115,7 @@ lazy_static! {
                 EXIT_OP_ID,
                 "Exit with input error".to_string(),
                 PolyFuncTypeRV::new(
-                    [TypeParam::new_list(TypeBound::Any), TypeParam::new_list(TypeBound::Any)],
+                    [TypeParam::new_list_type(TypeBound::Any), TypeParam::new_list_type(TypeBound::Any)],
                     FuncValueType::new(
                         vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
                         vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
@@ -615,7 +615,7 @@ impl MakeOpDef for TupleOpDef {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
         let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
 
-        let param = TypeParam::new_list(TypeBound::Any);
+        let param = TypeParam::new_list_type(TypeBound::Any);
         match self {
             TupleOpDef::MakeTuple => {
                 PolyFuncTypeRV::new([param], FuncValueType::new(rv, tuple_type))
@@ -910,7 +910,7 @@ impl MakeOpDef for BarrierDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::new_list(TypeBound::Any)],
+            vec![TypeParam::new_list_type(TypeBound::Any)],
             FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any)),
         )
         .into()
