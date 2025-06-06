@@ -15,9 +15,7 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeBound, TypeEnum,
-        type_param::{TypeArgVariable, TypeParam},
-        type_row::TypeRowBase,
+        TypeBase, TypeBound, TypeEnum, type_param::TypeArgVariable, type_row::TypeRowBase,
     },
 };
 

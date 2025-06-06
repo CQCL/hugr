@@ -208,6 +208,10 @@ impl Term {
             (Term::Bytes { value: v1 }, Term::Bytes { value: v2 }) => v1 == v2,
             (Term::Float { value: f1 }, Term::Float { value: f2 }) => f1 == f2,
             (Term::Variable { v: v1 }, Term::Variable { v: v2 }) => v1 == v2,
+            (Term::List { elems: e1 }, Term::List { elems: e2 }) if e1 == e2 => true,
+            (Term::List { elems }, other) => elems.iter().any(|elem| elem.contains(other)),
+            (Term::Tuple { elems: e1 }, Term::Tuple { elems: e2 }) if e1 == e2 => true,
+            (Term::Tuple { elems }, other) => elems.iter().any(|elem| elem.contains(other)),
             _ => false,
         }
     }
