@@ -1029,8 +1029,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: qb_t().into()
+                type_: TypeBound::Copyable.into(),
+                term: qb_t().into()
             }))
         );
 
@@ -1043,8 +1043,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: mk_opt(qb_t()).into()
+                type_: TypeBound::Copyable.into(),
+                term: mk_opt(qb_t()).into()
             }))
         );
 

@@ -808,8 +808,8 @@ pub(super) mod test {
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
-                        param: TypeBound::Any.into(),
-                        arg
+                        type_: TypeBound::Any.into(),
+                        term: arg,
                     }
                 ))
             );

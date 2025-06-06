@@ -1,6 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
+use crate::types::type_param::Term;
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -925,19 +926,19 @@ impl<'a> Context<'a> {
         self.make_term(table::Term::List(parts))
     }
 
-    /// Exports a `TypeParam` to a term.
+    /// Exports a term.
     ///
-    /// The `var` argument is set when the type parameter being exported is the
+    /// The `var` argument is set when the term being exported is the
     /// type of a parameter to a polymorphic definition. In that case we can
     /// generate a `nonlinear` constraint for the type of runtime types marked as
     /// `TypeBound::Copyable`.
     pub fn export_term(
         &mut self,
-        t: &TypeParam,
+        t: &Term,
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
         match t {
-            TypeParam::RuntimeType { b } => {
+            Term::RuntimeType { b } => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);
@@ -946,16 +947,15 @@ impl<'a> Context<'a> {
 
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
-            // This ignores the bound on the natural for now.
-            TypeParam::BoundedNatType { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
-            TypeParam::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
-            TypeParam::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
-            TypeParam::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
-            TypeParam::ListType { param } => {
+            Term::BoundedNatType { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            Term::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            Term::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            Term::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
+            Term::ListType { param } => {
                 let item_type = self.export_term(param, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            TypeParam::TupleType { params } => {
+            Term::TupleType { params } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     params
                         .iter()
@@ -964,12 +964,12 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(parts));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            TypeArg::Type { ty } => self.export_type(ty),
-            TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
-            TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
-            TypeArg::Float { value } => self.make_term(model::Literal::Float(*value).into()),
-            TypeArg::Bytes { value } => self.make_term(model::Literal::Bytes(value.clone()).into()),
-            TypeArg::List { elems } => {
+            Term::Type { ty } => self.export_type(ty),
+            Term::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
+            Term::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
+            Term::Float { value } => self.make_term(model::Literal::Float(*value).into()),
+            Term::Bytes { value } => self.make_term(model::Literal::Bytes(value.clone()).into()),
+            Term::List { elems } => {
                 // For now we assume that the sequence is meant to be a list.
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
@@ -978,7 +978,7 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            TypeArg::Tuple { elems } => {
+            Term::Tuple { elems } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
@@ -986,7 +986,8 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::Tuple(parts))
             }
-            TypeArg::Variable { v } => self.export_type_arg_var(v),
+            Term::Variable { v } => self.export_type_arg_var(v),
+            Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
         }
     }
 

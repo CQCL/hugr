@@ -338,8 +338,8 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
-            param: TypeBound::Copyable.into(),
-            arg: TypeArg::Type { ty: valid }
+            type_: TypeBound::Copyable.into(),
+            term: TypeArg::Type { ty: valid }
         })
     );
 
