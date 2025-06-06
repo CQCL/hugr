@@ -1239,6 +1239,7 @@ dependencies = [
 name = "hugr-core"
 version = "0.20.1"
 dependencies = [
+ "base64",
  "cgmath",
  "cool_asserts",
  "delegate",
@@ -1254,6 +1255,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema",
  "lazy_static",
+ "ordered-float",
  "paste",
  "petgraph 0.8.1",
  "portgraph",
@@ -1988,6 +1990,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
 dependencies = [
  "num-traits",
+ "rand",
+ "serde",
 ]
 
 [[package]]
@@ -2388,6 +2392,7 @@ dependencies = [
  "libc",
  "rand_chacha",
  "rand_core",
+ "serde",
 ]
 
 [[package]]
@@ -2407,6 +2412,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
+ "serde",
 ]
 
 [[package]]

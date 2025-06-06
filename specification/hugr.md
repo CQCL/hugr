@@ -824,6 +824,9 @@ such declarations may include (bind) any number of type parameters, of kinds as 
 TypeParam ::= Type(Any|Copyable)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
+            | String
+            | Bytes
+            | Float
             | List(TypeParam) -- homogeneous, any sized
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
@@ -841,6 +844,9 @@ TypeArgs appropriate for the function's TypeParams:
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
           | BoundedUSize(u64)
+          | String(String)
+          | Bytes([u8])
+          | Float(f64)
           | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
           | List([TypeArg])
           | Tuple([TypeArg])

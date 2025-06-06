@@ -9,3 +9,18 @@
   (core.fn [?a ?b] [?b ?a])
   (dfg [%a %b] [%b %a]
        (signature (core.fn [?a ?b] [?b ?a]))))
+
+(declare-func example.literals
+  (param ?a core.str)
+  (param ?b core.nat)
+  (param ?c core.bytes)
+  (param ?d core.float)
+  (core.fn [] []))
+
+(define-func example.call_literals
+  (core.fn [] [])
+  (dfg [] []
+    (signature (core.fn [] []))
+    ((core.call
+      (example.literals "string" 42 (bytes "SGVsbG8gd29ybGQg8J+Yig==") 6.023e23))
+      (signature (core.fn [] [])))))

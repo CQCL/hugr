@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
@@ -155,6 +156,34 @@ class StringParam(TypeParam):
 
 
 @dataclass(frozen=True)
+class FloatParam(TypeParam):
+    """Float type parameter."""
+
+    def _to_serial(self) -> stys.FloatParam:
+        return stys.FloatParam()
+
+    def __str__(self) -> str:
+        return "Float"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.float")
+
+
+@dataclass(frozen=True)
+class BytesParam(TypeParam):
+    """Bytes type parameter."""
+
+    def _to_serial(self) -> stys.BytesParam:
+        return stys.BytesParam()
+
+    def __str__(self) -> str:
+        return "Bytes"
+
+    def to_model(self) -> model.Term:
+        return model.Apply("core.bytes")
+
+
+@dataclass(frozen=True)
 class ListParam(TypeParam):
     """Type parameter which requires a list of type arguments."""
 
@@ -239,6 +268,39 @@ class StringArg(TypeArg):
 
     def __str__(self) -> str:
         return f'"{self.value}"'
+
+    def to_model(self) -> model.Term:
+        return model.Literal(self.value)
+
+
+@dataclass(frozen=True)
+class FloatArg(TypeArg):
+    """A floating point type argument."""
+
+    value: float
+
+    def _to_serial(self) -> stys.FloatArg:
+        return stys.FloatArg(value=self.value)
+
+    def __str__(self) -> str:
+        return f"{self.value}"
+
+    def to_model(self) -> model.Term:
+        return model.Literal(self.value)
+
+
+@dataclass(frozen=True)
+class BytesArg(TypeArg):
+    """A bytes type argument."""
+
+    value: bytes
+
+    def _to_serial(self) -> stys.BytesArg:
+        value = base64.b64encode(self.value).decode()
+        return stys.BytesArg(value=value)
+
+    def __str__(self) -> str:
+        return "bytes"
 
     def to_model(self) -> model.Term:
         return model.Literal(self.value)
