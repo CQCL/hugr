@@ -540,7 +540,10 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    fn add_hugr_with_defns(#[values(false, true)] replace: bool) {
+    fn add_hugr_with_defns(
+        #[values(false, true)] replace: bool,
+        #[values(true, false)] view: bool,
+    ) {
         let mut fb = FunctionBuilder::new("main", Signature::new_endo(bool_t())).unwrap();
         let my_decl = fb
             .module_root_builder()
@@ -568,7 +571,12 @@ pub(crate) mod test {
             (ins_defn.node(), InsertDefnMode::Add),
             (ins_decl.node(), decl_mode),
         ]);
-        let inserted = fb.add_hugr_with_wires_defns(insert, [], link_spec).unwrap();
+        let inserted = if view {
+            fb.add_hugr_view_with_wires_defns(&insert, [], link_spec)
+                .unwrap()
+        } else {
+            fb.add_hugr_with_wires_defns(insert, [], link_spec).unwrap()
+        };
         let h = fb.finish_hugr_with_outputs(inserted.outputs()).unwrap();
         let defn_names = h
             .nodes()
