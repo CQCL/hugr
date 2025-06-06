@@ -274,8 +274,8 @@ mod test {
             def.instantiate([TypeArg::Type { ty: qb_t() }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type { ty: qb_t() },
-                    param: TypeBound::Copyable.into()
+                    term: TypeArg::Type { ty: qb_t() },
+                    type_: TypeBound::Copyable.into()
                 }
             ))
         );

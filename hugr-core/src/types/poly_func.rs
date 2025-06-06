@@ -240,16 +240,16 @@ pub(crate) mod test {
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    param: type_params[0].clone(),
-                    arg: TypeArg::Type { ty: usize_t() }
+                    type_: type_params[0].clone(),
+                    term: TypeArg::Type { ty: usize_t() }
                 }
             ))
         );
 
         // (Try to) make a schema with the args in the wrong order
         let arg_err = SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
-            param: type_params[0].clone(),
-            arg: ty_var.clone(),
+            type_: type_params[0].clone(),
+            term: ty_var.clone(),
         });
         assert_eq!(
             array_type_parametric(ty_var.clone(), size_var.clone()),
@@ -349,8 +349,8 @@ pub(crate) mod test {
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
-                        param: bound.clone(),
-                        arg: TypeArg::new_var_use(0, decl.clone())
+                        type_: bound.clone(),
+                        term: TypeArg::new_var_use(0, decl.clone())
                     }
                 ))
             );
