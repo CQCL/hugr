@@ -22,7 +22,7 @@ pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
 pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
-pub use type_param::TypeArg;
+pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
 
 pub(crate) use poly_func::PolyFuncTypeBase;

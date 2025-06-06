@@ -50,107 +50,106 @@ impl UpperBound {
     }
 }
 
+/// A [`Term`] that is the argument to an operation or constructor.
 pub type TypeArg = Term;
+
+/// A [`Term`] that is the static type of an operation or constructor parameter.
 pub type TypeParam = Term;
 
-/// A *kind* of [`TypeArg`]. Thus, a parameter declared by a [`PolyFuncType`] or [`PolyFuncTypeRV`],
-/// specifying a value that must be provided statically in order to instantiate it.
-///
-/// [`PolyFuncType`]: super::PolyFuncType
-/// [`PolyFuncTypeRV`]: super::PolyFuncTypeRV
+/// A term in the language of static parameters in HUGR.
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
 #[non_exhaustive]
 #[serde(tag = "t")]
 pub enum Term {
-    /// Argument is a [`TypeArg::Type`].
+    /// The type of runtime types.
     #[display("Type{}", match b {
         TypeBound::Any => String::new(),
         _ => format!("[{b}]")
     })]
     RuntimeType {
-        /// Bound for the type parameter.
+        /// The type bound on the runtime type.
         b: TypeBound,
     },
     /// The type of static data.
     StaticType,
-    /// Argument is a [`TypeArg::BoundedNat`] that is less than the upper bound.
+    /// The type of static natural numbers up to a given bound.
     #[display("{}", match bound.value() {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
     })]
     BoundedNatType {
-        /// Upper bound for the Nat parameter.
+        /// The upper bound on the natural number.
         bound: UpperBound,
     },
-    /// Argument is a [`TypeArg::String`].
+    /// The type of static strings. See [`Term::String`].
     StringType,
-    /// Argument is a [`TypeArg::Bytes`].
+    /// The type of static byte strings. See [`Term::Bytes`].
     BytesType,
-    /// Argument is a [`TypeArg::Float`].
+    /// The type of static floating point numbers. See [`Term::Float`].
     FloatType,
-    /// Argument is a [`TypeArg::List`]. A list of indeterminate size containing
-    /// parameters all of the (same) specified element type.
+    /// The type of static lists of indeterminate size containing terms of the
+    /// specified static type.
     #[display("ListType[{param}]")]
     ListType {
-        /// The [`TypeParam`] describing each element of the list.
-        param: Box<TypeParam>,
+        /// The static type of the items in the list.
+        param: Box<Term>,
     },
-    /// Argument is a [`TypeArg::Tuple`]. A tuple of parameters.
+    /// The type of static tuples.
     #[display("TupleType[{}]", params.iter().map(std::string::ToString::to_string).join(", "))]
     TupleType {
-        /// The [`TypeParam`]s contained in the tuple.
-        params: Vec<TypeParam>,
+        /// The static types of the items of the tuple.
+        params: Vec<Term>,
     },
-    /// Where the (Type/Op)Def declares that an argument is a [`TypeParam::Type`]
+    /// A runtime type as a term.
     #[display("{ty}")]
     Type {
-        /// The concrete type for the parameter.
+        /// The runtime type.
         ty: Type,
     },
-    /// Instance of [`TypeParam::BoundedNat`]. 64-bit unsigned integer.
+    /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
     #[display("{n}")]
     BoundedNat {
-        /// The integer value for the parameter.
+        /// The value of the literal.
         n: u64,
     },
-    ///Instance of [`TypeParam::String`]. UTF-8 encoded string argument.
+    /// UTF-8 encoded string literal. Instance of [`Term::StringType`].
     #[display("\"{arg}\"")]
     String {
-        /// The string value for the parameter.
+        /// The value of the literal.
         arg: String,
     },
-    /// Instance of [`TypeParam::Bytes`]. Byte string.
+    /// Byte string literal. Instance of [`Term::BytesType`].
     #[display("bytes")]
     Bytes {
-        /// The value of the bytes parameter.
+        /// The value of the literal.
         #[serde(with = "base64")]
         value: Arc<[u8]>,
     },
-    /// Instance of [`TypeParam::Float`]. 64-bit floating point number.
+    /// A 64-bit floating point number. Instance of [`Term::FloatType`].
     #[display("{}", value.into_inner())]
     Float {
         /// The value of the float parameter.
         value: OrderedFloat<f64>,
     },
-    /// Instance of [`TypeParam::List`] defined by a sequence of elements of the same type.
+    /// A list of static terms. Instance of [`Term::ListType`].
     #[display("[{}]", {
         use itertools::Itertools as _;
         elems.iter().map(|t|t.to_string()).join(",")
     })]
     List {
-        /// List of elements
-        elems: Vec<TypeArg>,
+        /// List of elements.
+        elems: Vec<Term>,
     },
-    /// Instance of [`TypeParam::Tuple`] defined by a sequence of elements of varying type.
+    /// A tuple of static terms. Instance of [`Term::TupleType`].
     #[display("({})", {
         use itertools::Itertools as _;
         elems.iter().map(std::string::ToString::to_string).join(",")
     })]
     Tuple {
-        /// List of elements
-        elems: Vec<TypeArg>,
+        /// List of elements.
+        elems: Vec<Term>,
     },
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
