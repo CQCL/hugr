@@ -27,7 +27,7 @@ workspace = true
 [dependencies]
 inkwell = { version = "0.6.0", default-features = false }
 hugr-core = { path = "../hugr-core", version = "0.20.1" }
-anyhow = "1.0.98"
+anyhow.workspace = true
 itertools.workspace = true
 delegate.workspace = true
 petgraph.workspace = true
