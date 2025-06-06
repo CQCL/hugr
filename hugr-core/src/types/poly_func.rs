@@ -388,7 +388,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    const TP_ANY: TypeParam = TypeParam::RuntimeType { b: TypeBound::Any };
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
@@ -405,7 +405,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(actual, decl);
-            assert_eq!(cached, TypeParam::ListType {param: Box::new(TypeParam::Type {b: TypeBound::Copyable})});
+            assert_eq!(cached, TypeParam::ListType {param: Box::new(TypeParam::RuntimeType {b: TypeBound::Copyable})});
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -459,7 +459,7 @@ pub(crate) mod test {
         )));
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::ListType {
-                param: Box::new(TypeParam::Type {
+                param: Box::new(TypeParam::RuntimeType {
                     b: TypeBound::Copyable,
                 }),
             }],

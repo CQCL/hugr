@@ -250,7 +250,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::Type {
+            params: vec![TypeParam::RuntimeType {
                 b: TypeBound::Copyable,
             }],
             extension: "MyRsrc".try_into().unwrap(),
