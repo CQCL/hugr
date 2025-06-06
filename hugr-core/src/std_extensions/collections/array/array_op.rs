@@ -65,7 +65,7 @@ const STATIC_SIZE_PARAM: &[TypeParam; 1] = &[TypeParam::max_nat_type()];
 
 impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
-        let [TypeArg::BoundedNat { n }] = *arg_values else {
+        let [TypeArg::BoundedNat { value: n }] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
@@ -289,7 +289,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
                 vec![ty_arg]
             }
             new_array | pop_left | pop_right | get | set | swap => {
-                vec![TypeArg::BoundedNat { n: self.size }, ty_arg]
+                vec![TypeArg::BoundedNat { value: self.size }, ty_arg]
             }
             _phantom(_, never) => match never {},
         }
@@ -316,7 +316,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         let (ty, size) = match (self, type_args) {
             (GenericArrayOpDef::discard_empty, [TypeArg::Type { ty }]) => (ty.clone(), 0),
-            (_, [TypeArg::BoundedNat { n }, TypeArg::Type { ty }]) => (ty.clone(), *n),
+            (_, [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }]) => (ty.clone(), *n),
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
 

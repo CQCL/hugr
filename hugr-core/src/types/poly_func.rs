@@ -228,13 +228,13 @@ pub(crate) mod test {
 
         // Sanity check (good args)
         good_ts.instantiate(&[
-            TypeArg::BoundedNat { n: 5 },
+            TypeArg::BoundedNat { value: 5 },
             TypeArg::Type { ty: usize_t() },
         ])?;
 
         let wrong_args = good_ts.instantiate(&[
             TypeArg::Type { ty: usize_t() },
-            TypeArg::BoundedNat { n: 5 },
+            TypeArg::BoundedNat { value: 5 },
         ]);
         assert_eq!(
             wrong_args,
@@ -278,11 +278,11 @@ pub(crate) mod test {
         let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
             TypeParam::ListType {
-                param: Box::new(TypeParam::max_nat_type()),
+                item_type: Box::new(TypeParam::max_nat_type()),
             },
             TypeParam::StringType,
             TypeParam::TupleType {
-                params: vec![TypeBound::Any.into(), TypeParam::max_nat_type()],
+                item_types: vec![TypeBound::Any.into(), TypeParam::max_nat_type()],
             },
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
@@ -367,7 +367,7 @@ pub(crate) mod test {
         )?;
 
         let list_of_tys = |b: TypeBound| TypeParam::ListType {
-            param: Box::new(b.into()),
+            item_type: Box::new(b.into()),
         };
         decl_accepts_rejects_var(
             list_of_tys(TypeBound::Copyable),
@@ -388,12 +388,14 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeType { b: TypeBound::Any };
+    const TP_ANY: TypeParam = TypeParam::RuntimeType {
+        bound: TypeBound::Any,
+    };
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
         let decl = TypeParam::ListType {
-            param: Box::new(TP_ANY),
+            item_type: Box::new(TP_ANY),
         };
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
@@ -405,7 +407,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(actual, decl);
-            assert_eq!(cached, TypeParam::ListType {param: Box::new(TypeParam::RuntimeType {b: TypeBound::Copyable})});
+            assert_eq!(cached, TypeParam::ListType {item_type: Box::new(TypeParam::RuntimeType {bound: TypeBound::Copyable})});
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -459,8 +461,8 @@ pub(crate) mod test {
         )));
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::ListType {
-                param: Box::new(TypeParam::RuntimeType {
-                    b: TypeBound::Copyable,
+                item_type: Box::new(TypeParam::RuntimeType {
+                    bound: TypeBound::Copyable,
                 }),
             }],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
