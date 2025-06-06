@@ -8,7 +8,6 @@ use itertools::Itertools;
 use ordered_float::OrderedFloat;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
-use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
 use std::sync::Arc;
 use thiserror::Error;
@@ -74,6 +73,8 @@ pub enum Term {
         /// Bound for the type parameter.
         b: TypeBound,
     },
+    /// The type of static data.
+    StaticType,
     /// Argument is a [`TypeArg::BoundedNat`] that is less than the upper bound.
     #[display("{}", match bound.value() {
         Some(v) => format!("BoundedNat[{v}]"),
@@ -162,8 +163,8 @@ pub enum Term {
     },
 }
 
-impl TypeParam {
-    /// [`TypeParam::BoundedNatType`] with the maximum bound (`u64::MAX` + 1)
+impl Term {
+    /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
         Self::BoundedNatType {
@@ -171,7 +172,7 @@ impl TypeParam {
         }
     }
 
-    /// [`TypeParam::BoundedNatType`] with the stated upper bound (non-exclusive)
+    /// Creates a [`Term::BoundedNatType`] with the stated upper bound (non-exclusive).
     #[must_use]
     pub const fn bounded_nat_type(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNatType {
@@ -179,83 +180,85 @@ impl TypeParam {
         }
     }
 
-    /// Make a new [`TypeParam::ListType`] (an arbitrary-length homogeneous list)
-    pub fn new_list_type(elem: impl Into<TypeParam>) -> Self {
+    /// Creates a new [`Term::ListType`] given the type of its elements.
+    pub fn new_list_type(elem: impl Into<Term>) -> Self {
         Self::ListType {
             param: Box::new(elem.into()),
         }
     }
 
-    fn contains(&self, other: &TypeParam) -> bool {
+    fn contains(&self, other: &Term) -> bool {
         match (self, other) {
-            (TypeParam::RuntimeType { b: b1 }, TypeParam::RuntimeType { b: b2 }) => {
-                b1.contains(*b2)
-            }
-            (TypeParam::BoundedNatType { bound: b1 }, TypeParam::BoundedNatType { bound: b2 }) => {
+            (Term::RuntimeType { b: b1 }, Term::RuntimeType { b: b2 }) => b1.contains(*b2),
+            (Term::BoundedNatType { bound: b1 }, Term::BoundedNatType { bound: b2 }) => {
                 b1.contains(b2)
             }
-            (TypeParam::StringType, TypeParam::StringType) => true,
-            (TypeParam::ListType { param: e1 }, TypeParam::ListType { param: e2 }) => {
-                e1.contains(e2)
-            }
-            (TypeParam::TupleType { params: es1 }, TypeParam::TupleType { params: es2 }) => {
+            (Term::StringType, Term::StringType) => true,
+            (Term::ListType { param: e1 }, Term::ListType { param: e2 }) => e1.contains(e2),
+            (Term::TupleType { params: es1 }, Term::TupleType { params: es2 }) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
             }
+            (Term::BytesType, Term::BytesType) => true,
+            (Term::FloatType, Term::FloatType) => true,
+            (Term::Type { ty: t1 }, Term::Type { ty: t2 }) => t1 == t2,
+            (Term::BoundedNat { n: n1 }, Term::BoundedNat { n: n2 }) => n1 == n2,
+            (Term::String { arg: s1 }, Term::String { arg: s2 }) => s1 == s2,
+            (Term::Bytes { value: v1 }, Term::Bytes { value: v2 }) => v1 == v2,
+            (Term::Float { value: f1 }, Term::Float { value: f2 }) => f1 == f2,
+            (Term::Variable { v: v1 }, Term::Variable { v: v2 }) => v1 == v2,
             _ => false,
         }
     }
 }
 
-impl From<TypeBound> for TypeParam {
+impl From<TypeBound> for Term {
     fn from(bound: TypeBound) -> Self {
         Self::RuntimeType { b: bound }
     }
 }
 
-impl From<UpperBound> for TypeParam {
+impl From<UpperBound> for Term {
     fn from(bound: UpperBound) -> Self {
         Self::BoundedNatType { bound }
     }
 }
 
-impl<RV: MaybeRV> From<TypeBase<RV>> for TypeArg {
+impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
-            Ok(ty) => TypeArg::Type { ty },
-            Err(RowVariable(idx, bound)) => {
-                TypeArg::new_var_use(idx, TypeParam::new_list_type(bound))
-            }
+            Ok(ty) => Term::Type { ty },
+            Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
         }
     }
 }
 
-impl From<u64> for TypeArg {
+impl From<u64> for Term {
     fn from(n: u64) -> Self {
         Self::BoundedNat { n }
     }
 }
 
-impl From<String> for TypeArg {
+impl From<String> for Term {
     fn from(arg: String) -> Self {
-        TypeArg::String { arg }
+        Term::String { arg }
     }
 }
 
-impl From<&str> for TypeArg {
+impl From<&str> for Term {
     fn from(arg: &str) -> Self {
-        TypeArg::String {
+        Term::String {
             arg: arg.to_string(),
         }
     }
 }
 
-impl From<Vec<TypeArg>> for TypeArg {
-    fn from(elems: Vec<TypeArg>) -> Self {
+impl From<Vec<Term>> for Term {
+    fn from(elems: Vec<Term>) -> Self {
         Self::List { elems }
     }
 }
 
-/// Variable in a `TypeArg`, that is not a single [`TypeArg::Type`] (i.e. not a [`Type::new_var_use`]
+/// Variable in a [`Term`], that is not a single [`Term::Type`] (i.e. not a [`Type::new_var_use`]
 /// - it might be a [`Type::new_row_var_use`]).
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
@@ -266,21 +269,21 @@ pub struct TypeArgVariable {
     cached_decl: Box<TypeParam>,
 }
 
-impl TypeArg {
-    /// [`Type::UNIT`] as a [`TypeArg::Type`]
+impl Term {
+    /// [`Type::UNIT`] as a [`Term::Type`]
     pub const UNIT: Self = Self::Type { ty: Type::UNIT };
 
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
     #[must_use]
-    pub fn new_var_use(idx: usize, decl: TypeParam) -> Self {
+    pub fn new_var_use(idx: usize, decl: Term) -> Self {
         match decl {
             // Note a TypeParam::List of TypeParam::Type *cannot* be represented
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
-            TypeParam::RuntimeType { b } => Type::new_var_use(idx, b).into(),
-            _ => TypeArg::Variable {
+            Term::RuntimeType { b } => Type::new_var_use(idx, b).into(),
+            _ => Term::Variable {
                 v: TypeArgVariable {
                     idx,
                     cached_decl: Box::new(decl),
@@ -340,13 +343,14 @@ impl TypeArg {
 
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
-            Term::RuntimeType { b } => todo!(),
-            Term::BoundedNatType { bound } => todo!(),
-            Term::StringType => todo!(),
-            Term::BytesType => todo!(),
-            Term::FloatType => todo!(),
-            Term::ListType { param } => todo!(),
-            Term::TupleType { params } => todo!(),
+            Term::RuntimeType { .. } => Ok(()),
+            Term::BoundedNatType { .. } => Ok(()),
+            Term::StringType => Ok(()),
+            Term::BytesType => Ok(()),
+            Term::FloatType => Ok(()),
+            Term::ListType { param } => param.validate(var_decls),
+            Term::TupleType { params } => params.iter().try_for_each(|p| p.validate(var_decls)),
+            Term::StaticType => Ok(()),
         }
     }
 
@@ -392,13 +396,18 @@ impl TypeArg {
             Term::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
-            Term::RuntimeType { b } => todo!(),
-            Term::BoundedNatType { bound } => todo!(),
-            Term::StringType => todo!(),
-            Term::BytesType => todo!(),
-            Term::FloatType => todo!(),
-            Term::ListType { param } => todo!(),
-            Term::TupleType { params } => todo!(),
+            Term::RuntimeType { .. } => self.clone(),
+            Term::BoundedNatType { .. } => self.clone(),
+            Term::StringType => self.clone(),
+            Term::BytesType => self.clone(),
+            Term::FloatType => self.clone(),
+            Term::ListType { param } => Term::ListType {
+                param: Box::new(param.substitute(t)),
+            },
+            Term::TupleType { params } => Term::TupleType {
+                params: params.iter().map(|p| p.substitute(t)).collect(),
+            },
+            Term::StaticType => self.clone(),
         }
     }
 }
@@ -414,13 +423,14 @@ impl Transformable for Term {
             | Term::Variable { .. }
             | Term::Float { .. }
             | Term::Bytes { .. } => Ok(false),
-            Term::RuntimeType { b } => todo!(),
-            Term::BoundedNatType { bound } => todo!(),
-            Term::StringType => todo!(),
-            Term::BytesType => todo!(),
-            Term::FloatType => todo!(),
-            Term::ListType { param } => todo!(),
-            Term::TupleType { params } => todo!(),
+            Term::RuntimeType { .. } => Ok(false),
+            Term::BoundedNatType { .. } => Ok(false),
+            Term::StringType => Ok(false),
+            Term::BytesType => Ok(false),
+            Term::FloatType => Ok(false),
+            Term::ListType { param } => param.transform(tr),
+            Term::TupleType { params } => params.transform(tr),
+            Term::StaticType => Ok(false),
         }
     }
 }
@@ -436,8 +446,8 @@ impl TypeArgVariable {
     /// the [`TypeBound`] of the individual types it might stand for.
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let TypeParam::ListType { param } = &*self.cached_decl {
-            if let TypeParam::RuntimeType { b } = **param {
+        if let Term::ListType { param } = &*self.cached_decl {
+            if let Term::RuntimeType { b } = **param {
                 return Some(b);
             }
         }
@@ -446,24 +456,24 @@ impl TypeArgVariable {
 }
 
 /// Checks a [`TypeArg`] is as expected for a [`TypeParam`]
-pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgError> {
-    match (arg, param) {
+pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> {
+    match (term, type_) {
         (
             TypeArg::Variable {
                 v: TypeArgVariable { cached_decl, .. },
             },
             _,
-        ) if param.contains(cached_decl) => Ok(()),
+        ) if type_.contains(cached_decl) => Ok(()),
         (TypeArg::Type { ty }, TypeParam::RuntimeType { b: bound })
             if bound.contains(ty.least_upper_bound()) =>
         {
             Ok(())
         }
         (TypeArg::List { elems }, TypeParam::ListType { param }) => {
-            elems.iter().try_for_each(|arg| {
+            elems.iter().try_for_each(|term| {
                 // Also allow elements that are RowVars if fitting into a List of Types
                 if let (TypeArg::Variable { v }, TypeParam::RuntimeType { b: param_bound }) =
-                    (arg, &**param)
+                    (term, &**param)
                 {
                     if v.bound_if_row_var()
                         .is_some_and(|arg_bound| param_bound.contains(arg_bound))
@@ -471,7 +481,7 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
                         return Ok(());
                     }
                 }
-                check_type_arg(arg, param)
+                check_type_arg(term, param)
             })
         }
         (TypeArg::Tuple { elems: items }, TypeParam::TupleType { params: types }) => {
@@ -482,20 +492,29 @@ pub fn check_type_arg(arg: &TypeArg, param: &TypeParam) -> Result<(), TypeArgErr
             items
                 .iter()
                 .zip(types.iter())
-                .try_for_each(|(arg, param)| check_type_arg(arg, param))
+                .try_for_each(|(term, type_)| check_type_arg(term, type_))
         }
         (TypeArg::BoundedNat { n: val }, TypeParam::BoundedNatType { bound })
             if bound.valid_value(*val) =>
         {
             Ok(())
         }
-
         (TypeArg::String { .. }, TypeParam::StringType) => Ok(()),
         (TypeArg::Bytes { .. }, TypeParam::BytesType) => Ok(()),
         (TypeArg::Float { .. }, TypeParam::FloatType) => Ok(()),
+
+        // Static types
+        (TypeArg::StaticType, TypeParam::StaticType) => Ok(()),
+        (TypeArg::StringType, TypeParam::StaticType) => Ok(()),
+        (TypeArg::BytesType, TypeParam::StaticType) => Ok(()),
+        (TypeArg::BoundedNatType { .. }, TypeParam::StaticType) => Ok(()),
+        (TypeArg::FloatType, TypeParam::StaticType) => Ok(()),
+        (TypeArg::ListType { .. }, TypeParam::StaticType) => Ok(()),
+        (TypeArg::TupleType { .. }, TypeParam::StaticType) => Ok(()),
+
         _ => Err(TypeArgError::TypeMismatch {
-            arg: arg.clone(),
-            param: param.clone(),
+            term: term.clone(),
+            type_: type_.clone(),
         }),
     }
 }
@@ -516,11 +535,11 @@ pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), Typ
 #[non_exhaustive]
 pub enum TypeArgError {
     #[allow(missing_docs)]
-    /// For now, general case of a type arg not fitting a param.
+    /// For now, general case of a term not fitting a type.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Type argument {arg} does not fit declared parameter {param}")]
-    TypeMismatch { param: TypeParam, arg: TypeArg },
+    #[error("Term {term} does not fit declared type {type_}")]
+    TypeMismatch { term: TypeParam, type_: TypeArg },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -711,9 +730,9 @@ mod test {
         assert_eq!(
             check_type_arg(&TypeArg::List { elems }, &outer_param),
             Err(TypeArgError::TypeMismatch {
-                arg: usize_t().into(),
+                term: usize_t().into(),
                 // The error reports the type expected for each element of the list:
-                param: TypeParam::new_list_type(TypeBound::Any)
+                type_: TypeParam::new_list_type(TypeBound::Any)
             })
         );
 
