@@ -22,7 +22,7 @@ pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
 pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
-pub use type_param::TypeArg;
+pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
 
 // Unused in --no-features
@@ -751,7 +751,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
+        debug_assert!(check_type_arg(arg, &TypeParam::new_list_type(bound)).is_ok());
         match arg {
             TypeArg::List { elems } => elems
                 .iter()
@@ -979,7 +979,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -1003,7 +1003,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list(TypeBound::Copyable)],
+                vec![TypeParam::new_list_type(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,
@@ -1031,8 +1031,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: qb_t().into()
+                type_: TypeBound::Copyable.into(),
+                term: qb_t().into()
             }))
         );
 
@@ -1045,8 +1045,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: mk_opt(qb_t()).into()
+                type_: TypeBound::Copyable.into(),
+                term: mk_opt(qb_t()).into()
             }))
         );
 

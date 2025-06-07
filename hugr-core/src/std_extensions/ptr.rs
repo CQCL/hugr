@@ -89,8 +89,8 @@ impl MakeOpDef for PtrOpDef {
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("ptr");
 /// Name of pointer type.
 pub const PTR_TYPE_ID: TypeName = TypeName::new_inline("ptr");
-const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::Type {
-    b: TypeBound::Copyable,
+const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::RuntimeType {
+    bound: TypeBound::Copyable,
 }];
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);

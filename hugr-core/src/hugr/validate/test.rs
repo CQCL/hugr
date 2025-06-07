@@ -338,8 +338,8 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
-            param: TypeBound::Copyable.into(),
-            arg: TypeArg::Type { ty: valid }
+            type_: TypeBound::Copyable.into(),
+            term: TypeArg::Type { ty: valid }
         })
     );
 
@@ -380,7 +380,7 @@ fn invalid_types() {
         "MyContainer",
         vec![
             TypeArg::Type { ty: usize_t() },
-            TypeArg::BoundedNat { n: 3 },
+            TypeArg::BoundedNat { value: 3 },
         ],
         EXT_ID,
         TypeBound::Any,
@@ -458,8 +458,8 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
-    const BOUND: TypeParam = TypeParam::Type {
-        b: TypeBound::Copyable,
+    const BOUND: TypeParam = TypeParam::RuntimeType {
+        bound: TypeBound::Copyable,
     };
     let list_of_var = Type::new_extension(
         list::EXTENSION
@@ -493,7 +493,7 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list(TypeBound::Any);
+    let rowp = TypeParam::new_list_type(TypeBound::Any);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
@@ -563,7 +563,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list(TypeBound::Any)],
+            [TypeParam::new_list_type(TypeBound::Any)],
             Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;

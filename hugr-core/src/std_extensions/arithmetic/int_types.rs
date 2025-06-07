@@ -49,7 +49,7 @@ pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
     pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
-        .map(|i| int_type(TypeArg::BoundedNat { n: u64::from(i) }))
+        .map(|i| int_type(TypeArg::BoundedNat { value: u64::from(i) }))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
@@ -69,7 +69,7 @@ pub const LOG_WIDTH_BOUND: u8 = LOG_WIDTH_MAX + 1;
 
 /// Type parameter for the log width of the integer.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_type({
     assert!(LOG_WIDTH_BOUND > 0);
     NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
 });
@@ -78,17 +78,17 @@ pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
 /// is invalid.
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
     match arg {
-        TypeArg::BoundedNat { n } if is_valid_log_width(*n as u8) => Ok(*n as u8),
+        TypeArg::BoundedNat { value: n } if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TypeArgError::TypeMismatch {
-            arg: arg.clone(),
-            param: LOG_WIDTH_TYPE_PARAM,
+            term: arg.clone(),
+            type_: LOG_WIDTH_TYPE_PARAM,
         }),
     }
 }
 
 const fn type_arg(log_width: u8) -> TypeArg {
     TypeArg::BoundedNat {
-        n: log_width as u64,
+        value: log_width as u64,
     }
 }
 
@@ -239,10 +239,10 @@ mod test {
 
     #[test]
     fn test_int_widths() {
-        let type_arg_32 = TypeArg::BoundedNat { n: 5 };
+        let type_arg_32 = TypeArg::BoundedNat { value: 5 };
         assert_matches!(get_log_width(&type_arg_32), Ok(5));
 
-        let type_arg_128 = TypeArg::BoundedNat { n: 7 };
+        let type_arg_128 = TypeArg::BoundedNat { value: 7 };
         assert_matches!(
             get_log_width(&type_arg_128),
             Err(TypeArgError::TypeMismatch { .. })

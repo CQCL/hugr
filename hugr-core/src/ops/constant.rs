@@ -860,7 +860,7 @@ pub(crate) mod test {
         let ex_id: ExtensionId = "my_extension".try_into().unwrap();
         let typ_int = CustomType::new(
             "my_type",
-            vec![TypeArg::BoundedNat { n: 8 }],
+            vec![TypeArg::BoundedNat { value: 8 }],
             ex_id.clone(),
             TypeBound::Copyable,
             // Dummy extension reference.

@@ -656,7 +656,9 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+            const TP: TypeParam = TypeParam::RuntimeType {
+                bound: TypeBound::Any,
+            };
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
@@ -703,8 +705,10 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
-                let [TypeArg::BoundedNat { n }] = arg_values else {
+                const TP: TypeParam = TypeParam::RuntimeType {
+                    bound: TypeBound::Any,
+                };
+                let [TypeArg::BoundedNat { value: n }] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
                 let n = *n as usize;
@@ -718,7 +722,7 @@ pub(super) mod test {
             }
 
             fn static_params(&self) -> &[TypeParam] {
-                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
                 MAX_NAT
             }
         }
@@ -727,7 +731,7 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
+            let args = [TypeArg::BoundedNat { value: 3 }, usize_t().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -740,7 +744,7 @@ pub(super) mod test {
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-            let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
+            let args = [TypeArg::BoundedNat { value: 3 }, tyvar.clone().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -761,7 +765,7 @@ pub(super) mod test {
             );
 
             // First arg must be concrete, not a variable
-            let kind = TypeParam::bounded_nat(NonZeroU64::new(5).unwrap());
+            let kind = TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap());
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
@@ -808,8 +812,8 @@ pub(super) mod test {
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
                     TypeArgError::TypeMismatch {
-                        param: TypeBound::Any.into(),
-                        arg
+                        type_: TypeBound::Any.into(),
+                        term: arg,
                     }
                 ))
             );

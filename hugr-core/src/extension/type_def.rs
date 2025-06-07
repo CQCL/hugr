@@ -250,8 +250,8 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::Type {
-                b: TypeBound::Copyable,
+            params: vec![TypeParam::RuntimeType {
+                bound: TypeBound::Copyable,
             }],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
@@ -274,8 +274,8 @@ mod test {
             def.instantiate([TypeArg::Type { ty: qb_t() }]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    arg: TypeArg::Type { ty: qb_t() },
-                    param: TypeBound::Copyable.into()
+                    term: TypeArg::Type { ty: qb_t() },
+                    type_: TypeBound::Copyable.into()
                 }
             ))
         );
