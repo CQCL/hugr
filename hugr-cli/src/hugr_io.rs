@@ -7,7 +7,6 @@ use hugr::package::Package;
 use hugr::{Extension, Hugr};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
-use tracing::instrument;
 
 use crate::CliError;
 
