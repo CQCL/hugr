@@ -2,14 +2,13 @@
 
 use std::ffi::OsString;
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow};
 use clap::Parser as _;
 use clap_verbosity_flag::VerbosityFilter;
 use hugr_cli::{CliArgs, CliCommand};
-use tracing::{instrument, metadata::LevelFilter};
+use tracing::{error, metadata::LevelFilter};
 
-#[instrument(err(Debug))]
-fn main() -> Result<()> {
+fn main() {
     let cli_args = CliArgs::parse();
 
     let level = match cli_args.verbose.filter() {
@@ -20,17 +19,24 @@ fn main() -> Result<()> {
         VerbosityFilter::Debug => LevelFilter::DEBUG,
         VerbosityFilter::Trace => LevelFilter::TRACE,
     };
-    tracing_subscriber::fmt().with_max_level(level).init();
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_max_level(level)
+        .pretty()
+        .init();
 
-    match cli_args.command {
-        CliCommand::Validate(mut args) => args.run()?,
-        CliCommand::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG)?,
-        CliCommand::Mermaid(mut args) => args.run_print()?,
-        CliCommand::External(args) => run_external(args)?,
-        _ => bail!("Unknown command"),
+    let result = match cli_args.command {
+        CliCommand::Validate(mut args) => args.run(),
+        CliCommand::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
+        CliCommand::Mermaid(mut args) => args.run_print(),
+        CliCommand::External(args) => run_external(args),
+        _ => Err(anyhow!("Unknown command")),
     };
 
-    Ok(())
+    if let Err(err) = result {
+        error!("{:?}", err);
+        std::process::exit(1);
+    }
 }
 
 fn run_external(args: Vec<OsString>) -> Result<()> {

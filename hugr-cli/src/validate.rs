@@ -6,6 +6,7 @@ use hugr::HugrView;
 use hugr::package::PackageValidationError;
 use tracing::info;
 
+use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
 
 /// Validate and visualise a HUGR file.
@@ -29,10 +30,11 @@ impl ValArgs {
         if self.input_args.hugr_json {
             let hugr = self.input_args.get_hugr()?;
             hugr.validate()
-                .map_err(PackageValidationError::Validation)?;
+                .map_err(PackageValidationError::Validation)
+                .map_err(CliError::Validate)?;
         } else {
             let package = self.input_args.get_package()?;
-            package.validate()?;
+            package.validate().map_err(CliError::Validate)?;
         };
 
         info!("{VALID_PRINT}");

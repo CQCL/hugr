@@ -1,6 +1,7 @@
 //! Render mermaid diagrams.
 use std::io::Write;
 
+use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
 use anyhow::Result;
 use clap::Parser;
@@ -45,7 +46,7 @@ impl MermaidArgs {
         let package = self.input_args.get_package()?;
 
         if self.validate {
-            package.validate()?;
+            package.validate().map_err(CliError::Validate)?;
         }
 
         for hugr in package.modules {
