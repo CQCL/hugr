@@ -43,6 +43,7 @@ pub use resolve::ResolveError;
 ///
 /// [`table::Package`]: crate::v0::table::Package
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Package {
     /// The sequence of modules in the package.
     pub modules: Vec<Module>,
@@ -70,6 +71,7 @@ impl Package {
 ///
 /// [`table::Module`]: crate::v0::table::Module
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Module {
     /// The root region of the module.
     ///
@@ -103,6 +105,7 @@ impl Module {
 ///
 /// [`table::Node`]: crate::v0::table::Node
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Node {
     /// The operation that the node performs.
     pub operation: Operation,
@@ -129,6 +132,7 @@ pub struct Node {
 ///
 /// [`table::Operation`]: crate::v0::table::Operation
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Operation {
     /// Invalid operation to be used as a placeholder.
     #[default]
@@ -193,6 +197,7 @@ impl Operation {
 ///
 /// [`table::Symbol`]: crate::v0::table::Symbol
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Symbol {
     /// The name of the symbol.
     pub name: SymbolName,
@@ -210,6 +215,7 @@ pub struct Symbol {
 ///
 /// [`table::Param`]: crate::v0::table::Param
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Param {
     /// The name of the parameter.
     pub name: VarName,
@@ -223,6 +229,7 @@ pub struct Param {
 ///
 /// [`table::Region`]: crate::v0::table::Region
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Region {
     /// The kind of the region. See [`RegionKind`] for details.
     pub kind: RegionKind,
@@ -247,6 +254,7 @@ pub struct Region {
 ///
 /// [`table::Term`]: crate::v0::table::Term
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Term {
     /// Standin for any term.
     #[default]
@@ -277,6 +285,7 @@ impl From<Literal> for Term {
 ///
 /// [`table::SeqPart`]: crate::v0::table::SeqPart
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub enum SeqPart {
     /// An individual item in the sequence.
     Item(Term),

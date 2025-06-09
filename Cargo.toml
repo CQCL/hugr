@@ -4,13 +4,14 @@ lto = "thin"
 [workspace]
 resolver = "2"
 members = [
-    "hugr",
-    "hugr-core",
-    "hugr-passes",
-    "hugr-cli",
-    "hugr-model",
-    "hugr-llvm",
-    "hugr-py",
+  "hugr",
+  "hugr-core",
+  "hugr-passes",
+  "hugr-cli",
+  "hugr-model",
+  "hugr-llvm",
+  "hugr-py",
+  "fuzz",
 ]
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
@@ -24,10 +25,10 @@ license = "Apache-2.0"
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = [
-    # Set by our CI
-    'cfg(ci_run)',
-    # Set by codecov
-    'cfg(coverage,coverage_nightly)',
+  # Set by our CI
+  'cfg(ci_run)',
+  # Set by codecov
+  'cfg(coverage,coverage_nightly)',
 ] }
 
 missing_docs = "warn"
