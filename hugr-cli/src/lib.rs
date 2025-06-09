@@ -57,11 +57,11 @@
 //! ```
 
 use clap::{Parser, crate_version};
-use clap_verbosity_flag::log::Level;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;
 use hugr::package::PackageValidationError;
 use std::ffi::OsString;
+use thiserror::Error;
 
 pub mod extensions;
 pub mod hugr_io;
@@ -73,8 +73,19 @@ pub mod validate;
 #[clap(version = crate_version!(), long_about = None)]
 #[clap(about = "HUGR CLI tools.")]
 #[group(id = "hugr")]
+pub struct CliArgs {
+    /// The command to be run.
+    #[command(subcommand)]
+    pub command: CliCommand,
+    /// Verbosity.
+    #[command(flatten)]
+    pub verbose: Verbosity<InfoLevel>,
+}
+
+/// The CLI subcommands.
+#[derive(Debug, clap::Subcommand)]
 #[non_exhaustive]
-pub enum CliArgs {
+pub enum CliCommand {
     /// Validate and visualize a HUGR file.
     Validate(validate::ValArgs),
     /// Write standard extensions out in serialized form.
@@ -87,40 +98,24 @@ pub enum CliArgs {
 }
 
 /// Error type for the CLI.
-#[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CliError {
     /// Error reading input.
-    #[display("Error reading from path: {_0}")]
-    InputFile(std::io::Error),
+    #[error("Error reading from path.")]
+    InputFile(#[from] std::io::Error),
     /// Error parsing input.
-    #[display("Error parsing package: {_0}")]
-    Parse(serde_json::Error),
-    #[display("Error validating HUGR: {_0}")]
+    #[error("Error parsing package.")]
+    Parse(#[from] serde_json::Error),
+    #[error("Error validating HUGR.")]
     /// Errors produced by the `validate` subcommand.
-    Validate(PackageValidationError),
-    #[display("Error decoding HUGR envelope: {_0}")]
+    Validate(#[from] PackageValidationError),
+    #[error("Error decoding HUGR envelope.")]
     /// Errors produced by the `validate` subcommand.
-    Envelope(EnvelopeError),
+    Envelope(#[from] EnvelopeError),
     /// Pretty error when the user passes a non-envelope file.
-    #[display(
+    #[error(
         "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
     )]
     NotAnEnvelope,
-}
-
-/// Other arguments affecting the HUGR CLI runtime.
-#[derive(Parser, Debug)]
-pub struct OtherArgs {
-    /// Verbosity.
-    #[command(flatten)]
-    pub verbose: Verbosity<InfoLevel>,
-}
-
-impl OtherArgs {
-    /// Test whether a `level` message should be output.
-    #[must_use]
-    pub fn verbosity(&self, level: Level) -> bool {
-        self.verbose.log_level_filter() >= level
-    }
 }
