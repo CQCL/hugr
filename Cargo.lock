@@ -717,9 +717,9 @@ dependencies = [
 
 [[package]]
 name = "derive-where"
-version = "1.3.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2364b9aa47e460ce9bca6ac1777d14c98eef7e274eb077beed49f3adc94183ed"
+checksum = "e73f2692d4bd3cac41dca28934a39894200c9fabf49586d77d0e5954af1d7902"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1242,6 +1242,7 @@ dependencies = [
  "hugr-llvm",
  "hugr-model",
  "hugr-passes",
+ "hugr-persistent",
  "lazy_static",
  "serde_json",
 ]
@@ -1291,7 +1292,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "regex",
- "relrc",
  "rstest",
  "semver",
  "serde",
@@ -1366,6 +1366,23 @@ dependencies = [
  "proptest-recurse",
  "rstest",
  "strum",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "hugr-persistent"
+version = "0.1.0"
+dependencies = [
+ "delegate",
+ "derive_more 1.0.0",
+ "hugr-core",
+ "itertools 0.14.0",
+ "lazy_static",
+ "petgraph 0.8.1",
+ "portgraph",
+ "relrc",
+ "rstest",
+ "semver",
  "thiserror 2.0.12",
 ]
 
@@ -2583,7 +2600,6 @@ dependencies = [
  "fxhash",
  "itertools 0.13.0",
  "petgraph 0.8.1",
- "serde",
  "thiserror 1.0.69",
 ]
 
