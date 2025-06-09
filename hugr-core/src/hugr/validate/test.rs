@@ -8,7 +8,7 @@ use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, inout_sig,
 };
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
@@ -226,35 +226,6 @@ fn test_ext_edge() {
 }
 
 #[test]
-fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
-    let b2b = Signature::new_endo(bool_t());
-    let mut h = DFGBuilder::new(Signature::new(bool_t(), Type::new_function(b2b.clone())))?;
-    let [input] = h.input_wires_arr();
-
-    let mut dfg = h.dfg_builder(Signature::new(vec![], Type::new_function(b2b.clone())), [])?;
-    let mut func = dfg.define_function("AndWithOuter", b2b.clone())?;
-    let [fn_input] = func.input_wires_arr();
-    let and_op = func.add_dataflow_op(and_op(), [fn_input, input])?; // 'ext' edge
-    let func = func.finish_with_outputs(and_op.outputs())?;
-    let loadfn = dfg.load_func(func.handle(), &[])?;
-    let dfg = dfg.finish_with_outputs([loadfn])?;
-    let res = h.finish_hugr_with_outputs(dfg.outputs());
-    assert_eq!(
-        res,
-        Err(BuildError::InvalidHUGR(
-            ValidationError::InterGraphEdgeError(InterGraphEdgeError::ValueEdgeIntoFunc {
-                from: input.node(),
-                from_offset: input.source().into(),
-                to: and_op.node(),
-                to_offset: IncomingPort::from(1).into(),
-                func: func.node()
-            })
-        ))
-    );
-    Ok(())
-}
-
-#[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(Signature::new_endo(bool_t()));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
@@ -456,42 +427,31 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test that nested `FuncDefns` cannot use Type Variables declared by enclosing `FuncDefns`
+/// Test that `FuncDefns` cannot be nested.
 #[test]
-fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
-    const OUTER_BOUND: TypeBound = TypeBound::Any;
-    const INNER_BOUND: TypeBound = TypeBound::Copyable;
-    fn build(t: Type) -> Result<Hugr, BuildError> {
-        let mut outer = FunctionBuilder::new(
-            "outer",
-            PolyFuncType::new(
-                [OUTER_BOUND.into()],
-                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
-            ),
-        )?;
-        let inner = outer.define_function(
-            "inner",
-            PolyFuncType::new([INNER_BOUND.into()], Signature::new_endo(vec![t])),
-        )?;
-        let [w] = inner.input_wires_arr();
-        inner.finish_with_outputs([w])?;
-        let [w] = outer.input_wires_arr();
-        outer.finish_hugr_with_outputs([w])
-    }
-    assert!(build(Type::new_var_use(0, INNER_BOUND)).is_ok());
-    assert_matches!(
-        build(Type::new_var_use(1, OUTER_BOUND)).unwrap_err(),
-        BuildError::InvalidHUGR(ValidationError::SignatureError {
-            cause: SignatureError::FreeTypeVar {
-                idx: 1,
-                num_decls: 1
-            },
-            ..
+fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
+    let mut outer = FunctionBuilder::new("outer", Signature::new_endo(usize_t()))?;
+    let inner = outer
+        .add_hugr({
+            let inner = FunctionBuilder::new("inner", Signature::new_endo(bool_t()))?;
+            let [w] = inner.input_wires_arr();
+            inner.finish_hugr_with_outputs([w])?
         })
+        .inserted_entrypoint;
+    let [w] = outer.input_wires_arr();
+    let outer_node = outer.container_node();
+    let hugr = outer.finish_hugr_with_outputs([w]);
+    assert_matches!(
+        hugr.unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::InvalidParentOp {
+            child_optype: OpType::FuncDefn(_),
+            allowed_children: OpTag::DataflowChild,
+            parent_optype: OpType::FuncDefn(_),
+            child, parent
+        }) => {assert_eq!(child, inner);
+            assert_eq!(parent, outer_node);
+        }
     );
-    assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
-        BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
-        {assert_eq!(actual, INNER_BOUND.into()); assert_eq!(cached, OUTER_BOUND.into())});
     Ok(())
 }
 
@@ -588,8 +548,8 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn seq1ty(t: TypeRV) -> TypeArg {
-    TypeArg::Sequence {
+fn list1ty(t: TypeRV) -> TypeArg {
+    TypeArg::List {
         elems: vec![t.into()],
     }
 }
@@ -610,91 +570,18 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let id_usz = {
-        let bldr = fb.define_function("id_usz", Signature::new_endo(usize_t()))?;
+        let mut mb = fb.module_root_builder();
+        let bldr = mb.define_function("id_usz", Signature::new_endo(usize_t()))?;
         let vals = bldr.input_wires();
-        let inner_def = bldr.finish_with_outputs(vals)?;
-        fb.load_func(inner_def.handle(), &[])?
+        let helper_def = bldr.finish_with_outputs(vals)?;
+        fb.load_func(helper_def.handle(), &[])?
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
+        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;
-    Ok(())
-}
-
-#[test]
-fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: This tests a function call that is polymorphic in an extension set.
-    // Should this be rewritten to be polymorphic in something else or removed?
-
-    let e = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-        let params: Vec<TypeParam> = vec![TypeBound::Any.into(), TypeBound::Any.into()];
-        let evaled_fn = Type::new_function(Signature::new(
-            Type::new_var_use(0, TypeBound::Any),
-            Type::new_var_use(1, TypeBound::Any),
-        ));
-        // Single-input/output version of the higher-order "eval" operation, with extension param.
-        // Note the extension-delta of the eval node includes that of the input function.
-        ext.add_op(
-            "eval".into(),
-            String::new(),
-            PolyFuncTypeRV::new(
-                params.clone(),
-                Signature::new(
-                    vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
-                    Type::new_var_use(1, TypeBound::Any),
-                ),
-            ),
-            extension_ref,
-        )?;
-
-        Ok(())
-    })?;
-
-    fn utou() -> Type {
-        Type::new_function(Signature::new_endo(usize_t()))
-    }
-
-    let int_pair = Type::new_tuple(vec![usize_t(); 2]);
-    // Root DFG: applies a function int-->int to each element of a pair of two ints
-    let mut d = DFGBuilder::new(inout_sig(
-        vec![utou(), int_pair.clone()],
-        vec![int_pair.clone()],
-    ))?;
-    // ....by calling a function (int-->int, int_pair) -> int_pair
-    let f = {
-        let mut f = d.define_function(
-            "two_ints",
-            PolyFuncType::new(
-                vec![],
-                Signature::new(vec![utou(), int_pair.clone()], int_pair.clone()),
-            ),
-        )?;
-        let [func, tup] = f.input_wires_arr();
-        let mut c = f.conditional_builder(
-            (vec![vec![usize_t(); 2].into()], tup),
-            vec![],
-            vec![usize_t(); 2].into(),
-        )?;
-        let mut cc = c.case_builder(0)?;
-        let [i1, i2] = cc.input_wires_arr();
-        let op = e.instantiate_extension_op("eval", vec![usize_t().into(), usize_t().into()])?;
-        let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
-        let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
-        cc.finish_with_outputs([f1, f2])?;
-        let res = c.finish_sub_container()?.outputs();
-        let tup = f.make_tuple(res)?;
-        f.finish_with_outputs([tup])?
-    };
-
-    let [func, tup] = d.input_wires_arr();
-    let call = d.call(f.handle(), &[], [func, tup])?;
-    let h = d.finish_hugr_with_outputs(call.outputs())?;
-    let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
-    let exp_fun_ty = Signature::new(vec![utou(), int_pair.clone()], int_pair);
-    assert_eq!(call_ty.as_ref(), &exp_fun_ty);
     Ok(())
 }
 

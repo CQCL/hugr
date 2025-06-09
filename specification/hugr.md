@@ -248,6 +248,11 @@ edges. The following operations are *only* valid as immediate children of a
 - `AliasDecl`: an external type alias declaration. At link time this can be
   replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
   named opaque type.
+- `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
+  The function body is defined by the sibling graph formed by its children.
+  At link time `FuncDecl` nodes are replaced by `FuncDefn`.
+- `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
+  `AliasDefn`.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
@@ -258,11 +263,6 @@ regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
   weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
-- `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
-  The function body is defined by the sibling graph formed by its children.
-  At link time `FuncDecl` nodes are replaced by `FuncDefn`.
-- `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
-  `AliasDefn`.
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -552,11 +552,8 @@ parent(n<sub>2</sub>) when the edge's locality is:
 Each of these localities have additional constraints as follows:
 
 1. For Ext edges, we require parent(n<sub>1</sub>) ==
-   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only:
-     * there must be a order edge from n<sub>1</sub> to
-       parent<sup>i-1</sup>(n<sub>2</sub>).
-     * None of the parent<sup>j</sup>(n<sub>2</sub>), for i\>j\>=1,
-       may be a FuncDefn node
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
+   parent<sup>i-1</sup>(n<sub>2</sub>).
 
    The order edge records the
    ordering requirement that results, i.e. it must be possible to
@@ -569,9 +566,6 @@ Each of these localities have additional constraints as follows:
    For Static edges this order edge is not required since the source is
    guaranteed to causally precede the target.
 
-   The FuncDefn restriction means that FuncDefn really are static,
-   and do not capture runtime values from their environment.
-
 2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,
    **and** parent(n<sub>1</sub>) strictly dominates
@@ -579,8 +573,6 @@ Each of these localities have additional constraints as follows:
    parent(n<sub>1</sub>) \!= parent<sup>i-1</sup>(n<sub>2</sub>). (The
    i\>1 allows the node to target an arbitrarily-deep descendant of the
    dominated block, similar to an Ext edge.)
-
-   The same FuncDefn restriction also applies here, on the parent(<sup>j</sup>)(n<sub>2</sub>) for i\>j\>=1 (of course j=i is the CFG and j=i-1 is the basic block).
 
 Specifically, these rules allow for edges where in a given execution of
 the HUGR the source of the edge executes once, but the target may
@@ -832,6 +824,9 @@ such declarations may include (bind) any number of type parameters, of kinds as 
 TypeParam ::= Type(Any|Copyable)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
+            | String
+            | Bytes
+            | Float
             | List(TypeParam) -- homogeneous, any sized
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
@@ -849,8 +844,12 @@ TypeArgs appropriate for the function's TypeParams:
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
           | BoundedUSize(u64)
+          | String(String)
+          | Bytes([u8])
+          | Float(f64)
           | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
-          | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
+          | List([TypeArg])
+          | Tuple([TypeArg])
           | Opaque(Value)
           | Variable -- refers to an enclosing TypeParam (binder) of any kind above
 ```
@@ -864,7 +863,7 @@ Given TypeArgs, the body of the Function node's type can be converted to a monom
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
+(Note that within a polymorphic type scheme, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 #### Row Variables
@@ -876,16 +875,16 @@ treatment, as follows:
   but also a single `TypeArg::Type`. (This is purely a notational convenience.)
   For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
   for `Type::Function(#(usize), #(unit), <exts>)`.
-* When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
+* When a `TypeArg::List` is provided as argument for such a TypeParam, we allow
   elements to be a mixture of both types (including variables of kind
   `TypeParam::Type(_)`) and also row variables. When such variables are instantiated
-  (with other Sequences) the elements of the inner Sequence are spliced directly into
-  the outer (concatenating their elements), eliding the inner (Sequence) wrapper.
+  (with other `List`s) the elements of the inner `List` are spliced directly into
+  the outer (concatenating their elements), eliding the inner (`List`) wrapper.
 
 For example, a polymorphic FuncDefn might declare a row variable X of kind
 `TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
-`TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+`TypeArg::List([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
 See [Declarative Format](#declarative-format) for more examples.
 

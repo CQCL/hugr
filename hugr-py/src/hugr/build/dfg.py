@@ -21,8 +21,9 @@ from hugr.hugr import Hugr
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from hugr.build.function import Module
     from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
-    from hugr.tys import Type, TypeParam, TypeRow
+    from hugr.tys import TypeParam, TypeRow
 
     from .cfg import Cfg
     from .cond_loop import Conditional, If, TailLoop
@@ -36,40 +37,21 @@ class DataflowError(Exception):
 
 @dataclass()
 class DefinitionBuilder(Generic[OpVar]):
-    """Base class for builders that can define functions, constants, and aliases.
+    """Base class for builders that can define constants, and allow access
+       to the `Module` for declaring/defining functions and aliases.
 
     As this class may be a root node, it does not extend `ParentBuilder`.
     """
 
     hugr: Hugr[OpVar]
 
-    def define_function(
-        self,
-        name: str,
-        input_types: TypeRow,
-        output_types: TypeRow | None = None,
-        type_params: list[TypeParam] | None = None,
-        parent: ToNode | None = None,
-    ) -> Function:
-        """Start building a function definition in the graph.
-
-        Args:
-            name: The name of the function.
-            input_types: The input types for the function.
-            output_types: The output types for the function.
-                If not provided, it will be inferred after the function is built.
-            type_params: The type parameters for the function, if polymorphic.
-            parent: The parent node of the constant. Defaults to the entrypoint node.
-
-        Returns:
-            The new function builder.
+    def module_root_builder(self) -> Module:
+        """Allows access to the `Module` at the root of the Hugr
+        (outside the scope of this builder, perhaps outside the entrypoint).
         """
-        parent_node = parent or self.hugr.entrypoint
-        parent_op = ops.FuncDefn(name, input_types, type_params or [])
-        func = Function.new_nested(parent_op, self.hugr, parent_node)
-        if output_types is not None:
-            func.declare_outputs(output_types)
-        return func
+        from hugr.build.function import Module  # Avoid circular import
+
+        return Module(self.hugr)
 
     def add_const(self, value: val.Value, parent: ToNode | None = None) -> Node:
         """Add a static constant to the graph.
@@ -89,11 +71,6 @@ class DefinitionBuilder(Generic[OpVar]):
         """
         parent_node = parent or self.hugr.entrypoint
         return self.hugr.add_node(ops.Const(value), parent_node)
-
-    def add_alias_defn(self, name: str, ty: Type, parent: ToNode | None = None) -> Node:
-        """Add a type alias definition."""
-        parent_node = parent or self.hugr.entrypoint
-        return self.hugr.add_node(ops.AliasDefn(name, ty), parent_node)
 
 
 DP = TypeVar("DP", bound=ops.DfParentOp)

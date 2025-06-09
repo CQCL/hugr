@@ -9,7 +9,7 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{BuilderWiringError, FunctionBuilder};
+use super::{BuilderWiringError, ModuleBuilder};
 use super::{
     CircuitBuilder,
     handle::{BuildHandle, Outputs},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 use crate::extension::ExtensionRegistry;
-use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
+use crate::types::{Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -82,33 +82,6 @@ pub trait Container {
         self.add_child_node(constant.into()).into()
     }
 
-    /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
-    /// body graph.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ops::FuncDefn`] node.
-    fn define_function(
-        &mut self,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
-
-        // Add the extensions used by the function types.
-        self.use_extensions(
-            body.used_extensions().unwrap_or_else(|e| {
-                panic!("Build-time signatures should have valid extensions. {e}")
-            }),
-        );
-
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
-        Ok(FunctionBuilder::from_dfg_builder(db))
-    }
-
     /// Insert a HUGR as a child of the container.
     fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
         let parent = self.container_node();
@@ -155,8 +128,19 @@ pub trait Container {
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
-/// (with varying root node types)
+/// (with varying entrypoint node types)
 pub trait HugrBuilder: Container {
+    /// Allows adding definitions to the module root of which
+    /// this builder is building a part
+    fn module_root_builder(&mut self) -> ModuleBuilder<&mut Hugr> {
+        debug_assert!(
+            self.hugr()
+                .get_optype(self.hugr().module_root())
+                .is_module()
+        );
+        ModuleBuilder(self.hugr_mut())
+    }
+
     /// Finish building the HUGR, perform any validation checks and return it.
     fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }

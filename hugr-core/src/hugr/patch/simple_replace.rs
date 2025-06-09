@@ -17,6 +17,8 @@ use thiserror::Error;
 use super::inline_dfg::InlineDFGError;
 use super::{BoundaryPort, HostPort, PatchHugrMut, PatchVerification, ReplacementPort};
 
+pub mod serial;
+
 /// Specification of a simple replacement operation.
 ///
 /// # Type parameters
@@ -638,8 +640,8 @@ pub(in crate::hugr::patch) mod test {
 
     use crate::builder::test::n_identity;
     use crate::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::patch::simple_replace::Outcome;

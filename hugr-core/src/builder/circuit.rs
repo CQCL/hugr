@@ -245,7 +245,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::Extension;
-    use crate::builder::{Container, HugrBuilder, ModuleBuilder};
+    use crate::builder::{HugrBuilder, ModuleBuilder};
     use crate::extension::ExtensionId;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::ConstF64;

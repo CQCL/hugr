@@ -233,4 +233,12 @@ mod test {
         );
         assert!(extracted_hugr.get_optype(extracted_bb).is_dataflow_block());
     }
+
+    #[test]
+    fn mermaid_format() {
+        let h = simple_cfg_hugr();
+        let rerooted = h.with_entrypoint(h.entrypoint());
+        let mermaid_str = rerooted.mermaid_format().finish();
+        assert_eq!(mermaid_str, h.mermaid_format().finish());
+    }
 }

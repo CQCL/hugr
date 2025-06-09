@@ -19,6 +19,7 @@ workspace = true
 [features]
 declarative = ["serde_yaml"]
 zstd = ["dep:zstd"]
+default = []
 
 [lib]
 bench = false
@@ -60,6 +61,8 @@ thiserror = { workspace = true }
 typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
+ordered-float = { workspace = true, features = ["serde"] }
+base64.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }
@@ -73,3 +76,4 @@ proptest-derive = { workspace = true }
 # Required for documentation examples
 hugr = { path = "../hugr" }
 serde_yaml = "0.9.34"
+anyhow = { workspace = true }

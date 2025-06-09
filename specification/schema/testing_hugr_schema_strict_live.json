@@ -130,6 +130,41 @@
             "title": "BoundedNatParam",
             "type": "object"
         },
+        "BytesArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "Bytes",
+                    "default": "Bytes",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "value": {
+                    "contentEncoding": "base64",
+                    "description": "Base64-encoded byte string",
+                    "title": "Value",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "value"
+            ],
+            "title": "BytesArg",
+            "type": "object"
+        },
+        "BytesParam": {
+            "additionalProperties": false,
+            "properties": {
+                "tp": {
+                    "const": "Bytes",
+                    "default": "Bytes",
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "BytesParam",
+            "type": "object"
+        },
         "CFG": {
             "additionalProperties": false,
             "description": "A dataflow node which is defined by a child CFG.",
@@ -566,6 +601,39 @@
             "title": "FixedHugr",
             "type": "object"
         },
+        "FloatArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "Float",
+                    "default": "Float",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "value": {
+                    "title": "Value",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "value"
+            ],
+            "title": "FloatArg",
+            "type": "object"
+        },
+        "FloatParam": {
+            "additionalProperties": false,
+            "properties": {
+                "tp": {
+                    "const": "Float",
+                    "default": "Float",
+                    "title": "Tp",
+                    "type": "string"
+                }
+            },
+            "title": "FloatParam",
+            "type": "object"
+        },
         "FromParamsBound": {
             "properties": {
                 "b": {
@@ -759,6 +827,29 @@
                 "parent"
             ],
             "title": "Input",
+            "type": "object"
+        },
+        "ListArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "List",
+                    "default": "List",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "elems": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Elems",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "elems"
+            ],
+            "title": "ListArg",
             "type": "object"
         },
         "ListParam": {
@@ -1171,29 +1262,6 @@
             "title": "RowVar",
             "type": "object"
         },
-        "SequenceArg": {
-            "additionalProperties": false,
-            "properties": {
-                "tya": {
-                    "const": "Sequence",
-                    "default": "Sequence",
-                    "title": "Tya",
-                    "type": "string"
-                },
-                "elems": {
-                    "items": {
-                        "$ref": "#/$defs/TypeArg"
-                    },
-                    "title": "Elems",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "elems"
-            ],
-            "title": "SequenceArg",
-            "type": "object"
-        },
         "SerialHugr": {
             "description": "A serializable representation of a Hugr.",
             "properties": {
@@ -1561,6 +1629,29 @@
             "title": "TestingHugr",
             "type": "object"
         },
+        "TupleArg": {
+            "additionalProperties": false,
+            "properties": {
+                "tya": {
+                    "const": "Tuple",
+                    "default": "Tuple",
+                    "title": "Tya",
+                    "type": "string"
+                },
+                "elems": {
+                    "items": {
+                        "$ref": "#/$defs/TypeArg"
+                    },
+                    "title": "Elems",
+                    "type": "array"
+                }
+            },
+            "required": [
+                "elems"
+            ],
+            "title": "TupleArg",
+            "type": "object"
+        },
         "TupleParam": {
             "additionalProperties": false,
             "properties": {
@@ -1659,8 +1750,11 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatArg",
-                    "Sequence": "#/$defs/SequenceArg",
+                    "Bytes": "#/$defs/BytesArg",
+                    "Float": "#/$defs/FloatArg",
+                    "List": "#/$defs/ListArg",
                     "String": "#/$defs/StringArg",
+                    "Tuple": "#/$defs/TupleArg",
                     "Type": "#/$defs/TypeTypeArg",
                     "Variable": "#/$defs/VariableArg"
                 },
@@ -1677,7 +1771,16 @@
                     "$ref": "#/$defs/StringArg"
                 },
                 {
-                    "$ref": "#/$defs/SequenceArg"
+                    "$ref": "#/$defs/BytesArg"
+                },
+                {
+                    "$ref": "#/$defs/FloatArg"
+                },
+                {
+                    "$ref": "#/$defs/ListArg"
+                },
+                {
+                    "$ref": "#/$defs/TupleArg"
                 },
                 {
                     "$ref": "#/$defs/VariableArg"
@@ -1754,6 +1857,8 @@
             "discriminator": {
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
+                    "Bytes": "#/$defs/BytesParam",
+                    "Float": "#/$defs/FloatParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
                     "Tuple": "#/$defs/TupleParam",
@@ -1770,6 +1875,12 @@
                 },
                 {
                     "$ref": "#/$defs/StringParam"
+                },
+                {
+                    "$ref": "#/$defs/FloatParam"
+                },
+                {
+                    "$ref": "#/$defs/BytesParam"
                 },
                 {
                     "$ref": "#/$defs/ListParam"

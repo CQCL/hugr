@@ -259,6 +259,39 @@ def test_poly_function(direct_call: bool) -> None:
     validate(mod.hugr)
 
 
+def test_literals() -> None:
+    mod = Module()
+
+    func = mod.declare_function(
+        "literals",
+        tys.PolyFuncType(
+            [
+                tys.StringParam(),
+                tys.BoundedNatParam(),
+                tys.BytesParam(),
+                tys.FloatParam(),
+            ],
+            tys.FunctionType.endo([tys.Qubit]),
+        ),
+    )
+
+    caller = mod.define_function("caller", [tys.Qubit], [tys.Qubit])
+    call = caller.call(
+        func,
+        caller.inputs()[0],
+        instantiation=tys.FunctionType.endo([tys.Qubit]),
+        type_args=[
+            tys.StringArg("string"),
+            tys.BoundedNatArg(42),
+            tys.BytesArg(b"HUGR"),
+            tys.FloatArg(0.9),
+        ],
+    )
+    caller.set_outputs(call)
+
+    validate(mod.hugr)
+
+
 @pytest.mark.parametrize("direct_call", [True, False])
 def test_mono_function(direct_call: bool) -> None:
     mod = Module()
@@ -276,6 +309,19 @@ def test_mono_function(direct_call: bool) -> None:
     f_main.set_outputs(call)
 
     validate(mod.hugr)
+
+
+def test_function_dfg() -> None:
+    d = Dfg(tys.Qubit)
+
+    f_id = d.module_root_builder().define_function("id", [tys.Qubit])
+    f_id.set_outputs(f_id.input_node[0])
+
+    (q,) = d.inputs()
+    call = d.call(f_id, q)
+    d.set_outputs(call)
+
+    validate(d.hugr)
 
 
 def test_recursive_function(snapshot) -> None:
