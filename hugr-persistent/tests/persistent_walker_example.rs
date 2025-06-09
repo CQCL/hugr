@@ -2,18 +2,17 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
-use hugr::types::EdgeKind;
 use itertools::Itertools;
 
 use hugr_core::{
     Hugr, HugrView, PortIndex, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
     extension::prelude::qb_t,
-    hugr::{
-        persistent::{CommitStateSpace, PersistentReplacement, PinnedWire, Walker},
-        views::SiblingSubgraph,
-    },
+    hugr::views::SiblingSubgraph,
+    types::EdgeKind,
 };
+
+use hugr_persistent::{CommitStateSpace, PersistentReplacement, PinnedWire, Walker};
 
 /// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 2;
@@ -24,10 +23,10 @@ use walker_example_extension::{cz_gate, h_gate};
 mod walker_example_extension {
     use std::sync::Arc;
 
-    use hugr::Extension;
-    use hugr::extension::ExtensionId;
-    use hugr::ops::{ExtensionOp, OpName};
-    use hugr::types::{FuncValueType, PolyFuncTypeRV};
+    use hugr_core::Extension;
+    use hugr_core::extension::ExtensionId;
+    use hugr_core::ops::{ExtensionOp, OpName};
+    use hugr_core::types::{FuncValueType, PolyFuncTypeRV};
 
     use lazy_static::lazy_static;
     use semver::Version;

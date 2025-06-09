@@ -417,15 +417,5 @@ mod tests {
         {
             assert!(RenderConfig::try_from(config).is_err());
         }
-
-        #[allow(deprecated)]
-        let config = RenderConfig {
-            entrypoint: Some(h.entrypoint()),
-            ..Default::default()
-        };
-        assert_eq!(
-            MermaidFormatter::from_render_config(config, &h),
-            h.mermaid_format()
-        )
     }
 }

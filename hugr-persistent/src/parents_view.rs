@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 
-use crate::{
+use hugr_core::{
     Direction, Hugr, HugrView, Node, Port,
     extension::ExtensionRegistry,
     hugr::{
+        self,
         internal::HugrInternals,
         views::{ExtractionResult, render},
     },
@@ -17,12 +18,12 @@ use super::{CommitStateSpace, PatchNode, state_space::CommitId};
 /// Note that this is not a valid HUGR: not a single entrypoint, root etc. As
 /// a consequence, not all HugrView methods are implemented.
 #[derive(Debug, Clone)]
-pub(super) struct ParentsView<'a> {
+pub(crate) struct ParentsView<'a> {
     hugrs: BTreeMap<CommitId, &'a Hugr>,
 }
 
 impl<'a> ParentsView<'a> {
-    pub(super) fn from_commit(commit_id: CommitId, state_space: &'a CommitStateSpace) -> Self {
+    pub(crate) fn from_commit(commit_id: CommitId, state_space: &'a CommitStateSpace) -> Self {
         let mut hugrs = BTreeMap::new();
         for parent in state_space.parents(commit_id) {
             hugrs.insert(parent, state_space.commit_hugr(parent));
@@ -51,7 +52,7 @@ impl HugrInternals for ParentsView<'_> {
         unimplemented!()
     }
 
-    fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap {
+    fn node_metadata_map(&self, node: Self::Node) -> &hugr::NodeMetadataMap {
         let PatchNode(commit_id, node) = node;
         self.hugrs
             .get(&commit_id)
