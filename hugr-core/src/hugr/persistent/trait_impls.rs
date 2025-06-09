@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
-use portgraph::render::{DotFormat, MermaidFormat};
+use portgraph::render::MermaidFormat;
 
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
@@ -10,7 +10,7 @@ use crate::{
         internal::HugrInternals,
         views::{
             ExtractionResult,
-            render::{self, RenderConfig},
+            render::{self, MermaidFormatter, NodeLabel},
         },
     },
 };
@@ -242,35 +242,49 @@ impl HugrView for PersistentHugr {
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
     }
 
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: Some(self.entrypoint()),
-        })
+    #[allow(deprecated)]
+    fn mermaid_string_with_config(&self, config: render::RenderConfig<Self::Node>) -> String {
+        self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
 
-    fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String {
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
         // Extract a concrete HUGR for displaying
         let (hugr, node_map) = self.apply_all();
 
-        // Map config accordingly
-        let config = RenderConfig {
-            entrypoint: config.entrypoint.map(|n| node_map[&n]),
-            node_indices: config.node_indices,
-            port_offsets_in_edges: config.port_offsets_in_edges,
-            type_labels_in_edges: config.type_labels_in_edges,
-        };
-
         // Render the extracted HUGR but map the node indices back to the
         // original patch node IDs
-        let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
-        let fmt_node_index = |n: portgraph::NodeIndex| format!("{:?}", inv_node_map[&n.into()]);
+        let entrypoint = formatter.entrypoint().map(|n| node_map[&n]);
+        let node_labels = match formatter.node_labels() {
+            NodeLabel::None => NodeLabel::None,
+            NodeLabel::Numeric => {
+                // replace node labels with patch node IDs
+                let node_labels_map: HashMap<_, _> = node_map
+                    .into_iter()
+                    .map(|(k, v)| (v, format!("{:?}", k)))
+                    .collect();
+                NodeLabel::Custom(node_labels_map)
+            }
+            NodeLabel::Custom(labels) => {
+                // rekey labels to the extracted HUGR node IDs
+                let labels = labels
+                    .iter()
+                    .map(|(k, v)| (node_map[k], v.clone()))
+                    .collect();
+                NodeLabel::Custom(labels)
+            }
+        };
+
+        // Map config accordingly
+        let config = MermaidFormatter::new(&hugr)
+            .with_entrypoint(entrypoint)
+            .with_node_labels(node_labels)
+            .with_port_offsets(formatter.port_offsets())
+            .with_type_labels(formatter.type_labels());
+
         hugr.graph
             .mermaid_format()
             .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(&hugr, config, fmt_node_index))
+            .with_node_style(render::node_style(&hugr, config.clone()))
             .with_edge_style(render::edge_style(&hugr, config))
             .finish()
     }
@@ -279,26 +293,7 @@ impl HugrView for PersistentHugr {
     where
         Self: Sized,
     {
-        // Extract a concrete HUGR for displaying
-        let (hugr, node_map) = self.apply_all();
-
-        // Map config accordingly
-        let config = RenderConfig {
-            entrypoint: Some(node_map[&self.entrypoint()]),
-            ..RenderConfig::default()
-        };
-
-        // Render the extracted HUGR but map the node indices back to the
-        // original patch node IDs
-        let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
-        let fmt_node_index = |n: portgraph::NodeIndex| format!("{:?}", inv_node_map[&n.into()]);
-        hugr.graph
-            .dot_format()
-            .with_hierarchy(&hugr.hierarchy)
-            .with_node_style(render::node_style(&hugr, config, fmt_node_index))
-            .with_port_style(render::port_style(&hugr, config))
-            .with_edge_style(render::edge_style(&hugr, config))
-            .finish()
+        unimplemented!("use mermaid_string instead")
     }
 
     fn extensions(&self) -> &crate::extension::ExtensionRegistry {
@@ -351,19 +346,15 @@ mod tests {
             .try_extract_hugr([commit1, commit2, commit4])
             .unwrap();
 
-        let mermaid_str = hugr.mermaid_string_with_config(RenderConfig {
-            node_indices: false,
-            entrypoint: Some(hugr.entrypoint()),
-            ..Default::default()
-        });
+        let mermaid_str = hugr
+            .mermaid_format()
+            .with_node_labels(NodeLabel::None)
+            .finish();
         let extracted_hugr = hugr.to_hugr();
         let exp_str = extracted_hugr
-            .mermaid_string_with_config(RenderConfig {
-                node_indices: false,
-                entrypoint: Some(extracted_hugr.entrypoint()),
-                ..Default::default()
-            })
-            .to_string();
+            .mermaid_format()
+            .with_node_labels(NodeLabel::None)
+            .finish();
 
         assert_eq!(mermaid_str, exp_str);
     }
