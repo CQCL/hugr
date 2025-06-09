@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from hugr.ops import ComWire
 
-QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+QUANTUM_EXT = ext.Extension("pytest.quantum", ext.Version(0, 1, 0))
 QUANTUM_EXT.add_op_def(
     ext.OpDef(
         name="H",
@@ -122,7 +122,8 @@ Rz = RzDef()
 def _base_command() -> list[str]:
     workspace_dir = pathlib.Path(__file__).parent.parent.parent
     # use the HUGR_BIN environment variable if set, otherwise use the debug build
-    bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
+    bin_loc = os.environ.get("HUGR_BIN", str(
+        workspace_dir / "target/debug/hugr"))
     return [bin_loc]
 
 
