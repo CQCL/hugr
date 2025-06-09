@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::BTreeMap, rc::Rc};
 
 use hugr_core::{
     HugrView, Node,
@@ -56,7 +56,7 @@ impl<
 ///
 /// Those callbacks may hold references with lifetimes older than `'a`.
 #[derive(Default)]
-pub struct ExtensionOpMap<'a, H>(HashMap<(ExtensionId, OpName), Box<dyn ExtensionOpFn<'a, H>>>);
+pub struct ExtensionOpMap<'a, H>(BTreeMap<(ExtensionId, OpName), Box<dyn ExtensionOpFn<'a, H>>>);
 
 impl<'a, H: HugrView<Node = Node>> ExtensionOpMap<'a, H> {
     /// Register a callback to emit a [`ExtensionOp`], keyed by fully

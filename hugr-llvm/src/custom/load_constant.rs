@@ -1,5 +1,5 @@
 //! Provides the implementation for a collection of [`CustomConst`] callbacks.
-use std::{any::TypeId, collections::HashMap};
+use std::{any::TypeId, collections::BTreeMap};
 
 use hugr_core::{HugrView, Node, ops::constant::CustomConst};
 use inkwell::values::BasicValueEnum;
@@ -36,7 +36,7 @@ impl<
 /// The callbacks are keyed by the [`TypeId`] of those impls.
 #[derive(Default)]
 pub struct LoadConstantsMap<'a, H>(
-    HashMap<TypeId, Box<dyn LoadConstantFn<'a, H, dyn CustomConst>>>,
+    BTreeMap<TypeId, Box<dyn LoadConstantFn<'a, H, dyn CustomConst>>>,
 );
 
 impl<'a, H: HugrView<Node = Node>> LoadConstantsMap<'a, H> {

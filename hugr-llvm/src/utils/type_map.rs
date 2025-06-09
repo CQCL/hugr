@@ -1,5 +1,5 @@
 //! Provides a generic mapping from [`HugrType`] into some domain.
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use hugr_core::{
     extension::ExtensionId,
@@ -94,7 +94,7 @@ pub type CustomTypeKey = (ExtensionId, TypeName);
 #[derive(Default)]
 pub struct TypeMap<'a, TM: TypeMapping> {
     type_map: TM,
-    custom_hooks: HashMap<CustomTypeKey, Box<dyn TypeMappingFn<'a, TM> + 'a>>,
+    custom_hooks: BTreeMap<CustomTypeKey, Box<dyn TypeMappingFn<'a, TM> + 'a>>,
 }
 
 impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
