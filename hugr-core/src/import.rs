@@ -35,7 +35,7 @@ use thiserror::Error;
 
 /// An error that can occur during import.
 #[derive(Debug, Clone, Error)]
-#[error("failed to import hugr")]
+#[error("failed to import hugr: {0}")]
 pub struct ImportError(#[from] ImportErrorInner);
 
 #[derive(Debug, Clone, Error)]
@@ -56,7 +56,7 @@ enum ImportErrorInner {
     Invalid(String),
 
     /// An error with additional context.
-    #[error("import failed in context: {1}")]
+    #[error("import failed in context: {1} with error: {0}")]
     Context(#[source] Box<ImportErrorInner>, String),
 
     /// A signature mismatch was detected during import.
@@ -106,6 +106,7 @@ impl From<ExtensionError> for ImportError {
 #[derive(Debug, Clone, Error)]
 enum OrderHintError {
     /// Duplicate order hint key in the same region.
+    // TODO use {1} in error message
     #[error("duplicate order hint key {0}")]
     DuplicateKey(table::NodeId, u64),
     /// Order hint including a key not defined in the region.
