@@ -120,7 +120,6 @@ impl<'a> Context<'a> {
     /// Exports the root module of the HUGR graph.
     pub fn export_root(&mut self) {
         self.module.root = self.module.insert_region(table::Region::default());
-        self.symbols.enter(self.module.root);
         self.links.enter(self.module.root);
 
         let hugr_children = self.hugr.children(self.hugr.module_root());
@@ -149,7 +148,6 @@ impl<'a> Context<'a> {
         self.export_node_json_metadata(self.hugr.module_root(), &mut meta);
 
         let (links, ports) = self.links.exit();
-        self.symbols.exit();
 
         self.module.regions[self.module.root.index()] = table::Region {
             kind: model::RegionKind::Module,
@@ -610,7 +608,6 @@ impl<'a> Context<'a> {
     ) -> table::RegionId {
         let region = self.module.insert_region(table::Region::default());
 
-        self.symbols.enter(region);
         if closure == model::ScopeClosure::Closed {
             self.links.enter(region);
         }
@@ -684,7 +681,6 @@ impl<'a> Context<'a> {
             }
             model::ScopeClosure::Open => None,
         };
-        self.symbols.exit();
 
         self.module.regions[region.index()] = table::Region {
             kind: model::RegionKind::DataFlow,
@@ -702,7 +698,6 @@ impl<'a> Context<'a> {
     /// Creates a control flow region from the given node's children.
     pub fn export_cfg(&mut self, node: Node, closure: model::ScopeClosure) -> table::RegionId {
         let region = self.module.insert_region(table::Region::default());
-        self.symbols.enter(region);
 
         if closure == model::ScopeClosure::Closed {
             self.links.enter(region);
@@ -761,7 +756,6 @@ impl<'a> Context<'a> {
             }
             model::ScopeClosure::Open => None,
         };
-        self.symbols.exit();
 
         self.module.regions[region.index()] = table::Region {
             kind: model::RegionKind::ControlFlow,

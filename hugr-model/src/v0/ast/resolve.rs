@@ -37,14 +37,12 @@ impl<'a> Context<'a> {
 
     pub fn resolve_module(&mut self, module: &'a Module) -> BuildResult<()> {
         self.module.root = self.module.insert_region(table::Region::default());
-        self.symbols.enter(self.module.root);
         self.links.enter(self.module.root);
 
         let children = self.resolve_nodes(&module.root.children)?;
         let meta = self.resolve_terms(&module.root.meta)?;
 
         let (links, ports) = self.links.exit();
-        self.symbols.exit();
         let scope = Some(table::RegionScope { links, ports });
 
         // Symbols that could not be resolved within the module still need to
@@ -252,9 +250,6 @@ impl<'a> Context<'a> {
         // id, which we need to track the region's scopes.
         let region_id = self.module.insert_region(table::Region::default());
 
-        // Each region defines a new scope for symbols.
-        self.symbols.enter(region_id);
-
         // If the region is closed, it also defines a new scope for links.
         if ScopeClosure::Closed == scope_closure {
             self.links.enter(region_id);
@@ -272,7 +267,6 @@ impl<'a> Context<'a> {
                 Some(table::RegionScope { links, ports })
             }
         };
-        self.symbols.exit();
 
         self.module.regions[region_id.index()] = table::Region {
             kind: region.kind,
