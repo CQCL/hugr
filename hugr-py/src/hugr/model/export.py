@@ -213,7 +213,8 @@ class ModelExport:
                 )
 
             case LoadFunc() as op:
-                signature = op.instantiation.to_model()
+                signature = op.outer_signature().to_model()
+                instantiation = op.instantiation.to_model()
                 func_args = cast(
                     list[model.Term], [type.to_model() for type in op.type_args]
                 )
@@ -227,10 +228,10 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", [signature, func])
+                        model.Apply("core.load_const", [instantiation, func])
                     ),
                     signature=signature,
-                    inputs=inputs,
+                    inputs=[],
                     outputs=outputs,
                     meta=meta,
                 )

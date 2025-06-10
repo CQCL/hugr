@@ -966,8 +966,10 @@ impl<'a> Context<'a> {
         node_data: &'a table::Node<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
-        if let Some([_, _]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
-            let signature = self.get_node_signature(node_id)?;
+        if let Some([inputs, outputs]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
+            let inputs = self.import_type_row(inputs)?;
+            let outputs = self.import_type_row(outputs)?;
+            let signature = Signature::new(inputs, outputs);
             let optype = OpType::CallIndirect(CallIndirect { signature });
             let node = self.make_node(node_id, optype, parent)?;
             return Ok(node);
