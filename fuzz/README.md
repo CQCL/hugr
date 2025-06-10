@@ -7,7 +7,7 @@ This project uses `cargo-fuzz` for doing fuzz testing for hugr.
 1. Install `cargo-fuzz` with: `cargo install cargo-fuzz`
 2. Build with `cargo fuzz build`
 
-> [!NOTE] Important
+> [!NOTE]
 > The `libFuzzer` used by `cargo-fuzz` needs **nightly**.
 
 ## Fuzz targets
@@ -52,6 +52,9 @@ To run this target:
 The fuzzing process will be terminated once a crash is detected, and the offending input
 will be saved to the `artifacts/<target>` directory. You can reproduce the crash by doing:
 `cargo fuzz run fuzz_structure artifacts/<target>/crash-XXXXXX`
+
+If you want to keep the fuzzing process, even after a crash has been detected,
+you can provide the options `-fork=1` and `-ignore_crashes=1`.
 
 ## Providing options to `libFuzzer`
 
