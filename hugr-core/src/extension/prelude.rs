@@ -11,7 +11,7 @@ use crate::extension::simple_op::{
     MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name,
 };
 use crate::extension::{
-    ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDefBound,
+    ConstFolder, ExtensionId, FoldVal, OpDef, SignatureError, SignatureFunc, TypeDefBound,
 };
 use crate::ops::OpName;
 use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
@@ -586,7 +586,7 @@ pub enum TupleOpDef {
 }
 
 #[allow(deprecated)] // TODO: need a way to handle types of tuples. Or drop that SumType...
-impl ConstFold for TupleOpDef {
+impl super::ConstFold for TupleOpDef {
     fn fold(
         &self,
         _type_args: &[TypeArg],
@@ -824,13 +824,9 @@ impl MakeOpDef for NoopDef {
     }
 }
 
-impl ConstFold for NoopDef {
-    fn fold(
-        &self,
-        _type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, Value)],
-    ) -> crate::extension::ConstFoldResult {
-        fold_out_row([consts.first()?.1.clone()])
+impl ConstFolder for NoopDef {
+    fn fold(&self, _type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        outputs[0] = inputs[0].clone()
     }
 }
 
