@@ -7,14 +7,15 @@ use std::sync::{Arc, Weak};
 use serde_with::serde_as;
 
 use crate::envelope::serde_with::AsStringEnvelope;
+use crate::extension::const_fold::fold_vals_to_indexed_vals;
 use crate::ops::{OpName, OpNameRef, Value};
 use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
-use crate::{Hugr, IncomingPort};
+use crate::{Hugr, IncomingPort, PortIndex};
 
 use super::const_fold::FoldVal;
 use super::{
-    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
+    ConstFoldResult, ConstFolder, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
     SignatureError,
 };
 
@@ -329,7 +330,7 @@ pub struct OpDef {
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
     #[serde(skip)]
-    constant_folder: Option<Box<dyn ConstFold>>,
+    constant_folder: Option<Box<dyn ConstFolder>>,
 }
 
 impl OpDef {
@@ -459,7 +460,7 @@ impl OpDef {
 
     /// Set the constant folding function for this Op, which can evaluate it
     /// given constant inputs.
-    pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
+    pub fn set_constant_folder(&mut self, fold: impl ConstFolder + 'static) {
         self.constant_folder = Some(Box::new(fold));
     }
 
@@ -472,8 +473,15 @@ impl OpDef {
         type_args: &[TypeArg],
         consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
-        #[allow(deprecated)] // we are in deprecated function, remove at same time
-        (self.constant_folder.as_ref())?.fold(type_args, consts)
+        let folder = self.constant_folder.as_ref()?;
+        let sig = self.compute_signature(type_args).unwrap();
+        let mut inputs = vec![FoldVal::Unknown; sig.input_count()];
+        for (p, v) in consts {
+            inputs[p.index()] = v.clone().into();
+        }
+        let mut outputs = vec![FoldVal::Unknown; sig.output_count()];
+        folder.fold(type_args, &inputs, &mut outputs);
+        Some(fold_vals_to_indexed_vals(&outputs))
     }
 
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
@@ -481,7 +489,7 @@ impl OpDef {
     /// initialised to [FoldVal::Unknown].
     pub fn const_fold(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
         if let Some(cf) = self.constant_folder.as_ref() {
-            cf.fold2(type_args, inputs, outputs)
+            cf.fold(type_args, inputs, outputs)
         }
     }
 

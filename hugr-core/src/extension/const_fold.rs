@@ -140,31 +140,13 @@ pub fn fold_out_row(consts: impl IntoIterator<Item = Value>) -> ConstFoldResult 
     Some(vec)
 }
 
-/// Trait implemented by extension operations that can perform constant folding.
+#[deprecated(note = "Use ConstFolder")]
+/// Old trait implemented by extension operations that can perform constant folding.
+/// Deprecated: see [ConstFolder]
 pub trait ConstFold: Send + Sync {
-    /// Given type arguments `type_args` and [`FoldVal`]s for each input,
-    /// update the outputs (these will be initialized to [FoldVal::Unknown]).
-    ///
-    /// Defaults to calling [Self::fold] with those arguments that can be converted ---
-    /// [FoldVal::LoadedFunction]s will be lost as these are not representable as [Value]s.
-    fn fold2(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
-        let consts = inputs
-            .iter()
-            .cloned()
-            .enumerate()
-            .filter_map(|(p, fv)| Some((p.into(), fv.try_into().ok()?)))
-            .collect::<Vec<_>>();
-        #[allow(deprecated)] // remove this when fold is removed
-        let outs = self.fold(type_args, &consts);
-        for (p, v) in outs.unwrap_or_default() {
-            outputs[p.index()] = v.into();
-        }
-    }
-
     /// Given type arguments `type_args` and
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s,
     /// try to evaluate the operation.
-    #[deprecated(note = "Use fold2")]
     fn fold(
         &self,
         type_args: &[TypeArg],
@@ -172,7 +154,50 @@ pub trait ConstFold: Send + Sync {
     ) -> ConstFoldResult;
 }
 
+/// Trait implemented by extension operations that can perform constant folding.
+pub trait ConstFolder: Send + Sync {
+    /// Given type arguments `type_args` and [`FoldVal`]s for each input,
+    /// update the outputs (these will be initialized to [FoldVal::Unknown]).
+    fn fold(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]);
+}
+
+pub(super) fn fold_vals_to_indexed_vals<P: From<usize>>(fvs: &[FoldVal]) -> Vec<(P, Value)> {
+    fvs.iter()
+        .cloned()
+        .enumerate()
+        .filter_map(|(p, fv)| Some((p.into(), fv.try_into().ok()?)))
+        .collect::<Vec<_>>()
+}
+
+#[allow(deprecated)] // Legacy conversion routine, remove when ConstFold removed
+fn do_fold(
+    old_fold: &impl ConstFold,
+    type_args: &[TypeArg],
+    inputs: &[FoldVal],
+    outputs: &mut [FoldVal],
+) {
+    let consts = fold_vals_to_indexed_vals(inputs);
+    let outs = old_fold.fold(type_args, &consts);
+    for (p, v) in outs.unwrap_or_default() {
+        outputs[p.index()] = v.into();
+    }
+}
+
+#[allow(deprecated)] // Remove when ConstFold removed
+impl<T: ConstFold> ConstFolder for T {
+    fn fold(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        do_fold(self, type_args, inputs, outputs)
+    }
+}
+
+#[allow(deprecated)] // Remove when ConstFold removed
 impl Debug for Box<dyn ConstFold> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<custom constant folding>")
+    }
+}
+
+impl Debug for Box<dyn ConstFolder> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "<custom constant folding>")
     }
@@ -180,6 +205,7 @@ impl Debug for Box<dyn ConstFold> {
 
 /// Blanket implementation for functions that only require the constants to
 /// evaluate - type arguments are not relevant.
+#[allow(deprecated)] // Remove when ConstFold removed
 impl<T> ConstFold for T
 where
     T: Fn(&[(crate::IncomingPort, crate::ops::Value)]) -> ConstFoldResult + Send + Sync,
@@ -195,14 +221,25 @@ where
 
 type FoldFn = dyn Fn(&[TypeArg], &[(IncomingPort, Value)]) -> ConstFoldResult + Send + Sync;
 
-/// Type holding a boxed const-folding function.
+/// Legacy type holding a boxed const-folding function.
+/// Deprecated: use [BoxedFolder] instead.
+#[deprecated(note = "Use BoxedFolder")]
 pub struct Folder {
     /// Const-folding function.
     pub folder: Box<FoldFn>,
 }
 
+#[allow(deprecated)] // Remove when ConstFold removed
 impl ConstFold for Folder {
     fn fold(&self, type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         (self.folder)(type_args, consts)
+    }
+}
+
+pub struct BoxedFolder(Box<dyn Fn(&[TypeArg], &[FoldVal], &mut [FoldVal]) + Send + Sync>);
+
+impl ConstFolder for BoxedFolder {
+    fn fold(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        self.0(type_args, inputs, outputs)
     }
 }
