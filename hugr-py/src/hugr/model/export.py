@@ -539,7 +539,7 @@ class ModelExport:
             case _:
                 return None
 
-        return _mangle_name(node, name)
+        return _mangle_name(func_node, name)
 
     def find_const_input(self, node: Node) -> model.Term | None:
         """Find and export the constant that a node is connected to, if any."""
