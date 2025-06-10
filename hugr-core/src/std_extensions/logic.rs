@@ -31,8 +31,7 @@ impl ConstFolder for LogicOp {
             Self::Or => {
                 let res = inps.iter().any(|x| *x);
                 // We can only fold to false if we have a const for all our inputs
-                let r = (res || inps.len() == 2).then_some(res);
-                r
+                (res || inps.len() == 2).then_some(res)
             }
             Self::Eq => {
                 debug_assert_eq!(inputs.len(), 2);
