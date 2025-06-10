@@ -585,6 +585,7 @@ pub enum TupleOpDef {
     UnpackTuple,
 }
 
+#[allow(deprecated)] // TODO: need a way to handle types of tuples. Or drop that SumType...
 impl ConstFold for TupleOpDef {
     fn fold(
         &self,
