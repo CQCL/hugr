@@ -118,6 +118,28 @@ impl Default for EnvelopeConfig {
 }
 
 impl EnvelopeConfig {
+    /// Create a new envelope configuration with the specified format.
+    /// `zstd` compression is set to default.
+    pub fn new(format: EnvelopeFormat) -> Self {
+        Self {
+            format,
+            ..Default::default()
+        }
+    }
+
+    /// Set the zstd compression configuration for the envelope.
+    pub fn with_zstd(self, zstd: ZstdConfig) -> Self {
+        Self {
+            zstd: Some(zstd),
+            ..self
+        }
+    }
+
+    /// Disable zstd compression in the envelope configuration.
+    pub fn disable_compression(self) -> Self {
+        Self { zstd: None, ..self }
+    }
+
     /// Create a new envelope header with the specified configuration.
     pub(super) fn make_header(&self) -> EnvelopeHeader {
         EnvelopeHeader {
@@ -162,6 +184,12 @@ pub struct ZstdConfig {
 }
 
 impl ZstdConfig {
+    /// Create a new zstd configuration with the specified compression level.
+    pub fn new(level: u8) -> Self {
+        Self {
+            level: NonZeroU8::new(level),
+        }
+    }
     /// Create a new zstd configuration with default compression level.
     #[must_use]
     pub const fn default_level() -> Self {
