@@ -367,8 +367,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        inout_sig,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        HugrBuilder, inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, usize_t};
@@ -798,9 +798,9 @@ mod test {
         let lin_t: Type = lin_ct.clone().into();
 
         // A simple Hugr that discards a usize_t, with a "drop" function
-        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
+        let mut fb = FunctionBuilder::new("main", inout_sig(usize_t(), type_row![])).unwrap();
         let discard_fn = {
-            let mut mb = dfb.module_root_builder();
+            let mut mb = fb.module_root_builder();
             let mut fb = mb
                 .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
                 .unwrap();
@@ -813,7 +813,7 @@ mod test {
             fb.finish_with_outputs([]).unwrap()
         }
         .node();
-        let backup = dfb.finish_hugr().unwrap();
+        let backup = fb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
         lower_discard_to_call
@@ -847,9 +847,9 @@ mod test {
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::NestedTemplateError(
                     nested_t,
-                    BuildError::NodeNotFound { node } // Note `..` would be somewhat less fragile
+                    BuildError::UnexpectedType { .. }
                 )
-            )) if nested_t == lin_t && node == discard_fn
+            )) if nested_t == lin_t
         ));
     }
 }

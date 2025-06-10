@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO
 use std::cmp::{max, min};
 
 use crate::{

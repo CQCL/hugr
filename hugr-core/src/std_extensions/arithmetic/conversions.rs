@@ -214,9 +214,7 @@ impl HasDef for ConvertOpType {
 mod test {
     use rstest::rstest;
 
-    use crate::IncomingPort;
-    use crate::extension::prelude::ConstUsize;
-    use crate::ops::Value;
+    use crate::extension::{FoldVal, prelude::ConstUsize};
     use crate::std_extensions::arithmetic::int_types::ConstInt;
 
     use super::*;
@@ -251,35 +249,21 @@ mod test {
     }
 
     #[rstest]
-    #[case::itobool_false(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 0).unwrap().into()], &[Value::false_val()])]
-    #[case::itobool_true(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 1).unwrap().into()], &[Value::true_val()])]
-    #[case::ifrombool_false(ConvertOpDef::ifrombool.without_log_width(), &[Value::false_val()], &[ConstInt::new_u(0, 0).unwrap().into()])]
-    #[case::ifrombool_true(ConvertOpDef::ifrombool.without_log_width(), &[Value::true_val()], &[ConstInt::new_u(0, 1).unwrap().into()])]
+    #[case::itobool_false(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 0).unwrap().into()], &[FoldVal::false_val()])]
+    #[case::itobool_true(ConvertOpDef::itobool.without_log_width(), &[ConstInt::new_u(0, 1).unwrap().into()], &[FoldVal::true_val()])]
+    #[case::ifrombool_false(ConvertOpDef::ifrombool.without_log_width(), &[FoldVal::false_val()], &[ConstInt::new_u(0, 0).unwrap().into()])]
+    #[case::ifrombool_true(ConvertOpDef::ifrombool.without_log_width(), &[FoldVal::true_val()], &[ConstInt::new_u(0, 1).unwrap().into()])]
     #[case::itousize(ConvertOpDef::itousize.without_log_width(), &[ConstInt::new_u(6, 42).unwrap().into()], &[ConstUsize::new(42).into()])]
     #[case::ifromusize(ConvertOpDef::ifromusize.without_log_width(), &[ConstUsize::new(42).into()], &[ConstInt::new_u(6, 42).unwrap().into()])]
     fn convert_fold(
         #[case] op: ConvertOpType,
-        #[case] inputs: &[Value],
-        #[case] outputs: &[Value],
+        #[case] inputs: &[FoldVal],
+        #[case] outputs: &[FoldVal],
     ) {
-        use crate::ops::Value;
-
-        let consts: Vec<(IncomingPort, Value)> = inputs
-            .iter()
-            .enumerate()
-            .map(|(i, v)| (i.into(), v.clone()))
-            .collect();
-
-        let res = op
-            .to_extension_op()
+        let mut working = vec![FoldVal::Unknown; outputs.len()];
+        op.to_extension_op()
             .unwrap()
-            .constant_fold(&consts)
-            .unwrap();
-
-        for (i, expected) in outputs.iter().enumerate() {
-            let res_val: &Value = &res.get(i).unwrap().1;
-
-            assert_eq!(res_val, expected);
-        }
+            .const_fold(inputs, &mut working);
+        assert_eq!(&working, outputs);
     }
 }

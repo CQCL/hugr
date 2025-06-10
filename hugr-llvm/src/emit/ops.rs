@@ -118,6 +118,7 @@ pub fn emit_value<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     match v {
         Value::Extension { e } => context.emit_custom_const(e.value()),
+        #[allow(deprecated)] // Yay, will be able to remove this
         Value::Function { .. } => bail!(
             "Value::Function Const nodes are not supported. \
             Ensure you eliminate these from the HUGR before lowering to LLVM. \

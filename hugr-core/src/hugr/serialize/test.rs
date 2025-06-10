@@ -451,6 +451,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::extension(ConstInt::new_u(2,1).unwrap()))]
 #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
+#[allow(deprecated)] // remove when Value::Function removed
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
@@ -511,6 +512,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]
+#[allow(deprecated)] // remove when Value::Function removed
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]

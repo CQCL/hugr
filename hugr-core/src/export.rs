@@ -1036,6 +1036,7 @@ impl<'a> Context<'a> {
                 self.make_term(table::Term::Apply(symbol, args))
             }
 
+            #[allow(deprecated)] // Remove when Value::Function removed
             Value::Function { hugr } => {
                 let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);

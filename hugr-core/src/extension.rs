@@ -33,7 +33,10 @@ pub mod resolution;
 pub mod simple_op;
 mod type_def;
 
-pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
+#[deprecated(note = "Use ConstFolder")]
+#[allow(deprecated)] // Remove when ConstFold removed
+pub use const_fold::{ConstFold, Folder};
+pub use const_fold::{ConstFoldResult, ConstFolder, FoldVal, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
     ValidateJustArgs, ValidateTypeArgs,

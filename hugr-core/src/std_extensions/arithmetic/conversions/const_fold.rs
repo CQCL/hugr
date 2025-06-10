@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO
 use crate::extension::prelude::{ConstString, ConstUsize};
 use crate::ops::Value;
 use crate::ops::constant::get_single_input_value;

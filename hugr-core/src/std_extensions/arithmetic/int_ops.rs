@@ -357,12 +357,11 @@ fn sum_ty_with_err(t: Type) -> Type {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::{
-        ops::dataflow::DataflowOpTrait, std_extensions::arithmetic::int_types::int_type,
-        types::Signature,
-    };
+    use crate::std_extensions::arithmetic::int_types::{ConstInt, int_type};
+    use crate::{extension::FoldVal, ops::dataflow::DataflowOpTrait, types::Signature};
 
     use super::*;
 
@@ -449,33 +448,18 @@ mod test {
         #[case] outputs: &[u64],
         #[case] log_width: u8,
     ) {
-        use crate::ops::Value;
-        use crate::std_extensions::arithmetic::int_types::ConstInt;
-
         let consts: Vec<_> = inputs
             .iter()
-            .enumerate()
-            .map(|(i, &x)| {
-                (
-                    i.into(),
-                    Value::extension(ConstInt::new_u(log_width, x).unwrap()),
-                )
-            })
+            .map(|&x| FoldVal::from(ConstInt::new_u(log_width, x).unwrap()))
             .collect();
 
-        let res = op
-            .to_extension_op()
-            .unwrap()
-            .constant_fold(&consts)
-            .unwrap();
+        let mut outs = vec![FoldVal::Unknown; outputs.len()];
+        op.to_extension_op().unwrap().const_fold(&consts, &mut outs);
 
-        for (i, &expected) in outputs.iter().enumerate() {
-            let res_val: u64 = res
-                .get(i)
-                .unwrap()
-                .1
+        for (act, &expected) in outs.into_iter().zip_eq(outputs) {
+            let res_val: u64 = act
                 .get_custom_value::<ConstInt>()
-                .expect("This function assumes all incoming constants are floats.")
+                .expect("This function assumes all result constants are floats.")
                 .value_u();
 
             assert_eq!(res_val, expected);

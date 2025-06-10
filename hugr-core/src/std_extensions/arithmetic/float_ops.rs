@@ -133,7 +133,10 @@ impl MakeRegisteredOp for FloatOps {
 
 #[cfg(test)]
 mod test {
+    use crate::extension::FoldVal;
+    use crate::std_extensions::arithmetic::float_types::ConstF64;
     use cgmath::AbsDiffEq;
+    use itertools::Itertools;
     use rstest::rstest;
 
     use super::*;
@@ -158,28 +161,20 @@ mod test {
     #[case::fceil(FloatOps::fceil, &[42.42], &[43.])]
     #[case::fround(FloatOps::fround, &[42.42], &[42.])]
     fn float_fold(#[case] op: FloatOps, #[case] inputs: &[f64], #[case] outputs: &[f64]) {
-        use crate::ops::Value;
-        use crate::std_extensions::arithmetic::float_types::ConstF64;
-
         let consts: Vec<_> = inputs
             .iter()
-            .enumerate()
-            .map(|(i, &x)| (i.into(), Value::extension(ConstF64::new(x))))
+            .map(|&f| FoldVal::from(ConstF64::new(f)))
             .collect();
 
-        let res = op
-            .to_extension_op()
+        let mut actual = vec![FoldVal::Unknown; outputs.len()];
+        op.to_extension_op()
             .unwrap()
-            .constant_fold(&consts)
-            .unwrap();
+            .const_fold(&consts, &mut actual);
 
-        for (i, expected) in outputs.iter().enumerate() {
-            let res_val: f64 = res
-                .get(i)
-                .unwrap()
-                .1
+        for (act, expected) in actual.into_iter().zip_eq(outputs) {
+            let res_val: f64 = act
                 .get_custom_value::<ConstF64>()
-                .expect("This function assumes all incoming constants are floats.")
+                .expect("This function assumes all output constants are floats.")
                 .value();
 
             assert!(

@@ -6,16 +6,19 @@ use std::sync::{Arc, Weak};
 
 use serde_with::serde_as;
 
+use crate::envelope::serde_with::AsStringEnvelope;
+use crate::extension::const_fold::fold_vals_to_indexed_vals;
+use crate::ops::{OpName, OpNameRef, Value};
+use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
+use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
+use crate::{Hugr, IncomingPort, PortIndex};
+
+use super::const_fold::FoldVal;
 use super::{
-    ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
+    ConstFoldResult, ConstFolder, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
     SignatureError,
 };
 
-use crate::Hugr;
-use crate::envelope::serde_with::AsStringEnvelope;
-use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
-use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of `OpDef` signature
@@ -327,7 +330,7 @@ pub struct OpDef {
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
     #[serde(skip)]
-    constant_folder: Option<Box<dyn ConstFold>>,
+    constant_folder: Option<Box<dyn ConstFolder>>,
 }
 
 impl OpDef {
@@ -457,19 +460,37 @@ impl OpDef {
 
     /// Set the constant folding function for this Op, which can evaluate it
     /// given constant inputs.
-    pub fn set_constant_folder(&mut self, fold: impl ConstFold + 'static) {
+    pub fn set_constant_folder(&mut self, fold: impl ConstFolder + 'static) {
         self.constant_folder = Some(Box::new(fold));
     }
 
     /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
     /// [`crate::ops::Const`] values for inputs at [`crate::IncomingPort`]s.
     #[must_use]
+    #[deprecated(note = "use const_fold")]
     pub fn constant_fold(
         &self,
         type_args: &[TypeArg],
-        consts: &[(crate::IncomingPort, crate::ops::Value)],
+        consts: &[(IncomingPort, Value)],
     ) -> ConstFoldResult {
-        (self.constant_folder.as_ref())?.fold(type_args, consts)
+        let folder = self.constant_folder.as_ref()?;
+        let sig = self.compute_signature(type_args).unwrap();
+        let mut inputs = vec![FoldVal::Unknown; sig.input_count()];
+        for (p, v) in consts {
+            inputs[p.index()] = v.clone().into();
+        }
+        let mut outputs = vec![FoldVal::Unknown; sig.output_count()];
+        folder.fold(type_args, &inputs, &mut outputs);
+        Some(fold_vals_to_indexed_vals(&outputs))
+    }
+
+    /// Evaluate an instance of this [`OpDef`] defined by the `type_args`, given
+    /// [FoldVal] values for each input, and update the outputs, which should be
+    /// initialised to [FoldVal::Unknown].
+    pub fn const_fold(&self, type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        if let Some(cf) = self.constant_folder.as_ref() {
+            cf.fold(type_args, inputs, outputs)
+        }
     }
 
     /// Returns a reference to the signature function of this [`OpDef`].

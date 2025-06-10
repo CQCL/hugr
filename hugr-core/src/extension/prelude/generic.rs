@@ -1,30 +1,19 @@
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
-use crate::extension::OpDef;
-use crate::extension::SignatureFunc;
+use crate::Extension;
 use crate::extension::prelude::usize_custom_t;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ConstFold, ExtensionId};
-use crate::ops::ExtensionOp;
-use crate::ops::OpName;
+use crate::extension::{ConstFolder, ExtensionId, FoldVal, OpDef, SignatureError, SignatureFunc};
+use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
-use crate::types::FuncValueType;
-
-use crate::types::Type;
-
-use crate::extension::SignatureError;
-
-use crate::types::PolyFuncTypeRV;
-
-use crate::Extension;
-use crate::types::type_param::TypeArg;
+use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Type};
 
 use super::PRELUDE;
 use super::{ConstUsize, PRELUDE_ID};
-use crate::types::type_param::TypeParam;
 
 /// Name of the operation for loading generic `BoundedNat` parameters.
 pub static LOAD_NAT_OP_ID: OpName = OpName::new_inline("load_nat");
@@ -41,21 +30,11 @@ impl FromStr for LoadNatDef {
     }
 }
 
-impl ConstFold for LoadNatDef {
-    fn fold(
-        &self,
-        type_args: &[TypeArg],
-        _consts: &[(crate::IncomingPort, crate::ops::Value)],
-    ) -> crate::extension::ConstFoldResult {
-        let [arg] = type_args else {
-            return None;
-        };
-        let nat = arg.as_nat();
-        if let Some(n) = nat {
-            let n_const = ConstUsize::new(n);
-            Some(vec![(0.into(), n_const.into())])
-        } else {
-            None
+impl ConstFolder for LoadNatDef {
+    fn fold(&self, type_args: &[TypeArg], _inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        let [arg] = type_args else { return };
+        if let Some(n) = arg.as_nat() {
+            outputs[0] = ConstUsize::new(n).into();
         }
     }
 }
@@ -161,10 +140,11 @@ impl HasConcrete for LoadNatDef {
 #[cfg(test)]
 mod tests {
     use crate::{
-        HugrView, OutgoingPort,
+        HugrView,
         builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+        extension::FoldVal,
         extension::prelude::{ConstUsize, usize_t},
-        ops::{OpType, constant},
+        ops::OpType,
         type_row,
         types::TypeArg,
     };
@@ -201,10 +181,10 @@ mod tests {
         let optype: OpType = op.into();
 
         if let OpType::ExtensionOp(ext_op) = optype {
-            let result = ext_op.constant_fold(&[]);
-            let exp_port: OutgoingPort = 0.into();
-            let exp_val: constant::Value = ConstUsize::new(5).into();
-            assert_eq!(result, Some(vec![(exp_port, exp_val)]));
+            let mut out = [FoldVal::Unknown];
+            ext_op.const_fold(&[], &mut out);
+            let exp_val: FoldVal = ConstUsize::new(5).into();
+            assert_eq!(out, [exp_val])
         } else {
             panic!()
         }

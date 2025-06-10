@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO
 use crate::{
     IncomingPort,
     extension::{ConstFold, ConstFoldResult, OpDef, prelude::ConstString},

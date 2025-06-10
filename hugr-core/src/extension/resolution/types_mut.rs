@@ -257,6 +257,7 @@ pub(super) fn resolve_value_exts(
                 });
             }
         }
+        #[allow(deprecated)] // remove when Value::Function removed
         Value::Function { hugr } => {
             // We don't need to add the nested hugr's extensions to the main one here,
             // but we run resolution on it independently.

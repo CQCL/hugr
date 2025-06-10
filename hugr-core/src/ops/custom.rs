@@ -12,7 +12,7 @@ use {
 
 use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
+use crate::extension::{ConstFoldResult, ExtensionId, FoldVal, OpDef, SignatureError};
 use crate::types::{Signature, type_param::TypeArg};
 use crate::{IncomingPort, ops};
 
@@ -95,9 +95,17 @@ impl ExtensionOp {
     }
 
     /// Attempt to evaluate this operation. See [`OpDef::constant_fold`].
+    /// Deprecated: use [Self::const_fold]
     #[must_use]
+    #[deprecated(note = "Use const_fold")]
     pub fn constant_fold(&self, consts: &[(IncomingPort, ops::Value)]) -> ConstFoldResult {
+        #[allow(deprecated)] // in deprecated function, remove at same time
         self.def().constant_fold(self.args(), consts)
+    }
+
+    /// Attempt to evaluate this operation, See [`OpDef::const_fold`]
+    pub fn const_fold(&self, inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        self.def().const_fold(self.args(), inputs, outputs)
     }
 
     /// Creates a new [`OpaqueOp`] as a downgraded version of this
