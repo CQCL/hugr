@@ -169,7 +169,7 @@ mod test {
         let mut actual = vec![FoldVal::Unknown; outputs.len()];
         op.to_extension_op()
             .unwrap()
-            .constant_fold2(&consts, &mut actual);
+            .const_fold(&consts, &mut actual);
 
         for (act, expected) in actual.into_iter().zip_eq(outputs) {
             let res_val: f64 = act

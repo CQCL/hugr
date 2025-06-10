@@ -247,7 +247,7 @@ impl DFContext<ValueHandle<Node>> for ConstFoldContext {
             .map(|(ty, pv)| pv.clone().try_into_concrete(ty).unwrap_or_default())
             .collect::<Vec<_>>();
         let mut out_fvs = vec![FoldVal::Unknown; outs.len()];
-        op.constant_fold2(&inp_fvs, &mut out_fvs);
+        op.const_fold(&inp_fvs, &mut out_fvs);
         for ((p, out), out_fv) in outs.iter_mut().enumerate().zip(out_fvs) {
             // UGH. Need a partial_from_const for FoldVal, *as well* as the one from Value
             // 'coz we need to keep the latter for constants!!

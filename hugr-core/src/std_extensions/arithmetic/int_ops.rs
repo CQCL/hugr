@@ -454,9 +454,7 @@ mod test {
             .collect();
 
         let mut outs = vec![FoldVal::Unknown; outputs.len()];
-        op.to_extension_op()
-            .unwrap()
-            .constant_fold2(&consts, &mut outs);
+        op.to_extension_op().unwrap().const_fold(&consts, &mut outs);
 
         for (act, &expected) in outs.into_iter().zip_eq(outputs) {
             let res_val: u64 = act

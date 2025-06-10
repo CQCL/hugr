@@ -523,7 +523,7 @@ mod test {
         op.with_type(usize_t())
             .to_extension_op()
             .unwrap()
-            .constant_fold2(&inputs, &mut actual);
+            .const_fold(&inputs, &mut actual);
 
         for (act, expected) in actual.into_iter().zip_eq(outputs) {
             let expected = expected.to_value().into();

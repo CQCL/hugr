@@ -192,7 +192,7 @@ mod tests {
 
         if let OpType::ExtensionOp(ext_op) = optype {
             let mut out = [FoldVal::Unknown];
-            ext_op.constant_fold2(&[], &mut out);
+            ext_op.const_fold(&[], &mut out);
             let exp_val: FoldVal = ConstUsize::new(5).into();
             assert_eq!(out, [exp_val])
         } else {

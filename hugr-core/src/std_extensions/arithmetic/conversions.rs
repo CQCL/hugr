@@ -263,7 +263,7 @@ mod test {
         let mut working = vec![FoldVal::Unknown; outputs.len()];
         op.to_extension_op()
             .unwrap()
-            .constant_fold2(inputs, &mut working);
+            .const_fold(inputs, &mut working);
         assert_eq!(&working, outputs);
     }
 }
