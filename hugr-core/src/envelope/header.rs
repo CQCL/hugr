@@ -95,7 +95,7 @@ impl EnvelopeFormat {
 }
 
 /// Configuration for encoding an envelope.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct EnvelopeConfig {
     /// The format to use for the payload.
@@ -105,21 +105,9 @@ pub struct EnvelopeConfig {
     pub zstd: Option<ZstdConfig>,
 }
 
-impl Default for EnvelopeConfig {
-    fn default() -> Self {
-        let format = Default::default();
-        let zstd = if cfg!(feature = "zstd") {
-            Some(ZstdConfig::default())
-        } else {
-            None
-        };
-        Self { format, zstd }
-    }
-}
-
 impl EnvelopeConfig {
     /// Create a new envelope configuration with the specified format.
-    /// `zstd` compression is set to default.
+    /// `zstd` compression is set to default value `None`.
     pub fn new(format: EnvelopeFormat) -> Self {
         Self {
             format,
