@@ -22,11 +22,10 @@ class StringVal(val.ExtensionValue):
 
     def to_value(self) -> val.Extension:
         name = "ConstString"
-        payload = {"value": self.v}
         return val.Extension(
             name,
             typ=STRING_T,
-            val=payload,
+            val=self.v,
         )
 
     def __str__(self) -> str:
