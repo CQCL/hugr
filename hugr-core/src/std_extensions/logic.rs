@@ -4,62 +4,52 @@ use std::sync::{Arc, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
-use crate::extension::{ConstFold, ConstFoldResult};
-use crate::ops::constant::ValueName;
-use crate::ops::{OpName, Value};
-use crate::types::Signature;
-use crate::{
-    Extension, IncomingPort,
-    extension::{
-        ExtensionId, OpDef, SignatureFunc,
-        prelude::bool_t,
-        simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
-    },
-    ops,
-    types::type_param::TypeArg,
-    utils::sorted_consts,
+use crate::Extension;
+use crate::extension::{
+    ConstFolder, ExtensionId, FoldVal, OpDef, SignatureFunc,
+    prelude::bool_t,
+    simple_op::{MakeOpDef, MakeRegisteredOp, OpLoadError, try_from_name},
 };
+use crate::ops::{OpName, constant::ValueName};
+use crate::types::{Signature, type_param::TypeArg};
+
 use lazy_static::lazy_static;
 /// Name of extension false value.
 pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
 pub const TRUE_NAME: ValueName = ValueName::new_inline("TRUE");
 
-impl ConstFold for LogicOp {
-    fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
-        match self {
+impl ConstFolder for LogicOp {
+    fn fold(&self, _type_args: &[TypeArg], inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        let inps = read_known_inputs(inputs);
+        let out = match self {
             Self::And => {
-                let inps = read_inputs(consts)?;
                 let res = inps.iter().all(|x| *x);
                 // We can only fold to true if we have a const for all our inputs.
-                (!res || inps.len() as u64 == 2)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                (!res || inps.len() as u64 == 2).then_some(res)
             }
             Self::Or => {
-                let inps = read_inputs(consts)?;
                 let res = inps.iter().any(|x| *x);
                 // We can only fold to false if we have a const for all our inputs
-                (res || inps.len() as u64 == 2)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                let r = (res || inps.len() == 2).then_some(res);
+                r
             }
             Self::Eq => {
-                let inps = read_inputs(consts)?;
-                let res = inps.iter().copied().reduce(|a, b| a == b)?;
-                // If we have only some inputs, we can still fold to false, but not to true
-                (!res || inps.len() as u64 == 2)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                debug_assert_eq!(inputs.len(), 2);
+                (inps.len() == 2).then(|| inps[0] == inps[1])
             }
             Self::Not => {
-                let inps = read_inputs(consts)?;
-                let res = inps.iter().all(|x| !*x);
-                (!res || inps.len() as u64 == 1)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                debug_assert_eq!(inputs.len(), 1);
+                inps.first().map(|b| !*b)
             }
             Self::Xor => {
-                let inps = read_inputs(consts)?;
-                let res = inps.iter().fold(false, |acc, x| acc ^ *x);
-                (inps.len() as u64 == 2).then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                debug_assert_eq!(inputs.len(), 2);
+                (inps.len() == 2).then(|| inps[0] ^ inps[1])
             }
+        };
+        debug_assert_eq!(outputs, &[FoldVal::Unknown]);
+        if let Some(res) = out {
+            outputs[0] = FoldVal::from_bool(res);
         }
     }
 }
@@ -84,9 +74,9 @@ impl MakeOpDef for LogicOp {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         match self {
             LogicOp::And | LogicOp::Or | LogicOp::Eq | LogicOp::Xor => {
-                Signature::new(vec![bool_t(); 2], vec![bool_t()])
+                Signature::new(vec![bool_t(); 2], bool_t())
             }
-            LogicOp::Not => Signature::new_endo(vec![bool_t()]),
+            LogicOp::Not => Signature::new_endo(bool_t()),
         }
         .into()
     }
@@ -146,23 +136,22 @@ impl MakeRegisteredOp for LogicOp {
     }
 }
 
-fn read_inputs(consts: &[(IncomingPort, ops::Value)]) -> Option<Vec<bool>> {
-    let true_val = ops::Value::true_val();
-    let false_val = ops::Value::false_val();
-    let inps: Option<Vec<bool>> = sorted_consts(consts)
-        .into_iter()
-        .map(|c| {
-            if c == &true_val {
-                Some(true)
-            } else if c == &false_val {
-                Some(false)
-            } else {
-                None
-            }
-        })
-        .collect();
-    let inps = inps?;
-    Some(inps)
+fn read_known_inputs(consts: &[FoldVal]) -> Vec<bool> {
+    let true_val = FoldVal::true_val();
+    let false_val = FoldVal::false_val();
+    let mut res = Vec::new();
+    for c in consts {
+        if c == &true_val {
+            res.push(true)
+        } else if c == &false_val {
+            res.push(false)
+        } else if c != &FoldVal::Unknown {
+            // Preserving legacy behaviour, but if any input is not true/false,
+            // bail completely.
+            return vec![];
+        }
+    }
+    res
 }
 
 #[cfg(test)]
@@ -173,7 +162,7 @@ pub(crate) mod test {
     use crate::{
         Extension,
         extension::simple_op::{MakeOpDef, MakeRegisteredOp},
-        extension::{ConstFold, FoldVal},
+        extension::{ConstFolder, FoldVal},
     };
 
     use itertools::Itertools;
@@ -230,11 +219,10 @@ pub(crate) mod test {
     ) {
         use itertools::Itertools;
 
-        use crate::extension::ConstFold;
         let in_vals = ins.into_iter().map(FoldVal::from_bool).collect_vec();
         let type_args = [(in_vals.len() as u64).into()];
         let mut outs = [FoldVal::Unknown];
-        op.fold2(&type_args, &in_vals, &mut outs);
+        op.fold(&type_args, &in_vals, &mut outs);
         assert_eq!(outs, [FoldVal::from_bool(out)]);
     }
 
@@ -257,7 +245,7 @@ pub(crate) mod test {
             .collect_vec();
         let type_args = [(in_vals.len() as u64).into()];
         let mut outs = [FoldVal::Unknown];
-        op.fold2(&type_args, &in_vals, &mut outs);
+        op.fold(&type_args, &in_vals, &mut outs);
         assert_eq!(outs, [mb_out.map_or(FoldVal::Unknown, FoldVal::from_bool)]);
     }
 }
