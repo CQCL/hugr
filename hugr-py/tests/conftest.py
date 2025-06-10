@@ -169,19 +169,30 @@ def validate(
                 dot.pipe("svg")
     else:
         # Package
+        # first python roundtrip
         encoded = h.to_str(EnvelopeConfig.TEXT)
         loaded = Package.from_str(encoded)
         roundtrip_encoded = loaded.to_str(EnvelopeConfig.TEXT)
         assert encoded == roundtrip_encoded
 
+        # then roundtrip through the CLI
 
-def _run_hugr_cmd(serial: bytes, cmd: list[str]):
+        # TODO once model loading is supported in Python
+        # try every combo of input and output formats
+        cmd = [*_base_command(), "convert", "-", "--text"]
+
+        serial = h.to_bytes(EnvelopeConfig.BINARY)
+        out = _run_hugr_cmd(serial, cmd)
+        loaded = Package.from_bytes(out.stdout)
+
+
+def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
     """Run a HUGR command.
 
     The `serial` argument is the serialized HUGR to pass to the command via stdin.
     """
     try:
-        subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
+        return subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e
