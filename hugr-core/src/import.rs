@@ -7,7 +7,9 @@ use std::sync::Arc;
 
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    extension::{ExtensionId, ExtensionRegistry, SignatureError},
+    extension::{
+        ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
+    },
     hugr::{HugrMut, NodeMetadata},
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
@@ -60,16 +62,20 @@ enum ImportErrorInner {
     Context(#[source] Box<ImportErrorInner>, String),
 
     /// A signature mismatch was detected during import.
-    #[error("signature error: {0}")]
+    #[error("signature error")]
     Signature(#[from] SignatureError),
 
     /// An error relating to the loaded extension registry.
-    #[error("extension error: {0}")]
+    #[error("extension error")]
     Extension(#[from] ExtensionError),
 
     /// Incorrect order hints.
-    #[error("incorrect order hint: {0}")]
+    #[error("incorrect order hint")]
     OrderHint(#[from] OrderHintError),
+
+    /// Extension resolution.
+    #[error("extension resolution error")]
+    ExtensionResolution(#[from] ExtensionResolutionError),
 }
 
 #[derive(Debug, Clone, Error)]
@@ -185,6 +191,10 @@ pub fn import_hugr(
     ctx.import_root()?;
     ctx.link_ports()?;
     ctx.link_static_ports()?;
+
+    ctx.hugr
+        .resolve_extension_defs(extensions)
+        .map_err(ImportErrorInner::ExtensionResolution)?;
 
     Ok(ctx.hugr)
 }
