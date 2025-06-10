@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::BTreeMap, rc::Rc};
 
 use anyhow::{Result, anyhow};
 use hugr_core::{
@@ -51,7 +51,7 @@ where
     emit_context: EmitModuleContext<'c, 'a, H>,
     todo: EmissionSet,
     func: FunctionValue<'c>,
-    env: HashMap<Wire, ValueMailBox<'c>>,
+    env: BTreeMap<Wire, ValueMailBox<'c>>,
     builder: Builder<'c>,
     prologue_bb: BasicBlock<'c>,
     launch_bb: BasicBlock<'c>,
