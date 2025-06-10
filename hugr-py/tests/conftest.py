@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from hugr.ops import ComWire
 
-QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+QUANTUM_EXT = ext.Extension("pytest.quantum", ext.Version(0, 1, 0))
 QUANTUM_EXT.add_op_def(
     ext.OpDef(
         name="H",
