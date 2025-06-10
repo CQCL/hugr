@@ -22,6 +22,10 @@ derive_more = { workspace = true, features = ["display", "error", "from"] }
 hugr = { path = "../hugr", version = "0.20.1" }
 serde_json.workspace = true
 clio = { workspace = true, features = ["clap-parse"] }
+anyhow.workspace = true
+thiserror.workspace = true
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
 
 [lints]
 workspace = true
