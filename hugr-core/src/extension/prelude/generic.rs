@@ -6,7 +6,7 @@ use crate::extension::prelude::usize_custom_t;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
 };
-use crate::extension::{ConstFold, ExtensionId, OpDef, SignatureError, SignatureFunc};
+use crate::extension::{ConstFolder, ExtensionId, FoldVal, OpDef, SignatureError, SignatureFunc};
 use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
@@ -30,21 +30,11 @@ impl FromStr for LoadNatDef {
     }
 }
 
-impl ConstFold for LoadNatDef {
-    fn fold(
-        &self,
-        type_args: &[TypeArg],
-        _consts: &[(crate::IncomingPort, crate::ops::Value)],
-    ) -> crate::extension::ConstFoldResult {
-        let [arg] = type_args else {
-            return None;
-        };
-        let nat = arg.as_nat();
-        if let Some(n) = nat {
-            let n_const = ConstUsize::new(n);
-            Some(vec![(0.into(), n_const.into())])
-        } else {
-            None
+impl ConstFolder for LoadNatDef {
+    fn fold(&self, type_args: &[TypeArg], _inputs: &[FoldVal], outputs: &mut [FoldVal]) {
+        let [arg] = type_args else { return };
+        if let Some(n) = arg.as_nat() {
+            outputs[0] = ConstUsize::new(n).into();
         }
     }
 }
