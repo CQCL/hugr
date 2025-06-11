@@ -9,7 +9,6 @@ use crate::extension::resolution::{
 };
 use crate::ops::Value;
 use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
-use crate::types::type_param::TypeArg;
 use crate::types::{CustomCheckFailure, CustomType, Type};
 
 use super::array_kind::ArrayKind;
@@ -93,21 +92,28 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
             })?;
 
         // constant can only hold classic type.
-        let ty = match typ.args() {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if *n as usize == self.values.len() => {
-                ty
-            }
-            _ => {
-                return Err(CustomCheckFailure::Message(format!(
-                    "Invalid array type arguments: {:?}",
-                    typ.args()
-                )));
-            }
+        let [n, ty] = typ.args() else {
+            return Err(CustomCheckFailure::Message(format!(
+                "Invalid array type arguments. Expected two arguments but got: {:?}",
+                typ.args()
+            )));
         };
+
+        let _ = n.as_nat().ok_or_else(|| CustomCheckFailure::Message(format!(
+            "Invalid array type arguments. Expected natural number for array size, but got: {:?}",
+            typ.args()
+        )))?;
+
+        let ty = ty.as_runtime().ok_or_else(|| {
+            CustomCheckFailure::Message(format!(
+                "Invalid array type arguments. Expected element type, but got: {:?}",
+                typ.args()
+            ))
+        })?;
 
         // check all values are instances of the element type
         for v in &self.values {
-            if v.get_type() != *ty {
+            if v.get_type() != ty {
                 return Err(CustomCheckFailure::Message(format!(
                     "Array element {v:?} is not of expected type {ty}"
                 )));

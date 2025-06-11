@@ -640,10 +640,15 @@ mod test {
         ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
     }
 
-    fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
+    fn just_elem_type(args: &[TypeArg]) -> Type {
+        let [ty] = args else {
             panic!("Expected just elem type")
         };
+
+        let Some(ty) = ty.as_runtime() else {
+            panic!("Expected just elem type")
+        };
+
         ty
     }
 
@@ -888,7 +893,7 @@ mod test {
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
         lowerer.replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
-            (![usize_t(), i64_t()].contains(ty)).then_some(value_array_type(10, ty.clone()))
+            (![usize_t(), i64_t()].contains(&ty)).then_some(value_array_type(10, ty.clone()))
         });
         {
             let mut h = backup.clone();
@@ -1008,13 +1013,13 @@ mod test {
         lowerer.replace_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
         lowerer.replace_parametrized_type(list_type_def(), |args| {
-            option_contents(just_elem_type(args)).map(list_type)
+            option_contents(&just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
         lowerer.replace_parametrized_op(
             e.get_op(READ).unwrap().as_ref(),
             Box::new(|args: &[TypeArg]| {
-                option_contents(just_elem_type(args)).map(|elem| {
+                option_contents(&just_elem_type(args)).map(|elem| {
                     NodeTemplate::SingleOp(
                         ListOp::get
                             .with_type(elem)

@@ -544,6 +544,7 @@ pub(super) mod test {
     use std::num::NonZeroU64;
 
     use itertools::Itertools;
+    use once_cell::sync::Lazy;
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
@@ -554,7 +555,7 @@ pub(super) mod test {
     use crate::ops::OpName;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TermTypeError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
+    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound, TypeRV};
     use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
@@ -656,10 +657,12 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
-            let list_of_var =
-                Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
-            let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
+            let tp: TypeParam = TypeBound::Any.into();
+            let list_of_var = Type::new_extension(
+                list_def.instantiate(vec![TypeArg::new_var_use(0, tp.clone())])?,
+            );
+            let type_scheme =
+                PolyFuncTypeRV::new(vec![tp.clone()], Signature::new_endo(vec![list_of_var]));
 
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
@@ -702,23 +705,26 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
-                let [TypeArg::BoundedNat(n)] = arg_values else {
+                let [n] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
-                let n = *n as usize;
+
+                let Some(n) = n.as_nat() else {
+                    return Err(SignatureError::InvalidTypeArgs);
+                };
+
                 let tvs: Vec<Type> = (0..n)
                     .map(|_| Type::new_var_use(0, TypeBound::Any))
                     .collect();
                 Ok(PolyFuncTypeRV::new(
-                    vec![TP.clone()],
+                    vec![TypeBound::Any.into()],
                     Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
                 ))
             }
 
             fn static_params(&self) -> &[TypeParam] {
-                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
-                MAX_NAT
+                static MAX_NAT: Lazy<[Term; 1]> = Lazy::new(|| [Term::max_nat_type()]);
+                &*MAX_NAT
             }
         }
         let _ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
@@ -726,7 +732,7 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat(3), usize_t().into()];
+            let args = [Term::from(3u64), usize_t().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -739,7 +745,7 @@ pub(super) mod test {
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-            let args = [TypeArg::BoundedNat(3), tyvar.clone().into()];
+            let args = [Term::from(3u64), tyvar.clone().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -797,7 +803,7 @@ pub(super) mod test {
                 extension_ref,
             )?;
             let tv = Type::new_var_use(0, TypeBound::Copyable);
-            let args = [tv.clone().into()];
+            let args = [Term::from(tv.clone())];
             let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo(tv)));

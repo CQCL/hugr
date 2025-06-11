@@ -1256,6 +1256,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema",
  "lazy_static",
+ "once_cell",
  "ordered-float",
  "paste",
  "petgraph 0.8.2",
@@ -1269,6 +1270,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml",
+ "servo_arc",
  "smol_str",
  "static_assertions",
  "strum",
@@ -1329,6 +1331,7 @@ dependencies = [
  "hugr-core",
  "itertools 0.14.0",
  "lazy_static",
+ "once_cell",
  "paste",
  "petgraph 0.8.2",
  "portgraph",
@@ -2834,6 +2837,15 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "servo_arc"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "204ea332803bd95a0b60388590d59cf6468ec9becf626e2451f1d26a1d972de4"
+dependencies = [
+ "stable_deref_trait",
 ]
 
 [[package]]

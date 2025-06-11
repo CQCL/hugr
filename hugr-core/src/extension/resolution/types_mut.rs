@@ -9,6 +9,7 @@ use super::types::collect_type_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
+use crate::types::type_param::TermEnum;
 use crate::types::type_row::TypeRowBase;
 use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
 use crate::{Extension, Node};
@@ -220,37 +221,49 @@ pub(super) fn resolve_term_exts(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    match term {
-        Term::Runtime(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        Term::List(elems) => {
+    match term.get() {
+        TermEnum::Runtime(ty) => {
+            let mut ty = ty.clone();
+            resolve_type_exts(node, &mut ty, extensions, used_extensions)?;
+            *term = Term::from(ty);
+        }
+        TermEnum::List(elems) => {
+            let mut elems = elems.to_vec();
             for elem in elems.iter_mut() {
                 resolve_term_exts(node, elem, extensions, used_extensions)?;
             }
+            *term = Term::new_list(elems)
         }
-        Term::Tuple(elems) => {
+        TermEnum::Tuple(elems) => {
+            let mut elems = elems.to_vec();
             for elem in elems.iter_mut() {
                 resolve_term_exts(node, elem, extensions, used_extensions)?;
             }
+            *term = Term::new_tuple(elems)
         }
-        Term::ListType(item_type) => {
-            resolve_term_exts(node, item_type, extensions, used_extensions)?;
+        TermEnum::ListType(item_type) => {
+            let mut item_type_clone = item_type.clone();
+            resolve_term_exts(node, &mut item_type_clone, extensions, used_extensions)?;
+            *term = Term::new_list_type(item_type_clone);
         }
-        Term::TupleType(item_types) => {
-            for item_type in item_types.iter_mut() {
+        TermEnum::TupleType(item_types) => {
+            let mut item_types_clone = item_types.to_vec();
+            for item_type in item_types_clone.iter_mut() {
                 resolve_term_exts(node, item_type, extensions, used_extensions)?;
             }
+            *term = Term::new_tuple_type(item_types_clone);
         }
-        Term::Variable(_)
-        | Term::RuntimeType(_)
-        | Term::StaticType
-        | Term::BoundedNatType(_)
-        | Term::StringType
-        | Term::BytesType
-        | Term::FloatType
-        | Term::BoundedNat(_)
-        | Term::String(_)
-        | Term::Bytes(_)
-        | Term::Float(_) => {}
+        TermEnum::Variable(_)
+        | TermEnum::RuntimeType(_)
+        | TermEnum::StaticType
+        | TermEnum::BoundedNatType(_)
+        | TermEnum::StringType
+        | TermEnum::BytesType
+        | TermEnum::FloatType
+        | TermEnum::BoundedNat(_)
+        | TermEnum::String(_)
+        | TermEnum::Bytes(_)
+        | TermEnum::Float(_) => {}
     }
     Ok(())
 }

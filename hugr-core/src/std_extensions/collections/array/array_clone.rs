@@ -179,12 +179,21 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayCloneDef<AK> {
     type Concrete = GenericArrayClone<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
-                Ok(GenericArrayClone::new(ty.clone(), *n).unwrap())
-            }
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
+        let [n, ty] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let Some(n) = n.as_nat() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
+
+        if !ty.copyable() {
+            return Err(SignatureError::InvalidTypeArgs.into());
         }
+
+        Ok(GenericArrayClone::new(ty.clone(), n).unwrap())
     }
 }
 

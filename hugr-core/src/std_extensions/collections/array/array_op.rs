@@ -3,6 +3,7 @@
 use std::marker::PhantomData;
 use std::sync::{Arc, Weak};
 
+use once_cell::sync::Lazy;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::Extension;
@@ -65,13 +66,19 @@ pub enum GenericArrayOpDef<AK: ArrayKind> {
 }
 
 /// Static parameters for array operations. Includes array size. Type is part of the type scheme.
-const STATIC_SIZE_PARAM: &[TypeParam; 1] = &[TypeParam::max_nat_type()];
+fn static_size_param() -> &'static [TypeParam; 1] {
+    static STATIC_SIZE_PARAM: Lazy<[TypeParam; 1]> = Lazy::new(|| [TypeParam::max_nat_type()]);
+    &STATIC_SIZE_PARAM
+}
 
 impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
     fn compute_signature(&self, arg_values: &[TypeArg]) -> Result<PolyFuncTypeRV, SignatureError> {
-        let [TypeArg::BoundedNat(n)] = *arg_values else {
+        let [n] = arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
+
+        let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+
         let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
         let array_ty = AK::ty(n, elem_ty_var.clone());
         let params = vec![TypeBound::Any.into()];
@@ -104,7 +111,7 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
     }
 
     fn static_params(&self) -> &[TypeParam] {
-        STATIC_SIZE_PARAM
+        static_size_param()
     }
 }
 
@@ -286,7 +293,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
         use GenericArrayOpDef::{
             _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap, unpack,
         };
-        let ty_arg = self.elem_ty.clone().into();
+        let ty_arg = Term::from(self.elem_ty.clone());
         match self.def {
             discard_empty => {
                 debug_assert_eq!(
@@ -320,11 +327,27 @@ impl<AK: ArrayKind> HasDef for GenericArrayOp<AK> {
 impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
     type Concrete = GenericArrayOp<AK>;
 
-    fn instantiate(&self, type_args: &[Term]) -> Result<Self::Concrete, OpLoadError> {
-        let (ty, size) = match (self, type_args) {
-            (GenericArrayOpDef::discard_empty, [Term::Runtime(ty)]) => (ty.clone(), 0),
-            (_, [Term::BoundedNat(n), Term::Runtime(ty)]) => (ty.clone(), *n),
-            _ => return Err(SignatureError::InvalidTypeArgs.into()),
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        let (ty, size) = match self {
+            GenericArrayOpDef::discard_empty => {
+                let [ty] = type_args else {
+                    return Err(SignatureError::InvalidTypeArgs.into());
+                };
+
+                let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
+
+                (ty, 0)
+            }
+            _ => {
+                let [n, ty] = type_args else {
+                    return Err(SignatureError::InvalidTypeArgs.into());
+                };
+
+                let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+                let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
+
+                (ty, n)
+            }
         };
 
         Ok(self.to_concrete(ty.clone(), size))

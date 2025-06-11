@@ -7,14 +7,14 @@
 
 use std::iter;
 
-use anyhow::{Ok, Result, anyhow};
+use anyhow::{Ok, Result, anyhow, bail};
 use hugr_core::extension::prelude::option_type;
 use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
 use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array::{
     self, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan, array_type,
 };
-use hugr_core::types::{TypeArg, TypeEnum};
+use hugr_core::types::TypeEnum;
 use hugr_core::{HugrView, Node};
 use inkwell::IntPredicate;
 use inkwell::builder::{Builder, BuilderError};
@@ -126,11 +126,20 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
             .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
                 let ccg = self.0.clone();
                 move |ts, hugr_type| {
-                    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
-                        return Err(anyhow!("Invalid type args for array type"));
+                    let [n, ty] = hugr_type.args() else {
+                        bail!("Invalid type args for array type: expected 2 arguments.");
                     };
-                    let elem_ty = ts.llvm_type(ty)?;
-                    Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
+
+                    let Some(n) = n.as_nat() else {
+                        bail!("Invalid type args for array type: expected natural number.");
+                    };
+
+                    let Some(ty) = ty.as_runtime() else {
+                        bail!("Invalid type args for array type: expected type.");
+                    };
+
+                    let elem_ty = ts.llvm_type(&ty)?;
+                    Ok(ccg.array_type(&ts, elem_ty, n).as_basic_type_enum())
                 }
             })
             .custom_const::<array::ArrayValue>({

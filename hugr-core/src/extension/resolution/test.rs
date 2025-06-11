@@ -24,8 +24,7 @@ use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::std_extensions::std_reg;
-use crate::types::type_param::TypeParam;
-use crate::types::{PolyFuncType, Signature, Type, TypeBound};
+use crate::types::{PolyFuncType, Signature, Term, Type, TypeBound};
 use crate::{Extension, Hugr, HugrView, type_row};
 
 #[rstest]
@@ -333,12 +332,12 @@ fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
 #[rstest]
 fn resolve_call() {
     let dummy_fn_sig = PolyFuncType::new(
-        vec![TypeParam::RuntimeType(TypeBound::Any)],
+        vec![TypeBound::Any.into()],
         Signature::new(vec![], vec![bool_t()]),
     );
 
-    let generic_type_1 = float64_type().into();
-    let generic_type_2 = int_type(6).into();
+    let generic_type_1: Term = float64_type().into();
+    let generic_type_2: Term = int_type(6).into();
     let expected_exts = [
         float_types::EXTENSION_ID.clone(),
         int_types::EXTENSION_ID.clone(),

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
 
+use super::type_param::TermVar;
 use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
@@ -9,7 +10,7 @@ use super::custom::CustomType;
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::type_param::{TermVar, UpperBound};
+use crate::types::type_param::{TermEnum, UpperBound};
 use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -77,7 +78,7 @@ pub(super) enum TypeParamSer {
     Bytes,
     Float,
     StaticType,
-    List { param: Box<Term> },
+    List { param: Term },
     Tuple { params: Vec<Term> },
 }
 
@@ -119,26 +120,39 @@ pub(super) enum TermSer {
     TypeArg(TypeArgSer),
     TypeParam(TypeParamSer),
 }
-
 impl From<Term> for TermSer {
     fn from(value: Term) -> Self {
-        match value {
-            Term::RuntimeType(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
-            Term::StaticType => TermSer::TypeParam(TypeParamSer::StaticType),
-            Term::BoundedNatType(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat { bound }),
-            Term::StringType => TermSer::TypeParam(TypeParamSer::String),
-            Term::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
-            Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
-            Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
-            Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple { params }),
-            Term::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
-            Term::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
-            Term::String(arg) => TermSer::TypeArg(TypeArgSer::String { arg }),
-            Term::Bytes(value) => TermSer::TypeArg(TypeArgSer::Bytes { value }),
-            Term::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
-            Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
-            Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
-            Term::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v }),
+        match value.get() {
+            TermEnum::RuntimeType(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
+            TermEnum::StaticType => TermSer::TypeParam(TypeParamSer::StaticType),
+            TermEnum::BoundedNatType(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat {
+                bound: bound.clone(),
+            }),
+            TermEnum::StringType => TermSer::TypeParam(TypeParamSer::String),
+            TermEnum::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
+            TermEnum::FloatType => TermSer::TypeParam(TypeParamSer::Float),
+            TermEnum::ListType(item_type) => TermSer::TypeParam(TypeParamSer::List {
+                param: item_type.clone(),
+            }),
+            TermEnum::TupleType(item_types) => TermSer::TypeParam(TypeParamSer::Tuple {
+                params: item_types.to_vec(),
+            }),
+            TermEnum::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty: ty.clone() }),
+            TermEnum::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
+            TermEnum::String(arg) => TermSer::TypeArg(TypeArgSer::String {
+                arg: arg.to_string(),
+            }),
+            TermEnum::Bytes(value) => TermSer::TypeArg(TypeArgSer::Bytes {
+                value: value.clone(),
+            }),
+            TermEnum::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
+            TermEnum::List(elems) => TermSer::TypeArg(TypeArgSer::List {
+                elems: elems.to_vec(),
+            }),
+            TermEnum::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple {
+                elems: elems.to_vec(),
+            }),
+            TermEnum::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v: v.clone() }),
         }
     }
 }
@@ -147,24 +161,24 @@ impl From<TermSer> for Term {
     fn from(value: TermSer) -> Self {
         match value {
             TermSer::TypeParam(param) => match param {
-                TypeParamSer::Type { b } => Term::RuntimeType(b),
-                TypeParamSer::StaticType => Term::StaticType,
-                TypeParamSer::BoundedNat { bound } => Term::BoundedNatType(bound),
-                TypeParamSer::String => Term::StringType,
-                TypeParamSer::Bytes => Term::BytesType,
-                TypeParamSer::Float => Term::FloatType,
-                TypeParamSer::List { param } => Term::ListType(param),
-                TypeParamSer::Tuple { params } => Term::TupleType(params),
+                TypeParamSer::Type { b } => Term::new(TermEnum::RuntimeType(b)),
+                TypeParamSer::StaticType => Term::new(TermEnum::StaticType),
+                TypeParamSer::BoundedNat { bound } => Term::new(TermEnum::BoundedNatType(bound)),
+                TypeParamSer::String => Term::new(TermEnum::StringType),
+                TypeParamSer::Bytes => Term::new(TermEnum::BytesType),
+                TypeParamSer::Float => Term::new(TermEnum::FloatType),
+                TypeParamSer::List { param } => Term::new(TermEnum::ListType(&param)),
+                TypeParamSer::Tuple { params } => Term::new(TermEnum::TupleType(&params)),
             },
             TermSer::TypeArg(arg) => match arg {
-                TypeArgSer::Type { ty } => Term::Runtime(ty),
-                TypeArgSer::BoundedNat { n } => Term::BoundedNat(n),
-                TypeArgSer::String { arg } => Term::String(arg),
-                TypeArgSer::Bytes { value } => Term::Bytes(value),
-                TypeArgSer::Float { value } => Term::Float(value),
-                TypeArgSer::List { elems } => Term::List(elems),
-                TypeArgSer::Tuple { elems } => Term::Tuple(elems),
-                TypeArgSer::Variable { v } => Term::Variable(v),
+                TypeArgSer::Type { ty } => Term::new(TermEnum::Runtime(&ty)),
+                TypeArgSer::BoundedNat { n } => Term::new(TermEnum::BoundedNat(n)),
+                TypeArgSer::String { arg } => Term::new(TermEnum::String(&arg)),
+                TypeArgSer::Bytes { value } => Term::new(TermEnum::Bytes(&value)),
+                TypeArgSer::Float { value } => Term::new(TermEnum::Float(value)),
+                TypeArgSer::List { elems } => Term::new(TermEnum::List(&elems)),
+                TypeArgSer::Tuple { elems } => Term::new(TermEnum::Tuple(&elems)),
+                TypeArgSer::Variable { v } => Term::new(TermEnum::Variable(&v)),
             },
         }
     }

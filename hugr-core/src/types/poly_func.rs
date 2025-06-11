@@ -166,7 +166,7 @@ pub(crate) mod test {
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
-    use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
+    use crate::types::type_param::{TermEnum, TermTypeError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, MaybeRV, Signature, Term, Type, TypeBound, TypeName, TypeRV,
     };
@@ -225,9 +225,9 @@ pub(crate) mod test {
             PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(good_array))?;
 
         // Sanity check (good args)
-        good_ts.instantiate(&[5u64.into(), usize_t().into()])?;
+        good_ts.instantiate(&[Term::from(5u64), usize_t().into()])?;
 
-        let wrong_args = good_ts.instantiate(&[usize_t().into(), 5u64.into()]);
+        let wrong_args = good_ts.instantiate(&[usize_t().into(), Term::from(5u64)]);
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
@@ -269,9 +269,9 @@ pub(crate) mod test {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
         for decl in [
-            Term::new_list_type(Term::max_nat_type()),
-            Term::StringType,
-            Term::TupleType(vec![TypeBound::Any.into(), Term::max_nat_type()]),
+            Term::new_list_type(TypeParam::max_nat_type()),
+            Term::new(TermEnum::StringType),
+            Term::new_tuple_type([TypeBound::Any.into(), TypeParam::max_nat_type()]),
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
@@ -373,11 +373,10 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
-        let decl = Term::new_list_type(TP_ANY);
+        let decl = Term::new_list_type(TypeBound::Any);
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             FuncValueType::new(
@@ -388,7 +387,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(actual, decl);
-            assert_eq!(cached, TypeParam::new_list_type(TypeBound::Copyable));
+            assert_eq!(cached, Term::new_list_type(TypeBound::Copyable));
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -398,7 +397,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(actual, decl);
-            assert_eq!(cached, TP_ANY);
+            assert_eq!(cached, Term::from(TypeBound::Any));
         });
     }
 
@@ -406,7 +405,7 @@ pub(crate) mod test {
     fn row_variables() {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
         let pf = PolyFuncTypeBase::new_validated(
-            [TypeParam::new_list_type(TP_ANY)],
+            [TypeParam::new_list_type(TypeBound::Any)],
             FuncValueType::new(
                 vec![usize_t().into(), rty.clone()],
                 vec![TypeRV::new_tuple(rty)],
@@ -438,7 +437,7 @@ pub(crate) mod test {
             TypeBound::Copyable,
         )));
         let pf = PolyFuncTypeBase::new_validated(
-            [Term::new_list_type(TypeBound::Copyable)],
+            [TypeParam::new_list_type(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
         )
         .unwrap();

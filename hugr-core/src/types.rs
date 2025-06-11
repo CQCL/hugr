@@ -15,7 +15,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::check_term_type;
+use crate::types::type_param::{TermEnum, check_term_type};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -489,9 +489,8 @@ impl<RV: MaybeRV> TypeBase<RV> {
     }
 
     /// New use (occurrence) of the type variable with specified index.
-    /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
-    /// than required for the use.
+    /// `bound` must be exactly that with which the variable was declared,
+    /// which may be narrower than required for the use.
     #[must_use]
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
         Self(TypeEnum::Variable(idx, bound), bound)
@@ -575,7 +574,8 @@ impl<RV: MaybeRV> TypeBase<RV> {
             TypeEnum::RowVar(rv) => rv.substitute(t),
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
-                let TypeArg::Runtime(ty) = t.apply_var(*idx, &((*bound).into())) else {
+                let term = t.apply_var(*idx, &((*bound).into()));
+                let Some(ty) = term.as_runtime() else {
                     panic!("Variable was not a type - try validate() first")
                 };
                 vec![ty.into_()]
@@ -750,13 +750,13 @@ impl<'a> Substitution<'a> {
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
         debug_assert!(check_term_type(arg, &TypeParam::new_list_type(bound)).is_ok());
-        match arg {
-            TypeArg::List(elems) => elems
+        match arg.get() {
+            TermEnum::List(elems) => elems
                 .iter()
                 .map(|ta| {
-                    match ta {
-                        Term::Runtime(ty) => return ty.clone().into(),
-                        Term::Variable(v) => {
+                    match ta.get() {
+                        TermEnum::Runtime(ty) => return ty.clone().into(),
+                        TermEnum::Variable(v) => {
                             if let Some(b) = v.bound_if_row_var() {
                                 return TypeRV::new_row_var_use(v.index(), b);
                             }
@@ -766,7 +766,7 @@ impl<'a> Substitution<'a> {
                     panic!("Not a list of types - call validate() ?")
                 })
                 .collect(),
-            Term::Runtime(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
+            TermEnum::Runtime(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone().into()]
             }
@@ -781,7 +781,7 @@ impl<'a> Substitution<'a> {
 /// and applies to arbitrary extension types rather than type variables.
 pub trait TypeTransformer {
     /// Error returned when a [`CustomType`] cannot be transformed, or a type
-    /// containing it (e.g. if changing a runtime type from copyable to
+    /// containing it (e.g. if changing a [`Term`] containing a type from copyable to
     /// linear invalidates a parameterized type).
     type Err: std::error::Error + From<SignatureError>;
 

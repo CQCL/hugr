@@ -63,6 +63,8 @@ semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
 ordered-float = { workspace = true, features = ["serde"] }
 base64.workspace = true
+once_cell = "1.21.3"
+servo_arc = "0.4.1"
 
 [dev-dependencies]
 rstest = { workspace = true }

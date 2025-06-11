@@ -351,7 +351,7 @@ mod test {
     use crate::{
         extension::prelude::{qb_t, usize_t},
         ops::{Conditional, DataflowOpTrait, DataflowParent},
-        types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},
+        types::{Signature, Substitution, Term, Type, TypeBound, TypeRV},
     };
 
     use super::{DataflowBlock, TailLoop};
@@ -382,7 +382,7 @@ mod test {
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
+            Term::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
             qb_t().into(),
         ]));
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants

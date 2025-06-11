@@ -10,7 +10,7 @@ pub mod int_types;
 mod test {
     use crate::{
         std_extensions::arithmetic::int_types::{INT_TYPES, int_type},
-        types::type_param::TypeArg,
+        types::Term,
     };
 
     use super::int_types::LOG_WIDTH_BOUND;
@@ -18,10 +18,7 @@ mod test {
     #[test]
     fn test_int_types() {
         for i in 0..LOG_WIDTH_BOUND {
-            assert_eq!(
-                INT_TYPES[i as usize],
-                int_type(TypeArg::BoundedNat(u64::from(i)))
-            );
+            assert_eq!(INT_TYPES[i as usize], int_type(Term::from(u64::from(i))));
         }
     }
 }

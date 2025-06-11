@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Weak};
 
-use super::int_types::{LOG_WIDTH_TYPE_PARAM, get_log_width, int_tv};
+use super::int_types::{get_log_width, int_tv, log_width_type_param};
 use crate::extension::prelude::{bool_t, sum_with_error};
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -235,7 +235,7 @@ pub(in crate::std_extensions::arithmetic) fn int_polytype(
     output: impl Into<TypeRowRV>,
 ) -> PolyFuncTypeRV {
     PolyFuncTypeRV::new(
-        vec![LOG_WIDTH_TYPE_PARAM; n_vars],
+        vec![log_width_type_param(); n_vars],
         FuncValueType::new(input, output),
     )
 }

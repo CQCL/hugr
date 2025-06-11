@@ -202,7 +202,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeExtensionOp
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone().into()]
+        vec![self.size.into(), self.elem_ty.clone().into()]
     }
 }
 
@@ -230,12 +230,12 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> HasConcrete
     type Concrete = GenericArrayConvert<AK, DIR, OtherAK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
-                Ok(GenericArrayConvert::new(ty.clone(), *n))
-            }
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
-        }
+        let [n, ty] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+        let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+        let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
+        Ok(GenericArrayConvert::new(ty, n))
     }
 }
 

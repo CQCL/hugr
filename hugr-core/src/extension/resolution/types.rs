@@ -10,6 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
+use crate::types::type_param::TermEnum;
 use crate::types::type_row::TypeRowBase;
 use crate::types::{FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
 
@@ -215,37 +216,37 @@ pub(super) fn collect_term_exts(
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
-    match term {
-        Term::Runtime(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
-        Term::List(elems) => {
+    match term.get() {
+        TermEnum::Runtime(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        TermEnum::List(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
             }
         }
-        Term::Tuple(elems) => {
+        TermEnum::Tuple(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
             }
         }
-        Term::ListType(item_type) => {
+        TermEnum::ListType(item_type) => {
             collect_term_exts(item_type, used_extensions, missing_extensions)
         }
-        Term::TupleType(item_types) => {
+        TermEnum::TupleType(item_types) => {
             for item_type in item_types {
                 collect_term_exts(item_type, used_extensions, missing_extensions);
             }
         }
-        Term::Variable(_)
-        | Term::RuntimeType(_)
-        | Term::StaticType
-        | Term::BoundedNatType(_)
-        | Term::StringType
-        | Term::BytesType
-        | Term::FloatType
-        | Term::BoundedNat(_)
-        | Term::String(_)
-        | Term::Bytes(_)
-        | Term::Float(_) => {}
+        TermEnum::Variable(_)
+        | TermEnum::RuntimeType(_)
+        | TermEnum::StaticType
+        | TermEnum::BoundedNatType(_)
+        | TermEnum::StringType
+        | TermEnum::BytesType
+        | TermEnum::FloatType
+        | TermEnum::BoundedNat(_)
+        | TermEnum::String(_)
+        | TermEnum::Bytes(_)
+        | TermEnum::Float(_) => {}
     }
 }
 

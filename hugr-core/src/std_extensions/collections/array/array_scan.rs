@@ -12,8 +12,8 @@ use crate::extension::simple_op::{
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
-use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
+use crate::types::type_param::{TermEnum, TypeArg, TypeParam};
+use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Term, Type, TypeBound, TypeRV};
 
 use super::array_kind::ArrayKind;
 
@@ -188,7 +188,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
             self.size.into(),
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::new_list(self.acc_tys.clone().into_iter().map_into()),
+            Term::new_list(self.acc_tys.clone().into_iter().map_into()),
         ]
     }
 }
@@ -211,29 +211,30 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
     type Concrete = GenericArrayScan<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [
-                TypeArg::BoundedNat(n),
-                TypeArg::Runtime(src_ty),
-                TypeArg::Runtime(tgt_ty),
-                TypeArg::List(acc_tys),
-            ] => {
-                let acc_tys: Result<_, OpLoadError> = acc_tys
-                    .iter()
-                    .map(|acc_ty| match acc_ty {
-                        TypeArg::Runtime(ty) => Ok(ty.clone()),
-                        _ => Err(SignatureError::InvalidTypeArgs.into()),
-                    })
-                    .collect();
-                Ok(GenericArrayScan::new(
-                    src_ty.clone(),
-                    tgt_ty.clone(),
-                    acc_tys?,
-                    *n,
-                ))
-            }
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
-        }
+        let [n, src_ty, tgt_ty, acc_tys] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+
+        let TermEnum::List(acc_ty_args) = acc_tys.get() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let Some(src_ty) = src_ty.as_runtime() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let Some(tgt_ty) = tgt_ty.as_runtime() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let acc_tys: Vec<Type> = acc_ty_args
+            .iter()
+            .map(|acc_ty| acc_ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs))
+            .try_collect()?;
+
+        Ok(GenericArrayScan::new(src_ty, tgt_ty, acc_tys, n))
     }
 }
 
