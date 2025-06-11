@@ -163,16 +163,12 @@ pub const CORE_BYTES_TYPE: &str = "core.bytes";
 /// - **Result:** `core.static`
 pub const CORE_FLOAT_TYPE: &str = "core.float";
 
-/// Type of a control flow edge.
+/// Type of control flow regions.
 ///
-/// - **Parameter:** `?types : (core.list core.type)`
-/// - **Result:** `core.ctrl_type`
+/// - **Parameter:** `?inputs : (core.list (core.list core.type))`
+/// - **Parameter:** `?outputs : (core.list (core.list core.type))`
+/// - **Result:** `core.type`
 pub const CORE_CTRL: &str = "core.ctrl";
-
-/// The type of the types for control flow edges.
-///
-/// - **Result:** `?type : core.static`
-pub const CORE_CTRL_TYPE: &str = "core.ctrl_type";
 
 /// The type for runtime constants.
 ///

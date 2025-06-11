@@ -826,7 +826,7 @@ impl<'a> Context<'a> {
         }
 
         let region_target_types = (|| {
-            let [_, region_targets] = self.get_func_type(
+            let [_, region_targets] = self.get_ctrl_type(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -860,31 +860,31 @@ impl<'a> Context<'a> {
         };
 
         // The entry node in core control flow regions is identified by being
-        // the first child node of the CFG node. We therefore import the entry
-        // node first and follow it up by every other node.
+        // the first child node of the CFG node. We therefore import the entry node first.
         self.import_node(entry_node, node)?;
 
-        for child in region_data.children {
-            if *child != entry_node {
-                self.import_node(*child, node)?;
-            }
-        }
-
-        // Create the exit node for the control flow region.
+        // Create the exit node for the control flow region. This always needs
+        // to be second in the node list.
         {
             let cfg_outputs = {
-                let [ctrl_type] = region_target_types.as_slice() else {
+                let [target_types] = region_target_types.as_slice() else {
                     return Err(error_invalid!("cfg region expects a single target"));
                 };
 
-                let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
-                self.import_type_row(types)?
+                self.import_type_row(*target_types)?
             };
 
             let exit = self
                 .hugr
                 .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
             self.record_links(exit, Direction::Incoming, region_data.targets);
+        }
+
+        // Finally we import all other nodes.
+        for child in region_data.children {
+            if *child != entry_node {
+                self.import_node(*child, node)?;
+            }
         }
 
         for meta_item in region_data.meta {
@@ -1245,13 +1245,6 @@ impl<'a> Context<'a> {
                 return Err(error_unsupported!("`{}` as `TypeParam`", model::CORE_CONST));
             }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_CTRL_TYPE
-                ));
-            }
-
             if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // type of a list must be copyable. Therefore we import it as `Any`.
@@ -1337,13 +1330,6 @@ impl<'a> Context<'a> {
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
                 return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_STATIC));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_CTRL_TYPE
-                ));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
@@ -1508,6 +1494,11 @@ impl<'a> Context<'a> {
     fn get_func_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
         self.match_symbol(term_id, model::CORE_FN)?
             .ok_or(error_invalid!("expected a function type"))
+    }
+
+    fn get_ctrl_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
+        self.match_symbol(term_id, model::CORE_CTRL)?
+            .ok_or(error_invalid!("expected a control type"))
     }
 
     fn import_func_type<RV: MaybeRV>(
