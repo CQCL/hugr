@@ -245,15 +245,16 @@ mod test {
             .define_function("id1", Signature::new_endo(usize_t()))
             .unwrap();
         let inps = id1.input_wires();
-        let id1 = id1.finish_with_outputs(inps).unwrap();
+        id1.finish_with_outputs(inps).unwrap();
+
         let id2 = mb
-            .define_function("id2", Signature::new_endo(usize_t()))
+            .define_function_link_name("id2", Signature::new_endo(usize_t()), None)
             .unwrap();
         let inps = id2.input_wires();
         let id2 = id2.finish_with_outputs(inps).unwrap();
         let hugr = mb.finish_hugr().unwrap();
 
-        let dce = DeadCodeElimPass::default().with_entry_points([id1.node()]);
+        let dce = DeadCodeElimPass::default();
         let cfold =
             ConstantFoldPass::default().with_inputs(id2.node(), [(0, ConstUsize::new(2).into())]);
 

@@ -127,6 +127,26 @@ pub trait Container {
     }
 }
 
+/*pub(super) fn define_function_link_name<C: Container + ?Sized>(
+    ctr: &mut C,
+    name: impl Into<String>,
+    signature: impl Into<PolyFuncType>,
+    link_name: impl Into<Option<String>>,
+) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+    let signature = signature.into();
+    let body = signature.body().clone();
+    let f_node = ctr.add_child_node(ops::FuncDefn::new(name.into(), signature, link_name));
+
+    // Add the extensions used by the function types.
+    ctr.use_extensions(
+        body.used_extensions()
+            .unwrap_or_else(|e| panic!("Build-time signatures should have valid extensions. {e}")),
+    );
+
+    let db = DFGBuilder::create_with_io(ctr.hugr_mut(), f_node, body)?;
+    Ok(FunctionBuilder::from_dfg_builder(db))
+}*/
+
 /// Types implementing this trait can be used to build complete HUGRs
 /// (with varying entrypoint node types)
 pub trait HugrBuilder: Container {

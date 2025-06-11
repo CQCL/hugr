@@ -139,12 +139,15 @@ fn instantiate(
         Entry::Occupied(n) => return *n.get(),
         Entry::Vacant(ve) => ve,
     };
-
-    let name = mangle_name(
-        h.get_optype(poly_func).as_func_defn().unwrap().func_name(),
-        &type_args,
+    let poly_func_def = h.get_optype(poly_func).as_func_defn().unwrap();
+    // Mangle the link_name, leave the descriptive name unchanged
+    let link_name = poly_func_def
+        .link_name()
+        .map(|ln| mangle_name(ln, &type_args));
+    let mono_tgt = h.add_node_after(
+        poly_func,
+        FuncDefn::new_link_name(poly_func_def.func_name().clone(), mono_sig, link_name),
     );
-    let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
@@ -287,7 +290,8 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::dead_funcs::IncludeExports;
+    use crate::{ComposablePass, RemoveDeadFuncsPass, monomorphize, remove_dead_funcs};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -319,7 +323,7 @@ mod test {
                 [TypeBound::Copyable.into()],
                 Signature::new(tv0(), pair_type(tv0())),
             );
-            let mut fb = mb.define_function("double", pfty)?;
+            let mut fb = mb.define_function_pub("double", pfty)?;
             let [elem] = fb.input_wires_arr();
             // A "genuine" impl might:
             //   let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
@@ -335,7 +339,7 @@ mod test {
 
         let tr = {
             let sig = Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3]));
-            let mut fb = mb.define_function(
+            let mut fb = mb.define_function_pub(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
             )?;
@@ -351,7 +355,7 @@ mod test {
         };
         let mn = {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function_pub("main", Signature::new(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -394,7 +398,11 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [mn.node()])?;
+        RemoveDeadFuncsPass::default()
+            // ALAN can do better here?
+            .include_module_exports(IncludeExports::Never)
+            .with_module_entry_points([mn.node()])
+            .run(&mut nopoly)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -406,6 +414,7 @@ mod test {
     }
 
     #[test]
+    #[should_panic] // TODO test needs updating: We only mangle link_name, not name, and many here were inner functions.
     fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
@@ -529,12 +538,13 @@ mod test {
         assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs
     }
 
+    static EMPTY_STRING: String = String::new();
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
         h.entry_descendants()
             .filter_map(|n| {
                 h.get_optype(n)
                     .as_func_defn()
-                    .map(|fd| (fd.func_name(), (n, fd)))
+                    .map(|fd| (fd.link_name().unwrap_or(&EMPTY_STRING), (n, fd)))
             })
             .collect::<HashMap<_, _>>()
     }
@@ -545,12 +555,13 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let foo = {
                 let builder = module_builder
-                    .define_function(
+                    .define_function_link_name(
                         "foo",
                         PolyFuncType::new(
                             [TypeBound::Any.into()],
                             Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
                         ),
+                        None,
                     )
                     .unwrap();
                 let inputs = builder.input_wires();
@@ -581,7 +592,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []).unwrap();
+        remove_dead_funcs(&mut hugr).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));

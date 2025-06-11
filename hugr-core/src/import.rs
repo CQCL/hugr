@@ -475,6 +475,7 @@ impl<'a> Context<'a> {
             ),
 
             table::Operation::DeclareFunc(symbol) => Some(
+                // ALAN TODO make this public/private/something??
                 self.import_node_declare_func(node_id, symbol, parent)
                     .map_err(|err| {
                         error_context!(err, "`declare-func` node with id {}", node_id)

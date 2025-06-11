@@ -500,7 +500,8 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr>
         let dataflow_inputs = signature.input_count();
         let dataflow_outputs = signature.output_count();
 
-        let func = hugr.add_node_with_parent(module, ops::FuncDefn::new("main", signature.clone()));
+        let func =
+            hugr.add_node_with_parent(module, ops::FuncDefn::new_public("main", signature.clone()));
         let inp = hugr.add_node_with_parent(
             func,
             ops::Input {

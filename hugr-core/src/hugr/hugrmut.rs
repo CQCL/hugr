@@ -630,7 +630,7 @@ mod test {
         // Start a main function with two nat inputs.
         let f: Node = hugr.add_node_with_parent(
             module,
-            ops::FuncDefn::new(
+            ops::FuncDefn::new_public(
                 "main",
                 Signature::new(usize_t(), vec![usize_t(), usize_t()]),
             ),

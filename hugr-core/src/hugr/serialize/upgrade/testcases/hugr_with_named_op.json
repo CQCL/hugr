@@ -3,67 +3,8 @@
   "nodes": [
     {
       "parent": 0,
-      "op": "Module"
-    },
-    {
-      "parent": 0,
-      "op": "FuncDefn",
-      "name": "main",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "Sum",
-              "s": "Unit",
-              "size": 2
-            },
-            {
-              "t": "Sum",
-              "s": "Unit",
-              "size": 2
-            }
-          ],
-          "output": [
-            {
-              "t": "Sum",
-              "s": "Unit",
-              "size": 2
-            }
-          ]
-        }
-      }
-    },
-    {
-      "parent": 1,
-      "op": "Input",
-      "types": [
-        {
-          "t": "Sum",
-          "s": "Unit",
-          "size": 2
-        },
-        {
-          "t": "Sum",
-          "s": "Unit",
-          "size": 2
-        }
-      ]
-    },
-    {
-      "parent": 1,
-      "op": "Output",
-      "types": [
-        {
-          "t": "Sum",
-          "s": "Unit",
-          "size": 2
-        }
-      ]
-    },
-    {
-      "parent": 1,
       "op": "DFG",
+      "name": "main",
       "signature": {
         "input": [
           {
@@ -87,7 +28,7 @@
       }
     },
     {
-      "parent": 4,
+      "parent": 0,
       "op": "Input",
       "types": [
         {
@@ -103,7 +44,7 @@
       ]
     },
     {
-      "parent": 4,
+      "parent": 0,
       "op": "Output",
       "types": [
         {
@@ -114,7 +55,7 @@
       ]
     },
     {
-      "parent": 4,
+      "parent": 0,
       "op": "Extension",
       "extension": "logic",
       "name": "And",
@@ -146,27 +87,7 @@
   "edges": [
     [
       [
-        2,
-        0
-      ],
-      [
-        4,
-        0
-      ]
-    ],
-    [
-      [
-        2,
-        1
-      ],
-      [
-        4,
-        1
-      ]
-    ],
-    [
-      [
-        4,
+        1,
         0
       ],
       [
@@ -176,31 +97,21 @@
     ],
     [
       [
-        5,
-        0
-      ],
-      [
-        7,
-        0
-      ]
-    ],
-    [
-      [
-        5,
+        1,
         1
       ],
       [
-        7,
+        3,
         1
       ]
     ],
     [
       [
-        7,
+        3,
         0
       ],
       [
-        6,
+        2,
         0
       ]
     ]
@@ -209,12 +120,7 @@
     null,
     null,
     null,
-    null,
-    null,
-    null,
-    null,
     null
   ],
-  "encoder": "hugr-rs v0.15.4",
-  "entrypoint": 4
+  "encoder": "hugr-rs v0.15.4"
 }

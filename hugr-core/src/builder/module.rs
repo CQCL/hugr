@@ -8,11 +8,10 @@ use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::ops;
-use crate::types::{PolyFuncType, Type, TypeBound};
-
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-
+use crate::types::{PolyFuncType, Type, TypeBound};
 use crate::{Hugr, Node};
+
 use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
@@ -51,7 +50,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
+    /// Replace a [`ops::FuncDecl`] with public [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
     /// # Errors
@@ -63,19 +62,50 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let decl =
-            self.hugr()
-                .get_optype(f_node)
-                .as_func_decl()
-                .ok_or(BuildError::UnexpectedType {
-                    node: f_node,
-                    op_desc: "crate::ops::OpType::FuncDecl",
-                })?;
-        let name = decl.func_name().clone();
-        let sig = decl.signature().clone();
-        let body = sig.body().clone();
-        self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn::new(name, sig));
+        let opty = self.hugr_mut().optype_mut(f_node);
+        let ops::OpType::FuncDecl(decl) = opty else {
+            return Err(BuildError::UnexpectedType {
+                node: f_node,
+                op_desc: "crate::ops::OpType::FuncDecl",
+            });
+        };
+
+        let body = decl.signature().body().clone();
+        // TODO look for `name_hint` metadata on the FuncDecl and copy to FuncDefn
+        *opty = ops::FuncDefn::new_link_name(
+            format!("From Decl {}", decl.link_name()),
+            decl.signature().clone(),
+            decl.link_name().clone(),
+        )
+        .into();
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
+    }
+
+    /// Add a [`ops::FuncDefn`] node, with both `name` and `link_name` explicitly specified.
+    /// Returns a builder to define the function body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    pub fn define_function_link_name(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        link_name: impl Into<Option<String>>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let f_node = self.add_child_node(ops::FuncDefn::new_link_name(name, signature, link_name));
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
@@ -106,31 +136,36 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(declare_n.into())
     }
 
-    /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
+    /// Adds a private [`ops::FuncDefn`] node and returns a builder to define the function
     /// body graph.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ops::FuncDefn`] node.
+    // ALAN TODO? deprecate and rename to define_private_func(tion)? (Rather long...)
     pub fn define_function(
         &mut self,
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
+        self.define_function_link_name(name, signature, None)
+    }
 
-        // Add the extensions used by the function types.
-        self.use_extensions(
-            body.used_extensions().unwrap_or_else(|e| {
-                panic!("Build-time signatures should have valid extensions. {e}")
-            }),
-        );
-
-        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
-        Ok(FunctionBuilder::from_dfg_builder(db))
+    /// Adds a public [`ops::FuncDefn`] node, with `link_name` the same as `name`,
+    /// and returns a builder to define the function body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    pub fn define_function_pub(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let name = name.into();
+        self.define_function_link_name(name.clone(), signature, name)
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
@@ -218,10 +253,7 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new(
-                    vec![qubit_state_type.get_alias_type()],
-                    vec![qubit_state_type.get_alias_type()],
-                ),
+                Signature::new_endo(qubit_state_type.get_alias_type()),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr()
