@@ -95,7 +95,7 @@ impl EnvelopeFormat {
 }
 
 /// Configuration for encoding an envelope.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[non_exhaustive]
 pub struct EnvelopeConfig {
     /// The format to use for the payload.
@@ -105,19 +105,29 @@ pub struct EnvelopeConfig {
     pub zstd: Option<ZstdConfig>,
 }
 
-impl Default for EnvelopeConfig {
-    fn default() -> Self {
-        let format = Default::default();
-        let zstd = if cfg!(feature = "zstd") {
-            Some(ZstdConfig::default())
-        } else {
-            None
-        };
-        Self { format, zstd }
-    }
-}
-
 impl EnvelopeConfig {
+    /// Create a new envelope configuration with the specified format.
+    /// `zstd` compression is disabled by default.
+    pub fn new(format: EnvelopeFormat) -> Self {
+        Self {
+            format,
+            ..Default::default()
+        }
+    }
+
+    /// Set the zstd compression configuration for the envelope.
+    pub fn with_zstd(self, zstd: ZstdConfig) -> Self {
+        Self {
+            zstd: Some(zstd),
+            ..self
+        }
+    }
+
+    /// Disable zstd compression in the envelope configuration.
+    pub fn disable_compression(self) -> Self {
+        Self { zstd: None, ..self }
+    }
+
     /// Create a new envelope header with the specified configuration.
     pub(super) fn make_header(&self) -> EnvelopeHeader {
         EnvelopeHeader {
@@ -162,6 +172,12 @@ pub struct ZstdConfig {
 }
 
 impl ZstdConfig {
+    /// Create a new zstd configuration with the specified compression level.
+    pub fn new(level: u8) -> Self {
+        Self {
+            level: NonZeroU8::new(level),
+        }
+    }
     /// Create a new zstd configuration with default compression level.
     #[must_use]
     pub const fn default_level() -> Self {
