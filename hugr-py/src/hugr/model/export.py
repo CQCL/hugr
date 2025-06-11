@@ -39,6 +39,7 @@ class ModelExport:
         self.hugr = hugr
         self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
         self.link_names: dict[InPort | OutPort, str] = {}
+        self.link_next = 0
 
         # TODO: Store the hugr entrypoint
 
@@ -52,15 +53,20 @@ class ModelExport:
         if root in self.link_names:
             return self.link_names[root]
         else:
-            index = str(len(self.link_names))
+            index = str(self.link_next)
+            self.link_next += 1
             self.link_names[root] = index
             return index
 
-    def export_node(self, node: Node) -> model.Node | None:
+    def export_node(
+        self, node: Node, virtual_input_links: Sequence[str] = []
+    ) -> model.Node | None:
         """Export the node with the given node id."""
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
+        inputs = [*inputs, *virtual_input_links]
+
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = []
 
@@ -308,31 +314,21 @@ class ModelExport:
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
-                input_types = [
-                    model.Apply(
-                        "core.ctrl",
-                        [model.List([type.to_model() for type in op.inputs])],
-                    )
-                ]
+                input_types = [model.List([type.to_model() for type in op.inputs])]
 
                 other_output_types = [type.to_model() for type in op.other_outputs]
                 output_types = [
-                    model.Apply(
-                        "core.ctrl",
+                    model.List(
                         [
-                            model.List(
-                                [
-                                    *[type.to_model() for type in row],
-                                    *other_output_types,
-                                ]
-                            )
-                        ],
+                            *[type.to_model() for type in row],
+                            *other_output_types,
+                        ]
                     )
                     for row in op.sum_ty.variant_rows
                 ]
 
                 signature = model.Apply(
-                    "core.fn",
+                    "core.ctrl",
                     [model.List(input_types), model.List(output_types)],
                 )
 
@@ -469,9 +465,14 @@ class ModelExport:
                         source_types = model.List(
                             [type.to_model() for type in op.inputs]
                         )
-                        source = self.link_name(OutPort(child, 0))
+                        source = str(self.link_next)
+                        self.link_next += 1
 
-                    child_node = self.export_node(child)
+                        child_node = self.export_node(
+                            child, virtual_input_links=[source]
+                        )
+                    else:
+                        child_node = self.export_node(child)
 
                     if child_node is not None:
                         children.append(child_node)
@@ -483,7 +484,13 @@ class ModelExport:
             error = f"CFG {node} has no entry block."
             raise ValueError(error)
 
-        signature = model.Apply("core.fn", [source_types, target_types])
+        signature = model.Apply(
+            "core.ctrl",
+            [
+                model.List([source_types]),
+                model.List([target_types]),
+            ],
+        )
 
         return model.Region(
             kind=model.RegionKind.CONTROL_FLOW,
