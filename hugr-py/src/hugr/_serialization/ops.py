@@ -75,11 +75,16 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
+    link_name: str | None
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
         return ops.FuncDefn(
-            self.name, inputs=poly_func.body.input, _outputs=poly_func.body.output
+            self.name,
+            params=poly_func.params,
+            inputs=poly_func.body.input,
+            _outputs=poly_func.body.output,
+            link_name=self.link_name,
         )
 
 

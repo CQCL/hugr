@@ -706,12 +706,24 @@
                 },
                 "signature": {
                     "$ref": "#/$defs/PolyFuncType"
+                },
+                "link_name": {
+                    "anyOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "title": "Link Name"
                 }
             },
             "required": [
                 "parent",
                 "name",
-                "signature"
+                "signature",
+                "link_name"
             ],
             "title": "FuncDefn",
             "type": "object"
