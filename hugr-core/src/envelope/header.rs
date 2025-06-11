@@ -107,7 +107,7 @@ pub struct EnvelopeConfig {
 
 impl EnvelopeConfig {
     /// Create a new envelope configuration with the specified format.
-    /// `zstd` compression is set to default value `None`.
+    /// `zstd` compression is disabled by default.
     pub fn new(format: EnvelopeFormat) -> Self {
         Self {
             format,
