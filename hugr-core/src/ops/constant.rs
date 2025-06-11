@@ -601,6 +601,7 @@ pub(crate) mod test {
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::std_extensions::collections::array::{ArrayValue, array_type};
     use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
+    use crate::types::Term;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -609,7 +610,6 @@ pub(crate) mod test {
         },
         std_extensions::arithmetic::float_types::{ConstF64, float64_type},
         type_row,
-        types::type_param::TypeArg,
         types::{Type, TypeBound, TypeRow},
     };
     use cool_asserts::assert_matches;
@@ -860,7 +860,7 @@ pub(crate) mod test {
         let ex_id: ExtensionId = "my_extension".try_into().unwrap();
         let typ_int = CustomType::new(
             "my_type",
-            vec![TypeArg::BoundedNat(8)],
+            vec![Term::from(8u64)],
             ex_id.clone(),
             TypeBound::Copyable,
             // Dummy extension reference.
