@@ -26,13 +26,14 @@ pub enum CallGraphNode<N = Node> {
 }
 
 /// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
+/// 
 /// Each node in the `CallGraph` corresponds to a [`FuncDefn`] or [`FuncDecl`] in the Hugr;
 /// each edge corresponds to a [`Call`]/[`LoadFunction`] of the edge's target, contained in
 /// the edge's source.
 ///
-/// For Hugrs whose root is neither a [Module](OpType::Module) nor a [`FuncDefn`], the call graph
-/// will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's root,
-/// with no incoming edges.
+/// For Hugrs whose entrypoint is neither a [Module](OpType::Module) nor a [`FuncDefn`], the
+/// call graph will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's
+/// entrypoint, with no incoming edges.
 ///
 /// [`Call`]: OpType::Call
 /// [`FuncDecl`]: OpType::FuncDecl
