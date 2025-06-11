@@ -19,13 +19,17 @@ pub struct PeelTailLoop<N = Node>(N);
 #[non_exhaustive]
 pub enum PeelTailLoopError<N = Node> {
     /// The specified Node was not a [TailLoop]
-    #[display("Node to inline {_0} expected to be a TailLoop but actually {_1}")]
-    NotTailLoop(N, OpType),
+    #[display("Node to peel {node} expected to be a TailLoop but actually {op}")]
+    NotTailLoop {
+        /// The node requested to peel
+        node: N,
+        /// The actual (non-tail-loop) operation
+        op: OpType,
+    },
 }
 
 impl<N> PeelTailLoop<N> {
-    /// Create a new instance that will inline the specified node
-    /// (i.e. that should be a [TailLoop])
+    /// Create a new instance that will inline the specified [TailLoop] node
     pub fn new(node: N) -> Self {
         Self(node)
     }
@@ -37,7 +41,10 @@ impl<N: HugrNode> PatchVerification for PeelTailLoop<N> {
     fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
         let opty = h.get_optype(self.0);
         if !opty.is_tail_loop() {
-            return Err(PeelTailLoopError::NotTailLoop(self.0, opty.clone()));
+            return Err(PeelTailLoopError::NotTailLoop {
+                node: self.0,
+                op: opty.clone(),
+            });
         }
         Ok(())
     }
@@ -140,13 +147,16 @@ mod test {
     #[test]
     fn bad_peel() {
         let backup = simple_dfg_hugr();
-        let opty = backup.entrypoint_optype().clone();
-        assert!(!opty.is_tail_loop());
+        let op = backup.entrypoint_optype().clone();
+        assert!(!op.is_tail_loop());
         let mut h = backup.clone();
         let r = h.apply_patch(PeelTailLoop::new(h.entrypoint()));
         assert_eq!(
             r,
-            Err(PeelTailLoopError::NotTailLoop(backup.entrypoint(), opty))
+            Err(PeelTailLoopError::NotTailLoop {
+                node: backup.entrypoint(),
+                op
+            })
         );
         assert_eq!(h, backup);
     }
