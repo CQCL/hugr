@@ -75,7 +75,7 @@ strum = "0.27.0"
 tempfile = "3.20"
 thiserror = "2.0.12"
 typetag = "0.2.20"
-clap = { version = "4.5.39" }
+clap = { version = "4.5.40" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.3"
 assert_cmd = "2.0.17"
