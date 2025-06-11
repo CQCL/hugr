@@ -26,13 +26,17 @@ pub enum CallGraphNode<N = Node> {
 }
 
 /// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
-/// Each node in the `CallGraph` corresponds to a [`FuncDefn`] in the Hugr; each edge corresponds
-/// to a [`Call`]/[`LoadFunction`] of the edge's target, contained in the edge's source.
+/// 
+/// Each node in the `CallGraph` corresponds to a [`FuncDefn`] or [`FuncDecl`] in the Hugr;
+/// each edge corresponds to a [`Call`]/[`LoadFunction`] of the edge's target, contained in
+/// the edge's source.
 ///
-/// For Hugrs whose root is neither a [Module](OpType::Module) nor a [`FuncDefn`], the call graph
-/// will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's root, with no incoming edges.
+/// For Hugrs whose entrypoint is neither a [Module](OpType::Module) nor a [`FuncDefn`], the
+/// call graph will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's
+/// entrypoint, with no incoming edges.
 ///
 /// [`Call`]: OpType::Call
+/// [`FuncDecl`]: OpType::FuncDecl
 /// [`FuncDefn`]: OpType::FuncDefn
 /// [`LoadFunction`]: OpType::LoadFunction
 pub struct CallGraph<N = Node> {
@@ -41,14 +45,13 @@ pub struct CallGraph<N = Node> {
 }
 
 impl<N: HugrNode> CallGraph<N> {
-    /// Makes a new `CallGraph` for a specified (subview) of a Hugr.
-    /// Calls to functions outside the view will be dropped.
+    /// Makes a new `CallGraph` for a Hugr.
     pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
         let mut g = Graph::default();
         let non_func_root =
             (!hugr.get_optype(hugr.entrypoint()).is_module()).then_some(hugr.entrypoint());
         let node_to_g = hugr
-            .entry_descendants()
+            .children(hugr.module_root())
             .filter_map(|n| {
                 let weight = match hugr.get_optype(n) {
                     OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),
@@ -94,7 +97,7 @@ impl<N: HugrNode> CallGraph<N> {
 
     /// Convert a Hugr [Node] into a petgraph node index.
     /// Result will be `None` if `n` is not a [`FuncDefn`](OpType::FuncDefn),
-    /// [`FuncDecl`](OpType::FuncDecl) or the hugr root.
+    /// [`FuncDecl`](OpType::FuncDecl) or the [HugrView::entrypoint].
     pub fn node_index(&self, n: N) -> Option<petgraph::graph::NodeIndex<u32>> {
         self.node_to_g.get(&n).copied()
     }
