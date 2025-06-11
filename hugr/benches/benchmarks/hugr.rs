@@ -19,9 +19,7 @@ trait Serializer {
 struct JsonSer;
 impl Serializer for JsonSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        let mut cfg = EnvelopeConfig::default();
-        cfg.format = EnvelopeFormat::PackageJson;
-        cfg.zstd = None;
+        let cfg = EnvelopeConfig::new(EnvelopeFormat::PackageJson).disable_compression();
 
         let mut bytes = Vec::new();
         hugr.store(&mut bytes, cfg).unwrap();
@@ -36,9 +34,8 @@ struct CapnpSer;
 
 impl Serializer for CapnpSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
-        let mut cfg = EnvelopeConfig::default();
-        cfg.format = EnvelopeFormat::ModelWithExtensions;
-        cfg.zstd = Some(Default::default());
+        let cfg =
+            EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions).with_zstd(Default::default());
 
         let mut bytes = Vec::new();
         hugr.store(&mut bytes, cfg).unwrap();
