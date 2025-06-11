@@ -1,6 +1,7 @@
 //! HUGR invariant checks.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::iter;
 
 use itertools::Itertools;
@@ -60,6 +61,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.entrypoint(), &[])?;
 
+        self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
         // serialization round-trips. We verify the schema of the serialization
         // format only when an environment variable is set. This allows
@@ -78,6 +80,43 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::text());
         }
 
+        Ok(())
+    }
+
+    fn validate_linkage(&self) -> Result<(), ValidationError<H::Node>> {
+        // Map from link_name to *tuple of*
+        //    Node with that link_name,
+        //    Signature,
+        //    bool - true for FuncDefn
+        let mut node_sig_defn = HashMap::new();
+
+        for c in self.hugr.children(self.hugr.module_root()) {
+            let (link_name, sig, is_defn) = match self.hugr.get_optype(c) {
+                OpType::FuncDecl(fd) => (fd.link_name(), fd.signature(), false),
+                OpType::FuncDefn(fd) => match fd.link_name() {
+                    Some(ln) => (ln, fd.signature(), true),
+                    None => continue,
+                },
+                _ => continue,
+            };
+            match node_sig_defn.entry(link_name) {
+                Entry::Vacant(ve) => {
+                    ve.insert((c, sig, is_defn));
+                }
+                Entry::Occupied(oe) => {
+                    // Do not allow two defns, or a defn and a decl (should have been resolved).
+                    // Do allow two decls of the same sig (aliasing - we are allowing some laziness here).
+                    let (prev_c, prev_sig, prev_defn) = oe.get();
+                    if prev_sig != &sig || is_defn || *prev_defn {
+                        // Either they are different (import<->export, or import signature), or both are exports
+                        return Err(ValidationError::DuplicateLinkName {
+                            link_name: link_name.clone(),
+                            children: [*prev_c, c],
+                        });
+                    };
+                }
+            }
+        }
         Ok(())
     }
 
@@ -317,6 +356,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     });
                 }
             }
+
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c, self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {
@@ -665,6 +705,21 @@ pub enum ValidationError<N: HugrNode> {
         parent_optype: OpType,
         source: ChildrenValidationError<N>,
     },
+    /// Multiple, incompatible, nodes use the same `link_name` in a [Module](super::Module)
+    /// (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with the same signature are allowed)
+    #[error("FuncDefn is exported under same name {link_name} as earlier node {:?}", children[0])]
+    DuplicateLinkName {
+        /// The `link_name` of a `FuncDecl` or [`FuncDefn`]
+        link_name: String,
+        /// Two nodes using that `link_name`
+        children: [N; 2],
+    },
+    /// A [`FuncDecl`], or [`FuncDefn`] with a [link_name],
+    /// was neither root nor child of a [`Module`] root
+    ///
+    /// [`FuncDecl`]: crate::ops::FuncDecl
+    /// [link_name]: FuncDefn::link_name
+    /// [`Module`]: crate::ops::Module
     /// The children graph has invalid edges.
     #[error(
         "An operation {parent_optype} contains invalid edges between its children: {source}. In parent {parent}, edge from {from:?} port {from_port:?} to {to:?} port {to_port:?}",

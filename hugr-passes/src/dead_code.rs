@@ -20,6 +20,7 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
+    include_exports: bool,
 }
 
 impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
@@ -27,6 +28,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
+            include_exports: true,
         }
     }
 }
@@ -94,10 +96,18 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
     /// [`HugrView::entrypoint`] is assumed to be an entry point;
-    /// for Module roots the client will want to mark some of the `FuncDefn` children
-    /// as entry points too.
+    /// if the entrypoint is the `Module` root, then any public
+    /// [FuncDefn](OpType::FuncDefn)s and [Const](OpType::Const)s are also considered entry points
+    /// by default, but these can be removed by [Self::include_module_exports]`(false)`.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
+        self
+    }
+
+    /// Sets whether, for Module-rooted Hugrs, the exported [FuncDefn](OpType::FuncDefn)s
+    /// and [Const](OpType::Const)s are included as entry points (they are by default)
+    pub fn include_module_exports(mut self, include: bool) -> Self {
+        self.include_exports = include;
         self
     }
 
@@ -106,6 +116,13 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
+        if self.include_exports && h.entrypoint() == h.module_root() {
+            q.extend(h.children(h.module_root()).filter(|ch| {
+                h.get_optype(*ch)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.link_name().is_some())
+            }))
+        }
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
@@ -120,8 +137,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                     | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
                     | OpType::AliasDefn(_)
                     | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
-                    | OpType::Output(_) // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges
-                                                                // (from Call/LoadConst/LoadFunction):
+                    | OpType::Output(_) // Do not include FuncDecl / Const unless reachable by static edges
+                                                                // (from Call/LoadConst/LoadFunction)
                     )
                 {
                     q.push_back(ch);

@@ -19,14 +19,14 @@ pub enum CallGraphNode<N = Node> {
     FuncDecl(N),
     /// petgraph-node corresponds to a [`FuncDefn`](OpType::FuncDefn) node (specified) in the Hugr
     FuncDefn(N),
-    /// petgraph-node corresponds to the root node of the hugr, that is not
+    /// petgraph-node corresponds to the entrypoint node of the hugr, that is not
     /// a [`FuncDefn`](OpType::FuncDefn). Note that it will not be a [Module](OpType::Module)
     /// either, as such a node could not have outgoing edges, so is not represented in the petgraph.
     NonFuncRoot,
 }
 
 /// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
-/// 
+///
 /// Each node in the `CallGraph` corresponds to a [`FuncDefn`] or [`FuncDecl`] in the Hugr;
 /// each edge corresponds to a [`Call`]/[`LoadFunction`] of the edge's target, contained in
 /// the edge's source.

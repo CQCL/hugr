@@ -152,7 +152,9 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a `FuncDefn` rooted HUGR
+    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR; the function will be private.
+    /// (See also [Self::new_pub], [Self::new_link_name].)
+    ///
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
@@ -160,9 +162,36 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let op = ops::FuncDefn::new(name, signature);
+        Self::new_link_name(name, signature, None)
+    }
+
+    /// Initialize a builder for a FuncDefn-rooted HUGR; the function will be public
+    /// with the same name (see also [Self::new_link_name]).
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn new_pub(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<Self, BuildError> {
+        let name = name.into();
+        Self::new_link_name(name.clone(), signature, Some(name))
+    }
+
+    /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified
+    /// [link_name](ops::FuncDefn::link_name).
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn new_link_name(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        link_name: impl Into<Option<String>>,
+    ) -> Result<Self, BuildError> {
+        let op = ops::FuncDefn::new_link_name(name.into(), signature.into(), link_name);
+        let body = op.signature().body().clone();
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
         let root = base.entrypoint();

@@ -295,8 +295,7 @@ pub(crate) mod test {
 
     #[fixture]
     pub(crate) fn simple_funcdef_hugr() -> Hugr {
-        let fn_builder =
-            FunctionBuilder::new("test", Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
+        let fn_builder = FunctionBuilder::new("test", Signature::new_endo(bool_t())).unwrap();
         let [i1] = fn_builder.input_wires_arr();
         fn_builder.finish_hugr_with_outputs([i1]).unwrap()
     }
