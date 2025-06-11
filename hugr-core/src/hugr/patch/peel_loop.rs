@@ -11,14 +11,15 @@ use crate::{Direction, HugrView, Node};
 
 use super::{HugrMut, PatchHugrMut, PatchVerification};
 
-/// Rewrite peel one iteration of a [TailLoop] to a known [`FuncDefn`](OpType::FuncDefn)
+/// Rewrite that peels one iteration of a [TailLoop] by turning the
+/// iteration test into a [Conditional].
 pub struct PeelTailLoop<N = Node>(N);
 
 /// Error in performing [`PeelTailLoop`] rewrite.
 #[derive(Clone, Debug, Display, Error, PartialEq)]
 #[non_exhaustive]
 pub enum PeelTailLoopError<N = Node> {
-    /// The specified Node was not a [TailLoop]
+    /// The specified Node was not a [`TailLoop`]
     #[display("Node to peel {node} expected to be a TailLoop but actually {op}")]
     NotTailLoop {
         /// The node requested to peel
@@ -29,7 +30,7 @@ pub enum PeelTailLoopError<N = Node> {
 }
 
 impl<N> PeelTailLoop<N> {
-    /// Create a new instance that will inline the specified [TailLoop] node
+    /// Create a new instance that will peel the specified [TailLoop] node
     pub fn new(node: N) -> Self {
         Self(node)
     }
@@ -58,13 +59,12 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
     type Outcome = ();
     fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
         self.verify(h)?; // Now we know we have a TailLoop!
-        let signature = h
-            .get_optype(self.0)
-            .dataflow_signature()
-            .unwrap()
-            .into_owned();
+        let loop_ty = h.optype_mut(self.0);
+        let signature = loop_ty.dataflow_signature().unwrap().into_owned();
         // Replace the TailLoop with a DFG - this maintains all external connections
-        let OpType::TailLoop(tl) = h.replace_op(self.0, DFG { signature }) else {
+        let mut op = DFG { signature }.into();
+        std::mem::swap(loop_ty, &mut op);
+        let OpType::TailLoop(tl) = op else {
             panic!("Wasn't a TailLoop ?!")
         };
         let sum_rows = Vec::from(tl.control_variants());
