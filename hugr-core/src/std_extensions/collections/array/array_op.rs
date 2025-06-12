@@ -58,6 +58,10 @@ pub enum GenericArrayOpDef<AK: ArrayKind> {
     /// references `AK` to ensure that the type parameter is used.
     #[strum(disabled)]
     _phantom(PhantomData<AK>, Never),
+    /// Unpacks an array into its individual elements:
+    /// `unpack<SIZE><elemty>: array<SIZE, elemty> -> (elemty)^SIZE`
+    /// where `SIZE` must be statically known (not a variable)
+    unpack,
 }
 
 /// Static parameters for array operations. Includes array size. Type is part of the type scheme.
@@ -75,6 +79,10 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
             GenericArrayOpDef::new_array => PolyFuncTypeRV::new(
                 params,
                 FuncValueType::new(vec![elem_ty_var.clone(); n as usize], array_ty),
+            ),
+            GenericArrayOpDef::unpack => PolyFuncTypeRV::new(
+                params,
+                FuncValueType::new(array_ty, vec![elem_ty_var.clone(); n as usize]),
             ),
             GenericArrayOpDef::pop_left | GenericArrayOpDef::pop_right => {
                 let popped_array_ty = AK::ty(n - 1, elem_ty_var.clone());
@@ -124,9 +132,9 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
         _extension_ref: &Weak<Extension>,
     ) -> SignatureFunc {
         use GenericArrayOpDef::{
-            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap,
+            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap, unpack,
         };
-        if let new_array | pop_left | pop_right = self {
+        if let new_array | unpack | pop_left | pop_right = self {
             // implements SignatureFromArgs
             // signature computed dynamically, so can rely on type definition in extension.
             (*self).into()
@@ -184,7 +192,7 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
                     ),
                 ),
                 _phantom(_, never) => match *never {},
-                new_array | pop_left | pop_right => unreachable!(),
+                new_array | unpack | pop_left | pop_right => unreachable!(),
             }
             .into()
         }
@@ -218,6 +226,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
     fn description(&self) -> String {
         match self {
             GenericArrayOpDef::new_array => "Create a new array from elements",
+            GenericArrayOpDef::unpack => "Unpack an array into its elements",
             GenericArrayOpDef::get => "Get an element from an array",
             GenericArrayOpDef::set => "Set an element in an array",
             GenericArrayOpDef::swap => "Swap two elements in an array",
@@ -275,7 +284,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         use GenericArrayOpDef::{
-            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap,
+            _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap, unpack,
         };
         let ty_arg = TypeArg::Type {
             ty: self.elem_ty.clone(),
@@ -288,7 +297,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
                 );
                 vec![ty_arg]
             }
-            new_array | pop_left | pop_right | get | set | swap => {
+            new_array | unpack | pop_left | pop_right | get | set | swap => {
                 vec![TypeArg::BoundedNat { n: self.size }, ty_arg]
             }
             _phantom(_, never) => match never {},
@@ -375,6 +384,22 @@ mod tests {
         let op = GenericArrayOpDef::<AK>::new_array.to_concrete(qb_t(), 2);
 
         let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
+
+        b.finish_hugr_with_outputs(out.outputs()).unwrap();
+    }
+    
+    #[rstest]
+    #[case(Array)]
+    #[case(ValueArray)]
+    /// Test building a HUGR involving an unpack operation.
+    fn test_unpack<AK: ArrayKind>(#[case] _kind: AK) {
+        let mut b = DFGBuilder::new(inout_sig(AK::ty(2, qb_t()), vec![qb_t(), qb_t()])).unwrap();
+
+        let [array] = b.input_wires_arr();
+
+        let op = GenericArrayOpDef::<AK>::unpack.to_concrete(qb_t(), 2);
+
+        let out = b.add_dataflow_op(op, [array]).unwrap();
 
         b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }

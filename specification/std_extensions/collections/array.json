@@ -729,6 +729,13 @@
         }
       },
       "binary": false
+    },
+    "unpack": {
+      "extension": "collections.array",
+      "name": "unpack",
+      "description": "Unpack an array into its elements",
+      "signature": null,
+      "binary": true
     }
   }
 }
