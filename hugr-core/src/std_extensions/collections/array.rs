@@ -43,7 +43,7 @@ pub const ARRAY_VALUENAME: TypeName = TypeName::new_inline("array");
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.array");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// A linear, fixed-length collection of values.
 ///
