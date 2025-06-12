@@ -387,7 +387,7 @@ mod tests {
 
         b.finish_hugr_with_outputs(out.outputs()).unwrap();
     }
-    
+
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
