@@ -21,7 +21,7 @@ use crate::utils::Never;
 
 use super::array_kind::ArrayKind;
 
-/// Array operation definitions. Generic over the conrete array implementation.
+/// Array operation definitions. Generic over the concrete array implementation.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, IntoStaticStr, EnumIter, EnumString)]
 #[allow(non_camel_case_types)]
 #[non_exhaustive]
@@ -250,7 +250,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayOpDef<AK> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-/// Concrete array operation. Generic over the actual array implemenation.
+/// Concrete array operation. Generic over the actual array implementation.
 pub struct GenericArrayOp<AK: ArrayKind> {
     /// The operation definition.
     pub def: GenericArrayOpDef<AK>,
