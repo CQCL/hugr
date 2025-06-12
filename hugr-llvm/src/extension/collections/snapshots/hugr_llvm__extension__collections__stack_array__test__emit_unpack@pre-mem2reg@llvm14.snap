@@ -1,0 +1,33 @@
+---
+source: hugr-llvm/src/extension/collections/stack_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define { i64, i64 } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"1" = alloca i64, align 8
+  %"5_0" = alloca [2 x i64], align 8
+  %"6_0" = alloca i64, align 8
+  %"6_1" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store [2 x i64] [i64 1, i64 2], [2 x i64]* %"5_0", align 4
+  %"5_01" = load [2 x i64], [2 x i64]* %"5_0", align 4
+  %extract = extractvalue [2 x i64] %"5_01", 0
+  %extract2 = extractvalue [2 x i64] %"5_01", 1
+  store i64 %extract, i64* %"6_0", align 4
+  store i64 %extract2, i64* %"6_1", align 4
+  %"6_03" = load i64, i64* %"6_0", align 4
+  %"6_14" = load i64, i64* %"6_1", align 4
+  store i64 %"6_03", i64* %"0", align 4
+  store i64 %"6_14", i64* %"1", align 4
+  %"05" = load i64, i64* %"0", align 4
+  %"16" = load i64, i64* %"1", align 4
+  %mrv = insertvalue { i64, i64 } undef, i64 %"05", 0
+  %mrv7 = insertvalue { i64, i64 } %mrv, i64 %"16", 1
+  ret { i64, i64 } %mrv7
+}
