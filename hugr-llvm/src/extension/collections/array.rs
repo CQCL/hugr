@@ -455,6 +455,24 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             }
             outputs.finish(ctx.builder(), [array_v.into()])
         }
+        ArrayOpDef::unpack => {
+            let [array_v] = inputs
+                .try_into()
+                .map_err(|_| anyhow!("ArrayOpDef::unpack expects one argument"))?;
+            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
+
+            let mut result = Vec::with_capacity(size as usize);
+            let usize_t = usize_ty(&ctx.typing_session());
+
+            for i in 0..size {
+                let idx = builder.build_int_add(array_offset, usize_t.const_int(i, false), "")?;
+                let elem_addr = unsafe { builder.build_in_bounds_gep(array_ptr, &[idx], "")? };
+                let elem_v = builder.build_load(elem_addr, "")?;
+                result.push(elem_v);
+            }
+
+            outputs.finish(ctx.builder(), result)
+        }
         ArrayOpDef::get => {
             let [array_v, index_v] = inputs
                 .try_into()
@@ -991,6 +1009,24 @@ mod test {
                 let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
                 let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
                 builder.finish_hugr_with_outputs([arr]).unwrap()
+            });
+        llvm_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+        });
+        check_emission!(hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    fn emit_unpack(mut llvm_ctx: TestContext) {
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(STD_REG.to_owned())
+            .with_outs(vec![usize_t(), usize_t()])
+            .finish(|mut builder| {
+                let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
+                let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
+                let elems = builder.add_array_unpack(usize_t(), 2, arr).unwrap();
+                builder.finish_hugr_with_outputs(elems).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
