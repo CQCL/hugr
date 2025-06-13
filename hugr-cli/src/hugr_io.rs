@@ -57,11 +57,10 @@ impl HugrInputArgs {
     pub fn get_envelope(&mut self) -> Result<(EnvelopeConfig, Package), CliError> {
         let extensions = self.load_extensions()?;
         let buffer = BufReader::new(&mut self.input);
-        match read_envelope(buffer, &extensions) {
-            Ok(env) => Ok(env),
-            Err(EnvelopeError::MagicNumber { .. }) => Err(CliError::NotAnEnvelope),
-            Err(e) => Err(CliError::Envelope(e)),
-        }
+        read_envelope(buffer, &extensions).map_err(|e| match e {
+            EnvelopeError::MagicNumber { .. } => CliError::NotAnEnvelope,
+            _ => CliError::Envelope(e),
+        })
     }
     /// Read a hugr JSON file from the input.
     ///
