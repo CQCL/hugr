@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.2...hugr-py-v0.13.0) (2025-06-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* Added `TypeParam`s and `TypeArg`s corresponding to floats and bytes.
+* `TypeArg::Sequence` needs to be replaced with
+* FuncDefns must be moved to beneath Module. `Container::define_function` is gone, use `HugrBuilder::module_root_builder`; similarly in hugr-py `DefinitionBuilder` (`define_function` -> `module_root_builder().define_function`). In hugr-llvm, some uses of
+
+### Features
+
+* Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/issues/2289)) ([e9c5e91](https://github.com/CQCL/hugr/commit/e9c5e914d4fd9ee270dee8e43875d8a413b02926))
+* **core, llvm:** add array unpack operations ([#2339](https://github.com/CQCL/hugr/issues/2339)) ([a1a70f1](https://github.com/CQCL/hugr/commit/a1a70f1afb5d8d57082269d167816c7a90497dcf)), closes [#1947](https://github.com/CQCL/hugr/issues/1947)
+* No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/issues/2256)) ([214b8df](https://github.com/CQCL/hugr/commit/214b8df837537b8ac15c3b60845350c3818a6ac7))
+* Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/issues/2140)) ([cc4997f](https://github.com/CQCL/hugr/commit/cc4997f12dad4dfecc37be564712cae18dfce159))
+
+
+### Bug Fixes
+
+* Fixed bug in python model export name mangling. ([#2323](https://github.com/CQCL/hugr/issues/2323)) ([041342f](https://github.com/CQCL/hugr/commit/041342f58a3dcd9f73dbbaab102221c5d9ff5f61))
+* Fixed invalid extension name in test. ([#2319](https://github.com/CQCL/hugr/issues/2319)) ([c58ddbf](https://github.com/CQCL/hugr/commit/c58ddbfcc0a557a1644fc8094370e6c62a7ce129))
+* Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/issues/2324)) ([1ad450f](https://github.com/CQCL/hugr/commit/1ad450f807485f7ef6083270aaa4523cb95b2490))
+* **py:** correct ConstString JSON encoding ([#2325](https://github.com/CQCL/hugr/issues/2325)) ([9649a48](https://github.com/CQCL/hugr/commit/9649a48d376aff27e475c70072aecd55ae7a4ccb))
+
 ## [0.12.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.1...hugr-py-v0.12.2) (2025-06-03)
 
 
