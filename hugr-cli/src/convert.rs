@@ -72,9 +72,8 @@ impl ConvertArgs {
             EnvelopeConfig::new(format)
         };
 
-        // Create the envelope config
         // Configure compression
-        if let Some(level) = self.compression_level {
+        if let Some(level) = self.compress.then_some(self.compression_level).flatten() {
             config = config.with_zstd(ZstdConfig::new(level));
         }
 
