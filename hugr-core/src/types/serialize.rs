@@ -78,7 +78,7 @@ pub(super) enum TypeParamSer {
     Float,
     StaticType,
     List { param: Box<Term> },
-    Tuple { params: Vec<Term> },
+    Tuple { params: Box<Term> },
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

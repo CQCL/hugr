@@ -234,9 +234,7 @@ pub(super) fn resolve_term_exts(
             resolve_term_exts(node, item_type.as_mut(), extensions, used_extensions)?;
         }
         Term::TupleType(item_types) => {
-            for item_type in item_types.iter_mut() {
-                resolve_term_exts(node, item_type, extensions, used_extensions)?;
-            }
+            resolve_term_exts(node, item_types.as_mut(), extensions, used_extensions)?;
         }
         Term::Variable(_)
         | Term::RuntimeType(_)

@@ -4,7 +4,6 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
-use itertools::Itertools;
 use ordered_float::OrderedFloat;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -93,8 +92,8 @@ pub enum Term {
     #[display("ListType[{_0}]")]
     ListType(Box<Term>),
     /// The type of static tuples.
-    #[display("TupleType[{}]", _0.iter().map(std::string::ToString::to_string).join(", "))]
-    TupleType(Vec<Term>),
+    #[display("TupleType[{_0}]")]
+    TupleType(Box<Term>),
     /// A runtime type as a term. Instance of [`Term::RuntimeType`].
     #[display("{_0}")]
     Type(Type),
@@ -164,9 +163,9 @@ impl Term {
         Self::ListType(Box::new(elem.into()))
     }
 
-    /// Creates a new [`Term::TupleType`] given the types of its elements.
-    pub fn new_tuple_type(item_types: impl IntoIterator<Item = Term>) -> Self {
-        Self::TupleType(item_types.into_iter().collect())
+    /// Creates a new [`Term::TupleType`] given the type of its elements.
+    pub fn new_tuple_type(item_types: impl Into<Term>) -> Self {
+        Self::TupleType(Box::new(item_types.into()))
     }
 
     fn contains(&self, other: &Term) -> bool {
@@ -176,9 +175,7 @@ impl Term {
             (Term::StringType, Term::StringType) => true,
             (Term::StaticType, Term::StaticType) => true,
             (Term::ListType(e1), Term::ListType(e2)) => e1.contains(e2),
-            (Term::TupleType(es1), Term::TupleType(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
-            }
+            (Term::TupleType(es1), Term::TupleType(es2)) => es1.contains(es2),
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
             (Term::Type(t1), Term::Type(t2)) => t1 == t2,
@@ -240,6 +237,12 @@ impl From<&str> for Term {
 impl From<Vec<Term>> for Term {
     fn from(elems: Vec<Term>) -> Self {
         Self::new_list(elems)
+    }
+}
+
+impl<const N: usize> From<[Term; N]> for Term {
+    fn from(value: [Term; N]) -> Self {
+        Self::new_list(value)
     }
 }
 
@@ -357,7 +360,7 @@ impl Term {
             Term::BytesType => Ok(()),
             Term::FloatType => Ok(()),
             Term::ListType(item_type) => item_type.validate(var_decls),
-            Term::TupleType(params) => params.iter().try_for_each(|p| p.validate(var_decls)),
+            Term::TupleType(item_types) => item_types.validate(var_decls),
             Term::StaticType => Ok(()),
         }
     }
@@ -420,9 +423,7 @@ impl Term {
             Term::BytesType => self.clone(),
             Term::FloatType => self.clone(),
             Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(params) => {
-                Term::TupleType(params.iter().map(|p| p.substitute(t)).collect())
-            }
+            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
             Term::StaticType => self.clone(),
         }
     }
@@ -639,17 +640,18 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
             .iter()
             .try_for_each(|list| check_type_arg(list, item_type)),
         (TypeArg::Tuple(items), TypeParam::TupleType(item_types)) => {
-            if items.len() != item_types.len() {
-                return Err(TypeArgError::WrongNumberTuple(
-                    items.len(),
-                    item_types.len(),
-                ));
-            }
+            todo!()
+            // if items.len() != item_types.len() {
+            //     return Err(TypeArgError::WrongNumberTuple(
+            //         items.len(),
+            //         item_types.len(),
+            //     ));
+            // }
 
-            items
-                .iter()
-                .zip(item_types.iter())
-                .try_for_each(|(term, type_)| check_type_arg(term, type_))
+            // items
+            //     .iter()
+            //     .zip(item_types.iter())
+            //     .try_for_each(|(term, type_)| check_type_arg(term, type_))
         }
         (TypeArg::BoundedNat(val), TypeParam::BoundedNatType(bound)) if bound.valid_value(*val) => {
             Ok(())
@@ -926,7 +928,7 @@ mod test {
 
         // TypeParam::Tuples require a TypeArg::Tuple of the same number of elems
         let usize_and_ty =
-            TypeParam::TupleType(vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
+            TypeParam::new_tuple_type([TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
         check(
             TypeArg::Tuple(vec![5.into(), usize_t().into()]),
             &usize_and_ty,
@@ -937,7 +939,10 @@ mod test {
             &usize_and_ty,
         )
         .unwrap_err(); // Wrong way around
-        let two_types = TypeParam::TupleType(vec![TypeBound::Any.into(), TypeBound::Any.into()]);
+        let two_types = TypeParam::new_tuple_type(Term::new_list([
+            TypeBound::Any.into(),
+            TypeBound::Any.into(),
+        ]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
@@ -1077,11 +1082,11 @@ mod test {
                         .or(any_with::<Self>(depth.descend())
                             .prop_map(Self::new_list_type)
                             .boxed())
-                        .or(vec(any_with::<Self>(depth.descend()), 0..3)
+                        .or(any_with::<Self>(depth.descend())
                             .prop_map(Self::new_tuple_type)
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(Term::new_list)
+                            .prop_map(Self::new_list)
                             .boxed());
                 }
 

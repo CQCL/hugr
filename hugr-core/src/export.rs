@@ -952,14 +952,9 @@ impl<'a> Context<'a> {
                 let item_type = self.export_term(item_type, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            Term::TupleType(params) => {
-                let item_types = self.bump.alloc_slice_fill_iter(
-                    params
-                        .iter()
-                        .map(|param| table::SeqPart::Item(self.export_term(param, None))),
-                );
-                let types = self.make_term(table::Term::List(item_types));
-                self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
+            Term::TupleType(item_types) => {
+                let item_types = self.export_term(item_types, None);
+                self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
             Term::Type(ty) => self.export_type(ty),
             Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),

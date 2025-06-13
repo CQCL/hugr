@@ -231,9 +231,7 @@ pub(super) fn collect_term_exts(
             collect_term_exts(item_type, used_extensions, missing_extensions)
         }
         Term::TupleType(item_types) => {
-            for item_type in item_types {
-                collect_term_exts(item_type, used_extensions, missing_extensions);
-            }
+            collect_term_exts(item_types, used_extensions, missing_extensions)
         }
         Term::ListConcat(lists) => {
             for list in lists {

@@ -1261,14 +1261,10 @@ impl<'a> Context<'a> {
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // types of a tuple must be copyable. Therefore we import it as `Any`.
-                let item_types = (|| {
-                    self.import_closed_list(item_types)?
-                        .into_iter()
-                        .map(|param| self.import_term(param))
-                        .collect::<Result<_, _>>()
-                })()
-                .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::TupleType(item_types));
+                let item_types = self
+                    .import_term(item_types)
+                    .map_err(|err| error_context!(err, "item types of tuple type"))?;
+                return Ok(TypeParam::new_tuple_type(item_types));
             }
 
             match self.get_term(term_id)? {
