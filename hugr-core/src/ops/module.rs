@@ -184,7 +184,13 @@ impl FuncDecl {
     }
 
     /// Allows mutating the name of the function (as per [Self::func_name])
+    #[deprecated(note = "Use link_name_mut")]
     pub fn func_name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    /// Allows mutating the [Self::link_name] of the function
+    pub fn link_name_mut(&mut self) -> &mut String {
         &mut self.name
     }
 
