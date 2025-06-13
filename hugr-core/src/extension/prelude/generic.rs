@@ -166,7 +166,7 @@ mod tests {
         extension::prelude::{ConstUsize, usize_t},
         ops::{OpType, constant},
         type_row,
-        types::TypeArg,
+        types::Term,
     };
 
     use super::LoadNat;
@@ -175,7 +175,7 @@ mod tests {
     fn test_load_nat() {
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
 
-        let arg = TypeArg::BoundedNat(4);
+        let arg = Term::from(4u64);
         let op = LoadNat::new(arg);
 
         let out = b.add_dataflow_op(op.clone(), []).unwrap();
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_load_nat_fold() {
-        let arg = TypeArg::BoundedNat(5);
+        let arg = Term::from(5u64);
         let op = LoadNat::new(arg);
 
         let optype: OpType = op.into();

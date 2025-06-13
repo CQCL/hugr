@@ -147,7 +147,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone().into()]
+        vec![self.size.into(), self.elem_ty.clone().into()]
     }
 }
 
