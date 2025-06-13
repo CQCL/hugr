@@ -1017,23 +1017,40 @@ mod test {
         check_emission!(hugr, llvm_ctx);
     }
 
-    #[rstest]
-    fn emit_unpack(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
-            .with_extensions(STD_REG.to_owned())
-            .with_outs(vec![usize_t(), usize_t()])
-            .finish(|mut builder| {
-                let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
-                let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
-                let elems = builder.add_array_unpack(usize_t(), 2, arr).unwrap();
-                builder.finish_hugr_with_outputs(elems).unwrap()
-            });
-        llvm_ctx.add_extensions(|cge| {
-            cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
-        });
-        check_emission!(hugr, llvm_ctx);
-    }
+    // #[rstest]
+    // #[case(1, 2, 3)]
+    // #[case(0, 0, 0)]
+    // #[case(10, 20, 30)]
+    // fn exec_unpack_and_sum(mut exec_ctx: TestContext, #[case] a: u64, #[case] b: u64, #[case] expected: u64) {
+    //     let hugr = SimpleHugrConfig::new()
+    //         .with_extensions(exec_registry())
+    //         .with_outs(vec![usize_t()])
+    //         .finish(|mut builder| {
+    //             // Create an array with the test values
+    //             let values = vec![ConstUsize::new(a).into(), ConstUsize::new(b).into()];
+    //             let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), values));
+
+    //             // Unpack the array
+    //             let [val_a, val_b] = builder.add_array_unpack(usize_t(), 2, arr).unwrap().try_into().unwrap();
+
+    //             // Add the values
+    //             let sum = {
+    //                 let int_ty = int_type(6);
+    //                 let a_int = builder.cast(val_a, int_ty.clone()).unwrap();
+    //                 let b_int = builder.cast(val_b, int_ty.clone()).unwrap();
+    //                 let sum_int = builder.add_iadd(6, a_int, b_int).unwrap();
+    //                 builder.cast(sum_int, usize_t()).unwrap()
+    //             };
+
+    //             builder.finish_hugr_with_outputs([sum]).unwrap()
+    //         });
+    //     exec_ctx.add_extensions(|cge| {
+    //         cge.add_default_prelude_extensions()
+    //             .add_default_array_extensions()
+    //             .add_default_int_extensions()
+    //     });
+    //     assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    // }
 
     fn exec_registry() -> ExtensionRegistry {
         ExtensionRegistry::new([
@@ -1424,6 +1441,51 @@ mod test {
                         arr,
                     )
                     .unwrap();
+                builder.finish_hugr_with_outputs([r]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_array_extensions()
+                .add_default_int_extensions()
+        });
+        assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case(&[], 0)]
+    #[case(&[1, 2], 3)]
+    #[case(&[6, 6, 6], 18)]
+    fn exec_unpack(
+        mut exec_ctx: TestContext,
+        #[case] array_contents: &[u64],
+        #[case] expected: u64,
+    ) {
+        // We build a HUGR that:
+        // - Loads an array with the given contents
+        // - Unpacks all the elements
+        // - Returns the sum of the elements
+
+        let int_ty = int_type(6);
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let array = array::ArrayValue::new(
+                    int_ty.clone(),
+                    array_contents
+                        .iter()
+                        .map(|&i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let array = builder.add_load_value(array);
+                let unpacked = builder
+                    .add_array_unpack(int_ty.clone(), array_contents.len() as u64, array)
+                    .unwrap();
+                let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
+                for elem in unpacked {
+                    r = builder.add_iadd(6, r, elem).unwrap();
+                }
+
                 builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {

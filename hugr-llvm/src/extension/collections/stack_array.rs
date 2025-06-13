@@ -835,24 +835,6 @@ mod test {
         check_emission!(hugr, llvm_ctx);
     }
 
-    #[rstest]
-    fn emit_unpack(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
-            .with_extensions(STD_REG.to_owned())
-            .with_outs(vec![usize_t(), usize_t()])
-            .finish(|mut builder| {
-                let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
-                let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
-                let elems = builder.add_array_unpack(usize_t(), 2, arr).unwrap();
-                builder.finish_hugr_with_outputs(elems).unwrap()
-            });
-        llvm_ctx.add_extensions(|cge| {
-            cge.add_default_prelude_extensions()
-                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
-        });
-        check_emission!(hugr, llvm_ctx);
-    }
-
     fn exec_registry() -> ExtensionRegistry {
         ExtensionRegistry::new([
             int_types::EXTENSION.to_owned(),
@@ -1242,6 +1224,51 @@ mod test {
                         arr,
                     )
                     .unwrap();
+                builder.finish_hugr_with_outputs([r]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
+                .add_default_int_extensions()
+        });
+        assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case(&[], 0)]
+    #[case(&[1, 2], 3)]
+    #[case(&[6, 6, 6], 18)]
+    fn exec_unpack(
+        mut exec_ctx: TestContext,
+        #[case] array_contents: &[u64],
+        #[case] expected: u64,
+    ) {
+        // We build a HUGR that:
+        // - Loads an array with the given contents
+        // - Unpacks all the elements
+        // - Returns the sum of the elements
+
+        let int_ty = int_type(6);
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let array = array::ArrayValue::new(
+                    int_ty.clone(),
+                    array_contents
+                        .iter()
+                        .map(|&i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let array = builder.add_load_value(array);
+                let unpacked = builder
+                    .add_array_unpack(int_ty.clone(), array_contents.len() as u64, array)
+                    .unwrap();
+                let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
+                for elem in unpacked {
+                    r = builder.add_iadd(6, r, elem).unwrap();
+                }
+
                 builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
