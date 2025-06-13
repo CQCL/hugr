@@ -26,7 +26,7 @@ pub enum CallGraphNode<N = Node> {
 }
 
 /// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
-/// 
+///
 /// Each node in the `CallGraph` corresponds to a [`FuncDefn`] or [`FuncDecl`] in the Hugr;
 /// each edge corresponds to a [`Call`]/[`LoadFunction`] of the edge's target, contained in
 /// the edge's source.
