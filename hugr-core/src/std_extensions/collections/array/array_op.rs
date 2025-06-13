@@ -296,7 +296,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
                 vec![ty_arg]
             }
             new_array | unpack | pop_left | pop_right | get | set | swap => {
-                vec![TypeArg::BoundedNat(self.size), ty_arg]
+                vec![self.size.into(), ty_arg]
             }
             _phantom(_, never) => match never {},
         }

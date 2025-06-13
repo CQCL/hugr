@@ -4,7 +4,7 @@ use std::num::NonZeroU64;
 use std::sync::{Arc, Weak};
 
 use crate::ops::constant::ValueName;
-use crate::types::TypeName;
+use crate::types::{Term, TypeName};
 use crate::{
     Extension,
     extension::ExtensionId,
@@ -49,7 +49,7 @@ pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
     pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
-        .map(|i| int_type(TypeArg::BoundedNat(u64::from(i))))
+        .map(|i| int_type(Term::from(u64::from(i))))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
