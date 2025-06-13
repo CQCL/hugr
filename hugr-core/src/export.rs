@@ -231,16 +231,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Get the name of a function definition or declaration node. Returns `None` if not
-    /// one of those operations.
-    fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
-        match self.hugr.get_optype(func_node) {
-            OpType::FuncDecl(func_decl) => Some(func_decl.func_name()),
-            OpType::FuncDefn(func_defn) => Some(func_defn.func_name()),
-            _ => None,
-        }
-    }
-
     fn with_local_scope<T>(&mut self, node: table::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
         let prev_local_scope = self.local_scope.replace(node);
         let prev_local_constraints = std::mem::take(&mut self.local_constraints);
@@ -269,8 +259,9 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
+            // ALAN use link_name here...func_name saved as metadata in export_node_deep
             OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
-            OpType::FuncDecl(func_decl) => Some(func_decl.func_name().as_str()),
+            OpType::FuncDecl(func_decl) => Some(func_decl.link_name().as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
             _ => None,
@@ -339,7 +330,7 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
+                let name = func.func_name(); // ALAN use link_name, func_name is metadata
                 let symbol = this.export_poly_func_type(name, func.signature());
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
@@ -350,7 +341,7 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
+                let name = func.link_name();
                 let symbol = this.export_poly_func_type(name, func.signature());
                 table::Operation::DeclareFunc(symbol)
             }),
