@@ -239,7 +239,7 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
         TypeArg::Tuple(elems) => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
-        TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
+        TypeArg::Variable(_) => panic!("type_arg_str variable: {arg}"),
         _ => panic!("unknown type arg: {arg}"),
     }
 }
