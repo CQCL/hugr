@@ -2,7 +2,7 @@
 
 use clap::Parser as _;
 
-use hugr_cli::{CliArgs, mermaid, validate};
+use hugr_cli::{CliArgs, convert, mermaid, validate};
 
 use clap_verbosity_flag::log::Level;
 
@@ -11,6 +11,7 @@ fn main() {
         CliArgs::Validate(args) => run_validate(args),
         CliArgs::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
         CliArgs::Mermaid(args) => run_mermaid(args),
+        CliArgs::Convert(args) => run_convert(args),
         CliArgs::External(args) => {
             // External subcommand support: invoke `hugr-<subcommand>`
             if args.is_empty() {
@@ -68,6 +69,16 @@ fn run_mermaid(mut args: mermaid::MermaidArgs) {
         if args.other_args.verbosity(Level::Error) {
             eprintln!("{e}");
         }
+        std::process::exit(1);
+    }
+}
+
+/// Run the `convert` subcommand.
+fn run_convert(mut args: convert::ConvertArgs) {
+    let result = args.run_convert();
+
+    if let Err(e) = result {
+        eprintln!("{e}");
         std::process::exit(1);
     }
 }
