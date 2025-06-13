@@ -29,6 +29,7 @@ fn main() {
         CliCommand::Validate(mut args) => args.run(),
         CliCommand::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
         CliCommand::Mermaid(mut args) => args.run_print(),
+        CliCommand::Convert(mut args) => args.run_convert(),
         CliCommand::External(args) => run_external(args),
         _ => Err(anyhow!("Unknown command")),
     };

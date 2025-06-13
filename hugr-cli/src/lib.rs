@@ -63,6 +63,7 @@ use hugr::package::PackageValidationError;
 use std::ffi::OsString;
 use thiserror::Error;
 
+pub mod convert;
 pub mod extensions;
 pub mod hugr_io;
 pub mod mermaid;
@@ -92,6 +93,8 @@ pub enum CliCommand {
     GenExtensions(extensions::ExtArgs),
     /// Write HUGR as mermaid diagrams.
     Mermaid(mermaid::MermaidArgs),
+    /// Convert between different HUGR envelope formats.
+    Convert(convert::ConvertArgs),
     /// External commands
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -118,4 +121,9 @@ pub enum CliError {
         "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
     )]
     NotAnEnvelope,
+    /// Invalid format string for conversion.
+    #[error(
+        "Invalid format: '{_0}'. Valid formats are: json, model, model-exts, model-text, model-text-exts"
+    )]
+    InvalidFormat(String),
 }
