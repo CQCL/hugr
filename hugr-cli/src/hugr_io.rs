@@ -43,6 +43,8 @@ impl HugrInputArgs {
     /// Read a hugr envelope from the input and return the package encoded
     /// within.
     ///
+    /// # Errors
+    ///
     /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
     /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
@@ -51,6 +53,8 @@ impl HugrInputArgs {
 
     /// Read a hugr envelope from the input and return the envelope
     /// configuration and the package encoded within.
+    ///
+    /// # Errors
     ///
     /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
     /// reading the input as a package will fail.
