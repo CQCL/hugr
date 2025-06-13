@@ -9,7 +9,7 @@ use super::custom::CustomType;
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::type_param::{TypeArgVariable, UpperBound};
+use crate::types::type_param::{TermVar, UpperBound};
 use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -109,7 +109,7 @@ pub(super) enum TypeArgSer {
     },
     Variable {
         #[serde(flatten)]
-        v: TypeArgVariable,
+        v: TermVar,
     },
 }
 
@@ -138,7 +138,7 @@ impl From<Term> for TermSer {
             Term::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
-            Term::Variable { v } => TermSer::TypeArg(TypeArgSer::Variable { v }),
+            Term::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v }),
         }
     }
 }
@@ -164,7 +164,7 @@ impl From<TermSer> for Term {
                 TypeArgSer::Float { value } => Term::Float(value),
                 TypeArgSer::List { elems } => Term::List(elems),
                 TypeArgSer::Tuple { elems } => Term::Tuple(elems),
-                TypeArgSer::Variable { v } => Term::Variable { v },
+                TypeArgSer::Variable { v } => Term::Variable(v),
             },
         }
     }

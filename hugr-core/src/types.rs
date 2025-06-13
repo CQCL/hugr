@@ -756,7 +756,7 @@ impl<'a> Substitution<'a> {
                 .map(|ta| {
                     match ta {
                         Term::Type(ty) => return ty.clone().into(),
-                        Term::Variable { v } => {
+                        Term::Variable(v) => {
                             if let Some(b) = v.bound_if_row_var() {
                                 return TypeRV::new_row_var_use(v.index(), b);
                             }

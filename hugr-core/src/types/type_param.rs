@@ -122,13 +122,9 @@ pub enum Term {
     Tuple(Vec<Term>),
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
-    /// - see [`TypeArg::new_var_use`]
-    #[display("{v}")]
-    Variable {
-        #[allow(missing_docs)]
-        #[serde(flatten)]
-        v: TypeArgVariable,
-    },
+    /// - see [`Term::new_var_use`]
+    #[display("{_0}")]
+    Variable(TermVar),
 }
 
 impl Term {
@@ -172,15 +168,17 @@ impl Term {
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
             (Term::Type(t1), Term::Type(t2)) => t1 == t2,
-            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
+            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 >= n2,
             (Term::String(s1), Term::String(s2)) => s1 == s2,
             (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
             (Term::Float(f1), Term::Float(f2)) => f1 == f2,
-            (Term::Variable { v: v1 }, Term::Variable { v: v2 }) => v1 == v2,
-            (Term::List(e1), Term::List(e2)) if e1 == e2 => true,
-            (Term::List(elems), other) => elems.iter().any(|elem| elem.contains(other)),
-            (Term::Tuple(e1), Term::Tuple(e2)) if e1 == e2 => true,
-            (Term::Tuple(elems), other) => elems.iter().any(|elem| elem.contains(other)),
+            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
+            (Term::List(es1), Term::List(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+            }
+            (Term::Tuple(es1), Term::Tuple(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+            }
             _ => false,
         }
     }
@@ -237,9 +235,9 @@ impl From<Vec<Term>> for Term {
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
 #[display("#{idx}")]
-pub struct TypeArgVariable {
+pub struct TermVar {
     idx: usize,
-    cached_decl: Box<TypeParam>,
+    cached_decl: Box<Term>,
 }
 
 impl Term {
@@ -256,12 +254,10 @@ impl Term {
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
             Term::RuntimeType(b) => Type::new_var_use(idx, b).into(),
-            _ => Term::Variable {
-                v: TypeArgVariable {
-                    idx,
-                    cached_decl: Box::new(decl),
-                },
-            },
+            _ => Term::Variable(TermVar {
+                idx,
+                cached_decl: Box::new(decl),
+            }),
         }
     }
 
@@ -303,9 +299,7 @@ impl Term {
             }
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
-            Term::Variable {
-                v: TypeArgVariable { idx, cached_decl },
-            } => {
+            Term::Variable(TermVar { idx, cached_decl }) => {
                 assert!(
                     !matches!(&**cached_decl, TypeParam::RuntimeType { .. }),
                     "Malformed TypeArg::Variable {cached_decl} - should be inconstructible"
@@ -336,7 +330,7 @@ impl Term {
             Term::List(elems) => {
                 let mut are_types = elems.iter().map(|ta| match ta {
                     Term::Type { .. } => true,
-                    Term::Variable { v } => v.bound_if_row_var().is_some(),
+                    Term::Variable(v) => v.bound_if_row_var().is_some(),
                     _ => false,
                 });
                 let elems = match are_types.next() {
@@ -362,9 +356,7 @@ impl Term {
             Term::Tuple(elems) => {
                 Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
             }
-            Term::Variable {
-                v: TypeArgVariable { idx, cached_decl },
-            } => t.apply_var(*idx, cached_decl),
+            Term::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
             Term::RuntimeType { .. } => self.clone(),
             Term::BoundedNatType { .. } => self.clone(),
             Term::StringType => self.clone(),
@@ -386,8 +378,8 @@ impl Transformable for Term {
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)
-            | Term::String { .. }
-            | Term::Variable { .. }
+            | Term::String(_)
+            | Term::Variable(_)
             | Term::Float(_)
             | Term::Bytes(_) => Ok(false),
             Term::RuntimeType { .. } => Ok(false),
@@ -402,7 +394,7 @@ impl Transformable for Term {
     }
 }
 
-impl TypeArgVariable {
+impl TermVar {
     /// Return the index.
     #[must_use]
     pub fn index(&self) -> usize {
@@ -425,12 +417,9 @@ impl TypeArgVariable {
 /// Checks a [`TypeArg`] is as expected for a [`TypeParam`]
 pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> {
     match (term, type_) {
-        (
-            TypeArg::Variable {
-                v: TypeArgVariable { cached_decl, .. },
-            },
-            _,
-        ) if type_.contains(cached_decl) => Ok(()),
+        (TypeArg::Variable(TermVar { cached_decl, .. }), _) if type_.contains(cached_decl) => {
+            Ok(())
+        }
         (TypeArg::Type(ty), TypeParam::RuntimeType(bound))
             if bound.contains(ty.least_upper_bound()) =>
         {
@@ -439,7 +428,7 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
         (TypeArg::List(elems), TypeParam::ListType(item_type)) => {
             elems.iter().try_for_each(|term| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (TypeArg::Variable { v }, TypeParam::RuntimeType(param_bound)) =
+                if let (TypeArg::Variable(v), TypeParam::RuntimeType(param_bound)) =
                     (term, &**item_type)
                 {
                     if v.bound_if_row_var()
@@ -698,11 +687,11 @@ mod test {
 
         use proptest::prelude::*;
 
-        use super::super::{TypeArgVariable, UpperBound};
+        use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
         use crate::types::{Term, Type, TypeBound};
 
-        impl Arbitrary for TypeArgVariable {
+        impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
@@ -746,8 +735,8 @@ mod test {
                             // to be constructed from TypeArg::new_var_use. We are only
                             // using this instance for serialization now, but if we want
                             // to generate valid TypeArgs this will need to change.
-                            any_with::<TypeArgVariable>(depth.descend())
-                                .prop_map(|v| Self::Variable { v })
+                            any_with::<TermVar>(depth.descend())
+                                .prop_map(|v| Self::Variable(v))
                                 .boxed(),
                         )
                         .or(any_with::<Self>(depth.descend())

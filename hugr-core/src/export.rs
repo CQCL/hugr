@@ -15,7 +15,7 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeBase, TypeBound, TypeEnum, type_param::TypeArgVariable, type_row::TypeRowBase,
+        TypeBase, TypeBound, TypeEnum, type_param::TermVar, type_row::TypeRowBase,
     },
 };
 
@@ -858,7 +858,7 @@ impl<'a> Context<'a> {
         self.make_term(term)
     }
 
-    pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> table::TermId {
+    pub fn export_type_arg_var(&mut self, var: &TermVar) -> table::TermId {
         let node = self.local_scope.expect("local variable out of scope");
         self.make_term(table::Term::Var(table::VarId(node, var.index() as _)))
     }
@@ -984,7 +984,7 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::Tuple(parts))
             }
-            Term::Variable { v } => self.export_type_arg_var(v),
+            Term::Variable(v) => self.export_type_arg_var(v),
             Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
         }
     }
