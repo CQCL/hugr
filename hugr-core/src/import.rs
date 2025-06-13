@@ -1243,6 +1243,7 @@ impl<'a> Context<'a> {
                 return Err(error_unsupported!("`{}`", model::CORE_CTRL_TYPE));
             }
 
+            // See https://github.com/CQCL/hugr/issues/2304.
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
                 return Err(error_unsupported!("`{}`", model::CORE_CONST));
             }

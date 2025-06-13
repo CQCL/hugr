@@ -154,6 +154,11 @@ impl Term {
         Self::ListType(Box::new(elem.into()))
     }
 
+    /// Creates a new [`Term::TupleType`] given the types of its elements.
+    pub fn new_tuple_type(item_types: impl IntoIterator<Item = Term>) -> Self {
+        Self::TupleType(item_types.into_iter().collect())
+    }
+
     fn contains(&self, other: &Term) -> bool {
         match (self, other) {
             (Term::RuntimeType(b1), Term::RuntimeType(b2)) => b1.contains(*b2),
@@ -721,17 +726,17 @@ mod test {
                     Just(Self::BytesType).boxed(),
                     Just(Self::FloatType).boxed(),
                     Just(Self::StringType).boxed(),
-                    any::<TypeBound>().prop_map(Self::RuntimeType).boxed(),
-                    any::<UpperBound>().prop_map(Self::BoundedNatType).boxed(),
-                    any::<u64>().prop_map(|n| Self::BoundedNat(n)).boxed(),
-                    any::<String>().prop_map(Self::String).boxed(),
+                    any::<TypeBound>().prop_map(Self::from).boxed(),
+                    any::<UpperBound>().prop_map(Self::from).boxed(),
+                    any::<u64>().prop_map(Self::from).boxed(),
+                    any::<String>().prop_map(Self::from).boxed(),
                     any::<Vec<u8>>()
                         .prop_map(|bytes| Self::Bytes(bytes.into()))
                         .boxed(),
                     any::<f64>()
                         .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
-                    any_with::<Type>(depth).prop_map(Self::Type).boxed(),
+                    any_with::<Type>(depth).prop_map(Self::from).boxed(),
                 ]);
                 if !depth.leaf() {
                     // we descend here because we these constructors contain Terms
@@ -749,7 +754,7 @@ mod test {
                             .prop_map(Self::new_list_type)
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(|item_types| Self::TupleType(item_types))
+                            .prop_map(Self::new_tuple_type)
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
                             .prop_map(Term::new_list)
