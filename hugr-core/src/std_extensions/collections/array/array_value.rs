@@ -94,11 +94,7 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }]
-                if *n as usize == self.values.len() =>
-            {
-                ty
-            }
+            [TypeArg::BoundedNat(n), TypeArg::Type(ty)] if *n as usize == self.values.len() => ty,
             _ => {
                 return Err(CustomCheckFailure::Message(format!(
                     "Invalid array type arguments: {:?}",

@@ -1228,7 +1228,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeType { bound });
+                return Ok(TypeParam::RuntimeType(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1246,11 +1246,10 @@ impl<'a> Context<'a> {
             if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // type of a list must be copyable. Therefore we import it as `Any`.
-                let item_type = Box::new(
-                    self.import_term(item_type)
-                        .map_err(|err| error_context!(err, "item type of list type"))?,
-                );
-                return Ok(TypeParam::ListType { item_type });
+                let item_type = self
+                    .import_term(item_type)
+                    .map_err(|err| error_context!(err, "item type of list type"))?;
+                return Ok(TypeParam::new_list_type(item_type));
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
@@ -1263,7 +1262,7 @@ impl<'a> Context<'a> {
                         .collect::<Result<_, _>>()
                 })()
                 .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::TupleType { item_types });
+                return Ok(TypeParam::TupleType(item_types));
             }
 
             match self.get_term(term_id)? {
@@ -1275,7 +1274,7 @@ impl<'a> Context<'a> {
                         .get(var)
                         .ok_or_else(|| error_invalid!("unknown variable {}", var))?;
                     let decl = self.import_term_with_bound(var_info.r#type, var_info.bound)?;
-                    Ok(TypeArg::new_var_use(var.1 as _, decl))
+                    Ok(Term::new_var_use(var.1 as _, decl))
                 }
 
                 table::Term::List { .. } => {
@@ -1287,7 +1286,7 @@ impl<'a> Context<'a> {
                     })()
                     .map_err(|err| error_context!(err, "list items"))?;
 
-                    Ok(TypeArg::List { elems })
+                    Ok(Term::List(elems))
                 }
 
                 table::Term::Tuple { .. } => {
@@ -1299,28 +1298,24 @@ impl<'a> Context<'a> {
                     })()
                     .map_err(|err| error_context!(err, "tuple items"))?;
 
-                    Ok(TypeArg::Tuple { elems })
+                    Ok(Term::Tuple(elems))
                 }
 
-                table::Term::Literal(model::Literal::Str(value)) => Ok(TypeArg::String {
-                    value: value.to_string(),
-                }),
-
-                table::Term::Literal(model::Literal::Nat(value)) => {
-                    Ok(TypeArg::BoundedNat { value: *value })
+                table::Term::Literal(model::Literal::Str(value)) => {
+                    Ok(Term::String(value.to_string()))
                 }
 
-                table::Term::Literal(model::Literal::Bytes(value)) => Ok(TypeArg::Bytes {
-                    value: value.clone(),
-                }),
-                table::Term::Literal(model::Literal::Float(value)) => {
-                    Ok(TypeArg::Float { value: *value })
+                table::Term::Literal(model::Literal::Nat(value)) => Ok(Term::BoundedNat(*value)),
+
+                table::Term::Literal(model::Literal::Bytes(value)) => {
+                    Ok(Term::Bytes(value.clone()))
                 }
+                table::Term::Literal(model::Literal::Float(value)) => Ok(Term::Float(*value)),
                 table::Term::Func { .. } => Err(error_unsupported!("function constant")),
 
                 table::Term::Apply { .. } => {
-                    let ty = self.import_type(term_id)?;
-                    Ok(TypeArg::Type { ty })
+                    let ty: Type = self.import_type(term_id)?;
+                    Ok(ty.into())
                 }
             }
         })()

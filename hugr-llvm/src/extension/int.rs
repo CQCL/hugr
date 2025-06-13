@@ -668,9 +668,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             ])
         }),
         IntOpDef::inarrow_s => {
-            let Some(TypeArg::BoundedNat {
-                value: out_log_width,
-            }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_s wasn't a Nat");
             };
@@ -688,9 +686,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::inarrow_u => {
-            let Some(TypeArg::BoundedNat {
-                value: out_log_width,
-            }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_u wasn't a Nat");
             };
@@ -760,7 +756,7 @@ pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     args: &EmitOpArgs<'_, '_, ExtensionOp, H>,
     op: &impl MakeExtensionOp,
 ) -> Result<u64> {
-    let [TypeArg::BoundedNat { value: log_width }] = args.node.args() else {
+    let [TypeArg::BoundedNat(log_width)] = args.node.args() else {
         bail!(
             "Expected exactly one BoundedNat parameter to {}",
             op.op_id()
@@ -1098,7 +1094,7 @@ fn llvm_type<'c>(
     context: TypingSession<'c, '_>,
     hugr_type: &CustomType,
 ) -> Result<BasicTypeEnum<'c>> {
-    if let [TypeArg::BoundedNat { value: n }] = hugr_type.args() {
+    if let [TypeArg::BoundedNat(n)] = hugr_type.args() {
         let m = *n as usize;
         if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
             return Ok(match m {

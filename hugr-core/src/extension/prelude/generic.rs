@@ -175,7 +175,7 @@ mod tests {
     fn test_load_nat() {
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
 
-        let arg = TypeArg::BoundedNat { value: 4 };
+        let arg = TypeArg::BoundedNat(4);
         let op = LoadNat::new(arg);
 
         let out = b.add_dataflow_op(op.clone(), []).unwrap();
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_load_nat_fold() {
-        let arg = TypeArg::BoundedNat { value: 5 };
+        let arg = TypeArg::BoundedNat(5);
         let op = LoadNat::new(arg);
 
         let optype: OpType = op.into();

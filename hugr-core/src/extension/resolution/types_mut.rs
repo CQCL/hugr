@@ -221,13 +221,13 @@ pub(super) fn resolve_typearg_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match arg {
-        TypeArg::Type { ty } => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        TypeArg::List { elems } => {
+        TypeArg::Type(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
+        TypeArg::List(elems) => {
             for elem in elems.iter_mut() {
                 resolve_typearg_exts(node, elem, extensions, used_extensions)?;
             }
         }
-        TypeArg::Tuple { elems } => {
+        TypeArg::Tuple(elems) => {
             for elem in elems.iter_mut() {
                 resolve_typearg_exts(node, elem, extensions, used_extensions)?;
             }

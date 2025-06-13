@@ -575,7 +575,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
             TypeEnum::RowVar(rv) => rv.substitute(t),
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
-                let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
+                let TypeArg::Type(ty) = t.apply_var(*idx, &((*bound).into())) else {
                     panic!("Variable was not a type - try validate() first")
                 };
                 vec![ty.into_()]
@@ -751,12 +751,12 @@ impl<'a> Substitution<'a> {
             .expect("Undeclared type variable - call validate() ?");
         debug_assert!(check_type_arg(arg, &TypeParam::new_list_type(bound)).is_ok());
         match arg {
-            TypeArg::List { elems } => elems
+            TypeArg::List(elems) => elems
                 .iter()
                 .map(|ta| {
                     match ta {
-                        TypeArg::Type { ty } => return ty.clone().into(),
-                        TypeArg::Variable { v } => {
+                        Term::Type(ty) => return ty.clone().into(),
+                        Term::Variable { v } => {
                             if let Some(b) = v.bound_if_row_var() {
                                 return TypeRV::new_row_var_use(v.index(), b);
                             }
@@ -766,7 +766,7 @@ impl<'a> Substitution<'a> {
                     panic!("Not a list of types - call validate() ?")
                 })
                 .collect(),
-            TypeArg::Type { ty } if matches!(ty.0, TypeEnum::RowVar(_)) => {
+            Term::Type(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone().into()]
             }
@@ -1020,9 +1020,7 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([TypeArg::List {
-                elems: vec![Type::from(cpy.clone()).into()],
-            }])
+            .instantiate([Term::new_list([Type::from(cpy.clone()).into()])])
             .unwrap();
 
         let mut t = Type::new_extension(c_of_cpy.clone());
@@ -1035,10 +1033,8 @@ pub(crate) mod test {
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::List {
-                elems: vec![mk_opt(Type::from(cpy.clone())).into()],
-            }])
-            .unwrap(),
+            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone())).into()])])
+                .unwrap(),
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
@@ -1054,19 +1050,15 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::List {
-                elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
-            }])
-            .unwrap(),
+            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()).into(); 2])])
+                .unwrap(),
         );
         assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([TypeArg::List {
-                    elems: vec![usize_t().into(); 2]
-                }])
-                .unwrap()
+                coln.instantiate([Term::new_list([usize_t().into(), usize_t().into()])])
+                    .unwrap()
             )
         );
     }

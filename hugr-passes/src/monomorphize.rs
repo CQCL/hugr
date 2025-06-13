@@ -232,11 +232,11 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
-        TypeArg::BoundedNat { value: n } => f.write_fmt(format_args!("n({n})")),
-        TypeArg::String { value: arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
-        TypeArg::List { elems } => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
-        TypeArg::Tuple { elems } => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
+        TypeArg::Type(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
+        TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
+        TypeArg::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
+        TypeArg::List(elems) => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
+        TypeArg::Tuple(elems) => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
         TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
@@ -411,7 +411,7 @@ mod test {
 
         let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
-        let sa = |n| TypeArg::BoundedNat { value: n };
+        let sa = |n| TypeArg::BoundedNat(n);
         let n: u64 = 5;
         let mut outer = FunctionBuilder::new(
             "mainish",
@@ -472,7 +472,7 @@ mod test {
         let elem = pf1
             .call(
                 pf2.handle(),
-                &[TypeArg::BoundedNat { value: 2 }, usize_t().into()],
+                &[TypeArg::BoundedNat(2), usize_t().into()],
                 inner.outputs(),
             )
             .unwrap();
@@ -509,11 +509,11 @@ mod test {
         assert_eq!(
             funcs.keys().copied().sorted().collect_vec(),
             vec![
-                &mangle_name("pf1", &[TypeArg::BoundedNat { value: 5 }]),
-                &mangle_name("pf1", &[TypeArg::BoundedNat { value: 4 }]),
-                &mangle_name("pf2", &[TypeArg::BoundedNat { value: 5 }, arr2u().into()]), // from pf1<5>
-                &mangle_name("pf2", &[TypeArg::BoundedNat { value: 4 }, arr2u().into()]), // from pf1<4>
-                &mangle_name("pf2", &[TypeArg::BoundedNat { value: 2 }, usize_t().into()]), // from both pf1<4> and <5>
+                &mangle_name("pf1", &[TypeArg::BoundedNat(5)]),
+                &mangle_name("pf1", &[TypeArg::BoundedNat(4)]),
+                &mangle_name("pf2", &[TypeArg::BoundedNat(5), arr2u().into()]), // from pf1<5>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(4), arr2u().into()]), // from pf1<4>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(2), usize_t().into()]), // from both pf1<4> and <5>
                 "get_usz",
                 "pf2",
                 "mainish",
@@ -594,7 +594,7 @@ mod test {
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
-    #[case::sequence(vec![TypeArg::Tuple { elems: vec![0.into(), Type::UNIT.into()] }], "$foo$$tuple($n(0)$t(Unit))")]
+    #[case::sequence(vec![TypeArg::Tuple(vec![0.into(),Type::UNIT.into()])], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
     #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringType)],
                             "$foo$$v(1)")]
