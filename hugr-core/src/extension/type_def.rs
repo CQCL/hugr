@@ -147,7 +147,7 @@ impl TypeDef {
                 least_upper_bound(indices.iter().map(|i| {
                     let ta = args.get(*i);
                     match ta {
-                        Some(TypeArg::Type { ty: s }) => s.least_upper_bound(),
+                        Some(TypeArg::Type(s)) => s.least_upper_bound(),
                         _ => panic!("TypeArg index does not refer to a type."),
                     }
                 }))
@@ -241,7 +241,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::type_param::{TypeArgError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
@@ -250,9 +250,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::RuntimeType {
-                bound: TypeBound::Copyable,
-            }],
+            params: vec![TypeParam::RuntimeType(TypeBound::Copyable)],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),
@@ -260,9 +258,9 @@ mod test {
             bound: TypeDefBound::FromParams { indices: vec![0] },
         };
         let typ = Type::new_extension(
-            def.instantiate(vec![TypeArg::Type {
-                ty: Type::new_function(Signature::new(vec![], vec![])),
-            }])
+            def.instantiate(vec![
+                Type::new_function(Signature::new(vec![], vec![])).into(),
+            ])
             .unwrap(),
         );
         assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
@@ -271,10 +269,10 @@ mod test {
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate([TypeArg::Type { ty: qb_t() }]),
+            def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
                 TypeArgError::TypeMismatch {
-                    term: TypeArg::Type { ty: qb_t() },
+                    term: qb_t().into(),
                     type_: TypeBound::Copyable.into()
                 }
             ))
@@ -286,11 +284,8 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate([
-                TypeArg::Type { ty: float64_type() },
-                TypeArg::Type { ty: float64_type() },
-            ])
-            .unwrap_err(),
+            def.instantiate([float64_type().into(), float64_type().into(),])
+                .unwrap_err(),
             SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
         );
     }

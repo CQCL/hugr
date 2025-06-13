@@ -67,25 +67,19 @@ pub type TypeParam = Term;
 )]
 pub enum Term {
     /// The type of runtime types.
-    #[display("Type{}", match bound {
+    #[display("Type{}", match _0 {
         TypeBound::Any => String::new(),
-        _ => format!("[{bound}]")
+        _ => format!("[{_0}]")
     })]
-    RuntimeType {
-        /// The type bound on the runtime type.
-        bound: TypeBound,
-    },
+    RuntimeType(TypeBound),
     /// The type of static data.
     StaticType,
     /// The type of static natural numbers up to a given bound.
-    #[display("{}", match bound.value() {
+    #[display("{}", match _0.value() {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
     })]
-    BoundedNatType {
-        /// The upper bound on the natural number.
-        bound: UpperBound,
-    },
+    BoundedNatType(UpperBound),
     /// The type of static strings. See [`Term::String`].
     StringType,
     /// The type of static byte strings. See [`Term::Bytes`].
@@ -94,65 +88,38 @@ pub enum Term {
     FloatType,
     /// The type of static lists of indeterminate size containing terms of the
     /// specified static type.
-    #[display("ListType[{item_type}]")]
-    ListType {
-        /// The static type of the items in the list.
-        item_type: Box<Term>,
-    },
+    #[display("ListType[{_0}]")]
+    ListType(Box<Term>),
     /// The type of static tuples.
-    #[display("TupleType[{}]", item_types.iter().map(std::string::ToString::to_string).join(", "))]
-    TupleType {
-        /// The static types of the items of the tuple.
-        item_types: Vec<Term>,
-    },
-    /// A runtime type as a term.
-    #[display("{ty}")]
-    Type {
-        /// The runtime type.
-        ty: Type,
-    },
+    #[display("TupleType[{}]", _0.iter().map(std::string::ToString::to_string).join(", "))]
+    TupleType(Vec<Term>),
+    /// A runtime type as a term. Instance of [`Term::RuntimeType`].
+    #[display("{_0}")]
+    Type(Type),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
-    #[display("{value}")]
-    BoundedNat {
-        /// The value of the literal.
-        value: u64,
-    },
+    #[display("{_0}")]
+    BoundedNat(u64),
     /// UTF-8 encoded string literal. Instance of [`Term::StringType`].
-    #[display("\"{value}\"")]
-    String {
-        /// The value of the literal.
-        value: String,
-    },
+    #[display("\"{_0}\"")]
+    String(String),
     /// Byte string literal. Instance of [`Term::BytesType`].
     #[display("bytes")]
-    Bytes {
-        /// The value of the literal.
-        value: Arc<[u8]>,
-    },
+    Bytes(Arc<[u8]>),
     /// A 64-bit floating point number. Instance of [`Term::FloatType`].
-    #[display("{}", value.into_inner())]
-    Float {
-        /// The value of the float parameter.
-        value: OrderedFloat<f64>,
-    },
+    #[display("{}", _0.into_inner())]
+    Float(OrderedFloat<f64>),
     /// A list of static terms. Instance of [`Term::ListType`].
     #[display("[{}]", {
         use itertools::Itertools as _;
-        elems.iter().map(|t|t.to_string()).join(",")
+        _0.iter().map(|t|t.to_string()).join(",")
     })]
-    List {
-        /// List of elements.
-        elems: Vec<Term>,
-    },
+    List(Vec<Term>),
     /// A tuple of static terms. Instance of [`Term::TupleType`].
     #[display("({})", {
         use itertools::Itertools as _;
-        elems.iter().map(std::string::ToString::to_string).join(",")
+        _0.iter().map(std::string::ToString::to_string).join(",")
     })]
-    Tuple {
-        /// List of elements.
-        elems: Vec<Term>,
-    },
+    Tuple(Vec<Term>),
     /// Variable (used in type schemes or inside polymorphic functions),
     /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
     /// - see [`TypeArg::new_var_use`]
@@ -168,50 +135,47 @@ impl Term {
     /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
-        Self::BoundedNatType {
-            bound: UpperBound(None),
-        }
+        Self::BoundedNatType(UpperBound(None))
     }
 
     /// Creates a [`Term::BoundedNatType`] with the stated upper bound (non-exclusive).
     #[must_use]
     pub const fn bounded_nat_type(upper_bound: NonZeroU64) -> Self {
-        Self::BoundedNatType {
-            bound: UpperBound(Some(upper_bound)),
-        }
+        Self::BoundedNatType(UpperBound(Some(upper_bound)))
+    }
+
+    /// Create s a new [`Term::List`] given a sequence of its items.
+    pub fn new_list(items: impl IntoIterator<Item = Term>) -> Self {
+        Self::List(items.into_iter().collect())
     }
 
     /// Creates a new [`Term::ListType`] given the type of its elements.
     pub fn new_list_type(elem: impl Into<Term>) -> Self {
-        Self::ListType {
-            item_type: Box::new(elem.into()),
-        }
+        Self::ListType(Box::new(elem.into()))
     }
 
     fn contains(&self, other: &Term) -> bool {
         match (self, other) {
-            (Term::RuntimeType { bound: b1 }, Term::RuntimeType { bound: b2 }) => b1.contains(*b2),
-            (Term::BoundedNatType { bound: b1 }, Term::BoundedNatType { bound: b2 }) => {
-                b1.contains(b2)
-            }
+            (Term::RuntimeType(b1), Term::RuntimeType(b2)) => b1.contains(*b2),
+            (Term::BoundedNatType(b1), Term::BoundedNatType(b2)) => b1.contains(b2),
             (Term::StringType, Term::StringType) => true,
             (Term::StaticType, Term::StaticType) => true,
-            (Term::ListType { item_type: e1 }, Term::ListType { item_type: e2 }) => e1.contains(e2),
-            (Term::TupleType { item_types: es1 }, Term::TupleType { item_types: es2 }) => {
+            (Term::ListType(e1), Term::ListType(e2)) => e1.contains(e2),
+            (Term::TupleType(es1), Term::TupleType(es2)) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Type { ty: t1 }, Term::Type { ty: t2 }) => t1 == t2,
-            (Term::BoundedNat { value: n1 }, Term::BoundedNat { value: n2 }) => n1 == n2,
-            (Term::String { value: s1 }, Term::String { value: s2 }) => s1 == s2,
-            (Term::Bytes { value: v1 }, Term::Bytes { value: v2 }) => v1 == v2,
-            (Term::Float { value: f1 }, Term::Float { value: f2 }) => f1 == f2,
+            (Term::Type(t1), Term::Type(t2)) => t1 == t2,
+            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
+            (Term::String(s1), Term::String(s2)) => s1 == s2,
+            (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
+            (Term::Float(f1), Term::Float(f2)) => f1 == f2,
             (Term::Variable { v: v1 }, Term::Variable { v: v2 }) => v1 == v2,
-            (Term::List { elems: e1 }, Term::List { elems: e2 }) if e1 == e2 => true,
-            (Term::List { elems }, other) => elems.iter().any(|elem| elem.contains(other)),
-            (Term::Tuple { elems: e1 }, Term::Tuple { elems: e2 }) if e1 == e2 => true,
-            (Term::Tuple { elems }, other) => elems.iter().any(|elem| elem.contains(other)),
+            (Term::List(e1), Term::List(e2)) if e1 == e2 => true,
+            (Term::List(elems), other) => elems.iter().any(|elem| elem.contains(other)),
+            (Term::Tuple(e1), Term::Tuple(e2)) if e1 == e2 => true,
+            (Term::Tuple(elems), other) => elems.iter().any(|elem| elem.contains(other)),
             _ => false,
         }
     }
@@ -219,20 +183,20 @@ impl Term {
 
 impl From<TypeBound> for Term {
     fn from(bound: TypeBound) -> Self {
-        Self::RuntimeType { bound }
+        Self::RuntimeType(bound)
     }
 }
 
 impl From<UpperBound> for Term {
     fn from(bound: UpperBound) -> Self {
-        Self::BoundedNatType { bound }
+        Self::BoundedNatType(bound)
     }
 }
 
 impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
-            Ok(ty) => Term::Type { ty },
+            Ok(ty) => Term::Type(ty),
             Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
         }
     }
@@ -240,27 +204,25 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
 
 impl From<u64> for Term {
     fn from(n: u64) -> Self {
-        Self::BoundedNat { value: n }
+        Self::BoundedNat(n)
     }
 }
 
 impl From<String> for Term {
     fn from(arg: String) -> Self {
-        Term::String { value: arg }
+        Term::String(arg)
     }
 }
 
 impl From<&str> for Term {
     fn from(arg: &str) -> Self {
-        Term::String {
-            value: arg.to_string(),
-        }
+        Term::String(arg.to_string())
     }
 }
 
 impl From<Vec<Term>> for Term {
     fn from(elems: Vec<Term>) -> Self {
-        Self::List { elems }
+        Self::new_list(elems)
     }
 }
 
@@ -277,7 +239,7 @@ pub struct TypeArgVariable {
 
 impl Term {
     /// [`Type::UNIT`] as a [`Term::Type`]
-    pub const UNIT: Self = Self::Type { ty: Type::UNIT };
+    pub const UNIT: Self = Self::Type(Type::UNIT);
 
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
@@ -288,7 +250,7 @@ impl Term {
             // Note a TypeParam::List of TypeParam::Type *cannot* be represented
             // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
             // not a RowVariable.
-            Term::RuntimeType { bound: b } => Type::new_var_use(idx, b).into(),
+            Term::RuntimeType(b) => Type::new_var_use(idx, b).into(),
             _ => Term::Variable {
                 v: TypeArgVariable {
                     idx,
@@ -302,7 +264,7 @@ impl Term {
     #[must_use]
     pub fn as_nat(&self) -> Option<u64> {
         match self {
-            TypeArg::BoundedNat { value: n } => Some(*n),
+            TypeArg::BoundedNat(n) => Some(*n),
             _ => None,
         }
     }
@@ -311,7 +273,7 @@ impl Term {
     #[must_use]
     pub fn as_type(&self) -> Option<TypeBase<NoRV>> {
         match self {
-            TypeArg::Type { ty } => Some(ty.clone()),
+            TypeArg::Type(ty) => Some(ty.clone()),
             _ => None,
         }
     }
@@ -320,7 +282,7 @@ impl Term {
     #[must_use]
     pub fn as_string(&self) -> Option<String> {
         match self {
-            TypeArg::String { value: arg } => Some(arg.clone()),
+            TypeArg::String(arg) => Some(arg.clone()),
             _ => None,
         }
     }
@@ -329,16 +291,13 @@ impl Term {
     /// is valid and closed.
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::Type { ty } => ty.validate(var_decls),
-            Term::List { elems } => {
+            Term::Type(ty) => ty.validate(var_decls),
+            Term::List(elems) => {
                 // TODO: Full validation would check that the type of the elements agrees
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
-            Term::Tuple { elems } => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            Term::BoundedNat { .. }
-            | Term::String { .. }
-            | Term::Float { .. }
-            | Term::Bytes { .. } => Ok(()),
+            Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
+            Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
             Term::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => {
@@ -354,25 +313,22 @@ impl Term {
             Term::StringType => Ok(()),
             Term::BytesType => Ok(()),
             Term::FloatType => Ok(()),
-            Term::ListType { item_type: param } => param.validate(var_decls),
-            Term::TupleType { item_types: params } => {
-                params.iter().try_for_each(|p| p.validate(var_decls))
-            }
+            Term::ListType(item_type) => item_type.validate(var_decls),
+            Term::TupleType(params) => params.iter().try_for_each(|p| p.validate(var_decls)),
             Term::StaticType => Ok(()),
         }
     }
 
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
-            Term::Type { ty } => {
+            Term::Type(ty) => {
                 // RowVariables are represented as Term::Variable
                 ty.substitute1(t).into()
             }
-            Term::BoundedNat { .. }
-            | Term::String { .. }
-            | Term::Bytes { .. }
-            | Term::Float { .. } => self.clone(),
-            Term::List { elems } => {
+            Term::BoundedNat(_) | Term::String { .. } | Term::Bytes(_) | Term::Float(_) => {
+                self.clone()
+            }
+            Term::List(elems) => {
                 let mut are_types = elems.iter().map(|ta| match ta {
                     Term::Type { .. } => true,
                     Term::Variable { v } => v.bound_if_row_var().is_some(),
@@ -386,7 +342,7 @@ impl Term {
                             .iter()
                             .flat_map(|ta| match ta.substitute(t) {
                                 ty @ Term::Type { .. } => vec![ty],
-                                Term::List { elems } => elems,
+                                Term::List(elems) => elems,
                                 _ => panic!("Expected Type or row of Types"),
                             })
                             .collect()
@@ -396,11 +352,11 @@ impl Term {
                         elems.iter().map(|ta| ta.substitute(t)).collect()
                     }
                 };
-                Term::List { elems }
+                Term::List(elems)
             }
-            Term::Tuple { elems } => Term::Tuple {
-                elems: elems.iter().map(|elem| elem.substitute(t)).collect(),
-            },
+            Term::Tuple(elems) => {
+                Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
+            }
             Term::Variable {
                 v: TypeArgVariable { idx, cached_decl },
             } => t.apply_var(*idx, cached_decl),
@@ -409,12 +365,10 @@ impl Term {
             Term::StringType => self.clone(),
             Term::BytesType => self.clone(),
             Term::FloatType => self.clone(),
-            Term::ListType { item_type: param } => Term::ListType {
-                item_type: Box::new(param.substitute(t)),
-            },
-            Term::TupleType { item_types: params } => Term::TupleType {
-                item_types: params.iter().map(|p| p.substitute(t)).collect(),
-            },
+            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
+            Term::TupleType(params) => {
+                Term::TupleType(params.iter().map(|p| p.substitute(t)).collect())
+            }
             Term::StaticType => self.clone(),
         }
     }
@@ -423,21 +377,21 @@ impl Term {
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
-            Term::Type { ty } => ty.transform(tr),
-            Term::List { elems } => elems.transform(tr),
-            Term::Tuple { elems } => elems.transform(tr),
-            Term::BoundedNat { .. }
+            Term::Type(ty) => ty.transform(tr),
+            Term::List(elems) => elems.transform(tr),
+            Term::Tuple(elems) => elems.transform(tr),
+            Term::BoundedNat(_)
             | Term::String { .. }
             | Term::Variable { .. }
-            | Term::Float { .. }
-            | Term::Bytes { .. } => Ok(false),
+            | Term::Float(_)
+            | Term::Bytes(_) => Ok(false),
             Term::RuntimeType { .. } => Ok(false),
             Term::BoundedNatType { .. } => Ok(false),
             Term::StringType => Ok(false),
             Term::BytesType => Ok(false),
             Term::FloatType => Ok(false),
-            Term::ListType { item_type } => item_type.transform(tr),
-            Term::TupleType { item_types } => item_types.transform(tr),
+            Term::ListType(item_type) => item_type.transform(tr),
+            Term::TupleType(item_types) => item_types.transform(tr),
             Term::StaticType => Ok(false),
         }
     }
@@ -454,8 +408,8 @@ impl TypeArgVariable {
     /// the [`TypeBound`] of the individual types it might stand for.
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let Term::ListType { item_type: param } = &*self.cached_decl {
-            if let Term::RuntimeType { bound: b } = **param {
+        if let Term::ListType(item_type) = &*self.cached_decl {
+            if let Term::RuntimeType(b) = **item_type {
                 return Some(b);
             }
         }
@@ -472,16 +426,16 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
             },
             _,
         ) if type_.contains(cached_decl) => Ok(()),
-        (TypeArg::Type { ty }, TypeParam::RuntimeType { bound })
+        (TypeArg::Type(ty), TypeParam::RuntimeType(bound))
             if bound.contains(ty.least_upper_bound()) =>
         {
             Ok(())
         }
-        (TypeArg::List { elems }, TypeParam::ListType { item_type: param }) => {
+        (TypeArg::List(elems), TypeParam::ListType(item_type)) => {
             elems.iter().try_for_each(|term| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (TypeArg::Variable { v }, TypeParam::RuntimeType { bound: param_bound }) =
-                    (term, &**param)
+                if let (TypeArg::Variable { v }, TypeParam::RuntimeType(param_bound)) =
+                    (term, &**item_type)
                 {
                     if v.bound_if_row_var()
                         .is_some_and(|arg_bound| param_bound.contains(arg_bound))
@@ -489,10 +443,10 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
                         return Ok(());
                     }
                 }
-                check_type_arg(term, param)
+                check_type_arg(term, item_type)
             })
         }
-        (TypeArg::Tuple { elems: items }, TypeParam::TupleType { item_types }) => {
+        (TypeArg::Tuple(items), TypeParam::TupleType(item_types)) => {
             if items.len() != item_types.len() {
                 return Err(TypeArgError::WrongNumberTuple(
                     items.len(),
@@ -505,14 +459,12 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
                 .zip(item_types.iter())
                 .try_for_each(|(term, type_)| check_type_arg(term, type_))
         }
-        (TypeArg::BoundedNat { value: val }, TypeParam::BoundedNatType { bound })
-            if bound.valid_value(*val) =>
-        {
+        (TypeArg::BoundedNat(val), TypeParam::BoundedNatType(bound)) if bound.valid_value(*val) => {
             Ok(())
         }
         (TypeArg::String { .. }, TypeParam::StringType) => Ok(()),
-        (TypeArg::Bytes { .. }, TypeParam::BytesType) => Ok(()),
-        (TypeArg::Float { .. }, TypeParam::FloatType) => Ok(()),
+        (TypeArg::Bytes(_), TypeParam::BytesType) => Ok(()),
+        (TypeArg::Float(_), TypeParam::FloatType) => Ok(()),
 
         // Static types
         (TypeArg::StaticType, TypeParam::StaticType) => Ok(()),
@@ -521,7 +473,7 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
         (TypeArg::BoundedNatType { .. }, TypeParam::StaticType) => Ok(()),
         (TypeArg::FloatType, TypeParam::StaticType) => Ok(()),
         (TypeArg::ListType { .. }, TypeParam::StaticType) => Ok(()),
-        (TypeArg::TupleType { .. }, TypeParam::StaticType) => Ok(()),
+        (TypeArg::TupleType(_), TypeParam::StaticType) => Ok(()),
 
         _ => Err(TypeArgError::TypeMismatch {
             term: term.clone(),
@@ -576,6 +528,7 @@ mod test {
 
     use super::{Substitution, TypeArg, TypeParam, check_type_arg};
     use crate::extension::prelude::{bool_t, usize_t};
+    use crate::types::Term;
     use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
 
     #[test]
@@ -643,26 +596,19 @@ mod test {
         .unwrap_err();
 
         // TypeParam::Tuples require a TypeArg::Tuple of the same number of elems
-        let usize_and_ty = TypeParam::TupleType {
-            item_types: vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()],
-        };
+        let usize_and_ty =
+            TypeParam::TupleType(vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
         check(
-            TypeArg::Tuple {
-                elems: vec![5.into(), usize_t().into()],
-            },
+            TypeArg::Tuple(vec![5.into(), usize_t().into()]),
             &usize_and_ty,
         )
         .unwrap();
         check(
-            TypeArg::Tuple {
-                elems: vec![usize_t().into(), 5.into()],
-            },
+            TypeArg::Tuple(vec![usize_t().into(), 5.into()]),
             &usize_and_ty,
         )
         .unwrap_err(); // Wrong way around
-        let two_types = TypeParam::TupleType {
-            item_types: vec![TypeBound::Any.into(), TypeBound::Any.into()],
-        };
+        let two_types = TypeParam::TupleType(vec![TypeBound::Any.into(), TypeBound::Any.into()]);
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
@@ -670,25 +616,23 @@ mod test {
 
     #[test]
     fn type_arg_subst_row() {
-        let row_param = TypeParam::new_list_type(TypeBound::Copyable);
-        let row_arg: TypeArg = vec![bool_t().into(), TypeArg::UNIT].into();
+        let row_param = Term::new_list_type(TypeBound::Copyable);
+        let row_arg: Term = vec![bool_t().into(), Term::UNIT].into();
         check_type_arg(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
-        let outer_param = TypeParam::new_list_type(TypeBound::Any);
-        let outer_arg = TypeArg::List {
-            elems: vec![
-                TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
-                usize_t().into(),
-            ],
-        };
+        let outer_param = Term::new_list_type(TypeBound::Any);
+        let outer_arg = Term::new_list([
+            TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
+            usize_t().into(),
+        ]);
         check_type_arg(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
         assert_eq!(
             outer_arg2,
-            vec![bool_t().into(), TypeArg::UNIT, usize_t().into()].into()
+            vec![bool_t().into(), Term::UNIT, usize_t().into()].into()
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
@@ -697,26 +641,24 @@ mod test {
 
     #[test]
     fn subst_list_list() {
-        let outer_param = TypeParam::new_list_type(TypeParam::new_list_type(TypeBound::Any));
-        let row_var_decl = TypeParam::new_list_type(TypeBound::Copyable);
-        let row_var_use = TypeArg::new_var_use(0, row_var_decl.clone());
-        let good_arg = TypeArg::List {
-            elems: vec![
-                // The row variables here refer to `row_var_decl` above
-                vec![usize_t().into()].into(),
-                row_var_use.clone(),
-                vec![row_var_use, usize_t().into()].into(),
-            ],
-        };
+        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Any));
+        let row_var_decl = Term::new_list_type(TypeBound::Copyable);
+        let row_var_use = Term::new_var_use(0, row_var_decl.clone());
+        let good_arg = Term::new_list([
+            // The row variables here refer to `row_var_decl` above
+            vec![usize_t().into()].into(),
+            row_var_use.clone(),
+            vec![row_var_use, usize_t().into()].into(),
+        ]);
         check_type_arg(&good_arg, &outer_param).unwrap();
 
         // Outer list cannot include single types:
-        let TypeArg::List { mut elems } = good_arg.clone() else {
+        let Term::List(mut elems) = good_arg.clone() else {
             panic!()
         };
         elems.push(usize_t().into());
         assert_eq!(
-            check_type_arg(&TypeArg::List { elems }, &outer_param),
+            check_type_arg(&Term::new_list(elems), &outer_param),
             Err(TypeArgError::TypeMismatch {
                 term: usize_t().into(),
                 // The error reports the type expected for each element of the list:
@@ -731,23 +673,19 @@ mod test {
         check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
-            TypeArg::List {
-                elems: vec![
-                    vec![usize_t().into()].into(),
-                    row_var_arg,
-                    vec![usize_t().into(), bool_t().into(), usize_t().into()].into()
-                ]
-            }
+            Term::new_list([
+                Term::new_list([usize_t().into()]),
+                row_var_arg,
+                Term::new_list([usize_t().into(), bool_t().into(), usize_t().into()])
+            ])
         );
     }
 
     #[test]
     fn bytes_json_roundtrip() {
-        let bytes_arg = TypeArg::Bytes {
-            value: vec![0, 1, 2, 3, 255, 254, 253, 252].into(),
-        };
+        let bytes_arg = Term::Bytes(vec![0, 1, 2, 3, 255, 254, 253, 252].into());
         let serialized = serde_json::to_string(&bytes_arg).unwrap();
-        let deserialized: TypeArg = serde_json::from_str(&serialized).unwrap();
+        let deserialized: Term = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, bytes_arg);
     }
 
@@ -783,31 +721,17 @@ mod test {
                     Just(Self::BytesType).boxed(),
                     Just(Self::FloatType).boxed(),
                     Just(Self::StringType).boxed(),
-                    any::<TypeBound>()
-                        .prop_map(|b| Self::RuntimeType { bound: b })
-                        .boxed(),
-                    any::<UpperBound>()
-                        .prop_map(|bound| Self::BoundedNatType { bound })
-                        .boxed(),
-                    any::<u64>()
-                        .prop_map(|n| Self::BoundedNat { value: n })
-                        .boxed(),
-                    any::<String>()
-                        .prop_map(|arg| Self::String { value: arg })
-                        .boxed(),
+                    any::<TypeBound>().prop_map(Self::RuntimeType).boxed(),
+                    any::<UpperBound>().prop_map(Self::BoundedNatType).boxed(),
+                    any::<u64>().prop_map(|n| Self::BoundedNat(n)).boxed(),
+                    any::<String>().prop_map(Self::String).boxed(),
                     any::<Vec<u8>>()
-                        .prop_map(|bytes| Self::Bytes {
-                            value: bytes.into(),
-                        })
+                        .prop_map(|bytes| Self::Bytes(bytes.into()))
                         .boxed(),
                     any::<f64>()
-                        .prop_map(|value| Self::Float {
-                            value: value.into(),
-                        })
+                        .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
-                    any_with::<Type>(depth)
-                        .prop_map(|ty| Self::Type { ty })
-                        .boxed(),
+                    any_with::<Type>(depth).prop_map(Self::Type).boxed(),
                 ]);
                 if !depth.leaf() {
                     // we descend here because we these constructors contain Terms
@@ -822,15 +746,13 @@ mod test {
                                 .boxed(),
                         )
                         .or(any_with::<Self>(depth.descend())
-                            .prop_map(|x| Self::ListType {
-                                item_type: Box::new(x),
-                            })
+                            .prop_map(Self::new_list_type)
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(|item_types| Self::TupleType { item_types })
+                            .prop_map(|item_types| Self::TupleType(item_types))
                             .boxed())
                         .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(|elems| Self::List { elems })
+                            .prop_map(Term::new_list)
                             .boxed());
                 }
 

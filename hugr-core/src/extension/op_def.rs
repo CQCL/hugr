@@ -656,9 +656,7 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::RuntimeType {
-                bound: TypeBound::Any,
-            };
+            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
@@ -680,11 +678,10 @@ pub(super) mod test {
         reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
-        let list_usize =
-            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: usize_t() }])?);
+        let list_usize = Type::new_extension(list_def.instantiate(vec![usize_t().into()])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }])
+            e.instantiate_extension_op(&OP_NAME, vec![usize_t().into()])
                 .unwrap(),
             dfg.input_wires(),
         )?;
@@ -705,10 +702,8 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::RuntimeType {
-                    bound: TypeBound::Any,
-                };
-                let [TypeArg::BoundedNat { value: n }] = arg_values else {
+                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+                let [TypeArg::BoundedNat(n)] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
                 let n = *n as usize;
@@ -731,7 +726,7 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat { value: 3 }, usize_t().into()];
+            let args = [TypeArg::BoundedNat(3), usize_t().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -744,7 +739,7 @@ pub(super) mod test {
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-            let args = [TypeArg::BoundedNat { value: 3 }, tyvar.clone().into()];
+            let args = [TypeArg::BoundedNat(3), tyvar.clone().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -802,7 +797,7 @@ pub(super) mod test {
                 extension_ref,
             )?;
             let tv = Type::new_var_use(0, TypeBound::Copyable);
-            let args = [TypeArg::Type { ty: tv.clone() }];
+            let args = [tv.clone().into()];
             let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo(tv)));

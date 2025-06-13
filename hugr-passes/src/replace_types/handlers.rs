@@ -106,7 +106,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }] = args else {
+    let [TypeArg::BoundedNat(n), TypeArg::Type(ty)] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
@@ -307,7 +307,7 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat { value: n }, TypeArg::Type { ty }] = args else {
+    let [TypeArg::BoundedNat(n), TypeArg::Type(ty)] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if ty.copyable() {

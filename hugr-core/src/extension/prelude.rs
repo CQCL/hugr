@@ -18,8 +18,8 @@ use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeBound,
-    TypeName, TypeRV, TypeRow, TypeRowRV,
+    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type,
+    TypeBound, TypeName, TypeRV, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
 use crate::{Extension, type_row};
@@ -678,13 +678,13 @@ impl MakeExtensionOp for MakeTuple {
         if def != TupleOpDef::MakeTuple {
             return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
-        let [TypeArg::List { elems }] = ext_op.args() else {
+        let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                TypeArg::Type { ty } => Ok(ty.clone()),
+                TypeArg::Type(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();
@@ -692,13 +692,7 @@ impl MakeExtensionOp for MakeTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::List {
-            elems: self
-                .0
-                .iter()
-                .map(|t| TypeArg::Type { ty: t.clone() })
-                .collect(),
-        }]
+        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
     }
 }
 
@@ -739,27 +733,21 @@ impl MakeExtensionOp for UnpackTuple {
         if def != TupleOpDef::UnpackTuple {
             return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
         }
-        let [TypeArg::List { elems }] = ext_op.args() else {
+        let [Term::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                TypeArg::Type { ty } => Ok(ty.clone()),
+                Term::Type(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();
         Ok(Self(tys?.into()))
     }
 
-    fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::List {
-            elems: self
-                .0
-                .iter()
-                .map(|t| TypeArg::Type { ty: t.clone() })
-                .collect(),
-        }]
+    fn type_args(&self) -> Vec<Term> {
+        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
     }
 }
 
@@ -863,14 +851,14 @@ impl MakeExtensionOp for Noop {
         Self: Sized,
     {
         let _def = NoopDef::from_def(ext_op.def())?;
-        let [TypeArg::Type { ty }] = ext_op.args() else {
+        let [TypeArg::Type(ty)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         Ok(Self(ty.clone()))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Type { ty: self.0.clone() }]
+        vec![self.0.clone().into()]
     }
 }
 
@@ -969,13 +957,13 @@ impl MakeExtensionOp for Barrier {
     {
         let _def = BarrierDef::from_def(ext_op.def())?;
 
-        let [TypeArg::List { elems }] = ext_op.args() else {
+        let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                TypeArg::Type { ty } => Ok(ty.clone()),
+                TypeArg::Type(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();
@@ -985,13 +973,9 @@ impl MakeExtensionOp for Barrier {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::List {
-            elems: self
-                .type_row
-                .iter()
-                .map(|t| TypeArg::Type { ty: t.clone() })
-                .collect(),
-        }]
+        vec![TypeArg::new_list(
+            self.type_row.iter().map(|t| t.clone().into()),
+        )]
     }
 }
 
@@ -1009,6 +993,7 @@ impl MakeRegisteredOp for Barrier {
 mod test {
     use crate::builder::inout_sig;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
+    use crate::types::Term;
     use crate::{
         Hugr, Wire,
         builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
@@ -1132,9 +1117,8 @@ mod test {
 
         let err = b.add_load_value(error_val);
 
-        const TYPE_ARG_NONE: TypeArg = TypeArg::List { elems: vec![] };
         let op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [TYPE_ARG_NONE, TYPE_ARG_NONE])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -1146,10 +1130,8 @@ mod test {
     /// test the panic operation with input and output wires
     fn test_panic_with_io() {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::List {
-            elems: vec![type_arg_q.clone(), type_arg_q],
-        };
+        let type_arg_q: Term = qb_t().into();
+        let type_arg_2q: Term = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();

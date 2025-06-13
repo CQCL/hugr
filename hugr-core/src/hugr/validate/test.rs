@@ -22,8 +22,8 @@ use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
-    TypeRow,
+    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
+    TypeRV, TypeRow,
 };
 use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
@@ -318,7 +318,7 @@ fn invalid_types() {
 
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: usize_t() }],
+        vec![usize_t().into()],
         EXT_ID,
         TypeBound::Any,
         &Arc::downgrade(&ext),
@@ -330,7 +330,7 @@ fn invalid_types() {
     // valid is Any, so is not allowed as an element of an outer MyContainer.
     let element_outside_bound = CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: valid.clone() }],
+        vec![valid.clone().into()],
         EXT_ID,
         TypeBound::Any,
         &Arc::downgrade(&ext),
@@ -339,13 +339,13 @@ fn invalid_types() {
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
             type_: TypeBound::Copyable.into(),
-            term: TypeArg::Type { ty: valid }
+            term: valid.into()
         })
     );
 
     let bad_bound = CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type { ty: usize_t() }],
+        vec![usize_t().into()],
         EXT_ID,
         TypeBound::Copyable,
         &Arc::downgrade(&ext),
@@ -361,9 +361,7 @@ fn invalid_types() {
     // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
     let nested = CustomType::new(
         "MyContainer",
-        vec![TypeArg::Type {
-            ty: Type::new_extension(bad_bound),
-        }],
+        vec![Type::new_extension(bad_bound).into()],
         EXT_ID,
         TypeBound::Any,
         &Arc::downgrade(&ext),
@@ -378,10 +376,7 @@ fn invalid_types() {
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![
-            TypeArg::Type { ty: usize_t() },
-            TypeArg::BoundedNat { value: 3 },
-        ],
+        vec![usize_t().into(), 3u64.into()],
         EXT_ID,
         TypeBound::Any,
         &Arc::downgrade(&ext),
@@ -458,9 +453,7 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
-    const BOUND: TypeParam = TypeParam::RuntimeType {
-        bound: TypeBound::Copyable,
-    };
+    const BOUND: TypeParam = TypeParam::RuntimeType(TypeBound::Copyable);
     let list_of_var = Type::new_extension(
         list::EXTENSION
             .get_type(&list::LIST_TYPENAME)
@@ -523,8 +516,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    fn uint_seq(i: usize) -> TypeArg {
-        vec![TypeArg::Type { ty: usize_t() }; i].into()
+    fn uint_seq(i: usize) -> Term {
+        vec![usize_t().into(); i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -548,10 +541,8 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn list1ty(t: TypeRV) -> TypeArg {
-    TypeArg::List {
-        elems: vec![t.into()],
-    }
+fn list1ty(t: TypeRV) -> Term {
+    Term::new_list([t.into()])
 }
 
 #[test]

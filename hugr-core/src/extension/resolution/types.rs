@@ -216,13 +216,13 @@ pub(super) fn collect_typearg_exts(
     missing_extensions: &mut ExtensionSet,
 ) {
     match arg {
-        TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
-        TypeArg::List { elems } => {
+        TypeArg::Type(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        TypeArg::List(elems) => {
             for elem in elems.iter() {
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }
         }
-        TypeArg::Tuple { elems } => {
+        TypeArg::Tuple(elems) => {
             for elem in elems.iter() {
                 collect_typearg_exts(elem, used_extensions, missing_extensions);
             }
