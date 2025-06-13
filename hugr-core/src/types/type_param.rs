@@ -474,13 +474,13 @@ impl Term {
     /// The parts of a closed list are the items of that list wrapped in [`SeqPart::Item`]:
     ///
     /// ```
-    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
-    /// # let a = TypeArg::new_string("a");
-    /// # let b = TypeArg::new_string("b");
-    /// let type_arg = TypeArg::new_list([a.clone(), b.clone()]);
+    /// # use hugr_core::types::type_param::{Term, SeqPart};
+    /// # let a = Term::new_string("a");
+    /// # let b = Term::new_string("b");
+    /// let term = Term::new_list([a.clone(), b.clone()]);
     ///
     /// assert_eq!(
-    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     term.into_list_parts().collect::<Vec<_>>(),
     ///     vec![SeqPart::Item(a), SeqPart::Item(b)]
     /// );
     /// ```
@@ -488,19 +488,19 @@ impl Term {
     /// Parts of a concatenated list that are not closed lists are wrapped in [`SeqPart::Splice`]:
     ///
     /// ```
-    /// # use hugr_core::types::type_param::{TypeParam, TypeArg, SeqPart};
-    /// # let a = TypeArg::new_string("a");
-    /// # let b = TypeArg::new_string("b");
-    /// # let c = TypeArg::new_string("c");
-    /// let var = TypeArg::new_var_use(0, TypeParam::new_list(TypeParam::String));
-    /// let type_arg = TypeArg::new_list_concat([
-    ///     TypeArg::new_list([a.clone(), b.clone()]),
+    /// # use hugr_core::types::type_param::{Term, SeqPart};
+    /// # let a = Term::new_string("a");
+    /// # let b = Term::new_string("b");
+    /// # let c = Term::new_string("c");
+    /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringType));
+    /// let term = Term::new_list_concat([
+    ///     Term::new_list([a.clone(), b.clone()]),
     ///     var.clone(),
-    ///     TypeArg::new_list([c.clone()])
+    ///     Term::new_list([c.clone()])
     ///  ]);
     ///
     /// assert_eq!(
-    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     term.into_list_parts().collect::<Vec<_>>(),
     ///     vec![SeqPart::Item(a), SeqPart::Item(b), SeqPart::Splice(var), SeqPart::Item(c)]
     /// );
     /// ```
@@ -508,21 +508,21 @@ impl Term {
     /// Nested concatenations are traversed recursively:
     ///
     /// ```
-    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
-    /// # let a = TypeArg::new_string("a");
-    /// # let b = TypeArg::new_string("b");
-    /// # let c = TypeArg::new_string("c");
-    /// let type_arg = TypeArg::new_list_concat([
-    ///     TypeArg::new_list_concat([
-    ///         TypeArg::new_list([a.clone()]),
-    ///         TypeArg::new_list([b.clone()])
+    /// # use hugr_core::types::type_param::{Term, SeqPart};
+    /// # let a = Term::new_string("a");
+    /// # let b = Term::new_string("b");
+    /// # let c = Term::new_string("c");
+    /// let term = Term::new_list_concat([
+    ///     Term::new_list_concat([
+    ///         Term::new_list([a.clone()]),
+    ///         Term::new_list([b.clone()])
     ///     ]),
-    ///     TypeArg::new_list([]),
-    ///     TypeArg::new_list([c.clone()])
+    ///     Term::new_list([]),
+    ///     Term::new_list([c.clone()])
     /// ]);
     ///
     /// assert_eq!(
-    ///     type_arg.into_list_parts().collect::<Vec<_>>(),
+    ///     term.into_list_parts().collect::<Vec<_>>(),
     ///     vec![SeqPart::Item(a), SeqPart::Item(b), SeqPart::Item(c)]
     /// );
     /// ```
@@ -532,11 +532,11 @@ impl Term {
     /// This is the expected behaviour for type variables that stand for lists.
     /// This behaviour also allows this method not to fail on ill-typed type arguments.
     /// ```
-    /// # use hugr_core::types::type_param::{TypeArg, SeqPart};
-    /// let type_arg = TypeArg::new_string("not a list");
+    /// # use hugr_core::types::type_param::{Term, SeqPart};
+    /// let term = Term::new_string("not a list");
     /// assert_eq!(
-    ///     type_arg.clone().into_list_parts().collect::<Vec<_>>(),
-    ///     vec![SeqPart::Splice(type_arg)]
+    ///     term.clone().into_list_parts().collect::<Vec<_>>(),
+    ///     vec![SeqPart::Splice(term)]
     /// );
     /// ```
     #[inline]
