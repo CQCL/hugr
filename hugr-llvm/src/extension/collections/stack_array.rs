@@ -324,6 +324,18 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
             }
             outputs.finish(builder, [array_v.as_basic_value_enum()])
         }
+        ArrayOpDef::unpack => {
+            let [array_v] = inputs
+                .try_into()
+                .map_err(|_| anyhow!("ArrayOpDef::unpack expects one argument"))?;
+            let array_v = array_v.into_array_value();
+
+            let result = (0..size)
+                .map(|i| builder.build_extract_value(array_v, i as u32, "extract"))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            outputs.finish(builder, result)
+        }
         ArrayOpDef::get => {
             let [array_v, index_v] = inputs
                 .try_into()
@@ -1212,6 +1224,51 @@ mod test {
                         arr,
                     )
                     .unwrap();
+                builder.finish_with_outputs([r]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_extension(ArrayCodegenExtension::new(DefaultArrayCodegen))
+                .add_default_int_extensions()
+        });
+        assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case(&[], 0)]
+    #[case(&[1, 2], 3)]
+    #[case(&[6, 6, 6], 18)]
+    fn exec_unpack(
+        mut exec_ctx: TestContext,
+        #[case] array_contents: &[u64],
+        #[case] expected: u64,
+    ) {
+        // We build a HUGR that:
+        // - Loads an array with the given contents
+        // - Unpacks all the elements
+        // - Returns the sum of the elements
+
+        let int_ty = int_type(6);
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let array = array::ArrayValue::new(
+                    int_ty.clone(),
+                    array_contents
+                        .iter()
+                        .map(|&i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let array = builder.add_load_value(array);
+                let unpacked = builder
+                    .add_array_unpack(int_ty.clone(), array_contents.len() as u64, array)
+                    .unwrap();
+                let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
+                for elem in unpacked {
+                    r = builder.add_iadd(6, r, elem).unwrap();
+                }
+
                 builder.finish_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
