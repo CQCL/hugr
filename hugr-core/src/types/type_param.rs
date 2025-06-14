@@ -736,7 +736,7 @@ mod test {
                             // using this instance for serialization now, but if we want
                             // to generate valid TypeArgs this will need to change.
                             any_with::<TermVar>(depth.descend())
-                                .prop_map(|v| Self::Variable(v))
+                                .prop_map(Self::Variable)
                                 .boxed(),
                         )
                         .or(any_with::<Self>(depth.descend())
