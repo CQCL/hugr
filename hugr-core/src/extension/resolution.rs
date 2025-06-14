@@ -26,7 +26,7 @@ pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
 pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_type_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
 use types_mut::{
-    resolve_custom_type_exts, resolve_type_exts, resolve_typearg_exts, resolve_value_exts,
+    resolve_custom_type_exts, resolve_type_exts, resolve_term_exts, resolve_value_exts,
 };
 
 use derive_more::{Display, Error, From};
@@ -63,7 +63,7 @@ pub fn resolve_typearg_extensions(
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     let mut used_extensions = WeakExtensionRegistry::default();
-    resolve_typearg_exts(None, arg, extensions, &mut used_extensions)
+    resolve_term_exts(None, arg, extensions, &mut used_extensions)
 }
 
 /// Update all weak Extension pointers inside a constant value.
