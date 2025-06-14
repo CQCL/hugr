@@ -12,8 +12,8 @@ use crate::extension::simple_op::{
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
-use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
+use crate::types::type_param::{TermEnum, TypeArg, TypeParam};
+use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Term, Type, TypeBound, TypeRV};
 
 use super::array_kind::ArrayKind;
 
@@ -56,12 +56,12 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
         // array<N, T1>, (T1, *A -> T2, *A), *A, -> array<N, T2>, *A
         let params = vec![
-            TypeParam::max_nat(),
+            TypeParam::max_nat_type(),
             TypeBound::Any.into(),
             TypeBound::Any.into(),
-            TypeParam::new_list(TypeBound::Any),
+            TypeParam::new_list_type(TypeBound::Any),
         ];
-        let n = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let t1 = Type::new_var_use(1, TypeBound::Any);
         let t2 = Type::new_var_use(2, TypeBound::Any);
         let s = TypeRV::new_row_var_use(3, TypeBound::Any);
@@ -185,12 +185,10 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
-            TypeArg::BoundedNat { n: self.size },
+            self.size.into(),
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::List {
-                elems: self.acc_tys.clone().into_iter().map_into().collect(),
-            },
+            Term::new_list(self.acc_tys.clone().into_iter().map_into()),
         ]
     }
 }
@@ -213,29 +211,30 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
     type Concrete = GenericArrayScan<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [
-                TypeArg::BoundedNat { n },
-                TypeArg::Type { ty: src_ty },
-                TypeArg::Type { ty: tgt_ty },
-                TypeArg::List { elems: acc_tys },
-            ] => {
-                let acc_tys: Result<_, OpLoadError> = acc_tys
-                    .iter()
-                    .map(|acc_ty| match acc_ty {
-                        TypeArg::Type { ty } => Ok(ty.clone()),
-                        _ => Err(SignatureError::InvalidTypeArgs.into()),
-                    })
-                    .collect();
-                Ok(GenericArrayScan::new(
-                    src_ty.clone(),
-                    tgt_ty.clone(),
-                    acc_tys?,
-                    *n,
-                ))
-            }
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
-        }
+        let [n, src_ty, tgt_ty, acc_tys] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+
+        let TermEnum::List(acc_ty_args) = acc_tys.get() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let Some(src_ty) = src_ty.as_type() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let Some(tgt_ty) = tgt_ty.as_type() else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let acc_tys: Vec<Type> = acc_ty_args
+            .iter()
+            .map(|acc_ty| acc_ty.as_type().ok_or(SignatureError::InvalidTypeArgs))
+            .try_collect()?;
+
+        Ok(GenericArrayScan::new(src_ty, tgt_ty, acc_tys, n))
     }
 }
 

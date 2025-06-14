@@ -4,7 +4,7 @@ use std::num::NonZeroU64;
 use std::sync::{Arc, Weak};
 
 use crate::ops::constant::ValueName;
-use crate::types::TypeName;
+use crate::types::{Term, TypeName};
 use crate::{
     Extension,
     extension::ExtensionId,
@@ -49,7 +49,7 @@ pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
 lazy_static! {
     /// Array of valid integer types, indexed by log width of the integer.
     pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
-        .map(|i| int_type(TypeArg::BoundedNat { n: u64::from(i) }))
+        .map(|i| int_type(Term::from(u64::from(i))))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
@@ -69,27 +69,26 @@ pub const LOG_WIDTH_BOUND: u8 = LOG_WIDTH_MAX + 1;
 
 /// Type parameter for the log width of the integer.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat({
+pub fn log_width_type_param() -> TypeParam {
     assert!(LOG_WIDTH_BOUND > 0);
-    NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
-});
+    let upper_bound = NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1);
+    TypeParam::bounded_nat_type(upper_bound)
+}
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
-    match arg {
-        TypeArg::BoundedNat { n } if is_valid_log_width(*n as u8) => Ok(*n as u8),
+    match arg.as_nat() {
+        Some(n) if is_valid_log_width(n as u8) => Ok(n as u8),
         _ => Err(TypeArgError::TypeMismatch {
-            arg: arg.clone(),
-            param: LOG_WIDTH_TYPE_PARAM,
+            term: arg.clone(),
+            type_: log_width_type_param(),
         }),
     }
 }
 
-const fn type_arg(log_width: u8) -> TypeArg {
-    TypeArg::BoundedNat {
-        n: log_width as u64,
-    }
+fn type_arg(log_width: u8) -> TypeArg {
+    Term::from(u64::from(log_width))
 }
 
 /// An integer (either signed or unsigned)
@@ -199,7 +198,7 @@ fn extension() -> Arc<Extension> {
         extension
             .add_type(
                 INT_TYPE_ID,
-                vec![LOG_WIDTH_TYPE_PARAM],
+                vec![log_width_type_param()],
                 "integral value of a given bit width".to_owned(),
                 TypeBound::Copyable.into(),
                 extension_ref,
@@ -219,7 +218,7 @@ pub(super) fn int_tv(var_id: usize) -> Type {
         EXTENSION
             .get_type(&INT_TYPE_ID)
             .unwrap()
-            .instantiate(vec![TypeArg::new_var_use(var_id, LOG_WIDTH_TYPE_PARAM)])
+            .instantiate(vec![TypeArg::new_var_use(var_id, log_width_type_param())])
             .unwrap(),
     )
 }
@@ -239,10 +238,10 @@ mod test {
 
     #[test]
     fn test_int_widths() {
-        let type_arg_32 = TypeArg::BoundedNat { n: 5 };
+        let type_arg_32 = Term::from(5u64);
         assert_matches!(get_log_width(&type_arg_32), Ok(5));
 
-        let type_arg_128 = TypeArg::BoundedNat { n: 7 };
+        let type_arg_128 = Term::from(7u64);
         assert_matches!(
             get_log_width(&type_arg_128),
             Err(TypeArgError::TypeMismatch { .. })

@@ -7,7 +7,7 @@ use std::{
 use hugr_core::{
     Node,
     ops::{Call, FuncDefn, LoadFunction, OpTrait},
-    types::{Signature, Substitution, TypeArg},
+    types::{Signature, Substitution, TypeArg, type_param::TermEnum},
 };
 
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
@@ -231,15 +231,15 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 }
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match arg {
-        TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
-        TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
-        TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
-        TypeArg::List { elems } => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
-        TypeArg::Tuple { elems } => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
+    match arg.get() {
+        TermEnum::Type(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
+        TermEnum::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
+        TermEnum::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
+        TermEnum::List(elems) => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
+        TermEnum::Tuple(elems) => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
-        TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
+        TermEnum::Variable(_) => panic!("type_arg_str variable: {arg}"),
         _ => panic!("unknown type arg: {arg}"),
     }
 }
@@ -273,7 +273,7 @@ mod test {
     use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::ArrayKind;
     use hugr_core::std_extensions::collections::value_array::{VArrayOpDef, ValueArray};
-    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::type_param::{TermEnum, TypeParam};
     use itertools::Itertools;
 
     use hugr_core::builder::{
@@ -283,7 +283,9 @@ mod test {
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
+    use hugr_core::types::{
+        PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeEnum,
+    };
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -410,8 +412,8 @@ mod test {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
         let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
-        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
-        let sa = |n| TypeArg::BoundedNat { n };
+        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
+        let sa = |n: u64| Term::from(n);
         let n: u64 = 5;
         let mut outer = FunctionBuilder::new(
             "mainish",
@@ -440,7 +442,7 @@ mod test {
 
         let pf2 = {
             let pf2t = PolyFuncType::new(
-                [TypeParam::max_nat(), TypeBound::Copyable.into()],
+                [TypeParam::max_nat_type(), TypeBound::Copyable.into()],
                 Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
             );
             let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
@@ -457,7 +459,7 @@ mod test {
         };
 
         let pf1t = PolyFuncType::new(
-            [TypeParam::max_nat()],
+            [TypeParam::max_nat_type()],
             Signature::new(
                 ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
                 usize_t(),
@@ -472,7 +474,7 @@ mod test {
         let elem = pf1
             .call(
                 pf2.handle(),
-                &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
+                &[Term::from(2u64), usize_t().into()],
                 inner.outputs(),
             )
             .unwrap();
@@ -509,11 +511,11 @@ mod test {
         assert_eq!(
             funcs.keys().copied().sorted().collect_vec(),
             vec![
-                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 5 }]),
-                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 4 }]),
-                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 5 }, arr2u().into()]), // from pf1<5>
-                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
-                &mangle_name("pf2", &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
+                &mangle_name("pf1", &[Term::from(5u64)]),
+                &mangle_name("pf1", &[Term::from(4u64)]),
+                &mangle_name("pf2", &[Term::from(5u64), arr2u().into()]), // from pf1<5>
+                &mangle_name("pf2", &[Term::from(4u64), arr2u().into()]), // from pf1<4>
+                &mangle_name("pf2", &[Term::from(2u64), usize_t().into()]), // from both pf1<4> and <5>
                 "get_usz",
                 "pf2",
                 "mainish",
@@ -594,9 +596,9 @@ mod test {
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
-    #[case::sequence(vec![TypeArg::Tuple { elems: vec![0.into(), Type::UNIT.into()] }], "$foo$$tuple($n(0)$t(Unit))")]
+    #[case::sequence(vec![Term::new_tuple([0.into(), Type::UNIT.into()])], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
-    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, Term::new(TermEnum::StringType))],
                             "$foo$$v(1)")]
     #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
     fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {

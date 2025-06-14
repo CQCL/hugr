@@ -6,7 +6,7 @@ use crate::extension::SignatureError;
 
 #[cfg(test)]
 use proptest::prelude::{BoxedStrategy, Strategy, any};
-/// Describes a row variable - a type variable bound with a [`TypeParam::List`] of [`TypeParam::Type`]
+/// Describes a row variable - a type variable bound with a list of runtime types
 /// of the specified bound (checked in validation)
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.
@@ -70,7 +70,7 @@ impl MaybeRV for RowVariable {
     }
 
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        check_typevar_decl(var_decls, self.0, &TypeParam::new_list(self.1))
+        check_typevar_decl(var_decls, self.0, &TypeParam::new_list_type(self.1))
     }
 
     #[allow(private_interfaces)]

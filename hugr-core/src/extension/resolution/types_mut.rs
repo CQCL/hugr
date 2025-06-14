@@ -9,8 +9,9 @@ use super::types::collect_type_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
+use crate::types::type_param::TermEnum;
 use crate::types::type_row::TypeRowBase;
-use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
+use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
 use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -30,7 +31,7 @@ pub fn resolve_op_types_extensions(
     match op {
         OpType::ExtensionOp(ext) => {
             for arg in ext.args_mut() {
-                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+                resolve_term_exts(node, arg, extensions, used_extensions)?;
             }
             resolve_signature_exts(node, ext.signature_mut(), extensions, used_extensions)?;
         }
@@ -61,7 +62,7 @@ pub fn resolve_op_types_extensions(
             resolve_signature_exts(node, c.func_sig.body_mut(), extensions, used_extensions)?;
             resolve_signature_exts(node, &mut c.instantiation, extensions, used_extensions)?;
             for arg in &mut c.type_args {
-                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+                resolve_term_exts(node, arg, extensions, used_extensions)?;
             }
         }
         OpType::CallIndirect(c) => {
@@ -74,7 +75,7 @@ pub fn resolve_op_types_extensions(
             resolve_signature_exts(node, lf.func_sig.body_mut(), extensions, used_extensions)?;
             resolve_signature_exts(node, &mut lf.instantiation, extensions, used_extensions)?;
             for arg in &mut lf.type_args {
-                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+                resolve_term_exts(node, arg, extensions, used_extensions)?;
             }
         }
         OpType::DFG(dfg) => {
@@ -82,7 +83,7 @@ pub fn resolve_op_types_extensions(
         }
         OpType::OpaqueOp(op) => {
             for arg in op.args_mut() {
-                resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+                resolve_term_exts(node, arg, extensions, used_extensions)?;
             }
             resolve_signature_exts(node, op.signature_mut(), extensions, used_extensions)?;
         }
@@ -195,7 +196,7 @@ pub(super) fn resolve_custom_type_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     for arg in custom.args_mut() {
-        resolve_typearg_exts(node, arg, extensions, used_extensions)?;
+        resolve_term_exts(node, arg, extensions, used_extensions)?;
     }
 
     let ext_id = custom.extension();
@@ -211,28 +212,58 @@ pub(super) fn resolve_custom_type_exts(
     Ok(())
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a type arg.
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [`Term`].
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-pub(super) fn resolve_typearg_exts(
+pub(super) fn resolve_term_exts(
     node: Option<Node>,
-    arg: &mut TypeArg,
+    term: &mut Term,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    match arg {
-        TypeArg::Type { ty } => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        TypeArg::List { elems } => {
-            for elem in elems.iter_mut() {
-                resolve_typearg_exts(node, elem, extensions, used_extensions)?;
-            }
+    match term.get() {
+        TermEnum::Type(ty) => {
+            let mut ty = ty.clone();
+            resolve_type_exts(node, &mut ty, extensions, used_extensions)?;
+            *term = Term::from(ty);
         }
-        TypeArg::Tuple { elems } => {
+        TermEnum::List(elems) => {
+            let mut elems = elems.to_vec();
             for elem in elems.iter_mut() {
-                resolve_typearg_exts(node, elem, extensions, used_extensions)?;
+                resolve_term_exts(node, elem, extensions, used_extensions)?;
             }
+            *term = Term::new_list(elems)
         }
-        _ => {}
+        TermEnum::Tuple(elems) => {
+            let mut elems = elems.to_vec();
+            for elem in elems.iter_mut() {
+                resolve_term_exts(node, elem, extensions, used_extensions)?;
+            }
+            *term = Term::new_tuple(elems)
+        }
+        TermEnum::ListType(item_type) => {
+            let mut item_type_clone = item_type.clone();
+            resolve_term_exts(node, &mut item_type_clone, extensions, used_extensions)?;
+            *term = Term::new_list_type(item_type_clone);
+        }
+        TermEnum::TupleType(item_types) => {
+            let mut item_types_clone = item_types.to_vec();
+            for item_type in item_types_clone.iter_mut() {
+                resolve_term_exts(node, item_type, extensions, used_extensions)?;
+            }
+            *term = Term::new_tuple_type(item_types_clone);
+        }
+        TermEnum::Variable(_)
+        | TermEnum::RuntimeType(_)
+        | TermEnum::StaticType
+        | TermEnum::BoundedNatType(_)
+        | TermEnum::StringType
+        | TermEnum::BytesType
+        | TermEnum::FloatType
+        | TermEnum::BoundedNat(_)
+        | TermEnum::String(_)
+        | TermEnum::Bytes(_)
+        | TermEnum::Float(_) => {}
     }
     Ok(())
 }

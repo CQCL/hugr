@@ -1,3 +1,8 @@
+use std::sync::Arc;
+
+use ordered_float::OrderedFloat;
+
+use super::type_param::TermVar;
 use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, TypeEnum};
 
 use super::custom::CustomType;
@@ -5,6 +10,8 @@ use super::custom::CustomType;
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
+use crate::types::type_param::{TermEnum, UpperBound};
+use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -58,5 +65,144 @@ impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
                     .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?,
             )),
         })
+    }
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+#[serde(tag = "tp")]
+pub(super) enum TypeParamSer {
+    Type { b: TypeBound },
+    BoundedNat { bound: UpperBound },
+    String,
+    Bytes,
+    Float,
+    StaticType,
+    List { param: Term },
+    Tuple { params: Vec<Term> },
+}
+
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+#[non_exhaustive]
+#[serde(tag = "tya")]
+pub(super) enum TypeArgSer {
+    Type {
+        ty: Type,
+    },
+    BoundedNat {
+        n: u64,
+    },
+    String {
+        arg: String,
+    },
+    Bytes {
+        #[serde(with = "base64")]
+        value: Arc<[u8]>,
+    },
+    Float {
+        value: OrderedFloat<f64>,
+    },
+    List {
+        elems: Vec<Term>,
+    },
+    Tuple {
+        elems: Vec<Term>,
+    },
+    Variable {
+        #[serde(flatten)]
+        v: TermVar,
+    },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub(super) enum TermSer {
+    TypeArg(TypeArgSer),
+    TypeParam(TypeParamSer),
+}
+impl From<Term> for TermSer {
+    fn from(value: Term) -> Self {
+        match value.get() {
+            TermEnum::RuntimeType(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
+            TermEnum::StaticType => TermSer::TypeParam(TypeParamSer::StaticType),
+            TermEnum::BoundedNatType(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat {
+                bound: bound.clone(),
+            }),
+            TermEnum::StringType => TermSer::TypeParam(TypeParamSer::String),
+            TermEnum::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
+            TermEnum::FloatType => TermSer::TypeParam(TypeParamSer::Float),
+            TermEnum::ListType(item_type) => TermSer::TypeParam(TypeParamSer::List {
+                param: item_type.clone(),
+            }),
+            TermEnum::TupleType(item_types) => TermSer::TypeParam(TypeParamSer::Tuple {
+                params: item_types.to_vec(),
+            }),
+            TermEnum::Type(ty) => TermSer::TypeArg(TypeArgSer::Type { ty: ty.clone() }),
+            TermEnum::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
+            TermEnum::String(arg) => TermSer::TypeArg(TypeArgSer::String {
+                arg: arg.to_string(),
+            }),
+            TermEnum::Bytes(value) => TermSer::TypeArg(TypeArgSer::Bytes {
+                value: value.clone(),
+            }),
+            TermEnum::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
+            TermEnum::List(elems) => TermSer::TypeArg(TypeArgSer::List {
+                elems: elems.to_vec(),
+            }),
+            TermEnum::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple {
+                elems: elems.to_vec(),
+            }),
+            TermEnum::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v: v.clone() }),
+        }
+    }
+}
+
+impl From<TermSer> for Term {
+    fn from(value: TermSer) -> Self {
+        match value {
+            TermSer::TypeParam(param) => match param {
+                TypeParamSer::Type { b } => Term::new(TermEnum::RuntimeType(b)),
+                TypeParamSer::StaticType => Term::new(TermEnum::StaticType),
+                TypeParamSer::BoundedNat { bound } => Term::new(TermEnum::BoundedNatType(bound)),
+                TypeParamSer::String => Term::new(TermEnum::StringType),
+                TypeParamSer::Bytes => Term::new(TermEnum::BytesType),
+                TypeParamSer::Float => Term::new(TermEnum::FloatType),
+                TypeParamSer::List { param } => Term::new(TermEnum::ListType(&param)),
+                TypeParamSer::Tuple { params } => Term::new(TermEnum::TupleType(&params)),
+            },
+            TermSer::TypeArg(arg) => match arg {
+                TypeArgSer::Type { ty } => Term::new(TermEnum::Type(&ty)),
+                TypeArgSer::BoundedNat { n } => Term::new(TermEnum::BoundedNat(n)),
+                TypeArgSer::String { arg } => Term::new(TermEnum::String(&arg)),
+                TypeArgSer::Bytes { value } => Term::new(TermEnum::Bytes(&value)),
+                TypeArgSer::Float { value } => Term::new(TermEnum::Float(value)),
+                TypeArgSer::List { elems } => Term::new(TermEnum::List(&elems)),
+                TypeArgSer::Tuple { elems } => Term::new(TermEnum::Tuple(&elems)),
+                TypeArgSer::Variable { v } => Term::new(TermEnum::Variable(&v)),
+            },
+        }
+    }
+}
+
+/// Helper for to serialize and deserialize the byte string in [`TypeArg::Bytes`] via base64.
+mod base64 {
+    use std::sync::Arc;
+
+    use base64::Engine as _;
+    use base64::prelude::BASE64_STANDARD;
+    use serde::{Deserialize, Serialize};
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(v: &Arc<[u8]>, s: S) -> Result<S::Ok, S::Error> {
+        let base64 = BASE64_STANDARD.encode(v);
+        base64.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Arc<[u8]>, D::Error> {
+        let base64 = String::deserialize(d)?;
+        BASE64_STANDARD
+            .decode(base64.as_bytes())
+            .map(|v| v.into())
+            .map_err(serde::de::Error::custom)
     }
 }

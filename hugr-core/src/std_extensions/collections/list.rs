@@ -21,7 +21,7 @@ use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
 use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::ops::{OpName, Value};
-use crate::types::{TypeName, TypeRowRV};
+use crate::types::{Term, TypeName, TypeRowRV};
 use crate::{
     Extension,
     extension::{
@@ -32,7 +32,7 @@ use crate::{
     ops::custom::ExtensionOp,
     types::{
         CustomCheckFailure, CustomType, FuncValueType, PolyFuncTypeRV, Type, TypeBound,
-        type_param::{TypeArg, TypeParam},
+        type_param::TypeArg,
     },
 };
 
@@ -112,13 +112,15 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type { ty }] = typ.args() else {
+        let [ty] = typ.args() else {
             return Err(error());
         };
 
+        let ty = ty.as_type().ok_or_else(error)?;
+
         // check all values are instances of the element type
         for v in &self.0 {
-            if v.get_type() != *ty {
+            if v.get_type() != ty {
                 return Err(error());
             }
         }
@@ -167,7 +169,9 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    fn type_param() -> Term {
+        TypeBound::Any.into()
+    }
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -215,14 +219,14 @@ impl ListOp {
         input: impl Into<TypeRowRV>,
         output: impl Into<TypeRowRV>,
     ) -> PolyFuncTypeRV {
-        PolyFuncTypeRV::new(vec![Self::TP], FuncValueType::new(input, output))
+        PolyFuncTypeRV::new(vec![Self::type_param()], FuncValueType::new(input, output))
     }
 
     /// Returns the type of a generic list, associated with the element type parameter at index `idx`.
     fn list_type(self, list_type_def: &TypeDef, idx: usize) -> Type {
         Type::new_extension(
             list_type_def
-                .instantiate(vec![TypeArg::new_var_use(idx, Self::TP)])
+                .instantiate(vec![TypeArg::new_var_use(idx, Self::type_param())])
                 .unwrap(),
         )
     }
@@ -292,7 +296,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                 LIST_TYPENAME,
-                vec![ListOp::TP],
+                vec![ListOp::type_param()],
                 "Generic dynamically sized list of type T.".into(),
                 TypeDefBound::from_params(vec![0]),
                 extension_ref
@@ -325,9 +329,7 @@ pub fn list_type_def() -> &'static TypeDef {
 /// Get the type of a list of `elem_type` as a `CustomType`.
 #[must_use]
 pub fn list_custom_type(elem_type: Type) -> CustomType {
-    list_type_def()
-        .instantiate(vec![TypeArg::Type { ty: elem_type }])
-        .unwrap()
+    list_type_def().instantiate(vec![elem_type.into()]).unwrap()
 }
 
 /// Get the `Type` of a list of `elem_type`.
@@ -353,9 +355,10 @@ impl MakeExtensionOp for ListOpInst {
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        let [TypeArg::Type { ty }] = ext_op.args() else {
+        let [ty] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
+        let ty = ty.as_type().ok_or(SignatureError::InvalidTypeArgs)?;
         let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
@@ -368,9 +371,7 @@ impl MakeExtensionOp for ListOpInst {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Type {
-            ty: self.elem_type.clone(),
-        }]
+        vec![self.elem_type.clone().into()]
     }
 }
 
@@ -413,15 +414,9 @@ mod test {
     fn test_list() {
         let list_def = list_type_def();
 
-        let list_type = list_def
-            .instantiate([TypeArg::Type { ty: usize_t() }])
-            .unwrap();
+        let list_type = list_def.instantiate([usize_t().into()]).unwrap();
 
-        assert!(
-            list_def
-                .instantiate([TypeArg::BoundedNat { n: 3 }])
-                .is_err()
-        );
+        assert!(list_def.instantiate([Term::from(3u64)]).is_err());
 
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()], usize_t());

@@ -7,7 +7,6 @@ use hugr_core::extension::prelude::{
 };
 use hugr_core::extension::prelude::{ERROR_TYPE_NAME, STRING_TYPE_NAME};
 use hugr_core::ops::ExtensionOp;
-use hugr_core::types::TypeArg;
 use hugr_core::{
     HugrView, extension::simple_op::MakeExtensionOp as _, ops::constant::CustomConst,
     types::SumType,
@@ -388,12 +387,12 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
         let pcg = pcg.clone();
         move |context, args| {
             let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;
-            let v = match load_nat.get_nat() {
-                TypeArg::BoundedNat { n } => pcg
-                    .usize_type(&context.typing_session())
-                    .const_int(n, false),
-                arg => bail!("Unexpected type arg for LoadNat: {}", arg),
+            let Some(n) = load_nat.get_nat().as_nat() else {
+                bail!("Unexpected type arg for LoadNat")
             };
+            let v = pcg
+                .usize_type(&context.typing_session())
+                .const_int(n, false);
             args.outputs.finish(context.builder(), vec![v.into()])
         }
     })
@@ -408,7 +407,7 @@ mod test {
     use hugr_core::builder::{Dataflow, DataflowHugr};
     use hugr_core::extension::PRELUDE;
     use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
-    use hugr_core::types::{Type, TypeArg};
+    use hugr_core::types::{Term, Type};
     use hugr_core::{Hugr, type_row};
     use prelude::{PANIC_OP_ID, PRINT_OP_ID, bool_t, qb_t, usize_t};
     use rstest::{fixture, rstest};
@@ -559,10 +558,8 @@ mod test {
     #[rstest]
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::List {
-            elems: vec![type_arg_q.clone(), type_arg_q],
-        };
+        let type_arg_q: Term = qb_t().into();
+        let type_arg_2q: Term = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
@@ -587,10 +584,8 @@ mod test {
     #[rstest]
     fn prelude_exit(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "EXIT");
-        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
-        let type_arg_2q: TypeArg = TypeArg::List {
-            elems: vec![type_arg_q.clone(), type_arg_q],
-        };
+        let type_arg_q: Term = qb_t().into();
+        let type_arg_2q: Term = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let exit_op = PRELUDE
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
@@ -635,7 +630,7 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
-                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { n: 42 }), vec![])
+                    .add_dataflow_op(LoadNat::new(Term::from(42u64)), vec![])
                     .unwrap()
                     .out_wire(0);
                 builder.finish_hugr_with_outputs([v]).unwrap()

@@ -10,8 +10,9 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
+use crate::types::type_param::TermEnum;
 use crate::types::type_row::TypeRowBase;
-use crate::types::{FuncTypeBase, MaybeRV, SumType, TypeArg, TypeBase, TypeEnum};
+use crate::types::{FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -38,7 +39,7 @@ pub(crate) fn collect_op_types_extensions(
     match op {
         OpType::ExtensionOp(ext) => {
             for arg in ext.args() {
-                collect_typearg_exts(arg, &mut used, &mut missing);
+                collect_term_exts(arg, &mut used, &mut missing);
             }
             collect_signature_exts(&ext.signature(), &mut used, &mut missing);
         }
@@ -55,7 +56,7 @@ pub(crate) fn collect_op_types_extensions(
             collect_signature_exts(c.func_sig.body(), &mut used, &mut missing);
             collect_signature_exts(&c.instantiation, &mut used, &mut missing);
             for arg in &c.type_args {
-                collect_typearg_exts(arg, &mut used, &mut missing);
+                collect_term_exts(arg, &mut used, &mut missing);
             }
         }
         OpType::CallIndirect(c) => collect_signature_exts(&c.signature, &mut used, &mut missing),
@@ -64,13 +65,13 @@ pub(crate) fn collect_op_types_extensions(
             collect_signature_exts(lf.func_sig.body(), &mut used, &mut missing);
             collect_signature_exts(&lf.instantiation, &mut used, &mut missing);
             for arg in &lf.type_args {
-                collect_typearg_exts(arg, &mut used, &mut missing);
+                collect_term_exts(arg, &mut used, &mut missing);
             }
         }
         OpType::DFG(dfg) => collect_signature_exts(&dfg.signature, &mut used, &mut missing),
         OpType::OpaqueOp(op) => {
             for arg in op.args() {
-                collect_typearg_exts(arg, &mut used, &mut missing);
+                collect_term_exts(arg, &mut used, &mut missing);
             }
             collect_signature_exts(&op.signature(), &mut used, &mut missing);
         }
@@ -172,7 +173,7 @@ pub(crate) fn collect_type_exts<RV: MaybeRV>(
     match typ.as_type_enum() {
         TypeEnum::Extension(custom) => {
             for arg in custom.args() {
-                collect_typearg_exts(arg, used_extensions, missing_extensions);
+                collect_term_exts(arg, used_extensions, missing_extensions);
             }
             let ext_ref = custom.extension_ref();
             // Check if the extension reference is still valid.
@@ -202,34 +203,50 @@ pub(crate) fn collect_type_exts<RV: MaybeRV>(
     }
 }
 
-/// Collect the Extension pointers in the [`CustomType`]s inside a type argument.
+/// Collect the Extension pointers in the [`CustomType`]s inside a [`Term`].
 ///
 /// # Attributes
 ///
-/// - `arg`: The type argument to collect the extensions from.
+/// - `term`: The term argument to collect the extensions from.
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(super) fn collect_typearg_exts(
-    arg: &TypeArg,
+pub(super) fn collect_term_exts(
+    term: &Term,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
-    match arg {
-        TypeArg::Type { ty } => collect_type_exts(ty, used_extensions, missing_extensions),
-        TypeArg::List { elems } => {
+    match term.get() {
+        TermEnum::Type(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        TermEnum::List(elems) => {
             for elem in elems.iter() {
-                collect_typearg_exts(elem, used_extensions, missing_extensions);
+                collect_term_exts(elem, used_extensions, missing_extensions);
             }
         }
-        TypeArg::Tuple { elems } => {
+        TermEnum::Tuple(elems) => {
             for elem in elems.iter() {
-                collect_typearg_exts(elem, used_extensions, missing_extensions);
+                collect_term_exts(elem, used_extensions, missing_extensions);
             }
         }
-        // We ignore the `TypeArg::Extension` case, as it is not required to
-        // **define** the hugr.
-        _ => {}
+        TermEnum::ListType(item_type) => {
+            collect_term_exts(item_type, used_extensions, missing_extensions)
+        }
+        TermEnum::TupleType(item_types) => {
+            for item_type in item_types {
+                collect_term_exts(item_type, used_extensions, missing_extensions);
+            }
+        }
+        TermEnum::Variable(_)
+        | TermEnum::RuntimeType(_)
+        | TermEnum::StaticType
+        | TermEnum::BoundedNatType(_)
+        | TermEnum::StringType
+        | TermEnum::BytesType
+        | TermEnum::FloatType
+        | TermEnum::BoundedNat(_)
+        | TermEnum::String(_)
+        | TermEnum::Bytes(_)
+        | TermEnum::Float(_) => {}
     }
 }
 
