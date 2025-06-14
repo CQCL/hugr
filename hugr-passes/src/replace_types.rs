@@ -641,7 +641,7 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Type { ty }] = args else {
+        let [TypeArg::Type(ty)] = args else {
             panic!("Expected just elem type")
         };
         ty
