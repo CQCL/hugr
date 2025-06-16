@@ -168,18 +168,21 @@ impl Term {
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Runtime(t1), Term::Runtime(t2)) => t1 == t2,
-            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
-            (Term::String(s1), Term::String(s2)) => s1 == s2,
-            (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
-            (Term::Float(f1), Term::Float(f2)) => f1 == f2,
-            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
-            (Term::List(es1), Term::List(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
+            (
+                Term::Runtime(_)
+                | Term::BoundedNat(_)
+                | Term::String(_)
+                | Term::Bytes(_)
+                | Term::Float(_)
+                | Term::List(_)
+                | Term::Tuple(_),
+                _,
+            ) => {
+                // This is not a type at all, so it's not a supertype of anything.
+                false
             }
-            (Term::Tuple(es1), Term::Tuple(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
-            }
+            // ALAN not clear if we need this one? Tests would need complexifying
+            // (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
             _ => false,
         }
     }
