@@ -156,6 +156,7 @@ def validate(
         return
 
     # Roundtrip checks
+    # 1. just roundtrip with Python
     if isinstance(h, Hugr):
         starting_json = h.to_str()
         h2 = Hugr.from_str(starting_json)
@@ -169,21 +170,20 @@ def validate(
                 dot.pipe("svg")
     else:
         # Package
-        # first python roundtrip
         encoded = h.to_str(EnvelopeConfig.TEXT)
         loaded = Package.from_str(encoded)
         roundtrip_encoded = loaded.to_str(EnvelopeConfig.TEXT)
         assert encoded == roundtrip_encoded
 
-        # then roundtrip through the CLI
+    # 2. roundtrip through the CLI
 
-        # TODO once model loading is supported in Python
-        # try every combo of input and output formats
-        cmd = [*_base_command(), "convert", "-", "--text"]
+    # TODO once model loading is supported in Python
+    # try every combo of input and output formats
+    cmd = [*_base_command(), "convert", "-", "--text"]
 
-        serial = h.to_bytes(EnvelopeConfig.BINARY)
-        out = _run_hugr_cmd(serial, cmd)
-        loaded = Package.from_bytes(out.stdout)
+    serial = h.to_bytes(EnvelopeConfig.BINARY)
+    out = _run_hugr_cmd(serial, cmd)
+    loaded = Package.from_bytes(out.stdout)
 
 
 def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
