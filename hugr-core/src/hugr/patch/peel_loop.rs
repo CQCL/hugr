@@ -155,14 +155,14 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{
-        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, TailLoopBuilder,
+        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     };
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::hugr::internal::HugrMutInternals;
-    use crate::ops::{DFG, OpTag, OpTrait, Tag, TailLoop, handle::NodeHandle};
+
+    use crate::ops::{OpTag, OpTrait, Tag, TailLoop, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_types::INT_TYPES;
     use crate::types::{Signature, Type, TypeRow};
-    use crate::{HugrView, hugr::HugrMut, type_row};
+    use crate::{HugrView, hugr::HugrMut};
 
     use super::{PeelTailLoop, PeelTailLoopError};
 
