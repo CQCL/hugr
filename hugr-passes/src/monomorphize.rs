@@ -414,7 +414,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic] // TODO test needs updating: We only mangle link_name, not name, and many here were inner functions.
     fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
@@ -422,7 +421,7 @@ mod test {
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
         let sa = |n| TypeArg::BoundedNat { n };
         let n: u64 = 5;
-        let mut outer = FunctionBuilder::new(
+        let mut outer = FunctionBuilder::new_pub(
             "mainish",
             Signature::new(
                 ValueArray::ty_parametric(
@@ -441,7 +440,7 @@ mod test {
 
         let mono_func = {
             let mut fb = mb
-                .define_function("get_usz", Signature::new(vec![], usize_t()))
+                .define_function_pub("get_usz", Signature::new(vec![], usize_t()))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
@@ -452,7 +451,7 @@ mod test {
                 [TypeParam::max_nat(), TypeBound::Copyable.into()],
                 Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
             );
-            let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
+            let mut pf2 = mb.define_function_pub("pf2", pf2t).unwrap();
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
             let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
@@ -472,7 +471,7 @@ mod test {
                 usize_t(),
             ),
         );
-        let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
+        let mut pf1 = mb.define_function_pub("pf1", pf1t).unwrap();
 
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
         let inner = pf1
@@ -570,7 +569,7 @@ mod test {
 
             let _main = {
                 let mut builder = module_builder
-                    .define_function("main", Signature::new_endo(Type::UNIT))
+                    .define_function_pub("main", Signature::new_endo(Type::UNIT))
                     .unwrap();
                 let func_ptr = builder
                     .load_func(foo.handle(), &[Type::UNIT.into()])
