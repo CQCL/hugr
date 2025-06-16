@@ -49,6 +49,32 @@ pub trait GenericArrayOpBuilder: Dataflow {
         Ok(out)
     }
 
+    /// Adds an array unpack operation to the dataflow graph.
+    ///
+    /// This operation unpacks an array into individual elements.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// A vector of wires representing the individual elements of the array.
+    fn add_generic_array_unpack<AK: ArrayKind>(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<Vec<Wire>, BuildError> {
+        let op = GenericArrayOpDef::<AK>::unpack.instantiate(&[size.into(), elem_ty.into()])?;
+        Ok(self.add_dataflow_op(op, vec![input])?.outputs().collect())
+    }
     /// Adds an array clone operation to the dataflow graph and return the wires
     /// representing the originala and cloned array.
     ///
@@ -283,6 +309,17 @@ pub fn build_all_array_ops_generic<B: Dataflow, AK: ArrayKind>(mut builder: B) -
     let us0 = builder.add_load_value(ConstUsize::new(0));
     let us1 = builder.add_load_value(ConstUsize::new(1));
     let us2 = builder.add_load_value(ConstUsize::new(2));
+    let arr = builder
+        .add_new_generic_array::<AK>(usize_t(), [us1, us2])
+        .unwrap();
+
+    // Add array unpack operation
+    let [_us1, _us2] = builder
+        .add_generic_array_unpack::<AK>(usize_t(), 2, arr)
+        .unwrap()
+        .try_into()
+        .unwrap();
+
     let arr = builder
         .add_new_generic_array::<AK>(usize_t(), [us1, us2])
         .unwrap();

@@ -1,7 +1,7 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
-use hugr::envelope::{EnvelopeError, read_envelope};
+use hugr::envelope::{EnvelopeConfig, EnvelopeError, read_envelope};
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -43,18 +43,29 @@ impl HugrInputArgs {
     /// Read a hugr envelope from the input and return the package encoded
     /// within.
     ///
+    /// # Errors
+    ///
     /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
     /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
-        let extensions = self.load_extensions()?;
-        let buffer = BufReader::new(&mut self.input);
-        match read_envelope(buffer, &extensions) {
-            Ok((_, pkg)) => Ok(pkg),
-            Err(EnvelopeError::MagicNumber { .. }) => Err(CliError::NotAnEnvelope),
-            Err(e) => Err(CliError::Envelope(e)),
-        }
+        self.get_envelope().map(|(_, package)| package)
     }
 
+    /// Read a hugr envelope from the input and return the envelope
+    /// configuration and the package encoded within.
+    ///
+    /// # Errors
+    ///
+    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
+    /// reading the input as a package will fail.
+    pub fn get_envelope(&mut self) -> Result<(EnvelopeConfig, Package), CliError> {
+        let extensions = self.load_extensions()?;
+        let buffer = BufReader::new(&mut self.input);
+        read_envelope(buffer, &extensions).map_err(|e| match e {
+            EnvelopeError::MagicNumber { .. } => CliError::NotAnEnvelope,
+            _ => CliError::Envelope(e),
+        })
+    }
     /// Read a hugr JSON file from the input.
     ///
     /// This is a legacy option for reading old HUGR JSON files when the

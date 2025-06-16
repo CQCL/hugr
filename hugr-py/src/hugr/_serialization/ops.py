@@ -128,14 +128,13 @@ class FunctionValue(BaseValue):
     """A higher-order function value."""
 
     v: Literal["Function"] = Field(default="Function", title="ValueTag")
-    hugr: Any
+    hugr: str
 
     def deserialize(self) -> val.Value:
-        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr.from_str(self.hugr))
 
 
 class TupleValue(BaseValue):
