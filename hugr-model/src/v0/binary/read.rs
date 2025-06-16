@@ -140,18 +140,7 @@ fn read_operation<'a>(
             table::Operation::DeclareConstructor(read_symbol(bump, reader?, None)?)
         }
         Which::OperationDecl(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints,
-                signature,
-            });
-            table::Operation::DeclareOperation(symbol)
+            table::Operation::DeclareOperation(read_symbol(bump, reader?, None)?)
         }
         Which::Custom(operation) => table::Operation::Custom(table::TermId(operation)),
         Which::TailLoop(()) => table::Operation::TailLoop,
