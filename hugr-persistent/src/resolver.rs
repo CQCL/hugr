@@ -1,4 +1,10 @@
+use std::marker::PhantomData;
+
+use hugr_core::Hugr;
 use relrc::EquivalenceResolver;
+use wyhash::wyhash; // a fast platform-independent hash function
+
+use crate::state_space::CommitData;
 
 /// A resolver that considers two nodes equivalent if they are the same pointer.
 ///
@@ -7,7 +13,7 @@ use relrc::EquivalenceResolver;
 ///
 /// This is a trivial resolver (to be expanded on later), that considers two
 /// patches equivalent if they point to the same data in memory.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PointerEqResolver;
 
 impl<N, E: Clone> EquivalenceResolver<N, E> for PointerEqResolver {
@@ -39,5 +45,70 @@ impl<N, E: Clone> EquivalenceResolver<N, E> for PointerEqResolver {
 
     fn move_edge_source(&self, _mapping: &Self::MergeMapping, edge: &E) -> E {
         edge.clone()
+    }
+}
+
+/// A resolver that considers two nodes equivalent if the hashes of their
+/// serialisation is the same.
+///
+/// ### Generic type parameter
+///
+/// This is parametrised over a serializable type `H`, which must implement
+/// [`From<Hugr>`]. This type is used to serialise the commit data before
+/// hashing it.
+///
+/// Resolvers determine when two patches are equivalent and should be merged
+/// in the patch history.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SerdeHashResolver<H>(#[serde(skip)] PhantomData<H>);
+
+impl<H> Default for SerdeHashResolver<H> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
+
+impl<H> SerdeHashResolver<H> {
+    fn hash(value: &impl serde::Serialize) -> u64 {
+        let bytes = serde_json::to_vec(value).unwrap();
+        const SEED: u64 = 0;
+        wyhash(&bytes, SEED)
+    }
+}
+
+impl<H: serde::Serialize + From<Hugr>> EquivalenceResolver<CommitData, ()>
+    for SerdeHashResolver<H>
+{
+    type MergeMapping = ();
+
+    type DedupKey = u64;
+
+    fn id(&self) -> String {
+        "SerdeHashResolver".to_string()
+    }
+
+    fn dedup_key(&self, value: &CommitData, _incoming_edges: &[&()]) -> Self::DedupKey {
+        let ser_value = value.clone().into_serial::<H>();
+        Self::hash(&ser_value)
+    }
+
+    fn try_merge_mapping(
+        &self,
+        a_value: &CommitData,
+        _a_incoming_edges: &[&()],
+        b_value: &CommitData,
+        _b_incoming_edges: &[&()],
+    ) -> Result<Self::MergeMapping, relrc::resolver::NotEquivalent> {
+        let a_ser_value = a_value.clone().into_serial::<H>();
+        let b_ser_value = b_value.clone().into_serial::<H>();
+        if Self::hash(&a_ser_value) == Self::hash(&b_ser_value) {
+            Ok(())
+        } else {
+            Err(relrc::resolver::NotEquivalent)
+        }
+    }
+
+    fn move_edge_source(&self, _mapping: &Self::MergeMapping, _edge: &()) {
+        
     }
 }

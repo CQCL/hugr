@@ -10,7 +10,7 @@ use hugr_core::{
     hugr::patch::{Patch, PatchVerification, simple_replace},
 };
 use itertools::{Either, Itertools};
-use relrc::RelRc;
+use relrc::{EquivalenceResolver, RelRc};
 
 use crate::{
     CommitData, CommitId, CommitStateSpace, InvalidCommit, PatchNode, PersistentReplacement,
@@ -41,9 +41,9 @@ impl Commit {
     /// If any of the parents of the replacement are not in the commit state
     /// space, this function will return an [`InvalidCommit::UnknownParent`]
     /// error.
-    pub fn try_from_replacement(
+    pub fn try_from_replacement<R>(
         replacement: PersistentReplacement,
-        graph: &CommitStateSpace,
+        graph: &CommitStateSpace<R>,
     ) -> Result<Commit, InvalidCommit> {
         if replacement.subgraph().nodes().is_empty() {
             return Err(InvalidCommit::EmptyReplacement);
@@ -190,15 +190,16 @@ impl<'a> From<&'a RelRc<CommitData, ()>> for &'a Commit {
 /// Currently, only patches that apply to subgraphs within dataflow regions
 /// are supported.
 #[derive(Clone, Debug)]
-pub struct PersistentHugr {
+pub struct PersistentHugr<R = crate::PointerEqResolver> {
     /// The state space of all commits.
     ///
     /// Invariant: all commits are "compatible", meaning that no two patches
     /// invalidate the same node.
-    state_space: CommitStateSpace,
+    state_space: CommitStateSpace<R>,
 }
 
-impl PersistentHugr {
+#[allow(private_bounds)]
+impl<R: Default + EquivalenceResolver<CommitData, ()>> PersistentHugr<R> {
     /// Create a [`PersistentHugr`] with `hugr` as its base HUGR.
     ///
     /// All replacements added in the future will apply on top of `hugr`.
@@ -226,13 +227,6 @@ impl PersistentHugr {
     pub fn try_new(commits: impl IntoIterator<Item = Commit>) -> Result<Self, InvalidCommit> {
         let graph = CommitStateSpace::try_from_commits(commits)?;
         graph.try_extract_hugr(graph.all_commit_ids())
-    }
-
-    /// Construct a [`PersistentHugr`] from a [`CommitStateSpace`].
-    ///
-    /// Does not check that the commits are compatible.
-    pub(crate) fn from_state_space_unsafe(state_space: CommitStateSpace) -> Self {
-        Self { state_space }
     }
 
     /// Add a replacement to `self`.
@@ -314,6 +308,15 @@ impl PersistentHugr {
         }
         Ok(commit_id.expect("new_commits cannot be empty"))
     }
+}
+
+impl<R> PersistentHugr<R> {
+    /// Construct a [`PersistentHugr`] from a [`CommitStateSpace`].
+    ///
+    /// Does not check that the commits are compatible.
+    pub(crate) fn from_state_space_unsafe(state_space: CommitStateSpace<R>) -> Self {
+        Self { state_space }
+    }
 
     /// Convert this `PersistentHugr` to a materialized Hugr by applying all
     /// commits in `self`.
@@ -373,12 +376,12 @@ impl PersistentHugr {
     }
 
     /// Get a reference to the underlying state space of `self`.
-    pub fn as_state_space(&self) -> &CommitStateSpace {
+    pub fn as_state_space(&self) -> &CommitStateSpace<R> {
         &self.state_space
     }
 
     /// Convert `self` into its underlying [`CommitStateSpace`].
-    pub fn into_state_space(self) -> CommitStateSpace {
+    pub fn into_state_space(self) -> CommitStateSpace<R> {
         self.state_space
     }
 
@@ -654,7 +657,7 @@ impl PersistentHugr {
     }
 }
 
-impl IntoIterator for PersistentHugr {
+impl<R> IntoIterator for PersistentHugr<R> {
     type Item = Commit;
 
     type IntoIter = vec::IntoIter<Commit>;

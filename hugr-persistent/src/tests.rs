@@ -8,9 +8,13 @@ use hugr_core::{
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
+use relrc::EquivalenceResolver;
 use rstest::*;
 
-use crate::{Commit, CommitStateSpace, PatchNode, state_space::CommitId};
+use crate::{
+    Commit, CommitStateSpace, PatchNode,
+    state_space::{CommitData, CommitId},
+};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -201,10 +205,11 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
 /// - `commit1` and `commit2` are disjoint with `commit4` (i.e. compatible),
 /// - `commit2` depends on `commit1`
 #[fixture]
-pub(crate) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
+pub(crate) fn test_state_space<R: Default + EquivalenceResolver<CommitData, ()>>()
+-> (CommitStateSpace<R>, [CommitId; 4]) {
     let (base_hugr, [not0_node, not1_node, _and_node]) = simple_hugr();
 
-    let mut state_space = CommitStateSpace::with_base(base_hugr);
+    let mut state_space = CommitStateSpace::<R>::with_base(base_hugr);
 
     // Create first replacement (replace NOT0 with two NOT gates)
     let replacement1 = create_double_not_replacement(state_space.base_hugr(), not0_node);
