@@ -22,7 +22,7 @@ use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
 use crate::types::RowVariable;
-use crate::types::type_param::{TypeArg, TermTypeError, TypeParam};
+use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
