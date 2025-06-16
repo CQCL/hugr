@@ -62,18 +62,7 @@ class ModelExport:
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
-        meta = []
-
-        # Export JSON metadata
-        for meta_name, meta_value in node_data.metadata.items():
-            # TODO: Is this the correct way to convert the metadata as JSON?
-            meta_json = json.dumps(meta_value)
-            meta.append(
-                model.Apply(
-                    "compat.meta_json",
-                    [model.Literal(meta_name), model.Literal(meta_json)],
-                )
-            )
+        meta = self.export_json_meta(node)
 
         # Add an order hint key to the node if necessary
         if _needs_order_key(self.hugr, node):
@@ -374,9 +363,27 @@ class ModelExport:
                 error = f"Unknown operation: {op}"
                 raise ValueError(error)
 
+    def export_json_meta(self, node: Node) -> list[model.Term]:
+        """Export the metadata of the node via the JSON compatibility constructor."""
+        node_data = self.hugr[node]
+        meta = []
+
+        for meta_name, meta_value in node_data.metadata.items():
+            # TODO: Is this the correct way to convert the metadata as JSON?
+            meta_json = json.dumps(meta_value)
+            meta.append(
+                model.Apply(
+                    "compat.meta_json",
+                    [model.Literal(meta_name), model.Literal(meta_json)],
+                )
+            )
+
+        return meta
+
     def export_region_module(self, node: Node) -> model.Region:
         """Export a module node as a module region."""
         node_data = self.hugr[node]
+        meta = self.export_json_meta(node)
         children = []
 
         for child in node_data.children:
@@ -385,7 +392,7 @@ class ModelExport:
             if child_node is not None:
                 children.append(child_node)
 
-        return model.Region(kind=model.RegionKind.MODULE, children=children)
+        return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
     def export_region_dfg(self, node: Node) -> model.Region:
         """Export the children of a node as a dataflow region."""
@@ -440,6 +447,7 @@ class ModelExport:
             children=children,
             sources=sources,
             targets=targets,
+            meta=meta,
         )
 
     def export_region_cfg(self, node: Node) -> model.Region:
