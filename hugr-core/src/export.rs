@@ -21,6 +21,7 @@ use crate::{
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
+use hugr_model::v0::Visibility;
 use hugr_model::v0::{
     self as model,
     bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
@@ -94,8 +95,6 @@ struct Context<'a> {
     // TODO: Once this module matures, we should consider adding an auxiliary structure
     // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
-
-static EMPTY_STRING: String = String::new();
 
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
@@ -261,10 +260,8 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            OpType::FuncDefn(func_defn) => {
-                Some(func_defn.link_name().unwrap_or(&EMPTY_STRING).as_str())
-            }
-            OpType::FuncDecl(func_decl) => Some(func_decl.link_name().as_str()),
+            OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
+            OpType::FuncDecl(func_decl) => Some(func_decl.func_name().as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
             _ => None,
@@ -287,7 +284,6 @@ impl<'a> Context<'a> {
 
         let node = self.id_to_node[&node_id];
         let optype = self.hugr.get_optype(node);
-        let mut meta = Vec::new();
 
         let operation = match optype {
             OpType::Module(_) => todo!("this should be an error"),
@@ -334,11 +330,8 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = func.link_name().unwrap_or(&EMPTY_STRING);
-                let func_name = this.make_term(model::Literal::Str(func.func_name().into()).into());
-                let func_name_meta = this.make_term_apply(model::CORE_META_FUNCNAME, &[func_name]);
-                meta.push(func_name_meta);
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let visibility = func.link_name().map_or(Visibility::Private, |_| Visibility::Public);
+                let symbol = this.export_poly_func_type(func.func_name(), visibility, func.signature());
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -348,8 +341,7 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let name = func.link_name();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol = this.export_poly_func_type(func.link_name(), Visibility::temp(), func.signature());
                 table::Operation::DeclareFunc(symbol)
             }),
 
@@ -357,6 +349,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility: Visibility::temp(),
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -370,6 +363,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility: Visibility::temp(),
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -500,9 +494,12 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        self.export_node_json_metadata(node, &mut meta);
-        self.export_node_order_metadata(node, &mut meta);
-        let meta = self.bump.alloc_slice_copy(&meta);
+        let meta = {
+            let mut meta = Vec::new();
+            self.export_node_json_metadata(node, &mut meta);
+            self.export_node_order_metadata(node, &mut meta);
+            self.bump.alloc_slice_copy(&meta)
+        };
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
@@ -541,7 +538,8 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, poly_func_type)
+            // Assume all OpDef's are public
+            this.export_poly_func_type(name, Visibility::Public, poly_func_type)
         });
 
         let meta = {
@@ -791,6 +789,7 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         name: &'a str,
+        visibility: Visibility,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
@@ -809,6 +808,7 @@ impl<'a> Context<'a> {
         let body = self.export_func_type(t.body());
 
         self.bump.alloc(table::Symbol {
+            visibility,
             name,
             params: params.into_bump_slice(),
             constraints,

@@ -16,6 +16,7 @@ reserved = @{
   | "list"
   | "meta"
   | "signature"
+  | "pub"
   | "dfg"
   | "cfg"
   | "block"
@@ -68,8 +69,8 @@ node = {
 node_dfg               = { "(" ~ "dfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_cfg               = { "(" ~ "cfg" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_block             = { "(" ~ "block" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_define_func       = { "(" ~ "define-func" ~ symbol ~ meta* ~ region* ~ ")" }
-node_declare_func      = { "(" ~ "declare-func" ~ symbol ~ meta* ~ ")" }
+node_define_func       = { "(" ~ "define-func" ~ "pub"? ~ symbol ~ meta* ~ region* ~ ")" }
+node_declare_func      = { "(" ~ "declare-func" ~ "pub"? ~ symbol ~ meta* ~ ")" }
 node_define_alias      = { "(" ~ "define-alias" ~ symbol ~ term ~ meta* ~ ")" }
 node_declare_alias     = { "(" ~ "declare-alias" ~ symbol ~ meta* ~ ")" }
 node_declare_ctr       = { "(" ~ "declare-ctr" ~ symbol ~ meta* ~ ")" }

@@ -197,6 +197,10 @@ fn read_symbol<'a>(
     constraints: Option<&'a [table::TermId]>,
 ) -> ReadResult<&'a mut table::Symbol<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
+    let visibility = match reader.get_visibility() {
+        Ok(hugr_capnp::Visibility::Private ) | Err(_) => model::Visibility::Private,
+        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public
+    };
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {
         Some(cs) => cs,
@@ -204,6 +208,7 @@ fn read_symbol<'a>(
     };
     let signature = table::TermId(reader.get_signature());
     Ok(bump.alloc(table::Symbol {
+        visibility,
         name,
         params,
         constraints,

@@ -29,7 +29,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{Literal, RegionKind, ast};
+use super::{Literal, RegionKind, Visibility, ast};
 pub use view::View;
 
 /// A package consisting of a sequence of [`Module`]s.
@@ -252,7 +252,7 @@ impl<'a> Operation<'a> {
     #[must_use]
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
-            Operation::DefineFunc(symbol) => (!symbol.name.is_empty()).then_some(symbol.name),
+            Operation::DefineFunc(symbol) => Some(symbol.name),
             Operation::DeclareFunc(symbol) => Some(symbol.name),
             Operation::DefineAlias(symbol, _) => Some(symbol.name),
             Operation::DeclareAlias(symbol) => Some(symbol.name),
@@ -303,6 +303,8 @@ pub struct RegionScope {
 /// [`ast::Symbol`]: crate::v0::ast::Symbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol<'a> {
+    /// The visibility of the symbol.
+    pub visibility: Visibility,
     /// The name of the symbol.
     pub name: &'a str,
     /// The static parameters.

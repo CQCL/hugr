@@ -939,25 +939,12 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            // Look for a func_name in the metadata
-            let mut func_name = SmolStr::default();
-            for meta_item in node_data.meta {
-                if let Some([name_arg]) = ctx.match_symbol(*meta_item, model::CORE_META_FUNCNAME)? {
-                    let table::Term::Literal(model::Literal::Str(name)) = ctx.get_term(name_arg)?
-                    else {
-                        return Err(error_invalid!(
-                            "`{}` expects a string literal as its only argument",
-                            model::CORE_META_FUNCNAME
-                        ));
-                    };
-                    func_name = name.clone();
-                }
-            }
-            let optype = OpType::FuncDefn(FuncDefn::new_link_name(
-                func_name,
-                signature,
-                (!symbol.name.is_empty()).then_some(symbol.name.into()),
-            ));
+            let link_name = match symbol.visibility {
+                model::Visibility::Private => None,
+                model::Visibility::Public => Some(String::from(symbol.name)),
+                _ => panic!("Don't know how to handle")
+            };
+            let optype = OpType::FuncDefn(FuncDefn::new_link_name(symbol.name, signature, link_name));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
