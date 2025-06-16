@@ -1,18 +1,20 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-params.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
 (mod)
 
-(import core.bytes)
-
-(import core.nat)
-
 (import core.call)
 
 (import core.type)
+
+(import core.meta.func_name)
+
+(import core.bytes)
+
+(import core.nat)
 
 (import core.fn)
 
@@ -25,6 +27,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   (param ?0 core.type)
   (param ?1 core.type)
   (core.fn [?0 ?1] [?1 ?0])
+  (meta (core.meta.func_name ""))
   (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))
 
 (declare-func
@@ -36,6 +39,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   (core.fn [] []))
 
 (define-func example.call_literals (core.fn [] [])
+  (meta (core.meta.func_name ""))
   (dfg
     (signature (core.fn [] []))
     ((core.call

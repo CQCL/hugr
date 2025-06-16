@@ -14,9 +14,11 @@ expression: ast
 
 (import core.fn)
 
-(import core.order_hint.order)
+(import core.meta.func_name)
 
 (import arithmetic.int.types.int)
+
+(import core.order_hint.order)
 
 (declare-operation
   arithmetic.int.ineg
@@ -37,6 +39,7 @@ expression: ast
      (arithmetic.int.types.int 6)
      (arithmetic.int.types.int 6)
      (arithmetic.int.types.int 6)])
+  (meta (core.meta.func_name ""))
   (dfg [%0 %1 %2 %3] [%4 %5 %6 %7]
     (signature
       (core.fn

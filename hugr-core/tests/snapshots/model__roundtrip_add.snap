@@ -12,6 +12,8 @@ expression: ast
 
 (import core.fn)
 
+(import core.meta.func_name)
+
 (import arithmetic.int.types.int)
 
 (declare-operation
@@ -29,6 +31,7 @@ expression: ast
   (core.fn
     [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
     [(arithmetic.int.types.int 6)])
+  (meta (core.meta.func_name ""))
   (dfg [%0 %1] [%2]
     (signature
       (core.fn

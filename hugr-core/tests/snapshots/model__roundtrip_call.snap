@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -16,6 +16,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 
 (import arithmetic.int.types.int)
 
+(import core.meta.func_name)
+
 (declare-func
   example.callee
   (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
@@ -25,6 +27,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 (define-func
   example.caller
   (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
+  (meta (core.meta.func_name ""))
   (meta
     (compat.meta_json
       "description"
@@ -43,6 +46,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-call
 (define-func
   example.load
   (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])])
+  (meta (core.meta.func_name ""))
   (dfg [] [%0]
     (signature
       (core.fn
