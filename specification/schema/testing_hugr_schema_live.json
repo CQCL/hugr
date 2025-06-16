@@ -759,7 +759,8 @@
                     "type": "string"
                 },
                 "hugr": {
-                    "title": "Hugr"
+                    "title": "Hugr",
+                    "type": "string"
                 }
             },
             "required": [

@@ -298,9 +298,7 @@ class Function(Value):
         return self.body.entrypoint_op().inner_signature()
 
     def _to_serial(self) -> sops.FunctionValue:
-        return sops.FunctionValue(
-            hugr=self.body._to_serial(),
-        )
+        return sops.FunctionValue(hugr=self.body.to_str())
 
     def to_model(self) -> model.Term:
         module = self.body.to_model()
