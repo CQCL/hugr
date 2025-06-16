@@ -248,6 +248,12 @@ pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
 /// - **Result:** `core.meta`
 pub const CORE_ENTRYPOINT: &str = "core.entrypoint";
 
+/// Metadata to tag the name of a function (typically human readable; not for linking),
+/// i.e. [crate::ops::FuncDefn::func_name]
+///
+/// - **Result:** `core.meta`   (ALAN?)
+pub const CORE_META_FUNCNAME: &str = "core.meta.func_name";
+
 /// Constructor for JSON encoded metadata.
 ///
 /// This is included in the model to allow for compatibility with `hugr-core`.

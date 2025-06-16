@@ -252,7 +252,7 @@ impl<'a> Operation<'a> {
     #[must_use]
     pub fn symbol(&self) -> Option<&'a str> {
         match self {
-            Operation::DefineFunc(symbol) => Some(symbol.name),
+            Operation::DefineFunc(symbol) => (!symbol.name.is_empty()).then_some(symbol.name),
             Operation::DeclareFunc(symbol) => Some(symbol.name),
             Operation::DefineAlias(symbol, _) => Some(symbol.name),
             Operation::DeclareAlias(symbol) => Some(symbol.name),

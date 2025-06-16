@@ -95,6 +95,8 @@ struct Context<'a> {
     // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
 
+static EMPTY_STRING: String = String::new();
+
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
         let mut module = table::Module::default();
@@ -259,8 +261,9 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            // ALAN use link_name here...func_name saved as metadata in export_node_deep
-            OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
+            OpType::FuncDefn(func_defn) => {
+                Some(func_defn.link_name().unwrap_or(&EMPTY_STRING).as_str())
+            }
             OpType::FuncDecl(func_decl) => Some(func_decl.link_name().as_str()),
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
@@ -284,6 +287,7 @@ impl<'a> Context<'a> {
 
         let node = self.id_to_node[&node_id];
         let optype = self.hugr.get_optype(node);
+        let mut meta = Vec::new();
 
         let operation = match optype {
             OpType::Module(_) => todo!("this should be an error"),
@@ -330,7 +334,10 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = func.func_name(); // ALAN use link_name, func_name is metadata
+                let name = func.link_name().unwrap_or(&EMPTY_STRING);
+                let func_name = this.make_term(model::Literal::Str(func.func_name().into()).into());
+                let func_name_meta = this.make_term_apply(model::CORE_META_FUNCNAME, &[func_name]);
+                meta.push(func_name_meta);
                 let symbol = this.export_poly_func_type(name, func.signature());
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
@@ -493,12 +500,9 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        let meta = {
-            let mut meta = Vec::new();
-            self.export_node_json_metadata(node, &mut meta);
-            self.export_node_order_metadata(node, &mut meta);
-            self.bump.alloc_slice_copy(&meta)
-        };
+        self.export_node_json_metadata(node, &mut meta);
+        self.export_node_order_metadata(node, &mut meta);
+        let meta = self.bump.alloc_slice_copy(&meta);
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
