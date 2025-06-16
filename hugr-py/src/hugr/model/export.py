@@ -366,7 +366,7 @@ class ModelExport:
     def export_json_meta(self, node: Node) -> list[model.Term]:
         """Export the metadata of the node via the JSON compatibility constructor."""
         node_data = self.hugr[node]
-        meta = []
+        meta: list[model.Term] = []
 
         for meta_name, meta_value in node_data.metadata.items():
             # TODO: Is this the correct way to convert the metadata as JSON?
