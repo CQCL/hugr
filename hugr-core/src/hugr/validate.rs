@@ -709,17 +709,11 @@ pub enum ValidationError<N: HugrNode> {
     /// (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with the same signature are allowed)
     #[error("FuncDefn is exported under same name {link_name} as earlier node {:?}", children[0])]
     DuplicateLinkName {
-        /// The `link_name` of a `FuncDecl` or [`FuncDefn`]
+        /// The `link_name` of a `FuncDecl` or `FuncDefn`
         link_name: String,
         /// Two nodes using that `link_name`
         children: [N; 2],
     },
-    /// A [`FuncDecl`], or [`FuncDefn`] with a [link_name],
-    /// was neither root nor child of a [`Module`] root
-    ///
-    /// [`FuncDecl`]: crate::ops::FuncDecl
-    /// [link_name]: FuncDefn::link_name
-    /// [`Module`]: crate::ops::Module
     /// The children graph has invalid edges.
     #[error(
         "An operation {parent_optype} contains invalid edges between its children: {source}. In parent {parent}, edge from {from:?} port {from_port:?} to {to:?} port {to_port:?}",

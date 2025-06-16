@@ -137,6 +137,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// * If any node in `entry_points` is not a [`FuncDefn`]
 ///
 /// [`Call`]: hugr_core::ops::OpType::Call
+/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [link_name]: hugr_core::ops::FuncDefn::link_name
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module

@@ -249,7 +249,7 @@ pub const CORE_META_DESCRIPTION: &str = "core.meta.description";
 pub const CORE_ENTRYPOINT: &str = "core.entrypoint";
 
 /// Metadata to tag the name of a function (typically human readable; not for linking),
-/// i.e. [crate::ops::FuncDefn::func_name]
+/// i.e. `hugr-core::ops::FuncDefn::func_name`
 ///
 /// - **Result:** `core.meta`   (ALAN?)
 pub const CORE_META_FUNCNAME: &str = "core.meta.func_name";
