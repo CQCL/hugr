@@ -290,7 +290,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::dead_funcs::IncludeExports;
+    use crate::IncludeExports;
     use crate::{ComposablePass, RemoveDeadFuncsPass, monomorphize, remove_dead_funcs};
 
     use super::{is_polymorphic, mangle_name};

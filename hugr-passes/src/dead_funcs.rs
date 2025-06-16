@@ -11,7 +11,7 @@ use hugr_core::{
 use petgraph::visit::{Dfs, Walker};
 
 use crate::{
-    ComposablePass,
+    ComposablePass, IncludeExports,
     composable::{ValidatePassError, validate_if_test},
 };
 
@@ -29,14 +29,6 @@ pub enum RemoveDeadFuncsError<N = Node> {
         /// The invalid node.
         node: N,
     },
-}
-
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub enum IncludeExports {
-    Always,
-    Never,
-    #[default]
-    OnlyIfEntrypointIsModuleRoot,
 }
 
 fn reachable_funcs<'a, H: HugrView>(
@@ -90,20 +82,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Result = ();
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
-        let include_exports = match self.include_exports {
-            IncludeExports::Always => true,
-            IncludeExports::Never => false,
-            IncludeExports::OnlyIfEntrypointIsModuleRoot => hugr.entrypoint() == hugr.module_root(),
-        };
-        let include_exports2 = matches!(
-            (
-                self.include_exports,
-                hugr.entrypoint() == hugr.module_root()
-            ),
-            (IncludeExports::Always, _) | (IncludeExports::OnlyIfEntrypointIsModuleRoot, true)
-        );
-        assert_eq!(include_exports, include_exports2);
-        if include_exports {
+        if self.include_exports.for_hugr(hugr) {
             entry_points.extend(hugr.children(hugr.module_root()).filter(|ch| {
                 hugr.get_optype(*ch)
                     .as_func_defn()
