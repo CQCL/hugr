@@ -50,7 +50,7 @@ impl UpperBound {
     }
 }
 
-/// A [`Term`] that is the argument to an operation or constructor.
+/// A [`Term`] that is a static argument to an operation or constructor.
 pub type TypeArg = Term;
 
 /// A [`Term`] that is the static type of an operation or constructor parameter.
@@ -414,35 +414,29 @@ impl TermVar {
     }
 }
 
-/// Checks a [`TypeArg`] is as expected for a [`TypeParam`]
-pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> {
+/// Checks that a [`Term`] is valid for a given type.
+pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
     match (term, type_) {
-        (TypeArg::Variable(TermVar { cached_decl, .. }), _) if type_.contains(cached_decl) => {
+        (Term::Variable(TermVar { cached_decl, .. }), _) if type_.contains(cached_decl) => Ok(()),
+        (Term::Type(ty), Term::RuntimeType(bound)) if bound.contains(ty.least_upper_bound()) => {
             Ok(())
         }
-        (TypeArg::Type(ty), TypeParam::RuntimeType(bound))
-            if bound.contains(ty.least_upper_bound()) =>
-        {
-            Ok(())
-        }
-        (TypeArg::List(elems), TypeParam::ListType(item_type)) => {
+        (Term::List(elems), Term::ListType(item_type)) => {
             elems.iter().try_for_each(|term| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (TypeArg::Variable(v), TypeParam::RuntimeType(param_bound)) =
-                    (term, &**item_type)
-                {
+                if let (Term::Variable(v), Term::RuntimeType(param_bound)) = (term, &**item_type) {
                     if v.bound_if_row_var()
                         .is_some_and(|arg_bound| param_bound.contains(arg_bound))
                     {
                         return Ok(());
                     }
                 }
-                check_type_arg(term, item_type)
+                check_term_type(term, item_type)
             })
         }
-        (TypeArg::Tuple(items), TypeParam::TupleType(item_types)) => {
+        (Term::Tuple(items), Term::TupleType(item_types)) => {
             if items.len() != item_types.len() {
-                return Err(TypeArgError::WrongNumberTuple(
+                return Err(TermTypeError::WrongNumberTuple(
                     items.len(),
                     item_types.len(),
                 ));
@@ -451,52 +445,50 @@ pub fn check_type_arg(term: &TypeArg, type_: &Term) -> Result<(), TypeArgError> 
             items
                 .iter()
                 .zip(item_types.iter())
-                .try_for_each(|(term, type_)| check_type_arg(term, type_))
+                .try_for_each(|(term, type_)| check_term_type(term, type_))
         }
-        (TypeArg::BoundedNat(val), TypeParam::BoundedNatType(bound)) if bound.valid_value(*val) => {
-            Ok(())
-        }
-        (TypeArg::String { .. }, TypeParam::StringType) => Ok(()),
-        (TypeArg::Bytes(_), TypeParam::BytesType) => Ok(()),
-        (TypeArg::Float(_), TypeParam::FloatType) => Ok(()),
+        (Term::BoundedNat(val), Term::BoundedNatType(bound)) if bound.valid_value(*val) => Ok(()),
+        (Term::String { .. }, Term::StringType) => Ok(()),
+        (Term::Bytes(_), Term::BytesType) => Ok(()),
+        (Term::Float(_), Term::FloatType) => Ok(()),
 
         // Static types
-        (TypeArg::StaticType, TypeParam::StaticType) => Ok(()),
-        (TypeArg::StringType, TypeParam::StaticType) => Ok(()),
-        (TypeArg::BytesType, TypeParam::StaticType) => Ok(()),
-        (TypeArg::BoundedNatType { .. }, TypeParam::StaticType) => Ok(()),
-        (TypeArg::FloatType, TypeParam::StaticType) => Ok(()),
-        (TypeArg::ListType { .. }, TypeParam::StaticType) => Ok(()),
-        (TypeArg::TupleType(_), TypeParam::StaticType) => Ok(()),
+        (Term::StaticType, Term::StaticType) => Ok(()),
+        (Term::StringType, Term::StaticType) => Ok(()),
+        (Term::BytesType, Term::StaticType) => Ok(()),
+        (Term::BoundedNatType { .. }, Term::StaticType) => Ok(()),
+        (Term::FloatType, Term::StaticType) => Ok(()),
+        (Term::ListType { .. }, Term::StaticType) => Ok(()),
+        (Term::TupleType(_), Term::StaticType) => Ok(()),
 
-        _ => Err(TypeArgError::TypeMismatch {
+        _ => Err(TermTypeError::TypeMismatch {
             term: term.clone(),
             type_: type_.clone(),
         }),
     }
 }
 
-/// Check a list of type arguments match a list of required type parameters
-pub fn check_type_args(args: &[TypeArg], params: &[TypeParam]) -> Result<(), TypeArgError> {
-    if args.len() != params.len() {
-        return Err(TypeArgError::WrongNumberArgs(args.len(), params.len()));
+/// Check a list of [`Term`]s is valid for a list of types.
+pub fn check_term_types(terms: &[Term], types: &[Term]) -> Result<(), TermTypeError> {
+    if terms.len() != types.len() {
+        return Err(TermTypeError::WrongNumberArgs(terms.len(), types.len()));
     }
-    for (a, p) in args.iter().zip(params.iter()) {
-        check_type_arg(a, p)?;
+    for (term, type_) in terms.iter().zip(types.iter()) {
+        check_term_type(term, type_)?;
     }
     Ok(())
 }
 
-/// Errors that can occur fitting a [`TypeArg`] into a [`TypeParam`]
+/// Errors that can occur when checking that a [`Term`] has an expected type.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
-pub enum TypeArgError {
+pub enum TermTypeError {
     #[allow(missing_docs)]
     /// For now, general case of a term not fitting a type.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
     #[error("Term {term} does not fit declared type {type_}")]
-    TypeMismatch { term: TypeParam, type_: TypeArg },
+    TypeMismatch { term: Term, type_: Term },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -520,23 +512,23 @@ pub enum TypeArgError {
 mod test {
     use itertools::Itertools;
 
-    use super::{Substitution, TypeArg, TypeParam, check_type_arg};
+    use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::Term;
-    use crate::types::{TypeBound, TypeRV, type_param::TypeArgError};
+    use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
 
     #[test]
     fn type_arg_fits_param() {
         let rowvar = TypeRV::new_row_var_use;
-        fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TypeArgError> {
-            check_type_arg(&arg.into(), param)
+        fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TermTypeError> {
+            check_term_type(&arg.into(), param)
         }
         fn check_seq<T: Clone + Into<TypeArg>>(
             args: &[T],
             param: &TypeParam,
-        ) -> Result<(), TypeArgError> {
+        ) -> Result<(), TermTypeError> {
             let arg = args.iter().cloned().map_into().collect_vec().into();
-            check_type_arg(&arg, param)
+            check_term_type(&arg, param)
         }
         // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
@@ -612,7 +604,7 @@ mod test {
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
         let row_arg: Term = vec![bool_t().into(), Term::UNIT].into();
-        check_type_arg(&row_arg, &row_param).unwrap();
+        check_term_type(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
@@ -621,7 +613,7 @@ mod test {
             TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
             usize_t().into(),
         ]);
-        check_type_arg(&outer_arg, &outer_param).unwrap();
+        check_term_type(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
         assert_eq!(
@@ -630,7 +622,7 @@ mod test {
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
-        check_type_arg(&outer_arg2, &outer_param).unwrap();
+        check_term_type(&outer_arg2, &outer_param).unwrap();
     }
 
     #[test]
@@ -644,7 +636,7 @@ mod test {
             row_var_use.clone(),
             vec![row_var_use, usize_t().into()].into(),
         ]);
-        check_type_arg(&good_arg, &outer_param).unwrap();
+        check_term_type(&good_arg, &outer_param).unwrap();
 
         // Outer list cannot include single types:
         let Term::List(mut elems) = good_arg.clone() else {
@@ -652,8 +644,8 @@ mod test {
         };
         elems.push(usize_t().into());
         assert_eq!(
-            check_type_arg(&Term::new_list(elems), &outer_param),
-            Err(TypeArgError::TypeMismatch {
+            check_term_type(&Term::new_list(elems), &outer_param),
+            Err(TermTypeError::TypeMismatch {
                 term: usize_t().into(),
                 // The error reports the type expected for each element of the list:
                 type_: TypeParam::new_list_type(TypeBound::Any)
@@ -662,9 +654,9 @@ mod test {
 
         // Now substitute a list of two types for that row-variable
         let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
-        check_type_arg(&row_var_arg, &row_var_decl).unwrap();
+        check_term_type(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(&[row_var_arg.clone()]));
-        check_type_arg(&subst_arg, &outer_param).unwrap(); // invariance of substitution
+        check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([

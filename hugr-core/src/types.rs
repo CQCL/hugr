@@ -15,7 +15,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::check_type_arg;
+use crate::types::type_param::check_term_type;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -740,7 +740,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        debug_assert_eq!(check_term_type(arg, decl), Ok(()));
         arg.clone()
     }
 
@@ -749,7 +749,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert!(check_type_arg(arg, &TypeParam::new_list_type(bound)).is_ok());
+        debug_assert!(check_term_type(arg, &TypeParam::new_list_type(bound)).is_ok());
         match arg {
             TypeArg::List(elems) => elems
                 .iter()
@@ -857,7 +857,7 @@ pub(crate) mod test {
     use crate::extension::prelude::{option_type, qb_t, usize_t};
     use crate::std_extensions::collections::array::{array_type, array_type_parametric};
     use crate::std_extensions::collections::list::list_type;
-    use crate::types::type_param::TypeArgError;
+    use crate::types::type_param::TermTypeError;
     use crate::{Extension, hugr::IdentList, type_row};
 
     #[test]
@@ -1026,7 +1026,7 @@ pub(crate) mod test {
         let mut t = Type::new_extension(c_of_cpy.clone());
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TypeArgError::TypeMismatch {
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
                 type_: TypeBound::Copyable.into(),
                 term: qb_t().into()
             }))
@@ -1038,7 +1038,7 @@ pub(crate) mod test {
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TypeArgError::TypeMismatch {
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
                 type_: TypeBound::Copyable.into(),
                 term: mk_opt(qb_t()).into()
             }))

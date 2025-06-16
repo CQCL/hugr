@@ -14,7 +14,7 @@ use super::{
 use crate::Hugr;
 use crate::envelope::serde_with::AsStringEnvelope;
 use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
@@ -239,7 +239,7 @@ impl SignatureFunc {
                 let static_params = func.static_params();
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
 
-                check_type_args(static_args, static_params)?;
+                check_term_types(static_args, static_params)?;
                 temp = func.compute_signature(static_args, def)?;
                 (&temp, other_args)
             }
@@ -347,7 +347,7 @@ impl OpDef {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
                 static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
-                check_type_args(static_args, custom.static_params())?;
+                check_term_types(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self)?;
                 (&temp, other_args)
             }
@@ -357,7 +357,7 @@ impl OpDef {
             }
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
-        check_type_args(args, pf.params())?;
+        check_term_types(args, pf.params())?;
         Ok(())
     }
 
@@ -553,7 +553,7 @@ pub(super) mod test {
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::ops::OpName;
     use crate::std_extensions::collections::list;
-    use crate::types::type_param::{TypeArgError, TypeParam};
+    use crate::types::type_param::{TermTypeError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{Extension, const_extension_ids};
 
@@ -806,7 +806,7 @@ pub(super) mod test {
             assert_eq!(
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
-                    TypeArgError::TypeMismatch {
+                    TermTypeError::TypeMismatch {
                         type_: TypeBound::Any.into(),
                         term: arg,
                     }

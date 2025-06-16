@@ -13,7 +13,7 @@ use {
 };
 
 use super::Substitution;
-use super::type_param::{TypeArg, TypeParam, check_type_args};
+use super::type_param::{TypeArg, TypeParam, check_term_types};
 use super::{MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
 
 /// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
@@ -122,7 +122,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
-        check_type_args(args, &self.params)?;
+        check_term_types(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args)))
     }
 
@@ -166,7 +166,7 @@ pub(crate) mod test {
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
-    use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+    use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, MaybeRV, Signature, Term, Type, TypeBound, TypeName, TypeRV,
     };
@@ -231,7 +231,7 @@ pub(crate) mod test {
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
-                TypeArgError::TypeMismatch {
+                TermTypeError::TypeMismatch {
                     type_: type_params[0].clone(),
                     term: usize_t().into(),
                 }
@@ -239,7 +239,7 @@ pub(crate) mod test {
         );
 
         // (Try to) make a schema with the args in the wrong order
-        let arg_err = SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+        let arg_err = SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
             type_: type_params[0].clone(),
             term: ty_var.clone(),
         });
@@ -336,7 +336,7 @@ pub(crate) mod test {
             assert_eq!(
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
-                    TypeArgError::TypeMismatch {
+                    TermTypeError::TypeMismatch {
                         type_: bound.clone(),
                         term: TypeArg::new_var_use(0, decl.clone())
                     }

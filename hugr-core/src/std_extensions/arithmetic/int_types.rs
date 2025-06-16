@@ -11,7 +11,7 @@ use crate::{
     ops::constant::CustomConst,
     types::{
         ConstTypeError, CustomType, Type, TypeBound,
-        type_param::{TypeArg, TypeArgError, TypeParam},
+        type_param::{TermTypeError, TypeArg, TypeParam},
     },
 };
 use lazy_static::lazy_static;
@@ -76,10 +76,10 @@ pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_type({
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
-pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TypeArgError> {
+pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermTypeError> {
     match arg {
         TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
-        _ => Err(TypeArgError::TypeMismatch {
+        _ => Err(TermTypeError::TypeMismatch {
             term: arg.clone(),
             type_: LOG_WIDTH_TYPE_PARAM,
         }),
@@ -243,7 +243,7 @@ mod test {
         let type_arg_128 = TypeArg::BoundedNat(7);
         assert_matches!(
             get_log_width(&type_arg_128),
-            Err(TypeArgError::TypeMismatch { .. })
+            Err(TermTypeError::TypeMismatch { .. })
         );
     }
 
