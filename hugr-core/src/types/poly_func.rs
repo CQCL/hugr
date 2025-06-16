@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::extension::SignatureError;
+use crate::{extension::SignatureError, types::Term};
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
@@ -129,6 +129,7 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
     pub fn validate(&self) -> Result<(), SignatureError> {
+        self.params.iter().try_for_each(Term::validate_param)?;
         self.body.validate(&self.params)
     }
 

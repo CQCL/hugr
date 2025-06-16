@@ -289,6 +289,28 @@ impl Term {
         }
     }
 
+    /// Check that this is a valid bound on (type for) a parameter
+    pub(crate) fn validate_param(&self) -> Result<(), SignatureError> {
+        match self {
+            Term::RuntimeType(_)
+            | Term::StaticType
+            | Term::BoundedNatType(_)
+            | Term::StringType
+            | Term::BytesType
+            | Term::FloatType => Ok(()),
+            Term::ListType(term) => term.validate_param(),
+            Term::TupleType(terms) => terms.iter().try_for_each(Term::validate_param),
+            Term::Runtime(_)
+            | Term::BoundedNat(_)
+            | Term::String(_)
+            | Term::Bytes(_)
+            | Term::Float(_)
+            | Term::List(_)
+            | Term::Tuple(_)
+            | Term::Variable(_) => Err(SignatureError::InvalidTypeParam(self.clone())),
+        }
+    }
+
     /// Much as [`Type::validate`], also checks that the type of any [`TypeArg::Opaque`]
     /// is valid and closed.
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
@@ -308,7 +330,7 @@ impl Term {
 
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
-            Term::RuntimeType { .. } => Ok(()),
+            Term::RuntimeType(_) => Ok(()),
             Term::BoundedNatType { .. } => Ok(()),
             Term::StringType => Ok(()),
             Term::BytesType => Ok(()),
