@@ -676,8 +676,10 @@ mod test {
         hugr.use_extension(PRELUDE.to_owned());
         let root = hugr.entrypoint();
         let [foo, bar] = ["foo", "bar"].map(|name| {
-            let fd = hugr
-                .add_node_with_parent(root, FuncDefn::new(name, Signature::new_endo(usize_t())));
+            let fd = hugr.add_node_with_parent(
+                root,
+                FuncDefn::new_private(name, Signature::new_endo(usize_t())),
+            );
             let inp = hugr.add_node_with_parent(fd, Input::new(usize_t()));
             let out = hugr.add_node_with_parent(fd, Output::new(usize_t()));
             hugr.connect(inp, 0, out, 0);

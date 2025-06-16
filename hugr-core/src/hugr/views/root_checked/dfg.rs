@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{
     IncomingPort, OutgoingPort, PortIndex,
     hugr::HugrMut,
-    ops::{DFG, FuncDefn, Input, OpTrait, OpType, Output, dataflow::IOTrait, handle::DfgID},
+    ops::{OpTrait, OpType, handle::DfgID},
     types::{NoRV, Signature, TypeBase},
 };
 
@@ -168,20 +168,19 @@ fn disconnect_all<H: HugrMut>(hugr: &mut H, node: H::Node) {
 }
 
 fn update_signature<H: HugrMut>(hugr: &mut H, node: H::Node, new_sig: &Signature) {
-    let new_op: OpType = match hugr.get_optype(node) {
-        OpType::DFG(_) => DFG {
-            signature: new_sig.clone(),
+    match hugr.optype_mut(node) {
+        OpType::DFG(dfg) => {
+            dfg.signature = new_sig.clone();
         }
-        .into(),
-        OpType::FuncDefn(fn_def_op) => {
-            FuncDefn::new(fn_def_op.func_name().clone(), new_sig.clone()).into()
+        OpType::FuncDefn(fn_def_op) => *fn_def_op.signature_mut() = new_sig.clone().into(),
+        OpType::Input(inp) => {
+            inp.types = new_sig.input().clone();
         }
-        OpType::Input(_) => Input::new(new_sig.input().clone()).into(),
-        OpType::Output(_) => Output::new(new_sig.output().clone()).into(),
+        OpType::Output(out) => out.types = new_sig.output().clone(),
         _ => panic!("only update signature of DFG, FuncDefn, Input, or Output"),
     };
+    let new_op = hugr.get_optype(node);
     hugr.set_num_ports(node, new_op.input_count(), new_op.output_count());
-    hugr.replace_op(node, new_op);
 }
 
 fn check_valid_inputs<V>(
