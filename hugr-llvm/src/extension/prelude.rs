@@ -631,7 +631,7 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
-                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat(42)), vec![])
+                    .add_dataflow_op(LoadNat::new(42u64.into()), vec![])
                     .unwrap()
                     .out_wire(0);
                 builder.finish_hugr_with_outputs([v]).unwrap()

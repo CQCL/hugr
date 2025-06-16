@@ -530,7 +530,7 @@ mod test {
             let arg = args.iter().cloned().map_into().collect_vec().into();
             check_term_type(&arg, param)
         }
-        // Simple cases: a TypeArg::Type is a TypeParam::Type but singleton sequences are lists
+        // Simple cases: a Term::Type is a Term::RuntimeType but singleton sequences are lists
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &seq_param).unwrap_err();
@@ -581,7 +581,7 @@ mod test {
         )
         .unwrap_err();
 
-        // TypeParam::Tuples require a TypeArg::Tuple of the same number of elems
+        // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
             TypeParam::TupleType(vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
         check(
