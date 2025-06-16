@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: ast
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-constraints.edn\"))"
 ---
 (hugr 0)
 
@@ -15,8 +15,6 @@ expression: ast
 (import core.nonlinear)
 
 (import core.fn)
-
-(import core.meta.func_name)
 
 (declare-func
   array.replicate
@@ -39,5 +37,4 @@ expression: ast
   (param ?0 core.type)
   (where (core.nonlinear ?0))
   (core.fn [?0] [?0 ?0])
-  (meta (core.meta.func_name ""))
   (dfg [%0] [%0 %0] (signature (core.fn [?0] [?0 ?0]))))

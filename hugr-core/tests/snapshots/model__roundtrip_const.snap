@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: ast
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-const.edn\"))"
 ---
 (hugr 0)
 
@@ -14,13 +14,11 @@ expression: ast
 
 (import arithmetic.int.const)
 
-(import core.meta.func_name)
-
-(import arithmetic.int.types.int)
+(import arithmetic.float.const_f64)
 
 (import core.const.adt)
 
-(import arithmetic.float.const_f64)
+(import arithmetic.int.types.int)
 
 (import collections.array.const)
 
@@ -31,7 +29,6 @@ expression: ast
 (import core.adt)
 
 (define-func example.bools (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
-  (meta (core.meta.func_name ""))
   (dfg [] [%0 %1]
     (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])]))
     ((core.load_const (core.const.adt [[] []] _ 0 [])) [] [%0]
@@ -46,7 +43,6 @@ expression: ast
     [(core.adt
        [[(collections.array.array 5 (arithmetic.int.types.int 6))
          arithmetic.float.types.float64]])])
-  (meta (core.meta.func_name ""))
   (dfg [] [%0]
     (signature
       (core.fn
@@ -78,7 +74,6 @@ expression: ast
                arithmetic.float.types.float64]])])))))
 
 (define-func example.f64-json (core.fn [] [arithmetic.float.types.float64])
-  (meta (core.meta.func_name ""))
   (dfg [] [%0 %1]
     (signature
       (core.fn
