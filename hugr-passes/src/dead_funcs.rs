@@ -151,7 +151,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 ///
 /// `entry_points` may provide a list of entry points, which must be [`FuncDefn`]s (children of the root).
 /// * If the [HugrView::entrypoint] is the module root, then any [`FuncDefn`] children with a [link_name]
-/// will also be considered an entry point
+///   will also be considered an entry point
 /// * otherwise, the [HugrView::entrypoint] itself will.
 ///
 /// # Errors
