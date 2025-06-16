@@ -408,7 +408,7 @@ mod test {
     use hugr_core::builder::{Dataflow, DataflowHugr};
     use hugr_core::extension::PRELUDE;
     use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
-    use hugr_core::types::{Term, Type, TypeArg};
+    use hugr_core::types::{Term, Type};
     use hugr_core::{Hugr, type_row};
     use prelude::{PANIC_OP_ID, PRINT_OP_ID, bool_t, qb_t, usize_t};
     use rstest::{fixture, rstest};
