@@ -6,7 +6,7 @@ use crate::extension::SignatureError;
 
 #[cfg(test)]
 use proptest::prelude::{BoxedStrategy, Strategy, any};
-/// Describes a row variable - a type variable bound with a [`TypeParam::List`] of [`TypeParam::Type`]
+/// Describes a row variable - a type variable bound with a list of runtime types
 /// of the specified bound (checked in validation)
 // The serde derives here are not used except as markers
 // so that other types containing this can also #derive-serde the same way.

@@ -214,14 +214,14 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
         match type_args {
             [
                 TypeArg::BoundedNat(n),
-                TypeArg::Type(src_ty),
-                TypeArg::Type(tgt_ty),
+                TypeArg::Runtime(src_ty),
+                TypeArg::Runtime(tgt_ty),
                 TypeArg::List(acc_tys),
             ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {
-                        TypeArg::Type(ty) => Ok(ty.clone()),
+                        TypeArg::Runtime(ty) => Ok(ty.clone()),
                         _ => Err(SignatureError::InvalidTypeArgs.into()),
                     })
                     .collect();

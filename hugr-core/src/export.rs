@@ -962,13 +962,12 @@ impl<'a> Context<'a> {
                 let types = self.make_term(table::Term::List(item_types));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            Term::Type(ty) => self.export_type(ty),
+            Term::Runtime(ty) => self.export_type(ty),
             Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
             Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
             Term::Float(value) => self.make_term(model::Literal::Float(*value).into()),
             Term::Bytes(value) => self.make_term(model::Literal::Bytes(value.clone()).into()),
             Term::List(elems) => {
-                // For now we assume that the sequence is meant to be a list.
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()

@@ -684,7 +684,7 @@ impl MakeExtensionOp for MakeTuple {
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                TypeArg::Type(ty) => Ok(ty.clone()),
+                TypeArg::Runtime(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();
@@ -739,7 +739,7 @@ impl MakeExtensionOp for UnpackTuple {
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                Term::Type(ty) => Ok(ty.clone()),
+                Term::Runtime(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();
@@ -851,7 +851,7 @@ impl MakeExtensionOp for Noop {
         Self: Sized,
     {
         let _def = NoopDef::from_def(ext_op.def())?;
-        let [TypeArg::Type(ty)] = ext_op.args() else {
+        let [TypeArg::Runtime(ty)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         Ok(Self(ty.clone()))
@@ -963,7 +963,7 @@ impl MakeExtensionOp for Barrier {
         let tys: Result<Vec<Type>, _> = elems
             .iter()
             .map(|a| match a {
-                TypeArg::Type(ty) => Ok(ty.clone()),
+                TypeArg::Runtime(ty) => Ok(ty.clone()),
                 _ => Err(SignatureError::InvalidTypeArgs),
             })
             .collect();

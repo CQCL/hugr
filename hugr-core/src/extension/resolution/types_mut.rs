@@ -221,7 +221,7 @@ pub(super) fn resolve_term_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match term {
-        Term::Type(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
+        Term::Runtime(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
         Term::List(elems) => {
             for elem in elems.iter_mut() {
                 resolve_term_exts(node, elem, extensions, used_extensions)?;

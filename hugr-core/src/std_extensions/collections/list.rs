@@ -112,7 +112,7 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type(ty)] = typ.args() else {
+        let [TypeArg::Runtime(ty)] = typ.args() else {
             return Err(error());
         };
 
@@ -351,7 +351,7 @@ impl MakeExtensionOp for ListOpInst {
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        let [Term::Type(ty)] = ext_op.args() else {
+        let [Term::Runtime(ty)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
         let name = ext_op.unqualified_id();

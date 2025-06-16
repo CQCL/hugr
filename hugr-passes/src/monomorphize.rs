@@ -232,7 +232,7 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Type(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
+        TypeArg::Runtime(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
         TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
         TypeArg::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
         TypeArg::List(elems) => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),

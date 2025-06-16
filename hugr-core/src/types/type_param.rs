@@ -95,7 +95,7 @@ pub enum Term {
     TupleType(Vec<Term>),
     /// A runtime type as a term. Instance of [`Term::RuntimeType`].
     #[display("{_0}")]
-    Type(Type),
+    Runtime(Type),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
     #[display("{_0}")]
     BoundedNat(u64),
@@ -121,7 +121,7 @@ pub enum Term {
     })]
     Tuple(Vec<Term>),
     /// Variable (used in type schemes or inside polymorphic functions),
-    /// but not a [`TypeArg::Type`] (not even a row variable i.e. [`TypeParam::List`] of type)
+    /// but not a runtime type (not even a row variable i.e. list of runtime types)
     /// - see [`Term::new_var_use`]
     #[display("{_0}")]
     Variable(TermVar),
@@ -140,7 +140,7 @@ impl Term {
         Self::BoundedNatType(UpperBound(Some(upper_bound)))
     }
 
-    /// Create s a new [`Term::List`] given a sequence of its items.
+    /// Creates a new [`Term::List`] given a sequence of its items.
     pub fn new_list(items: impl IntoIterator<Item = Term>) -> Self {
         Self::List(items.into_iter().collect())
     }
@@ -155,29 +155,30 @@ impl Term {
         Self::TupleType(item_types.into_iter().collect())
     }
 
-    fn contains(&self, other: &Term) -> bool {
+    /// Checks if this term is a supertype of another.
+    fn is_supertype(&self, other: &Term) -> bool {
         match (self, other) {
             (Term::RuntimeType(b1), Term::RuntimeType(b2)) => b1.contains(*b2),
             (Term::BoundedNatType(b1), Term::BoundedNatType(b2)) => b1.contains(b2),
             (Term::StringType, Term::StringType) => true,
             (Term::StaticType, Term::StaticType) => true,
-            (Term::ListType(e1), Term::ListType(e2)) => e1.contains(e2),
+            (Term::ListType(e1), Term::ListType(e2)) => e1.is_supertype(e2),
             (Term::TupleType(es1), Term::TupleType(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Type(t1), Term::Type(t2)) => t1 == t2,
-            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 >= n2,
+            (Term::Runtime(t1), Term::Runtime(t2)) => t1 == t2,
+            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
             (Term::String(s1), Term::String(s2)) => s1 == s2,
             (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
             (Term::Float(f1), Term::Float(f2)) => f1 == f2,
             (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
             (Term::List(es1), Term::List(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
             }
             (Term::Tuple(es1), Term::Tuple(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.contains(e2))
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
             }
             _ => false,
         }
@@ -199,7 +200,7 @@ impl From<UpperBound> for Term {
 impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
-            Ok(ty) => Term::Type(ty),
+            Ok(ty) => Term::Runtime(ty),
             Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
         }
     }
@@ -229,7 +230,7 @@ impl From<Vec<Term>> for Term {
     }
 }
 
-/// Variable in a [`Term`], that is not a single [`Term::Type`] (i.e. not a [`Type::new_var_use`]
+/// Variable in a [`Term`], that is not a single runtime type (i.e. not a [`Type::new_var_use`]
 /// - it might be a [`Type::new_row_var_use`]).
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
@@ -241,8 +242,8 @@ pub struct TermVar {
 }
 
 impl Term {
-    /// [`Type::UNIT`] as a [`Term::Type`]
-    pub const UNIT: Self = Self::Type(Type::UNIT);
+    /// [`Type::UNIT`] as a [`Term::Runtime`]
+    pub const UNIT: Self = Self::Runtime(Type::UNIT);
 
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
@@ -261,7 +262,7 @@ impl Term {
         }
     }
 
-    /// Returns an integer if the `TypeArg` is an instance of `BoundedNat`.
+    /// Returns an integer if the [`Term`] is a natural number literal.
     #[must_use]
     pub fn as_nat(&self) -> Option<u64> {
         match self {
@@ -270,16 +271,16 @@ impl Term {
         }
     }
 
-    /// Returns a type if the `TypeArg` is an instance of Type.
+    /// Returns a [`Type`] if the [`Term`] is a runtime type.
     #[must_use]
-    pub fn as_type(&self) -> Option<TypeBase<NoRV>> {
+    pub fn as_runtime(&self) -> Option<TypeBase<NoRV>> {
         match self {
-            TypeArg::Type(ty) => Some(ty.clone()),
+            TypeArg::Runtime(ty) => Some(ty.clone()),
             _ => None,
         }
     }
 
-    /// Returns a string if the `TypeArg` is an instance of String.
+    /// Returns a string if the [`Term`] is a string literal.
     #[must_use]
     pub fn as_string(&self) -> Option<String> {
         match self {
@@ -292,7 +293,7 @@ impl Term {
     /// is valid and closed.
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::Type(ty) => ty.validate(var_decls),
+            Term::Runtime(ty) => ty.validate(var_decls),
             Term::List(elems) => {
                 // TODO: Full validation would check that the type of the elements agrees
                 elems.iter().try_for_each(|a| a.validate(var_decls))
@@ -320,7 +321,7 @@ impl Term {
 
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
-            Term::Type(ty) => {
+            Term::Runtime(ty) => {
                 // RowVariables are represented as Term::Variable
                 ty.substitute1(t).into()
             }
@@ -329,7 +330,7 @@ impl Term {
             }
             Term::List(elems) => {
                 let mut are_types = elems.iter().map(|ta| match ta {
-                    Term::Type { .. } => true,
+                    Term::Runtime { .. } => true,
                     Term::Variable(v) => v.bound_if_row_var().is_some(),
                     _ => false,
                 });
@@ -340,7 +341,7 @@ impl Term {
                         elems
                             .iter()
                             .flat_map(|ta| match ta.substitute(t) {
-                                ty @ Term::Type { .. } => vec![ty],
+                                ty @ Term::Runtime { .. } => vec![ty],
                                 Term::List(elems) => elems,
                                 _ => panic!("Expected Type or row of Types"),
                             })
@@ -374,7 +375,7 @@ impl Term {
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
-            Term::Type(ty) => ty.transform(tr),
+            Term::Runtime(ty) => ty.transform(tr),
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)
@@ -417,8 +418,10 @@ impl TermVar {
 /// Checks that a [`Term`] is valid for a given type.
 pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
     match (term, type_) {
-        (Term::Variable(TermVar { cached_decl, .. }), _) if type_.contains(cached_decl) => Ok(()),
-        (Term::Type(ty), Term::RuntimeType(bound)) if bound.contains(ty.least_upper_bound()) => {
+        (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
+            Ok(())
+        }
+        (Term::Runtime(ty), Term::RuntimeType(bound)) if bound.contains(ty.least_upper_bound()) => {
             Ok(())
         }
         (Term::List(elems), Term::ListType(item_type)) => {
@@ -749,7 +752,7 @@ mod test {
         proptest! {
             #[test]
             fn term_contains_itself(term: Term) {
-                assert!(term.contains(&term));
+                assert!(term.is_supertype(&term));
             }
         }
     }

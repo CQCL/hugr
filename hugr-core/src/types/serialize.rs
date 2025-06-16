@@ -131,7 +131,7 @@ impl From<Term> for TermSer {
             Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
             Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
             Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple { params }),
-            Term::Type(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
+            Term::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
             Term::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
             Term::String(arg) => TermSer::TypeArg(TypeArgSer::String { arg }),
             Term::Bytes(value) => TermSer::TypeArg(TypeArgSer::Bytes { value }),
@@ -157,7 +157,7 @@ impl From<TermSer> for Term {
                 TypeParamSer::Tuple { params } => Term::TupleType(params),
             },
             TermSer::TypeArg(arg) => match arg {
-                TypeArgSer::Type { ty } => Term::Type(ty),
+                TypeArgSer::Type { ty } => Term::Runtime(ty),
                 TypeArgSer::BoundedNat { n } => Term::BoundedNat(n),
                 TypeArgSer::String { arg } => Term::String(arg),
                 TypeArgSer::Bytes { value } => Term::Bytes(value),

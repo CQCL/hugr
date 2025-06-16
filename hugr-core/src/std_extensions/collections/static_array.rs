@@ -309,7 +309,7 @@ impl HasConcrete for StaticArrayOpDef {
         match type_args {
             [arg] => {
                 let elem_ty = arg
-                    .as_type()
+                    .as_runtime()
                     .filter(|t| Copyable.contains(t.least_upper_bound()))
                     .ok_or(SignatureError::TypeArgMismatch(
                         TermTypeError::TypeMismatch {

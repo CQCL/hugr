@@ -207,7 +207,7 @@ impl HasConcrete for PtrOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         let ty = match type_args {
-            [TypeArg::Type(ty)] => ty.clone(),
+            [TypeArg::Runtime(ty)] => ty.clone(),
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
 

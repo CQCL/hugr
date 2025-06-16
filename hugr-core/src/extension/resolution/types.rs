@@ -216,7 +216,7 @@ pub(super) fn collect_term_exts(
     missing_extensions: &mut ExtensionSet,
 ) {
     match term {
-        Term::Type(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        Term::Runtime(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
         Term::List(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
