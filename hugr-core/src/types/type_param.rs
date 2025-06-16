@@ -776,8 +776,9 @@ mod test {
 
         proptest! {
             #[test]
-            fn term_contains_itself(term: Term) {
-                assert!(term.is_supertype(&term));
+            fn type_term_contains_itself(term: Term) {
+                let is_type = term.validate_param().is_ok();
+                assert_eq!(is_type, term.is_supertype(&term));
             }
         }
     }
