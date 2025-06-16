@@ -254,7 +254,7 @@ pub(in crate::hugr) fn node_style<'a>(
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
         match h.get_optype(n.into()) {
-            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
+            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.link_name()),
             OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
             op => op.name().to_string(),
         }
