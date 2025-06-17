@@ -108,7 +108,5 @@ impl<H: serde::Serialize + From<Hugr>> EquivalenceResolver<CommitData, ()>
         }
     }
 
-    fn move_edge_source(&self, _mapping: &Self::MergeMapping, _edge: &()) {
-        
-    }
+    fn move_edge_source(&self, _mapping: &Self::MergeMapping, _edge: &()) {}
 }

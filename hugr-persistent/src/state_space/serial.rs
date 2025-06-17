@@ -1,3 +1,5 @@
+//! Serialized format for [`CommitStateSpace`]
+
 use relrc::serialization::SerializedHistoryGraph;
 
 use super::*;

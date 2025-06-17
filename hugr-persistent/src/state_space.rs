@@ -18,7 +18,7 @@ use crate::{
     find_conflicting_node, parents_view::ParentsView,
 };
 
-mod serial;
+pub mod serial;
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]
 pub type CommitId = relrc::NodeId;

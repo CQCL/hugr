@@ -16,6 +16,8 @@ use crate::{
     CommitData, CommitId, CommitStateSpace, InvalidCommit, PatchNode, PersistentReplacement,
 };
 
+pub mod serial;
+
 /// A patch that can be applied to a [`PersistentHugr`] or a
 /// [`CommitStateSpace`] as an atomic commit.
 ///
