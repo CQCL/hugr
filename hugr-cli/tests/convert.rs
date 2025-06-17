@@ -15,7 +15,6 @@ use hugr::{
     extension::ExtensionRegistry,
     extension::prelude::bool_t,
     types::Signature,
-    HugrView
 };
 use predicates::str::contains;
 use rstest::{fixture, rstest};
@@ -203,13 +202,6 @@ fn test_format_roundtrip(test_package: Package) {
     let (_, package_back) = read_envelope(reader, &registry).unwrap();
 
     // Package should be the same after roundtrip conversion
-    let [h1] = test_package.modules.as_slice() else {panic!()};
-    let [h2] = package_back.modules.iter().collect::<Vec<_>>().try_into().unwrap();
-    for n in h1.nodes() {
-        let op1 = h1.get_optype(n);
-        let op2 = h2.get_optype(n);
-        if op1!=op2 { eprintln!("ALAN node {n} original {:?} roundtrip {:?}", op1, op2)}
-    }
     assert_eq!(test_package, package_back);
 }
 
