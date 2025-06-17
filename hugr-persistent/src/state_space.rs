@@ -6,7 +6,15 @@ use delegate::delegate;
 use derive_more::From;
 use hugr_core::{
     Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::{self, internal::HugrInternals, patch::BoundaryPort},
+    hugr::{
+        self,
+        internal::HugrInternals,
+        patch::{
+            BoundaryPort,
+            simple_replace::{IncludeReplacementNodes, InvalidReplacement},
+        },
+        views::{InvalidSignature, sibling_subgraph::InvalidSubgraph},
+    },
     ops::OpType,
 };
 use itertools::{Either, Itertools};
@@ -25,9 +33,23 @@ pub type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
 #[derive(
-    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, serde::Serialize, serde::Deserialize,
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct PatchNode(pub CommitId, pub Node);
+
+impl PatchNode {
+    /// Get the commit ID of the commit that owns this node.
+    pub fn owner(&self) -> CommitId {
+        self.0
+    }
+}
+
+// Print out PatchNodes as `Node(x)@commit_hex`
+impl std::fmt::Debug for PatchNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}@{}", self.1, self.0)
+    }
+}
 
 impl std::fmt::Display for PatchNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -308,6 +330,9 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
+    /// The returned ports will be in the `child` commit unless the child commit
+    /// is empty, in which case they will be in one of the parents of `child`.
+    ///
     /// ## Panics
     ///
     /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
@@ -317,6 +342,7 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: OutgoingPort,
         child: CommitId,
+        return_invalid: IncludeReplacementNodes,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
         assert!(
             self.is_boundary_edge(node, port, child),
@@ -325,7 +351,7 @@ impl<R> CommitStateSpace<R> {
 
         let parent_hugrs = ParentsView::from_commit(child, self);
         let repl = self.replacement(child).expect("valid child commit");
-        repl.linked_replacement_inputs((node, port), &parent_hugrs)
+        repl.linked_replacement_inputs((node, port), &parent_hugrs, return_invalid)
             .collect_vec()
             .into_iter()
             .map(move |np| match np {
@@ -336,6 +362,9 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
+    /// The returned port will be in the `child` commit unless the child commit
+    /// is empty, in which case it will be in one of the parents of `child`.
+    ///
     /// ## Panics
     ///
     /// Panics if `child` is not a valid commit ID.
@@ -344,10 +373,11 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: IncomingPort,
         child: CommitId,
+        return_invalid: IncludeReplacementNodes,
     ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
         let repl = self.replacement(child).expect("valid child commit");
-        match repl.linked_replacement_output((node, port), &parent_hugrs)? {
+        match repl.linked_replacement_output((node, port), &parent_hugrs, return_invalid)? {
             BoundaryPort::Host(patch_node, port) => (patch_node, port),
             BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
         }
@@ -363,15 +393,16 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: impl Into<Port>,
         child: CommitId,
+        return_invalid: IncludeReplacementNodes,
     ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
         match port.into().as_directed() {
             Either::Left(incoming) => Either::Left(
-                self.linked_child_output(node, incoming, child)
+                self.linked_child_output(node, incoming, child, return_invalid)
                     .into_iter()
                     .map(|(node, port)| (node, port.into())),
             ),
             Either::Right(outgoing) => Either::Right(
-                self.linked_child_inputs(node, outgoing, child)
+                self.linked_child_inputs(node, outgoing, child, return_invalid)
                     .map(|(node, port)| (node, port.into())),
             ),
         }
@@ -384,7 +415,7 @@ impl<R> CommitStateSpace<R> {
     ///
     /// Panics if `(node, port)` is not connected to the input node in the
     /// commit of `node`, or if the node is not valid.
-    pub(crate) fn linked_parent_input(
+    pub fn linked_parent_input(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: IncomingPort,
@@ -402,7 +433,14 @@ impl<R> CommitStateSpace<R> {
         repl.linked_host_input((node, port), &parent_hugrs).into()
     }
 
-    pub(crate) fn linked_parent_outputs(
+    /// Get the input boundary ports linked to `(node, port)` in a
+    /// parent of the commit of `node`.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `(node, port)` is not connected to the output node in the
+    /// commit of `node`, or if the node is not valid.
+    pub fn linked_parent_outputs(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: OutgoingPort,
@@ -554,4 +592,20 @@ pub enum InvalidCommit {
     /// The commit is an empty replacement.
     #[error("Not allowed: empty replacement")]
     EmptyReplacement,
+
+    #[error("Invalid subgraph: {0}")]
+    /// The subgraph of the replacement is not convex.
+    InvalidSubgraph(#[from] InvalidSubgraph<PatchNode>),
+
+    /// The replacement of the commit is invalid.
+    #[error("Invalid replacement: {0}")]
+    InvalidReplacement(#[from] InvalidReplacement),
+
+    /// The signature of the replacement is invalid.
+    #[error("Invalid signature: {0}")]
+    InvalidSignature(#[from] InvalidSignature),
+
+    /// A wire has an unpinned port.
+    #[error("Incomplete wire: {0} is unpinned")]
+    IncompleteWire(PatchNode, Port),
 }

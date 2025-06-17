@@ -1,9 +1,12 @@
 use std::collections::{BTreeSet, VecDeque};
 
-use hugr_core::{Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire};
+use hugr_core::{
+    Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire,
+    hugr::patch::simple_replace::IncludeReplacementNodes,
+};
 use itertools::{Either, Itertools};
 
-use crate::{PatchNode, PersistentHugr, Resolver, Walker};
+use crate::{CommitId, PatchNode, PersistentHugr, Resolver, Walker};
 
 /// A wire in a [`PersistentHugr`].
 ///
@@ -72,10 +75,15 @@ impl PersistentWire {
                             .expect("deleted node has deleting commit");
                         for (opp_node, opp_port) in hugr.linked_ports(node, port) {
                             let opp_node = PatchNode(commit_id, opp_node);
-                            for (child_node, child_port) in per_hugr
-                                .as_state_space()
-                                .linked_child_ports(opp_node, opp_port, deleted_by)
+                            for (child_node, child_port) in
+                                per_hugr.as_state_space().linked_child_ports(
+                                    opp_node,
+                                    opp_port,
+                                    deleted_by,
+                                    IncludeReplacementNodes::All,
+                                )
                             {
+                                debug_assert_eq!(child_node.owner(), deleted_by);
                                 let w = to_wire(child_node, child_port, per_hugr);
                                 if wires.insert(w) {
                                     queue.push_back(w);
@@ -128,6 +136,11 @@ impl PersistentWire {
             }
         });
         dir_ports.filter(|&(node, _)| hugr.node_status(node) == NodeStatus::Valid)
+    }
+
+    /// All commit IDs that the wire traverses.
+    pub fn owners(&self) -> impl Iterator<Item = CommitId> {
+        self.wires.iter().map(|w| w.node().owner()).unique()
     }
 
     /// Consume the wire and return all ports attached to a wire in `hugr`.
