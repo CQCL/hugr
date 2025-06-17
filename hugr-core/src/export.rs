@@ -14,7 +14,7 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
+        TypeArg, TypeBase, TypeBound, TypeEnum,
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
     },
@@ -738,15 +738,20 @@ impl<'a> Context<'a> {
         let signature = {
             let node_signature = self.hugr.signature(node).unwrap();
 
-            let mut wrap_ctrl = |types: &TypeRow| {
-                let types = self.export_type_row(types);
+            let inputs = {
+                let types = self.export_type_row(node_signature.input());
                 self.make_term(table::Term::List(
                     self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
                 ))
             };
 
-            let inputs = wrap_ctrl(node_signature.input());
-            let outputs = wrap_ctrl(node_signature.output());
+            let outputs = {
+                let types = self.export_type_row(node_signature.output());
+                self.make_term(table::Term::List(
+                    self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
+                ))
+            };
+
             Some(self.make_term_apply(model::CORE_CTRL, &[inputs, outputs]))
         };
 
