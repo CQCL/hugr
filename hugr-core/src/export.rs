@@ -14,7 +14,7 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
+        TypeArg, TypeBase, TypeBound, TypeEnum,
         type_param::{TypeArgVariable, TypeParam},
         type_row::TypeRowBase,
     },
@@ -578,7 +578,6 @@ impl<'a> Context<'a> {
     pub fn export_block_signature(&mut self, block: &DataflowBlock) -> table::TermId {
         let inputs = {
             let inputs = self.export_type_row(&block.inputs);
-            let inputs = self.make_term_apply(model::CORE_CTRL, &[inputs]);
             self.make_term(table::Term::List(
                 self.bump.alloc_slice_copy(&[table::SeqPart::Item(inputs)]),
             ))
@@ -590,13 +589,12 @@ impl<'a> Context<'a> {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in &block.sum_rows {
                 let variant = self.export_type_row_with_tail(sum_row, Some(tail));
-                let control = self.make_term_apply(model::CORE_CTRL, &[variant]);
-                outputs.push(table::SeqPart::Item(control));
+                outputs.push(table::SeqPart::Item(variant));
             }
             self.make_term(table::Term::List(outputs.into_bump_slice()))
         };
 
-        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
+        self.make_term_apply(model::CORE_CTRL, &[inputs, outputs])
     }
 
     /// Creates a data flow region from the given node's children.
@@ -740,18 +738,21 @@ impl<'a> Context<'a> {
         let signature = {
             let node_signature = self.hugr.signature(node).unwrap();
 
-            let mut wrap_ctrl = |types: &TypeRow| {
-                let types = self.export_type_row(types);
-                let types_ctrl = self.make_term_apply(model::CORE_CTRL, &[types]);
+            let inputs = {
+                let types = self.export_type_row(node_signature.input());
                 self.make_term(table::Term::List(
-                    self.bump
-                        .alloc_slice_copy(&[table::SeqPart::Item(types_ctrl)]),
+                    self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
                 ))
             };
 
-            let inputs = wrap_ctrl(node_signature.input());
-            let outputs = wrap_ctrl(node_signature.output());
-            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
+            let outputs = {
+                let types = self.export_type_row(node_signature.output());
+                self.make_term(table::Term::List(
+                    self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
+                ))
+            };
+
+            Some(self.make_term_apply(model::CORE_CTRL, &[inputs, outputs]))
         };
 
         let scope = match closure {
