@@ -488,6 +488,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Float(_), Term::FloatType) => Ok(()),
 
         // Static types
+        (Term::RuntimeType(_), Term::StaticType) => Ok(()),
         (Term::StaticType, Term::StaticType) => Ok(()),
         (Term::StringType, Term::StaticType) => Ok(()),
         (Term::BytesType, Term::StaticType) => Ok(()),
