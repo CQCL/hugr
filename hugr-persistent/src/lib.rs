@@ -72,7 +72,7 @@ mod trait_impls;
 pub mod walker;
 
 pub use persistent_hugr::{Commit, PersistentHugr};
-pub use resolver::{PointerEqResolver, SerdeHashResolver};
+pub use resolver::{PointerEqResolver, Resolver, SerdeHashResolver};
 pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 pub use walker::{PinnedWire, Walker};
 

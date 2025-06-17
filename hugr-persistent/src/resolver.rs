@@ -6,6 +6,10 @@ use wyhash::wyhash; // a fast platform-independent hash function
 
 use crate::state_space::CommitData;
 
+/// A trait for resolvers that can be used in [`CommitStateSpace`](super::CommitStateSpace).
+pub trait Resolver: Clone + Default + EquivalenceResolver<CommitData, ()> {}
+impl<T: Clone + Default + EquivalenceResolver<CommitData, ()>> Resolver for T {}
+
 /// A resolver that considers two nodes equivalent if they are the same pointer.
 ///
 /// Resolvers determine when two patches are equivalent and should be merged

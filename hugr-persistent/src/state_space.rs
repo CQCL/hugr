@@ -10,11 +10,11 @@ use hugr_core::{
     ops::OpType,
 };
 use itertools::Itertools;
-use relrc::{EquivalenceResolver, HistoryGraph, RelRc};
+use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use crate::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, SerdeHashResolver,
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver, SerdeHashResolver,
     find_conflicting_node, parents_view::ParentsView,
 };
 
@@ -35,13 +35,21 @@ impl std::fmt::Display for PatchNode {
     }
 }
 
-/// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
-/// other commits apply), or a [`PersistentReplacement`]
-#[derive(Debug, Clone, From)]
-pub(crate) enum CommitData {
-    Base(Hugr),
-    Replacement(PersistentReplacement),
+mod hidden {
+    use super::*;
+
+    /// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
+    /// other commits apply), or a [`PersistentReplacement`]
+    ///
+    /// This is a "unnamable" type: we do not expose this struct publicly in our
+    /// API, but we can still use it in public trait bounds (see [`Resolver`](crate::resolver::Resolver)).
+    #[derive(Debug, Clone, From)]
+    pub enum CommitData {
+        Base(Hugr),
+        Replacement(PersistentReplacement),
+    }
 }
+pub(crate) use hidden::CommitData;
 
 /// A set of commits with directed (acyclic) dependencies between them.
 ///
@@ -76,8 +84,7 @@ pub struct CommitStateSpace<R = PointerEqResolver> {
     pub(super) base_commit: CommitId,
 }
 
-#[allow(private_bounds)]
-impl<R: Default + EquivalenceResolver<CommitData, ()>> CommitStateSpace<R> {
+impl<R: Resolver> CommitStateSpace<R> {
     /// Create a new commit state space with a single base commit.
     pub fn with_base(hugr: Hugr) -> Self {
         let commit = RelRc::new(CommitData::Base(hugr));

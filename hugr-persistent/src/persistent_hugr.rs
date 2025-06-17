@@ -10,10 +10,11 @@ use hugr_core::{
     hugr::patch::{Patch, PatchVerification, simple_replace},
 };
 use itertools::{Either, Itertools};
-use relrc::{EquivalenceResolver, RelRc};
+use relrc::RelRc;
 
 use crate::{
     CommitData, CommitId, CommitStateSpace, InvalidCommit, PatchNode, PersistentReplacement,
+    Resolver,
 };
 
 pub mod serial;
@@ -200,8 +201,7 @@ pub struct PersistentHugr<R = crate::PointerEqResolver> {
     state_space: CommitStateSpace<R>,
 }
 
-#[allow(private_bounds)]
-impl<R: Default + EquivalenceResolver<CommitData, ()>> PersistentHugr<R> {
+impl<R: Resolver> PersistentHugr<R> {
     /// Create a [`PersistentHugr`] with `hugr` as its base HUGR.
     ///
     /// All replacements added in the future will apply on top of `hugr`.
