@@ -168,8 +168,11 @@ impl Term {
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            // This is definitely ok, but there might be other cases(?)
-            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
+            // This is definitely ok (invariance), but there might be other cases(?).
+            // The recursive call checks the variable is actually a type.
+            (Term::Variable(v1), Term::Variable(v2)) => {
+                v1 == v2 && v1.cached_decl.is_supertype(&*v1.cached_decl)
+            }
             (
                 Term::Runtime(_)
                 | Term::BoundedNat(_)

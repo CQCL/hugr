@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::{extension::SignatureError, types::Term};
+use crate::extension::SignatureError;
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
