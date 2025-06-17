@@ -168,11 +168,7 @@ impl Term {
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            // This is definitely ok (invariance), but there might be other cases(?).
-            // The recursive call checks the variable is actually a type.
-            (Term::Variable(v1), Term::Variable(v2)) => {
-                v1 == v2 && v1.cached_decl.is_supertype(&*v1.cached_decl)
-            }
+            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2 && cached_is_static(v1),
             (
                 Term::Runtime(_)
                 | Term::BoundedNat(_)
@@ -188,6 +184,14 @@ impl Term {
             }
             _ => false,
         }
+    }
+}
+
+fn cached_is_static(tv: &TermVar) -> bool {
+    match &*tv.cached_decl {
+        Term::Variable(tv) => cached_is_static(&*tv),
+        Term::StaticType => true,
+        _ => false,
     }
 }
 
@@ -308,8 +312,17 @@ impl Term {
             | Term::FloatType => Ok(()),
             Term::ListType(term) => term.validate_param(),
             Term::TupleType(terms) => terms.iter().try_for_each(Term::validate_param),
-            // Variables are allowed as long as all legal instantiations are valid parameter types
-            Term::Variable(TermVar { cached_decl, .. }) => cached_decl.validate_param(),
+            // Variables are allowed as long as they could be a static type;
+            // since StaticType is itself a StaticType, we must loop through chains
+            // like `(param &b &a) (param ?c ?b) ...` arbitrarily: these could be
+            // legal if enough of the first params are instantiated with `StaticType`
+            Term::Variable(tv) => {
+                if cached_is_static(tv) {
+                    Ok(())
+                } else {
+                    Err(SignatureError::InvalidTypeParam(self.clone()))
+                }
+            }
             // The remainder are not static types
             Term::Runtime(_)
             | Term::BoundedNat(_)
