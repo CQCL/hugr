@@ -378,9 +378,7 @@ mod test {
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::List {
-                elems: vec![usize_t().into(); 3],
-            },
+            TypeArg::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
             qb_t().into(),
         ]));
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants

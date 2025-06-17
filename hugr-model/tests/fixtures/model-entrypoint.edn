@@ -25,10 +25,10 @@
     (cfg [] []
       (signature (core.fn [] []))
       (cfg [%entry] [%exit]
-        (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+        (signature (core.ctrl [[]] [[]]))
         (meta core.entrypoint)
         (block [%entry] [%exit]
-          (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+          (signature (core.ctrl [[]] [[]]))
           (dfg [] [%value]
             (signature (core.fn [] [(core.adt [[]])]))
             ((core.make_adt _ _ 0) [] [%value]

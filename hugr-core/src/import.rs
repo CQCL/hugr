@@ -24,8 +24,8 @@ use crate::{
     },
     types::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
-        Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow, type_param::TypeParam,
-        type_row::TypeRowBase,
+        Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
+        type_param::TypeParam, type_row::TypeRowBase,
     },
 };
 use fxhash::FxHashMap;
@@ -826,7 +826,7 @@ impl<'a> Context<'a> {
         }
 
         let region_target_types = (|| {
-            let [_, region_targets] = self.get_func_type(
+            let [_, region_targets] = self.get_ctrl_type(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -860,31 +860,31 @@ impl<'a> Context<'a> {
         };
 
         // The entry node in core control flow regions is identified by being
-        // the first child node of the CFG node. We therefore import the entry
-        // node first and follow it up by every other node.
+        // the first child node of the CFG node. We therefore import the entry node first.
         self.import_node(entry_node, node)?;
 
-        for child in region_data.children {
-            if *child != entry_node {
-                self.import_node(*child, node)?;
-            }
-        }
-
-        // Create the exit node for the control flow region.
+        // Create the exit node for the control flow region. This always needs
+        // to be second in the node list.
         {
             let cfg_outputs = {
-                let [ctrl_type] = region_target_types.as_slice() else {
+                let [target_types] = region_target_types.as_slice() else {
                     return Err(error_invalid!("cfg region expects a single target"));
                 };
 
-                let [types] = self.expect_symbol(*ctrl_type, model::CORE_CTRL)?;
-                self.import_type_row(types)?
+                self.import_type_row(*target_types)?
             };
 
             let exit = self
                 .hugr
                 .add_node_with_parent(node, OpType::ExitBlock(ExitBlock { cfg_outputs }));
             self.record_links(exit, Direction::Incoming, region_data.targets);
+        }
+
+        // Finally we import all other nodes.
+        for child in region_data.children {
+            if *child != entry_node {
+                self.import_node(*child, node)?;
+            }
         }
 
         for meta_item in region_data.meta {
@@ -997,7 +997,7 @@ impl<'a> Context<'a> {
 
             let type_args = args
                 .iter()
-                .map(|term| self.import_type_arg(*term))
+                .map(|term| self.import_term(*term))
                 .collect::<Result<Vec<TypeArg>, _>>()?;
 
             self.static_edges.push((*symbol, node_id));
@@ -1020,7 +1020,7 @@ impl<'a> Context<'a> {
                     let func_sig = self.get_func_signature(*symbol)?;
                     let type_args = args
                         .iter()
-                        .map(|term| self.import_type_arg(*term))
+                        .map(|term| self.import_term(*term))
                         .collect::<Result<Vec<TypeArg>, _>>()?;
 
                     self.static_edges.push((*symbol, node_id));
@@ -1097,7 +1097,7 @@ impl<'a> Context<'a> {
         let name = self.get_symbol_name(*node)?;
         let args = params
             .iter()
-            .map(|param| self.import_type_arg(*param))
+            .map(|param| self.import_term(*param))
             .collect::<Result<Vec<_>, _>>()?;
         let (extension, name) = self.import_custom_name(name)?;
         let signature = self.get_node_signature(node_id)?;
@@ -1188,10 +1188,10 @@ impl<'a> Context<'a> {
             for (index, param) in symbol.params.iter().enumerate() {
                 // NOTE: `PolyFuncType` only has explicit type parameters at present.
                 let bound = self.local_vars[&table::VarId(node, index as _)].bound;
-                imported_params
-                    .push(self.import_type_param(param.r#type, bound).map_err(|err| {
-                        error_context!(err, "type of parameter `{}`", param.name)
-                    })?);
+                imported_params.push(
+                    self.import_term_with_bound(param.r#type, bound)
+                        .map_err(|err| error_context!(err, "type of parameter `{}`", param.name))?,
+                );
             }
 
             let body = self.import_func_type::<RV>(symbol.signature)?;
@@ -1200,161 +1200,69 @@ impl<'a> Context<'a> {
         .map_err(|err| error_context!(err, "symbol `{}` defined by node {}", symbol.name, node))
     }
 
-    /// Import a [`TypeParam`] from a term that represents a static type.
-    fn import_type_param(
+    /// Import a [`Term`] from a term that represents a static type or value.
+    fn import_term(&mut self, term_id: table::TermId) -> Result<Term, ImportError> {
+        self.import_term_with_bound(term_id, TypeBound::Any)
+    }
+
+    fn import_term_with_bound(
         &mut self,
         term_id: table::TermId,
         bound: TypeBound,
-    ) -> Result<TypeParam, ImportError> {
+    ) -> Result<Term, ImportError> {
         (|| {
             if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(TypeParam::String);
+                return Ok(Term::StringType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Ok(TypeParam::max_nat());
+                return Ok(Term::max_nat_type());
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(TypeParam::Bytes);
+                return Ok(Term::BytesType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(TypeParam::Float);
+                return Ok(Term::FloatType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::Type { b: bound });
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_STATIC
-                ));
+                return Ok(TypeParam::RuntimeType(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_CONSTRAINT
-                ));
+                return Err(error_unsupported!("`{}`", model::CORE_CONSTRAINT));
+            }
+
+            if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
+                return Ok(Term::StaticType);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
-                return Err(error_unsupported!("`{}` as `TypeParam`", model::CORE_CONST));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeParam`",
-                    model::CORE_CTRL_TYPE
-                ));
+                return Err(error_unsupported!("`{}`", model::CORE_CONST));
             }
 
             if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // type of a list must be copyable. Therefore we import it as `Any`.
-                let param = Box::new(
-                    self.import_type_param(item_type, TypeBound::Any)
-                        .map_err(|err| error_context!(err, "item type of list type"))?,
-                );
-                return Ok(TypeParam::List { param });
+                let item_type = self
+                    .import_term(item_type)
+                    .map_err(|err| error_context!(err, "item type of list type"))?;
+                return Ok(TypeParam::new_list_type(item_type));
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // types of a tuple must be copyable. Therefore we import it as `Any`.
-                let params = (|| {
+                let item_types = (|| {
                     self.import_closed_list(item_types)?
                         .into_iter()
-                        .map(|param| self.import_type_param(param, TypeBound::Any))
+                        .map(|param| self.import_term(param))
                         .collect::<Result<_, _>>()
                 })()
                 .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::Tuple { params });
-            }
-
-            match self.get_term(term_id)? {
-                table::Term::Wildcard => Err(error_uninferred!("wildcard")),
-
-                table::Term::Var { .. } => Err(error_unsupported!("type variable as `TypeParam`")),
-                table::Term::Apply(symbol, _) => {
-                    let name = self.get_symbol_name(*symbol)?;
-                    Err(error_unsupported!("custom type `{}` as `TypeParam`", name))
-                }
-
-                table::Term::Tuple(_)
-                | table::Term::List { .. }
-                | table::Term::Func { .. }
-                | table::Term::Literal(_) => Err(error_invalid!("expected a static type")),
-            }
-        })()
-        .map_err(|err| error_context!(err, "term {} as `TypeParam`", term_id))
-    }
-
-    /// Import a `TypeArg` from a term that represents a static type or value.
-    fn import_type_arg(&mut self, term_id: table::TermId) -> Result<TypeArg, ImportError> {
-        (|| {
-            if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_STR_TYPE
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_NAT_TYPE
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_BYTES_TYPE
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_FLOAT_TYPE
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_TYPE));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_CONSTRAINT
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_STATIC));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CTRL_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_CTRL_TYPE
-                ));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
-                return Err(error_unsupported!("`{}` as `TypeArg`", model::CORE_CONST));
-            }
-
-            if let Some([]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
-                return Err(error_unsupported!(
-                    "`{}` as `TypeArg`",
-                    model::CORE_LIST_TYPE
-                ));
+                return Ok(TypeParam::TupleType(item_types));
             }
 
             match self.get_term(term_id)? {
@@ -1365,59 +1273,53 @@ impl<'a> Context<'a> {
                         .local_vars
                         .get(var)
                         .ok_or_else(|| error_invalid!("unknown variable {}", var))?;
-                    let decl = self.import_type_param(var_info.r#type, var_info.bound)?;
-                    Ok(TypeArg::new_var_use(var.1 as _, decl))
+                    let decl = self.import_term_with_bound(var_info.r#type, var_info.bound)?;
+                    Ok(Term::new_var_use(var.1 as _, decl))
                 }
 
                 table::Term::List { .. } => {
                     let elems = (|| {
                         self.import_closed_list(term_id)?
                             .iter()
-                            .map(|item| self.import_type_arg(*item))
+                            .map(|item| self.import_term(*item))
                             .collect::<Result<_, _>>()
                     })()
                     .map_err(|err| error_context!(err, "list items"))?;
 
-                    Ok(TypeArg::List { elems })
+                    Ok(Term::List(elems))
                 }
 
                 table::Term::Tuple { .. } => {
                     let elems = (|| {
                         self.import_closed_list(term_id)?
                             .iter()
-                            .map(|item| self.import_type_arg(*item))
+                            .map(|item| self.import_term(*item))
                             .collect::<Result<_, _>>()
                     })()
                     .map_err(|err| error_context!(err, "tuple items"))?;
 
-                    Ok(TypeArg::Tuple { elems })
+                    Ok(Term::Tuple(elems))
                 }
 
-                table::Term::Literal(model::Literal::Str(value)) => Ok(TypeArg::String {
-                    arg: value.to_string(),
-                }),
-
-                table::Term::Literal(model::Literal::Nat(value)) => {
-                    Ok(TypeArg::BoundedNat { n: *value })
+                table::Term::Literal(model::Literal::Str(value)) => {
+                    Ok(Term::String(value.to_string()))
                 }
 
-                table::Term::Literal(model::Literal::Bytes(value)) => Ok(TypeArg::Bytes {
-                    value: value.clone(),
-                }),
-                table::Term::Literal(model::Literal::Float(value)) => {
-                    Ok(TypeArg::Float { value: *value })
+                table::Term::Literal(model::Literal::Nat(value)) => Ok(Term::BoundedNat(*value)),
+
+                table::Term::Literal(model::Literal::Bytes(value)) => {
+                    Ok(Term::Bytes(value.clone()))
                 }
-                table::Term::Func { .. } => {
-                    Err(error_unsupported!("function constant as `TypeArg`"))
-                }
+                table::Term::Literal(model::Literal::Float(value)) => Ok(Term::Float(*value)),
+                table::Term::Func { .. } => Err(error_unsupported!("function constant")),
 
                 table::Term::Apply { .. } => {
-                    let ty = self.import_type(term_id)?;
-                    Ok(TypeArg::Type { ty })
+                    let ty: Type = self.import_type(term_id)?;
+                    Ok(ty.into())
                 }
             }
         })()
-        .map_err(|err| error_context!(err, "term {} as `TypeArg`", term_id))
+        .map_err(|err| error_context!(err, "term {}", term_id))
     }
 
     /// Import a `Type` from a term that represents a runtime type.
@@ -1451,7 +1353,7 @@ impl<'a> Context<'a> {
 
                     let args = args
                         .iter()
-                        .map(|arg| self.import_type_arg(*arg))
+                        .map(|arg| self.import_term(*arg))
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|err| {
                             error_context!(err, "type argument of custom type `{}`", name)
@@ -1508,6 +1410,11 @@ impl<'a> Context<'a> {
     fn get_func_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
         self.match_symbol(term_id, model::CORE_FN)?
             .ok_or(error_invalid!("expected a function type"))
+    }
+
+    fn get_ctrl_type(&mut self, term_id: table::TermId) -> Result<[table::TermId; 2], ImportError> {
+        self.match_symbol(term_id, model::CORE_CTRL)?
+            .ok_or(error_invalid!("expected a control type"))
     }
 
     fn import_func_type<RV: MaybeRV>(
