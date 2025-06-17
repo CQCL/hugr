@@ -54,3 +54,29 @@ impl<H: Into<Hugr> + From<Hugr> + serde::Serialize> From<SerialPersistentHugr<H>
         PersistentHugr::from_serial(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        CommitId,
+        tests::{WrappedHugr, test_state_space},
+    };
+
+    use rstest::rstest;
+
+    #[rstest]
+    fn test_serde_persistent_hugr(
+        test_state_space: (
+            CommitStateSpace<SerdeHashResolver<WrappedHugr>>,
+            [CommitId; 4],
+        ),
+    ) {
+        let (state_space, [cm1, cm2, _, cm4]) = test_state_space;
+
+        let per_hugr = state_space.try_extract_hugr([cm1, cm2, cm4]).unwrap();
+        let ser_per_hugr = per_hugr.to_serial();
+
+        insta::assert_snapshot!(serde_json::to_string_pretty(&ser_per_hugr).unwrap());
+    }
+}
