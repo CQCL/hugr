@@ -110,3 +110,34 @@ impl<H: serde::Serialize + From<Hugr>> EquivalenceResolver<CommitData, ()>
 
     fn move_edge_source(&self, _mapping: &Self::MergeMapping, _edge: &()) {}
 }
+
+#[cfg(test)]
+mod tests {
+    use hugr_core::{builder::endo_sig, ops::FuncDefn};
+
+    use super::*;
+    use crate::{CommitData, tests::WrappedHugr};
+
+    #[test]
+    fn test_serde_hash_resolver_equality() {
+        let resolver = SerdeHashResolver::<WrappedHugr>::default();
+
+        // Create a base CommitData
+        let base_data = CommitData::Base(Hugr::new());
+
+        // Clone the data to create an equivalent copy
+        let cloned_data = base_data.clone();
+
+        // Check that original and cloned data are considered equivalent
+        let result = resolver.try_merge_mapping(&base_data, &[], &cloned_data, &[]);
+        // Verify that the merge succeeds since the data is equivalent
+        assert!(result.is_ok());
+
+        // Check that the original and replacement data are considered different
+        let repl_data = CommitData::Base(
+            Hugr::new_with_entrypoint(FuncDefn::new("dummy", endo_sig(vec![]))).unwrap(),
+        );
+        let result = resolver.try_merge_mapping(&base_data, &[], &repl_data, &[]);
+        assert!(result.is_err());
+    }
+}

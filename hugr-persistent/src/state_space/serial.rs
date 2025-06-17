@@ -114,20 +114,10 @@ impl<H: Into<Hugr> + From<Hugr> + serde::Serialize> From<SerialCommitStateSpace<
 
 #[cfg(test)]
 mod tests {
-    use derive_more::derive::Into;
-    use hugr_core::envelope::serde_with::AsStringEnvelope;
     use rstest::rstest;
-    use serde_with::serde_as;
 
     use super::*;
-    use crate::tests::test_state_space;
-
-    #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
-    struct WrappedHugr {
-        #[serde_as(as = "AsStringEnvelope")]
-        pub hugr: Hugr,
-    }
+    use crate::tests::{WrappedHugr, test_state_space};
 
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[rstest]
