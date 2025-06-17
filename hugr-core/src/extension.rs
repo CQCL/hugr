@@ -22,9 +22,8 @@ use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
 use crate::types::RowVariable;
-use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
-use crate::types::{CustomType, TypeBound, TypeName};
-use crate::types::{Signature, TypeNameRef};
+use crate::types::type_param::{Term, TermTypeError, TypeArg, TypeParam};
+use crate::types::{CustomType, Signature, TypeBound, TypeName, TypeNameRef};
 
 mod const_fold;
 mod op_def;
@@ -388,6 +387,9 @@ pub enum SignatureError {
     /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
     TypeArgMismatch(#[from] TermTypeError),
+    /// A [Term] was not a valid type parameter
+    #[error("Term {0} is not a valid parameter type")]
+    InvalidTypeParam(Term),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,

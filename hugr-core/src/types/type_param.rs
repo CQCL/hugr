@@ -168,20 +168,30 @@ impl Term {
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Runtime(t1), Term::Runtime(t2)) => t1 == t2,
-            (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
-            (Term::String(s1), Term::String(s2)) => s1 == s2,
-            (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
-            (Term::Float(f1), Term::Float(f2)) => f1 == f2,
-            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
-            (Term::List(es1), Term::List(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
-            }
-            (Term::Tuple(es1), Term::Tuple(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
+            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2 && cached_is_static(v1),
+            (
+                Term::Runtime(_)
+                | Term::BoundedNat(_)
+                | Term::String(_)
+                | Term::Bytes(_)
+                | Term::Float(_)
+                | Term::List(_)
+                | Term::Tuple(_),
+                _,
+            ) => {
+                // This is not a type at all, so it's not a supertype of anything.
+                false
             }
             _ => false,
         }
+    }
+}
+
+fn cached_is_static(tv: &TermVar) -> bool {
+    match &*tv.cached_decl {
+        Term::Variable(tv) => cached_is_static(&*tv),
+        Term::StaticType => true,
+        _ => false,
     }
 }
 
@@ -289,6 +299,41 @@ impl Term {
         }
     }
 
+    /// Check that this is a valid bound on/type for a parameter.
+    /// Assumes [TermVar::cached_decl] and that in [TypeEnum::Variable] are correct
+    /// (call [Self::validate] first to confirm).
+    pub(crate) fn validate_param(&self) -> Result<(), SignatureError> {
+        match self {
+            Term::RuntimeType(_)
+            | Term::StaticType
+            | Term::BoundedNatType(_)
+            | Term::StringType
+            | Term::BytesType
+            | Term::FloatType => Ok(()),
+            Term::ListType(term) => term.validate_param(),
+            Term::TupleType(terms) => terms.iter().try_for_each(Term::validate_param),
+            // Variables are allowed as long as they could be a static type;
+            // since StaticType is itself a StaticType, we must loop through chains
+            // like `(param &b &a) (param ?c ?b) ...` arbitrarily: these could be
+            // legal if enough of the first params are instantiated with `StaticType`
+            Term::Variable(tv) => {
+                if cached_is_static(tv) {
+                    Ok(())
+                } else {
+                    Err(SignatureError::InvalidTypeParam(self.clone()))
+                }
+            }
+            // The remainder are not static types
+            Term::Runtime(_)
+            | Term::BoundedNat(_)
+            | Term::String(_)
+            | Term::Bytes(_)
+            | Term::Float(_)
+            | Term::List(_)
+            | Term::Tuple(_) => Err(SignatureError::InvalidTypeParam(self.clone())),
+        }
+    }
+
     /// Much as [`Type::validate`], also checks that the type of any [`TypeArg::Opaque`]
     /// is valid and closed.
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
@@ -308,7 +353,7 @@ impl Term {
 
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
-            Term::RuntimeType { .. } => Ok(()),
+            Term::RuntimeType(_) => Ok(()),
             Term::BoundedNatType { .. } => Ok(()),
             Term::StringType => Ok(()),
             Term::BytesType => Ok(()),
@@ -456,6 +501,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Float(_), Term::FloatType) => Ok(()),
 
         // Static types
+        (Term::RuntimeType(_), Term::StaticType) => Ok(()),
         (Term::StaticType, Term::StaticType) => Ok(()),
         (Term::StringType, Term::StaticType) => Ok(()),
         (Term::BytesType, Term::StaticType) => Ok(()),
@@ -751,8 +797,9 @@ mod test {
 
         proptest! {
             #[test]
-            fn term_contains_itself(term: Term) {
-                assert!(term.is_supertype(&term));
+            fn type_term_contains_itself(term: Term) {
+                let is_type = term.validate_param().is_ok();
+                assert_eq!(is_type, term.is_supertype(&term));
             }
         }
     }

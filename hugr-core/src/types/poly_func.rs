@@ -129,6 +129,12 @@ impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
     /// Validates this instance, checking that the types in the body are
     /// wellformed with respect to the registry, and the type variables declared.
     pub fn validate(&self) -> Result<(), SignatureError> {
+        for (i, p) in self.params.iter().enumerate() {
+            // This checks that variables have correct cached_decls,
+            // allowing them to refer to earlier-declared parameters only:
+            p.validate(&self.params[0..i])?;
+            p.validate_param()?;
+        }
         self.body.validate(&self.params)
     }
 
