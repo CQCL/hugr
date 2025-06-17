@@ -94,9 +94,12 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
+    visibility: Literal["Public", "Private"]
 
     def deserialize(self) -> ops.FuncDecl:
-        return ops.FuncDecl(self.name, self.signature.deserialize())
+        return ops.FuncDecl(
+            self.name, self.signature.deserialize(), visibility=self.visibility
+        )
 
 
 class CustomConst(ConfiguredBaseModel):

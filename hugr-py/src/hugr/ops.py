@@ -1211,12 +1211,15 @@ class FuncDecl(Op):
     #: polymorphic function signature
     signature: tys.PolyFuncType
     num_out: int = field(default=1, repr=False)
+    #: Visibility (for linking).
+    visibility: Literal["Public", "Private"] = "Public"
 
     def _to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
             parent=parent.idx,
             name=self.f_name,
             signature=self.signature._to_serial(),
+            visibility=self.visibility,
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:
