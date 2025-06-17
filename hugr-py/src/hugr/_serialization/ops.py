@@ -10,6 +10,7 @@ from pydantic import ConfigDict, Field, RootModel
 from hugr.hugr.node_port import (
     NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
 )
+from hugr.tys import Visibility  # noqa: TCH001 # pydantic needs this in scope
 from hugr.utils import deser_it
 
 from . import tys as stys
@@ -75,7 +76,7 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
-    visibility: Literal["Public", "Private"]
+    visibility: Visibility
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
@@ -94,7 +95,7 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
-    visibility: Literal["Public", "Private"]
+    visibility: Visibility
 
     def deserialize(self) -> ops.FuncDecl:
         return ops.FuncDecl(

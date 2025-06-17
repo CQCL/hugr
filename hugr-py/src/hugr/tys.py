@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
 import hugr.model as model
@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
 TypeBound = stys.TypeBound
+Visibility = Literal["Public", "Private"]
 
 
 @runtime_checkable

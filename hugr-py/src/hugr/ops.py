@@ -8,7 +8,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Literal,
     Protocol,
     TypeGuard,
     TypeVar,
@@ -27,6 +26,7 @@ if TYPE_CHECKING:
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
+    from hugr.tys import Visibility
 
 
 @dataclass
@@ -1152,7 +1152,7 @@ class FuncDefn(DfParentOp):
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
     #: Visibility (for linking).
-    visibility: Literal["Public", "Private"] = "Private"
+    visibility: Visibility = "Private"
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -1212,7 +1212,7 @@ class FuncDecl(Op):
     signature: tys.PolyFuncType
     num_out: int = field(default=1, repr=False)
     #: Visibility (for linking).
-    visibility: Literal["Public", "Private"] = "Public"
+    visibility: Visibility = "Public"
 
     def _to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
