@@ -82,5 +82,11 @@ pub type PersistentReplacement = hugr_core::SimpleReplacement<PatchNode>;
 use persistent_hugr::find_conflicting_node;
 use state_space::CommitData;
 
+pub mod serial {
+    //! Serialized formats for commits, state spaces and persistent HUGRs.
+    pub use super::persistent_hugr::serial::*;
+    pub use super::state_space::serial::*;
+}
+
 #[cfg(test)]
 mod tests;
