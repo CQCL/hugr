@@ -14,7 +14,7 @@ use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use crate::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver, SerdeHashResolver,
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
     find_conflicting_node, parents_view::ParentsView,
 };
 
