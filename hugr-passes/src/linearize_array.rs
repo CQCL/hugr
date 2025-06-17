@@ -66,7 +66,7 @@ impl Default for LinearizeArrayPass {
                     // error out and make sure we're not emitting `get`s for nested value
                     // arrays.
                     assert!(
-                        op_def != ArrayOpDef::get || args[1].as_type().unwrap().copyable(),
+                        op_def != ArrayOpDef::get || args[1].as_runtime().unwrap().copyable(),
                         "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
                     );

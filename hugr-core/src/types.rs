@@ -15,14 +15,14 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::check_type_arg;
+use crate::types::type_param::check_term_type;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
 pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
-pub use type_param::TypeArg;
+pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
 
 pub(crate) use poly_func::PolyFuncTypeBase;
@@ -490,7 +490,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`TypeParam::Type`]`(bound)`), which may be narrower
+    /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
     /// than required for the use.
     #[must_use]
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
@@ -575,7 +575,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
             TypeEnum::RowVar(rv) => rv.substitute(t),
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
-                let TypeArg::Type { ty } = t.apply_var(*idx, &((*bound).into())) else {
+                let TypeArg::Runtime(ty) = t.apply_var(*idx, &((*bound).into())) else {
                     panic!("Variable was not a type - try validate() first")
                 };
                 vec![ty.into_()]
@@ -653,7 +653,7 @@ impl TypeRV {
 
     /// New use (occurrence) of the row variable with specified index.
     /// `bound` must match that with which the variable was declared
-    /// (i.e. as a [TypeParam::List]` of a `[TypeParam::Type]` of that bound).
+    /// (i.e. as a list of runtime types of that bound).
     /// For use in [OpDef], not [FuncDefn], type schemes only.
     ///
     /// [OpDef]: crate::extension::OpDef
@@ -740,7 +740,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_type_arg(arg, decl), Ok(()));
+        debug_assert_eq!(check_term_type(arg, decl), Ok(()));
         arg.clone()
     }
 
@@ -749,14 +749,14 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert!(check_type_arg(arg, &TypeParam::new_list(bound)).is_ok());
+        debug_assert!(check_term_type(arg, &TypeParam::new_list_type(bound)).is_ok());
         match arg {
-            TypeArg::List { elems } => elems
+            TypeArg::List(elems) => elems
                 .iter()
                 .map(|ta| {
                     match ta {
-                        TypeArg::Type { ty } => return ty.clone().into(),
-                        TypeArg::Variable { v } => {
+                        Term::Runtime(ty) => return ty.clone().into(),
+                        Term::Variable(v) => {
                             if let Some(b) = v.bound_if_row_var() {
                                 return TypeRV::new_row_var_use(v.index(), b);
                             }
@@ -766,7 +766,7 @@ impl<'a> Substitution<'a> {
                     panic!("Not a list of types - call validate() ?")
                 })
                 .collect(),
-            TypeArg::Type { ty } if matches!(ty.0, TypeEnum::RowVar(_)) => {
+            Term::Runtime(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone().into()]
             }
@@ -781,7 +781,7 @@ impl<'a> Substitution<'a> {
 /// and applies to arbitrary extension types rather than type variables.
 pub trait TypeTransformer {
     /// Error returned when a [`CustomType`] cannot be transformed, or a type
-    /// containing it (e.g. if changing a [`TypeArg::Type`] from copyable to
+    /// containing it (e.g. if changing a runtime type from copyable to
     /// linear invalidates a parameterized type).
     type Err: std::error::Error + From<SignatureError>;
 
@@ -857,7 +857,7 @@ pub(crate) mod test {
     use crate::extension::prelude::{option_type, qb_t, usize_t};
     use crate::std_extensions::collections::array::{array_type, array_type_parametric};
     use crate::std_extensions::collections::list::list_type;
-    use crate::types::type_param::TypeArgError;
+    use crate::types::type_param::TermTypeError;
     use crate::{Extension, hugr::IdentList, type_row};
 
     #[test]
@@ -977,7 +977,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -1001,7 +1001,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list(TypeBound::Copyable)],
+                vec![TypeParam::new_list_type(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,
@@ -1020,31 +1020,27 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([TypeArg::List {
-                elems: vec![Type::from(cpy.clone()).into()],
-            }])
+            .instantiate([Term::new_list([Type::from(cpy.clone()).into()])])
             .unwrap();
 
         let mut t = Type::new_extension(c_of_cpy.clone());
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: qb_t().into()
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                type_: TypeBound::Copyable.into(),
+                term: qb_t().into()
             }))
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::List {
-                elems: vec![mk_opt(Type::from(cpy.clone())).into()],
-            }])
-            .unwrap(),
+            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone())).into()])])
+                .unwrap(),
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TypeArgError::TypeMismatch {
-                param: TypeBound::Copyable.into(),
-                arg: mk_opt(qb_t()).into()
+            Err(SignatureError::from(TermTypeError::TypeMismatch {
+                type_: TypeBound::Copyable.into(),
+                term: mk_opt(qb_t()).into()
             }))
         );
 
@@ -1054,19 +1050,15 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([TypeArg::List {
-                elems: vec![Type::from(c_of_cpy.clone()).into(); 2],
-            }])
-            .unwrap(),
+            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()).into(); 2])])
+                .unwrap(),
         );
         assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([TypeArg::List {
-                    elems: vec![usize_t().into(); 2]
-                }])
-                .unwrap()
+                coln.instantiate([Term::new_list([usize_t().into(), usize_t().into()])])
+                    .unwrap()
             )
         );
     }

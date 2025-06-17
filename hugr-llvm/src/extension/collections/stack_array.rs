@@ -126,7 +126,7 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
             .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
                 let ccg = self.0.clone();
                 move |ts, hugr_type| {
-                    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = hugr_type.args() else {
+                    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
                         return Err(anyhow!("Invalid type args for array type"));
                     };
                     let elem_ty = ts.llvm_type(ty)?;

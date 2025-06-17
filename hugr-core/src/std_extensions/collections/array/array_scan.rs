@@ -56,12 +56,12 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
         // array<N, T1>, (T1, *A -> T2, *A), *A, -> array<N, T2>, *A
         let params = vec![
-            TypeParam::max_nat(),
+            TypeParam::max_nat_type(),
             TypeBound::Any.into(),
             TypeBound::Any.into(),
-            TypeParam::new_list(TypeBound::Any),
+            TypeParam::new_list_type(TypeBound::Any),
         ];
-        let n = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let t1 = Type::new_var_use(1, TypeBound::Any);
         let t2 = Type::new_var_use(2, TypeBound::Any);
         let s = TypeRV::new_row_var_use(3, TypeBound::Any);
@@ -185,12 +185,10 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
 
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
-            TypeArg::BoundedNat { n: self.size },
+            self.size.into(),
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::List {
-                elems: self.acc_tys.clone().into_iter().map_into().collect(),
-            },
+            TypeArg::new_list(self.acc_tys.clone().into_iter().map_into()),
         ]
     }
 }
@@ -215,15 +213,15 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
             [
-                TypeArg::BoundedNat { n },
-                TypeArg::Type { ty: src_ty },
-                TypeArg::Type { ty: tgt_ty },
-                TypeArg::List { elems: acc_tys },
+                TypeArg::BoundedNat(n),
+                TypeArg::Runtime(src_ty),
+                TypeArg::Runtime(tgt_ty),
+                TypeArg::List(acc_tys),
             ] => {
                 let acc_tys: Result<_, OpLoadError> = acc_tys
                     .iter()
                     .map(|acc_ty| match acc_ty {
-                        TypeArg::Type { ty } => Ok(ty.clone()),
+                        TypeArg::Runtime(ty) => Ok(ty.clone()),
                         _ => Err(SignatureError::InvalidTypeArgs.into()),
                     })
                     .collect();

@@ -370,7 +370,7 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
                     let sac = self.0.clone();
                     move |ts, custom_type| {
                         let element_type = custom_type.args()[0]
-                            .as_type()
+                            .as_runtime()
                             .expect("Type argument for static array must be a type");
                         sac.static_array_type(ts, &element_type)
                     }
