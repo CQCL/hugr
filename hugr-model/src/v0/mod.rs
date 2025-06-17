@@ -98,14 +98,7 @@ pub enum Visibility {
     /// The linker should ignore this function or symbol
     Private,
     /// The linker should act upon this function or symbol
-    Public
-}
-
-impl Visibility {
-    #[deprecated]
-    pub fn temp() -> Self {
-        Visibility::Private
-    }
+    Public,
 }
 
 /// Core function types.

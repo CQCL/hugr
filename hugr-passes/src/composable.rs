@@ -248,7 +248,7 @@ mod test {
         id1.finish_with_outputs(inps).unwrap();
 
         let id2 = mb
-            .define_function_link_name("id2", Signature::new_endo(usize_t()), None)
+            .define_function("id2", Signature::new_endo(usize_t()))
             .unwrap();
         let inps = id2.input_wires();
         let id2 = id2.finish_with_outputs(inps).unwrap();

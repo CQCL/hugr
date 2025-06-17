@@ -330,8 +330,11 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let visibility = func.link_name().map_or(Visibility::Private, |_| Visibility::Public);
-                let symbol = this.export_poly_func_type(func.func_name(), visibility, func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().into(),
+                    func.signature(),
+                );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -341,7 +344,11 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let symbol = this.export_poly_func_type(func.link_name(), Visibility::temp(), func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().into(),
+                    func.signature(),
+                );
                 table::Operation::DeclareFunc(symbol)
             }),
 
@@ -349,7 +356,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::temp(),
+                    visibility: Visibility::Public, // Not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -363,7 +370,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::temp(),
+                    visibility: Visibility::Public, // Not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],

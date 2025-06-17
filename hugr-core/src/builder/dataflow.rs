@@ -8,14 +8,9 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{self, OpParent};
-use crate::ops::{DataflowParent, Input, Output};
-use crate::{Direction, IncomingPort, OutgoingPort, Wire};
-
+use crate::ops::{self, DataflowParent, Input, OpParent, Output};
 use crate::types::{PolyFuncType, Signature, Type};
-
-use crate::Node;
-use crate::{Hugr, hugr::HugrMut};
+use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -153,7 +148,7 @@ pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
     /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR; the function will be private.
-    /// (See also [Self::new_pub], [Self::new_link_name].)
+    /// (See also [Self::new_pub], [Self::new_vis]
     ///
     /// # Errors
     ///
@@ -162,11 +157,10 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        Self::new_link_name(name, signature, None)
+        Self::new_vis(name, signature, Visibility::Private)
     }
 
-    /// Initialize a builder for a FuncDefn-rooted HUGR; the function will be public
-    /// with the same name (see also [Self::new_link_name]).
+    /// Initialize a builder for a FuncDefn-rooted HUGR; the function will be [Visibility::Public].
     ///
     /// # Errors
     ///
@@ -175,22 +169,21 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let name = name.into();
-        Self::new_link_name(name.clone(), signature, Some(name))
+        Self::new_vis(name, signature, Visibility::Public)
     }
 
     /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified
-    /// [link_name](ops::FuncDefn::link_name).
+    /// [Visibility].
     ///
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
-    pub fn new_link_name(
+    pub fn new_vis(
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
-        link_name: impl Into<Option<String>>,
+        visibility: Visibility,
     ) -> Result<Self, BuildError> {
-        let op = ops::FuncDefn::new_link_name(name.into(), signature.into(), link_name);
+        let op = ops::FuncDefn::new_vis(name, signature, visibility);
         let body = op.signature().body().clone();
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");

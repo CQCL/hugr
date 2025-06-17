@@ -139,14 +139,12 @@ fn instantiate(
         Entry::Occupied(n) => return *n.get(),
         Entry::Vacant(ve) => ve,
     };
-    let poly_func_def = h.get_optype(poly_func).as_func_defn().unwrap();
-    // Mangle the link_name, leave the descriptive name unchanged
-    let link_name = poly_func_def
-        .link_name()
-        .map(|ln| mangle_name(ln, &type_args));
+
+    let defn = h.get_optype(poly_func).as_func_defn().unwrap();
+    let name = mangle_name(defn.func_name(), &type_args);
     let mono_tgt = h.add_node_after(
         poly_func,
-        FuncDefn::new_link_name(poly_func_def.func_name().clone(), mono_sig, link_name),
+        FuncDefn::new_vis(name, mono_sig, defn.visibility()),
     );
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
@@ -284,14 +282,13 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
-    use hugr_core::ops::handle::{FuncID, NodeHandle};
+    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::IncludeExports;
-    use crate::{ComposablePass, RemoveDeadFuncsPass, monomorphize, remove_dead_funcs};
+    use crate::{monomorphize, remove_dead_funcs};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -323,7 +320,7 @@ mod test {
                 [TypeBound::Copyable.into()],
                 Signature::new(tv0(), pair_type(tv0())),
             );
-            let mut fb = mb.define_function_pub("double", pfty)?;
+            let mut fb = mb.define_function("double", pfty)?;
             let [elem] = fb.input_wires_arr();
             // A "genuine" impl might:
             //   let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
@@ -339,7 +336,7 @@ mod test {
 
         let tr = {
             let sig = Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3]));
-            let mut fb = mb.define_function_pub(
+            let mut fb = mb.define_function(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
             )?;
@@ -353,7 +350,7 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        let mn = {
+        {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
             let mut fb = mb.define_function_pub("main", Signature::new(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
@@ -398,11 +395,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        RemoveDeadFuncsPass::default()
-            // ALAN can do better here?
-            .include_module_exports(IncludeExports::Never)
-            .with_module_entry_points([mn.node()])
-            .run(&mut nopoly)?;
+        remove_dead_funcs(&mut nopoly)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -421,7 +414,7 @@ mod test {
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
         let sa = |n| TypeArg::BoundedNat { n };
         let n: u64 = 5;
-        let mut outer = FunctionBuilder::new_pub(
+        let mut outer = FunctionBuilder::new(
             "mainish",
             Signature::new(
                 ValueArray::ty_parametric(
@@ -440,7 +433,7 @@ mod test {
 
         let mono_func = {
             let mut fb = mb
-                .define_function_pub("get_usz", Signature::new(vec![], usize_t()))
+                .define_function("get_usz", Signature::new(vec![], usize_t()))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
@@ -451,7 +444,7 @@ mod test {
                 [TypeParam::max_nat(), TypeBound::Copyable.into()],
                 Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
             );
-            let mut pf2 = mb.define_function_pub("pf2", pf2t).unwrap();
+            let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
             let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
@@ -471,7 +464,7 @@ mod test {
                 usize_t(),
             ),
         );
-        let mut pf1 = mb.define_function_pub("pf1", pf1t).unwrap();
+        let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
 
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
         let inner = pf1
@@ -537,13 +530,12 @@ mod test {
         assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs
     }
 
-    static EMPTY_STRING: String = String::new();
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
         h.entry_descendants()
             .filter_map(|n| {
                 h.get_optype(n)
                     .as_func_defn()
-                    .map(|fd| (fd.link_name().unwrap_or(&EMPTY_STRING), (n, fd)))
+                    .map(|fd| (fd.func_name(), (n, fd)))
             })
             .collect::<HashMap<_, _>>()
     }
@@ -554,13 +546,12 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
             let foo = {
                 let builder = module_builder
-                    .define_function_link_name(
+                    .define_function(
                         "foo",
                         PolyFuncType::new(
                             [TypeBound::Any.into()],
                             Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
                         ),
-                        None,
                     )
                     .unwrap();
                 let inputs = builder.input_wires();
@@ -569,7 +560,7 @@ mod test {
 
             let _main = {
                 let mut builder = module_builder
-                    .define_function_pub("main", Signature::new_endo(Type::UNIT))
+                    .define_function("main", Signature::new_endo(Type::UNIT))
                     .unwrap();
                 let func_ptr = builder
                     .load_func(foo.handle(), &[Type::UNIT.into()])

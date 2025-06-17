@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use crate::v0::Visibility;
+
 use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term};
 use pyo3::{
     Bound, PyAny, PyResult,
@@ -139,13 +141,20 @@ impl<'py> pyo3::IntoPyObject<'py> for &Param {
     }
 }
 
+#[deprecated]
+fn temp_vis() -> Visibility {
+    Visibility::Public
+}
+
 impl<'py> pyo3::FromPyObject<'py> for Symbol {
     fn extract_bound(symbol: &Bound<'py, PyAny>) -> PyResult<Self> {
         let name = symbol.getattr("name")?.extract()?;
         let params: Vec<_> = symbol.getattr("params")?.extract()?;
+        let visibility = temp_vis();
         let constraints: Vec<_> = symbol.getattr("constraints")?.extract()?;
         let signature = symbol.getattr("signature")?.extract()?;
         Ok(Self {
+            visibility,
             name,
             signature,
             params: params.into(),
@@ -163,6 +172,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &Symbol {
         let py_module = py.import("hugr.model")?;
         let py_class = py_module.getattr("Symbol")?;
         py_class.call1((
+            self.visibility,
             self.name.as_ref(),
             self.params.as_ref(),
             self.constraints.as_ref(),
@@ -425,5 +435,6 @@ impl_into_pyobject_owned!(Symbol);
 impl_into_pyobject_owned!(Module);
 impl_into_pyobject_owned!(Package);
 impl_into_pyobject_owned!(Node);
+impl_into_pyobject_owned!(Visibility);
 impl_into_pyobject_owned!(Region);
 impl_into_pyobject_owned!(Operation);

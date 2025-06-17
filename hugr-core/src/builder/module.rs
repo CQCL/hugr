@@ -10,7 +10,7 @@ use crate::hugr::views::HugrView;
 use crate::ops;
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::types::{PolyFuncType, Type, TypeBound};
-use crate::{Hugr, Node};
+use crate::{Hugr, Node, Visibility};
 
 use smol_str::SmolStr;
 
@@ -71,11 +71,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         };
 
         let body = decl.signature().body().clone();
-        // TODO look for `name_hint` metadata on the FuncDecl and copy to FuncDefn
-        *opty = ops::FuncDefn::new_link_name(
-            format!("From Decl {}", decl.link_name()),
+        *opty = ops::FuncDefn::new_vis(
+            decl.func_name(),
             decl.signature().clone(),
-            decl.link_name().clone(),
+            decl.visibility(),
         )
         .into();
 
@@ -83,22 +82,22 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Add a [`ops::FuncDefn`] node, with both `name` and `link_name` explicitly specified.
+    /// Add a [`ops::FuncDefn`] node of the specified visibility.
     /// Returns a builder to define the function body graph.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ops::FuncDefn`] node.
-    pub fn define_function_link_name(
+    pub fn define_function_vis(
         &mut self,
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
-        link_name: impl Into<Option<String>>,
+        visibility: Visibility,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let signature: PolyFuncType = signature.into();
         let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn::new_link_name(name, signature, link_name));
+        let f_node = self.add_child_node(ops::FuncDefn::new_vis(name, signature, visibility));
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -111,7 +110,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Declare a function with `signature` and return a handle to the declaration.
+    /// Declare a [Visibility::Public] function with `signature` and return a handle to the declaration.
     ///
     /// # Errors
     ///
@@ -122,9 +121,39 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
+        self.declare_vis(name, signature, Visibility::Public)
+    }
+
+    /// Declare a [Visibility::Private] function with `signature` and return a handle to the declaration.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`crate::ops::OpType::FuncDecl`] node.
+    pub fn declare_private(
+        &mut self,
+        name: impl Into<String>,
+        signature: PolyFuncType,
+    ) -> Result<FuncID<false>, BuildError> {
+        self.declare_vis(name, signature, Visibility::Private)
+    }
+
+    /// Declare a function with the specified `signature` and [Visibility],
+    /// and return a handle to the declaration.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`crate::ops::OpType::FuncDecl`] node.
+    pub fn declare_vis(
+        &mut self,
+        name: impl Into<String>,
+        signature: PolyFuncType,
+        visibility: Visibility,
+    ) -> Result<FuncID<false>, BuildError> {
         let body = signature.body().clone();
         // TODO add param names to metadata
-        let declare_n = self.add_child_node(ops::FuncDecl::new(name, signature));
+        let declare_n = self.add_child_node(ops::FuncDecl::new_vis(name, signature, visibility));
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -149,10 +178,10 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        self.define_function_link_name(name, signature, None)
+        self.define_function_vis(name, signature, Visibility::Private)
     }
 
-    /// Adds a public [`ops::FuncDefn`] node, with `link_name` the same as `name`,
+    /// Adds a public [`ops::FuncDefn`] node with the specified `name`
     /// and returns a builder to define the function body graph.
     ///
     /// # Errors
@@ -164,8 +193,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let name = name.into();
-        self.define_function_link_name(name.clone(), signature, name)
+        self.define_function_vis(name, signature, Visibility::Public)
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.

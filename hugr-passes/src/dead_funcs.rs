@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use hugr_core::{
-    HugrView, Node,
+    HugrView, Node, Visibility,
     hugr::hugrmut::HugrMut,
     ops::{OpTag, OpTrait},
 };
@@ -86,7 +86,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
             entry_points.extend(hugr.children(hugr.module_root()).filter(|ch| {
                 hugr.get_optype(*ch)
                     .as_func_defn()
-                    .is_some_and(|fd| fd.link_name().is_some())
+                    .is_some_and(|fd| fd.visibility() == Visibility::Public)
             }));
         }
 
@@ -128,9 +128,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// Deletes from the Hugr any functions that are not used by either [`Call`] or
 /// [`LoadFunction`] nodes in reachable parts.
 ///
-/// `entry_points` may provide a list of entry points, which must be [`FuncDefn`]s (children of the root).
-/// * If the [HugrView::entrypoint] is the module root, then any [`FuncDefn`] children with a [link_name]
-///   will also be considered an entry point
+/// `entry_points` may provide a list of entry points, which must be [`FuncDefn`] children
+/// of the root.
+/// * If the [HugrView::entrypoint] is the module root, then any [`FuncDefn`] children with
+///   [Visibility::Public] will also be considered an entry point
 /// * otherwise, the [HugrView::entrypoint] itself will.
 ///
 /// # Errors
@@ -138,7 +139,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 ///
 /// [`Call`]: hugr_core::ops::OpType::Call
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-/// [link_name]: hugr_core::ops::FuncDefn::link_name
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
 pub fn remove_dead_funcs(

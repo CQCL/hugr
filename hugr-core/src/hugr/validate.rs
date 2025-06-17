@@ -20,7 +20,7 @@ use crate::ops::validate::{
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
-use crate::{Direction, Port};
+use crate::{Direction, Port, Visibility};
 
 use super::ExtensionError;
 use super::internal::PortgraphNodeMap;
@@ -84,22 +84,23 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
     }
 
     fn validate_linkage(&self) -> Result<(), ValidationError<H::Node>> {
-        // Map from link_name to *tuple of*
-        //    Node with that link_name,
+        // Map from func_name, for visible funcs only, to *tuple of*
+        //    Node with that func_name,
         //    Signature,
         //    bool - true for FuncDefn
         let mut node_sig_defn = HashMap::new();
 
         for c in self.hugr.children(self.hugr.module_root()) {
-            let (link_name, sig, is_defn) = match self.hugr.get_optype(c) {
-                OpType::FuncDecl(fd) => (fd.link_name(), fd.signature(), false),
-                OpType::FuncDefn(fd) => match fd.link_name() {
-                    Some(ln) => (ln, fd.signature(), true),
-                    None => continue,
-                },
+            let (func_name, sig, is_defn) = match self.hugr.get_optype(c) {
+                OpType::FuncDecl(fd) if fd.visibility() == Visibility::Public => {
+                    (fd.func_name(), fd.signature(), false)
+                }
+                OpType::FuncDefn(fd) if fd.visibility() == Visibility::Public => {
+                    (fd.func_name(), fd.signature(), true)
+                }
                 _ => continue,
             };
-            match node_sig_defn.entry(link_name) {
+            match node_sig_defn.entry(func_name) {
                 Entry::Vacant(ve) => {
                     ve.insert((c, sig, is_defn));
                 }
@@ -109,8 +110,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     let (prev_c, prev_sig, prev_defn) = oe.get();
                     if prev_sig != &sig || is_defn || *prev_defn {
                         // Either they are different (import<->export, or import signature), or both are exports
-                        return Err(ValidationError::DuplicateLinkName {
-                            link_name: link_name.clone(),
+                        return Err(ValidationError::DuplicateExport {
+                            link_name: func_name.clone(),
                             children: [*prev_c, c],
                         });
                     };
@@ -705,13 +706,14 @@ pub enum ValidationError<N: HugrNode> {
         parent_optype: OpType,
         source: ChildrenValidationError<N>,
     },
-    /// Multiple, incompatible, nodes use the same `link_name` in a [Module](super::Module)
-    /// (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with the same signature are allowed)
-    #[error("FuncDefn is exported under same name {link_name} as earlier node {:?}", children[0])]
-    DuplicateLinkName {
-        /// The `link_name` of a `FuncDecl` or `FuncDefn`
+    /// Multiple, incompatible, nodes with [Visibility::Public] use the same `func_name`
+    /// in a [Module](super::Module). (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with
+    /// the same signature are allowed)
+    #[error("FuncDefn/Decl {} is exported under same name {link_name} as earlier node {}", children[0], children[1])]
+    DuplicateExport {
+        /// The `func_name` of a public `FuncDecl` or `FuncDefn`
         link_name: String,
-        /// Two nodes using that `link_name`
+        /// Two nodes using that name
         children: [N; 2],
     },
     /// The children graph has invalid edges.

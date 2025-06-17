@@ -9,12 +9,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::types::{EdgeKind, PolyFuncType, Signature};
-use crate::types::{Type, TypeBound};
+use crate::Visibility;
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeBound};
 
-use super::StaticTag;
 use super::dataflow::DataflowParent;
-use super::{OpTag, OpTrait, impl_op_name};
+use super::{OpTag, OpTrait, StaticTag, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -57,9 +56,9 @@ pub struct FuncDefn {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default = "priv_vis")]
     /// Is the function public? (Can it be linked against and called externally?)
-    link_name: Option<String>,
+    visibility: Visibility,
 }
 
 impl FuncDefn {
@@ -72,26 +71,25 @@ impl FuncDefn {
 
     /// Create a new function that is not for external calls or linkage
     pub fn new_private(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
-        Self::new_link_name(name, signature, None)
+        Self::new_vis(name, signature, Visibility::Private)
     }
 
-    /// Create a new instance with the specified name and `link_name`
-    pub fn new_link_name(
+    /// Create a new instance with the specified name and visibility
+    pub fn new_vis(
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
-        link_name: impl Into<Option<String>>,
+        visibility: Visibility,
     ) -> Self {
         Self {
             name: name.into(),
             signature: signature.into(),
-            link_name: link_name.into(),
+            visibility,
         }
     }
 
-    /// Create a new instance with [Self::link_name] set to the same as `name`
-    pub fn new_public(name: impl ToString, signature: impl Into<PolyFuncType>) -> Self {
-        let name = name.to_string();
-        Self::new_link_name(name.clone(), signature, Some(name))
+    /// Create a new instance with the specified name and [Visibility::Public]
+    pub fn new_public(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_vis(name, signature, Visibility::Public)
     }
 
     /// The name of the function (not the name of the Op). Note
@@ -116,13 +114,13 @@ impl FuncDefn {
     }
 
     /// The name of the function used for linking, if any
-    pub fn link_name(&self) -> Option<&String> {
-        self.link_name.as_ref()
+    pub fn visibility(&self) -> Visibility {
+        self.visibility
     }
 
     /// Allows changing the name used for linking or whether there is one
-    pub fn link_name_mut(&mut self) -> &mut Option<String> {
-        &mut self.link_name
+    pub fn visibility_mut(&mut self) -> &mut Visibility {
+        &mut self.visibility
     }
 }
 
@@ -157,41 +155,69 @@ impl OpTrait for FuncDefn {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct FuncDecl {
-    /// Really this is `link_name`
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
+    #[serde(default = "pub_vis")] // Note opposite of FuncDefn
+    visibility: Visibility,
+}
+
+fn pub_vis() -> Visibility {
+    Visibility::Public
+}
+
+fn priv_vis() -> Visibility {
+    Visibility::Private
 }
 
 impl FuncDecl {
-    /// Create a new instance with the given name and signature
+    /// Create a new instance with the given name and signature, that is [Visibility::Public]
+    #[deprecated(note = "Use new_public")]
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_public(name, signature)
+    }
+
+    /// Create a new instance with the given name and signature, that is [Visibility::Public]
+    pub fn new_public(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_vis(name, signature, Visibility::Public)
+    }
+
+    /// Create a new instance with the given name and signature, that is [Visibility::Private]
+    pub fn new_private(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_vis(name, signature, Visibility::Private)
+    }
+
+    /// Create a new instance with the given name, signature and visibility
+    pub fn new_vis(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        visibility: Visibility,
+    ) -> Self {
         Self {
             name: name.into(),
             signature: signature.into(),
+            visibility,
         }
     }
 
     /// The name of the function (not the name of the Op)
-    #[deprecated(note = "Use link_name")]
     pub fn func_name(&self) -> &String {
         &self.name
     }
 
     /// The name of the function (for linking purposes)
-    pub fn link_name(&self) -> &String {
-        &self.name
+    pub fn visibility(&self) -> Visibility {
+        self.visibility
     }
 
     /// Allows mutating the name of the function (as per [Self::func_name])
-    #[deprecated(note = "Use link_name_mut")]
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
     }
 
-    /// Allows mutating the [Self::link_name] of the function
-    pub fn link_name_mut(&mut self) -> &mut String {
-        &mut self.name
+    /// Allows mutating the [Self::visibility] of the function
+    pub fn visibility_mut(&mut self) -> &mut Visibility {
+        &mut self.visibility
     }
 
     /// Gets the signature of the function

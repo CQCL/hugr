@@ -939,12 +939,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let link_name = match symbol.visibility {
-                model::Visibility::Private => None,
-                model::Visibility::Public => Some(String::from(symbol.name)),
-                _ => panic!("Don't know how to handle")
-            };
-            let optype = OpType::FuncDefn(FuncDefn::new_link_name(symbol.name, signature, link_name));
+            let optype = OpType::FuncDefn(FuncDefn::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.into(),
+            ));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -969,7 +968,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
+            let optype = OpType::FuncDecl(FuncDecl::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.into(),
+            ));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })

@@ -198,8 +198,8 @@ fn read_symbol<'a>(
 ) -> ReadResult<&'a mut table::Symbol<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
     let visibility = match reader.get_visibility() {
-        Ok(hugr_capnp::Visibility::Private ) | Err(_) => model::Visibility::Private,
-        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public
+        Ok(hugr_capnp::Visibility::Private) | Err(_) => model::Visibility::Private,
+        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public,
     };
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {

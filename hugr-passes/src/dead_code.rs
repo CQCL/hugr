@@ -1,7 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
+use hugr_core::{HugrView, Visibility, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -120,7 +120,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             q.extend(h.children(h.module_root()).filter(|ch| {
                 h.get_optype(*ch)
                     .as_func_defn()
-                    .is_some_and(|fd| fd.link_name().is_some())
+                    .is_some_and(|fd| fd.visibility() == Visibility::Public)
             }))
         }
         while let Some(n) = q.pop_front() {
