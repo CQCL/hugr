@@ -181,7 +181,7 @@ impl Term {
                 // This is not a type at all, so it's not a supertype of anything.
                 false
             }
-            // ALAN not clear if we need this one? Tests would need complexifying
+            // ALAN I think this is not right yet.
             // (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
             _ => false,
         }
@@ -292,7 +292,9 @@ impl Term {
         }
     }
 
-    /// Check that this is a valid bound on (type for) a parameter
+    /// Check that this is a valid bound on/type for a parameter.
+    /// Assumes [TermVar::cached_decl] and that in [TypeEnum::Variable] are correct
+    /// (call [Self::validate] first to confirm).
     pub(crate) fn validate_param(&self) -> Result<(), SignatureError> {
         match self {
             Term::RuntimeType(_)
@@ -303,14 +305,16 @@ impl Term {
             | Term::FloatType => Ok(()),
             Term::ListType(term) => term.validate_param(),
             Term::TupleType(terms) => terms.iter().try_for_each(Term::validate_param),
+            // Variables are allowed as long as all legal instantiations are valid parameter types
+            Term::Variable(TermVar { cached_decl, .. }) => cached_decl.validate_param(),
+            // The remainder are not static types
             Term::Runtime(_)
             | Term::BoundedNat(_)
             | Term::String(_)
             | Term::Bytes(_)
             | Term::Float(_)
             | Term::List(_)
-            | Term::Tuple(_)
-            | Term::Variable(_) => Err(SignatureError::InvalidTypeParam(self.clone())),
+            | Term::Tuple(_) => Err(SignatureError::InvalidTypeParam(self.clone())),
         }
     }
 
