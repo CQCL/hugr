@@ -168,6 +168,8 @@ impl Term {
             }
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
+            // This is definitely ok, but there might be other cases(?)
+            (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
             (
                 Term::Runtime(_)
                 | Term::BoundedNat(_)
@@ -181,8 +183,6 @@ impl Term {
                 // This is not a type at all, so it's not a supertype of anything.
                 false
             }
-            // ALAN I think this is not right yet.
-            // (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
             _ => false,
         }
     }
