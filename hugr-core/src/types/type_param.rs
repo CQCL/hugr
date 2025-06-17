@@ -156,6 +156,11 @@ impl Term {
     }
 
     /// Checks if this term is a supertype of another.
+    ///
+    /// The subtyping relation applies primarily to terms that represent static
+    /// types. For consistency the relation is extended to a partial order on
+    /// all terms; in particular it is reflexive so that every term (even if it
+    /// is not a static type) is considered a subtype of itself.
     fn is_supertype(&self, other: &Term) -> bool {
         match (self, other) {
             (Term::RuntimeType(b1), Term::RuntimeType(b2)) => b1.contains(*b2),
@@ -463,6 +468,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::FloatType, Term::StaticType) => Ok(()),
         (Term::ListType { .. }, Term::StaticType) => Ok(()),
         (Term::TupleType(_), Term::StaticType) => Ok(()),
+        (Term::RuntimeType(_), Term::StaticType) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
             term: term.clone(),
