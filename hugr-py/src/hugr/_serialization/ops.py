@@ -75,7 +75,7 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
-    link_name: str | None
+    visibility: Literal["Public", "Private"]
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
@@ -84,7 +84,7 @@ class FuncDefn(BaseOp):
             params=poly_func.params,
             inputs=poly_func.body.input,
             _outputs=poly_func.body.output,
-            link_name=self.link_name,
+            visibility=self.visibility,
         )
 
 
