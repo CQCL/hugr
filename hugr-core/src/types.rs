@@ -25,8 +25,6 @@ use smol_str::SmolStr;
 pub use type_param::TypeArg;
 pub use type_row::{TypeRow, TypeRowRV};
 
-// Unused in --no-features
-#[allow(unused_imports)]
 pub(crate) use poly_func::PolyFuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
