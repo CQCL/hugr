@@ -51,8 +51,10 @@ impl<N: HugrNode> PatchVerification for PeelTailLoop<N> {
         Ok(())
     }
 
-    fn invalidated_nodes(&self, h: &impl HugrView<Node=N>) -> impl Iterator<Item = N> {
-        h.get_io(self.0).into_iter().flat_map(|[_, output]| [self.0, output].into_iter())
+    fn invalidated_nodes(&self, h: &impl HugrView<Node = N>) -> impl Iterator<Item = N> {
+        h.get_io(self.0)
+            .into_iter()
+            .flat_map(|[_, output]| [self.0, output].into_iter())
     }
 }
 
