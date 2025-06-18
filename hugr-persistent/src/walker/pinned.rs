@@ -2,9 +2,11 @@
 //!
 //! Encapsulation: we only ever expose pinned values publicly.
 
-use itertools::Either;
+use std::collections::BTreeSet;
 
-use crate::PatchNode;
+use itertools::{Either, Itertools};
+
+use crate::{PatchNode, state_space::CommitId};
 use hugr_core::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::Walker;
@@ -31,6 +33,9 @@ use super::Walker;
 pub struct PinnedWire {
     outgoing: MaybePinned<OutgoingPort>,
     incoming: Vec<MaybePinned<IncomingPort>>,
+    /// Any commits not in the outgoing or incoming ports but are still required
+    /// for the wire to exist.
+    bridge_commits: BTreeSet<CommitId>,
 }
 
 /// A private enum to track whether a port is pinned.
@@ -70,6 +75,13 @@ impl<P> MaybePinned<P> {
             MaybePinned::Unpinned(_, _) => None,
         }
     }
+
+    fn owner(&self) -> CommitId {
+        match *self {
+            MaybePinned::Pinned(node, _) => node.0,
+            MaybePinned::Unpinned(node, _) => node.0,
+        }
+    }
 }
 
 impl PinnedWire {
@@ -93,13 +105,29 @@ impl PinnedWire {
 
         let outgoing = MaybePinned::new(outgoing_node, outgoing_port, walker);
 
+        let mut visited_commits = BTreeSet::new();
         let incoming = walker
             .selected_commits
-            .get_all_incoming_ports(outgoing_node, outgoing_port)
+            .get_all_incoming_ports_with_callback(
+                outgoing_node,
+                outgoing_port,
+                &mut visited_commits,
+            )
             .map(|(n, p)| MaybePinned::new(n, p, walker))
-            .collect();
+            .collect_vec();
 
-        Self { outgoing, incoming }
+        // Only retain visited commit IDs that are not already part of the pinned wire
+        // (i.e. that are not one of the nodes of the ports)
+        visited_commits.retain(|&commit| {
+            let mut all_owners = incoming.iter().map(|p| p.owner()).chain([outgoing.owner()]);
+            all_owners.all(|owner| owner != commit)
+        });
+
+        Self {
+            outgoing,
+            incoming,
+            bridge_commits: visited_commits,
+        }
     }
 
     /// Check if all ports on the wire in the given direction are pinned.
@@ -154,6 +182,10 @@ impl PinnedWire {
         let dir = dir.into();
         mask_iter(incoming, dir != Some(Direction::Outgoing))
             .chain(mask_iter(outgoing, dir != Some(Direction::Incoming)))
+    }
+
+    pub(super) fn bridge_commits(&self) -> impl ExactSizeIterator<Item = CommitId> + '_ {
+        self.bridge_commits.iter().copied()
     }
 }
 
