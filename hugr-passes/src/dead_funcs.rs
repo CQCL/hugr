@@ -160,8 +160,7 @@ mod test {
     use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
     use super::RemoveDeadFuncsPass;
-    use crate::ComposablePass;
-    use crate::dead_funcs::IncludeExports;
+    use crate::{ComposablePass, IncludeExports};
 
     #[rstest]
     #[case(false, IncludeExports::default(), [], vec!["from_pub", "pubfunc"])]

@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::ComposablePass;
+use crate::{ComposablePass, IncludeExports};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -20,7 +20,7 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
-    include_exports: bool,
+    include_exports: IncludeExports,
 }
 
 impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
@@ -28,7 +28,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
-            include_exports: true,
+            include_exports: IncludeExports::default()
         }
     }
 }
@@ -105,8 +105,9 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     }
 
     /// Sets whether, for Module-rooted Hugrs, the exported [FuncDefn](OpType::FuncDefn)s
-    /// and [Const](OpType::Const)s are included as entry points (they are by default)
-    pub fn include_module_exports(mut self, include: bool) -> Self {
+    /// and [FuncDecl](OpType::FuncDecl)s, and all [Const](OpType::Const)s, are included
+    /// as entry points (by default they are only for module-entrypoint Hugrs).
+    pub fn include_module_exports(mut self, include: IncludeExports) -> Self {
         self.include_exports = include;
         self
     }
@@ -116,11 +117,13 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
-        if self.include_exports && h.entrypoint() == h.module_root() {
-            q.extend(h.children(h.module_root()).filter(|ch| {
-                h.get_optype(*ch)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.visibility() == Visibility::Public)
+        if self.include_exports.for_hugr(h) {
+            q.extend(h.children(h.module_root()).filter(|ch| 
+                match h.get_optype(*ch) {
+                    OpType::FuncDefn(fd) => fd.visibility() == Visibility::Public,
+                    OpType::FuncDecl(fd) => fd.visibility() == Visibility::Public,
+                    OpType::Const(_) => true,
+                    _ => false
             }))
         }
         while let Some(n) = q.pop_front() {
