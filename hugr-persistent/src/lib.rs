@@ -1,3 +1,5 @@
+#![doc(hidden)] // TODO: remove when stable
+
 //! Persistent data structure for HUGR mutations.
 //!
 //! This crate provides a persistent data structure [`PersistentHugr`] that
