@@ -1143,7 +1143,7 @@ class FuncDefn(DfParentOp):
     the function.
     """
 
-    #: function name - internal only
+    #: function name
     f_name: str
     #: input types of the function
     inputs: tys.TypeRow
