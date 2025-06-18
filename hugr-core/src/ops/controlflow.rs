@@ -59,10 +59,14 @@ impl TailLoop {
 
     /// Build the output `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
-        let mut outputs = vec![sum_type];
+        let mut outputs = vec![Type::new_sum(self.control_variants())];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
+    }
+
+    /// The variants (continue / break) of the first output from the child graph
+    pub(crate) fn control_variants(&self) -> [TypeRow; 2] {
+        [self.just_inputs.clone(), self.just_outputs.clone()]
     }
 
     /// Build the input `TypeRow` of the child graph of a `TailLoop` node.
