@@ -41,7 +41,7 @@ enum MaybePinned<P> {
 }
 
 impl<P> MaybePinned<P> {
-    fn new(node: PatchNode, port: P, walker: &Walker) -> Self {
+    fn new<R: Clone>(node: PatchNode, port: P, walker: &Walker<R>) -> Self {
         debug_assert!(
             walker.selected_commits.contains_node(node),
             "pinned node not in walker"
@@ -77,7 +77,11 @@ impl PinnedWire {
     ///
     /// # Panics
     /// Panics if `node` is not pinned in `walker`.
-    pub fn from_pinned_port(node: PatchNode, port: impl Into<Port>, walker: &Walker) -> Self {
+    pub fn from_pinned_port<R: Clone>(
+        node: PatchNode,
+        port: impl Into<Port>,
+        walker: &Walker<R>,
+    ) -> Self {
         assert!(walker.is_pinned(node), "node must be pinned");
 
         let (outgoing_node, outgoing_port) = match port.into().as_directed() {

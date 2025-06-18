@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entrypoint.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -40,10 +40,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entr
     (cfg
       (signature (core.fn [] []))
       (cfg [%0] [%1]
-        (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+        (signature (core.ctrl [[]] [[]]))
         (meta core.entrypoint)
         (block [%0] [%1]
-          (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+          (signature (core.ctrl [[]] [[]]))
           (dfg [] [%2]
             (signature (core.fn [] [(core.adt [[]])]))
             ((core.make_adt 0) [] [%2]

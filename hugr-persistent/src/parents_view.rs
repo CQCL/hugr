@@ -23,7 +23,10 @@ pub(crate) struct ParentsView<'a> {
 }
 
 impl<'a> ParentsView<'a> {
-    pub(crate) fn from_commit(commit_id: CommitId, state_space: &'a CommitStateSpace) -> Self {
+    pub(crate) fn from_commit<R>(
+        commit_id: CommitId,
+        state_space: &'a CommitStateSpace<R>,
+    ) -> Self {
         let mut hugrs = BTreeMap::new();
         for parent in state_space.parents(commit_id) {
             hugrs.insert(parent, state_space.commit_hugr(parent));

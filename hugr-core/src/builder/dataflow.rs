@@ -649,7 +649,7 @@ pub(crate) mod test {
         FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
-                [TypeParam::new_list(TypeBound::Copyable)],
+                [TypeParam::new_list_type(TypeBound::Copyable)],
                 Signature::new(
                     Type::new_function(FuncValueType::new(usize_t(), tv.clone())),
                     vec![],

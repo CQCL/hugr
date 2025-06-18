@@ -37,7 +37,7 @@ impl Patch<PersistentHugr> for PersistentReplacement {
     }
 }
 
-impl HugrInternals for PersistentHugr {
+impl<R> HugrInternals for PersistentHugr<R> {
     type RegionPortgraph<'p>
         = portgraph::MultiPortGraph
     where
@@ -71,7 +71,7 @@ impl HugrInternals for PersistentHugr {
 // the whole extracted HUGR in memory. We are currently prioritizing correctness
 // and clarity over performance and will optimise some of these operations in
 // the future as bottlenecks are encountered. (see #2248)
-impl HugrView for PersistentHugr {
+impl<R> HugrView for PersistentHugr<R> {
     fn entrypoint(&self) -> Self::Node {
         // The entrypoint remains unchanged throughout the patch history, and is
         // found in the base hugr.
