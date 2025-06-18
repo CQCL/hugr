@@ -1,26 +1,32 @@
+//! Store of commit histories for a [`PersistentHugr`].
+
 use std::collections::{BTreeSet, VecDeque};
 
 use delegate::delegate;
 use derive_more::From;
+use hugr_core::{
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
+    hugr::{self, internal::HugrInternals, patch::BoundaryPort},
+    ops::OpType,
+};
 use itertools::Itertools;
 use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
-use super::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
-    parents_view::ParentsView,
-};
 use crate::{
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::{internal::HugrInternals, patch::BoundaryPort},
-    ops::OpType,
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
+    find_conflicting_node, parents_view::ParentsView,
 };
+
+pub mod serial;
 
 /// A copyable handle to a [`Commit`] vertex within a [`CommitStateSpace`]
 pub type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash)]
+#[derive(
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct PatchNode(pub CommitId, pub Node);
 
 impl std::fmt::Display for PatchNode {
@@ -29,13 +35,21 @@ impl std::fmt::Display for PatchNode {
     }
 }
 
-/// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
-/// other commits apply), or a [`PersistentReplacement`]
-#[derive(Debug, Clone, From)]
-pub(super) enum CommitData {
-    Base(Hugr),
-    Replacement(PersistentReplacement),
+mod hidden {
+    use super::*;
+
+    /// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
+    /// other commits apply), or a [`PersistentReplacement`]
+    ///
+    /// This is a "unnamable" type: we do not expose this struct publicly in our
+    /// API, but we can still use it in public trait bounds (see [`Resolver`](crate::resolver::Resolver)).
+    #[derive(Debug, Clone, From)]
+    pub enum CommitData {
+        Base(Hugr),
+        Replacement(PersistentReplacement),
+    }
 }
+pub(crate) use hidden::CommitData;
 
 /// A set of commits with directed (acyclic) dependencies between them.
 ///
@@ -57,24 +71,24 @@ pub(super) enum CommitData {
 /// same subgraph. Use [`Self::try_extract_hugr`] to get a [`PersistentHugr`]
 /// with a set of compatible commits.
 #[derive(Clone, Debug)]
-pub struct CommitStateSpace {
+pub struct CommitStateSpace<R = PointerEqResolver> {
     /// A set of commits with directed (acyclic) dependencies between them.
     ///
     /// Each commit is stored as a [`RelRc`].
-    graph: HistoryGraph<CommitData, (), PointerEqResolver>,
+    pub(super) graph: HistoryGraph<CommitData, (), R>,
     /// The unique root of the commit graph.
     ///
     /// The only commit in the graph with variant [`CommitData::Base`]. All
     /// other commits are [`CommitData::Replacement`]s, and are descendants
     /// of this.
-    base_commit: CommitId,
+    pub(super) base_commit: CommitId,
 }
 
-impl CommitStateSpace {
+impl<R: Resolver> CommitStateSpace<R> {
     /// Create a new commit state space with a single base commit.
     pub fn with_base(hugr: Hugr) -> Self {
         let commit = RelRc::new(CommitData::Base(hugr));
-        let graph = HistoryGraph::new([commit.clone()], PointerEqResolver);
+        let graph = HistoryGraph::new([commit.clone()], R::default());
         let base_commit = graph
             .all_node_ids()
             .exactly_one()
@@ -90,7 +104,7 @@ impl CommitStateSpace {
     pub fn try_from_commits(
         commits: impl IntoIterator<Item = Commit>,
     ) -> Result<Self, InvalidCommit> {
-        let graph = HistoryGraph::new(commits.into_iter().map_into(), PointerEqResolver);
+        let graph = HistoryGraph::new(commits.into_iter().map_into(), R::default());
         let base_commits = graph
             .all_node_ids()
             .filter(|&id| matches!(graph.get_node(id).value(), CommitData::Base(_)))
@@ -114,6 +128,19 @@ impl CommitStateSpace {
         self.try_add_commit(commit)
     }
 
+    /// Add a commit (and all its ancestors) to the state space.
+    ///
+    /// Returns an [`InvalidCommit::NonUniqueBase`] error if the commit is a
+    /// base commit and does not coincide with the existing base commit.
+    pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
+        let is_base = commit.as_relrc().ptr_eq(self.base_commit().as_relrc());
+        if !is_base && matches!(commit.value(), CommitData::Base(_)) {
+            return Err(InvalidCommit::NonUniqueBase(2));
+        }
+        let commit = commit.into();
+        Ok(self.graph.insert_node(commit))
+    }
+
     /// Add a set of commits to the state space.
     ///
     /// Commits must be valid replacement commits or coincide with the existing
@@ -124,29 +151,6 @@ impl CommitStateSpace {
             self.try_add_commit(commit)
                 .expect("invalid commit in extend");
         }
-    }
-
-    /// Add a commit (and all its ancestors) to the state space.
-    ///
-    /// Returns an [`InvalidCommit::NonUniqueBase`] error if the commit is a
-    /// base commit and does not coincide with the existing base commit.
-    pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
-        if matches!(commit.value(), CommitData::Base(_) if !commit.0.ptr_eq(&self.base_commit().0))
-        {
-            return Err(InvalidCommit::NonUniqueBase(2));
-        }
-        let commit = commit.into();
-        Ok(self.graph.insert_node(commit))
-    }
-
-    /// Check if `commit` is in the commit state space.
-    pub fn contains(&self, commit: &Commit) -> bool {
-        self.graph.contains(commit.as_relrc())
-    }
-
-    /// Check if `commit_id` is in the commit state space.
-    pub fn contains_id(&self, commit_id: CommitId) -> bool {
-        self.graph.contains_id(commit_id)
     }
 
     /// Extract a `PersistentHugr` from this state space, consisting of
@@ -160,7 +164,7 @@ impl CommitStateSpace {
     pub fn try_extract_hugr(
         &self,
         commits: impl IntoIterator<Item = CommitId>,
-    ) -> Result<PersistentHugr, InvalidCommit> {
+    ) -> Result<PersistentHugr<R>, InvalidCommit> {
         // Define commits as the set of all ancestors of the given commits
         let all_commit_ids = get_all_ancestors(&self.graph, commits);
 
@@ -183,12 +187,24 @@ impl CommitStateSpace {
         let commits = all_commit_ids
             .into_iter()
             .map(|id| self.get_commit(id).as_relrc().clone());
-        let subgraph = HistoryGraph::new(commits, PointerEqResolver);
+        let subgraph = HistoryGraph::new(commits, R::default());
 
         Ok(PersistentHugr::from_state_space_unsafe(Self {
             graph: subgraph,
             base_commit: self.base_commit,
         }))
+    }
+}
+
+impl<R> CommitStateSpace<R> {
+    /// Check if `commit` is in the commit state space.
+    pub fn contains(&self, commit: &Commit) -> bool {
+        self.graph.contains(commit.as_relrc())
+    }
+
+    /// Check if `commit_id` is in the commit state space.
+    pub fn contains_id(&self, commit_id: CommitId) -> bool {
+        self.graph.contains_id(commit_id)
     }
 
     /// Get the base commit ID.
@@ -252,7 +268,7 @@ impl CommitStateSpace {
         }
     }
 
-    pub(super) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), PointerEqResolver> {
+    pub(crate) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), R> {
         &self.graph
     }
 
@@ -260,7 +276,7 @@ impl CommitStateSpace {
     ///
     /// This is either the replacement Hugr of a [`CommitData::Replacement`] or
     /// the base Hugr of a [`CommitData::Base`].
-    pub(super) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr {
+    pub(crate) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr {
         let commit = self.get_commit(commit_id);
         match commit.value() {
             CommitData::Base(base) => base,
@@ -295,7 +311,7 @@ impl CommitStateSpace {
     ///
     /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
     /// a valid commit ID.
-    pub(super) fn linked_child_inputs(
+    pub(crate) fn linked_child_inputs(
         &self,
         node: PatchNode,
         port: OutgoingPort,
@@ -322,7 +338,7 @@ impl CommitStateSpace {
     /// ## Panics
     ///
     /// Panics if `child` is not a valid commit ID.
-    pub(super) fn linked_child_output(
+    pub(crate) fn linked_child_output(
         &self,
         node: PatchNode,
         port: IncomingPort,
@@ -344,7 +360,7 @@ impl CommitStateSpace {
     ///
     /// Panics if `(node, port)` is not connected to the input node in the
     /// commit of `node`, or if the node is not valid.
-    pub(super) fn linked_parent_input(
+    pub(crate) fn linked_parent_input(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: IncomingPort,
@@ -362,7 +378,7 @@ impl CommitStateSpace {
         repl.linked_host_input((node, port), &parent_hugrs).into()
     }
 
-    pub(super) fn linked_parent_outputs(
+    pub(crate) fn linked_parent_outputs(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: OutgoingPort,
@@ -384,7 +400,7 @@ impl CommitStateSpace {
     }
 
     /// Get the replacement for `commit_id`.
-    pub(super) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
+    pub(crate) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
         let commit = self.get_commit(commit_id);
         commit.replacement()
     }
@@ -392,7 +408,7 @@ impl CommitStateSpace {
 
 // The subset of HugrView methods that can be implemented on CommitStateSpace
 // by simplify delegating to the patches' respective HUGRs
-impl CommitStateSpace {
+impl<R> CommitStateSpace<R> {
     /// Get the type of the operation at `node`.
     pub fn get_optype(&self, PatchNode(commit_id, node): PatchNode) -> &OpType {
         let hugr = self.commit_hugr(commit_id);
@@ -443,7 +459,7 @@ impl CommitStateSpace {
     pub fn node_metadata_map(
         &self,
         PatchNode(commit_id, node): PatchNode,
-    ) -> &crate::hugr::NodeMetadataMap {
+    ) -> &hugr::NodeMetadataMap {
         self.commit_hugr(commit_id).node_metadata_map(node)
     }
 }

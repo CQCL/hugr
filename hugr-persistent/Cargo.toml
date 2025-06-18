@@ -1,0 +1,35 @@
+[package]
+name = "hugr-persistent"
+version = "0.1.0"
+rust-version.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[[test]]
+name = "persistent_walker_example"
+
+[dependencies]
+hugr-core.path = "../hugr-core"
+
+delegate.workspace = true
+derive_more.workspace = true
+itertools.workspace = true
+petgraph.workspace = true
+portgraph.workspace = true
+relrc = { workspace = true, features = ["petgraph", "serde"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+wyhash = "0.6.0"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+lazy_static.workspace = true
+semver.workspace = true
+serde_with.workspace = true
+insta.workspace = true

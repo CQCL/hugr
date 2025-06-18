@@ -44,11 +44,12 @@
 //! 5. Once exploration is complete (e.g. a pattern was fully matched), the
 //!    walker can be converted into a [`PersistentHugr`] instance using
 //!    [`Walker::into_persistent_hugr`]. The matched nodes and ports can then be
-//!    used to create a [`SiblingSubgraph`](crate::hugr::views::SiblingSubgraph)
-//!    object, which can then be used to create new
-//!    [`SimpleReplacement`](crate::SimpleReplacement) instances---and possibly
-//!    in turn be added to the commit state space and the exploration of the
-//!    state space restarted!
+//!    used to create a
+//!    [`SiblingSubgraph`](hugr_core::hugr::views::SiblingSubgraph) object,
+//!    which can then be used to create new
+//!    [`SimpleReplacement`](hugr_core::SimpleReplacement) instances---and
+//!    possibly in turn be added to the commit state space and the exploration
+//!    of the state space restarted!
 //!
 //! This approach allows efficiently finding patterns across many potential
 //! versions of the graph simultaneously, without having to materialize
@@ -62,7 +63,9 @@ use std::{borrow::Cow, collections::BTreeSet};
 use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use crate::{Direction, HugrView, Port};
+use hugr_core::{Direction, HugrView, Port};
+
+use crate::{PointerEqResolver, resolver::Resolver};
 
 use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_space::CommitId};
 
@@ -84,30 +87,30 @@ use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_sp
 /// expansions of the current walker.
 /// current walker.
 #[derive(Debug, Clone)]
-pub struct Walker<'a> {
+pub struct Walker<'a, R: Clone = PointerEqResolver> {
     /// The state space being traversed.
-    state_space: Cow<'a, CommitStateSpace>,
+    state_space: Cow<'a, CommitStateSpace<R>>,
     /// The subset of compatible commits in `state_space` that are currently
     /// selected.
     // Note that we could store this as a set of `CommitId`s, but it is very
     // convenient to have access to all the methods of PersistentHugr (on top
     // of guaranteeing the compatibility invariant). The tradeoff is more
     // memory consumption.
-    selected_commits: PersistentHugr,
+    selected_commits: PersistentHugr<R>,
     /// The set of nodes that have been traversed by the walker and can no
     /// longer be rewritten.
     pinned_nodes: BTreeSet<PatchNode>,
 }
 
-impl<'a> Walker<'a> {
+impl<'a, R: Resolver> Walker<'a, R> {
     /// Create a new [`Walker`] over the given state space.
     ///
     /// No nodes are pinned initially. The [`Walker`] starts with only the base
     /// Hugr `state_space.base_hugr()` selected.
-    pub fn new(state_space: impl Into<Cow<'a, CommitStateSpace>>) -> Self {
+    pub fn new(state_space: impl Into<Cow<'a, CommitStateSpace<R>>>) -> Self {
         let state_space = state_space.into();
         let base = state_space.base_commit().clone();
-        let selected_commits = PersistentHugr::from_commit(base);
+        let selected_commits: PersistentHugr<R> = PersistentHugr::from_commit(base);
         Self {
             state_space,
             selected_commits,
@@ -118,7 +121,7 @@ impl<'a> Walker<'a> {
     /// Create a new [`Walker`] with a single pinned node.
     pub fn from_pinned_node(
         node: PatchNode,
-        state_space: impl Into<Cow<'a, CommitStateSpace>>,
+        state_space: impl Into<Cow<'a, CommitStateSpace<R>>>,
     ) -> Self {
         let mut walker = Self::new(state_space);
         walker
@@ -163,46 +166,21 @@ impl<'a> Walker<'a> {
         Ok(self.pinned_nodes.insert(node))
     }
 
-    /// Get the wire connected to a specified port of a pinned node.
-    ///
-    /// # Panics
-    /// Panics if `node` is not already pinned in this Walker.
-    pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PinnedWire {
-        PinnedWire::from_pinned_port(node, port, self)
-    }
-
-    /// Materialise the [`PersistentHugr`] containing all the compatible commits
-    /// that have been selected during exploration.
-    pub fn into_persistent_hugr(self) -> PersistentHugr {
-        self.selected_commits
-    }
-
-    /// View the [`PersistentHugr`] containing all the compatible commits that
-    /// have been selected so far during exploration.
-    ///
-    /// Of the space of all possible HUGRs that can be obtained from future
-    /// expansions of the walker, this is the HUGR corresponding to selecting
-    /// as few commits as possible (i.e. all the commits that have been selected
-    /// so far and no more).
-    pub fn as_hugr_view(&self) -> &PersistentHugr {
-        &self.selected_commits
-    }
-
     /// Expand the Walker by pinning a node connected to the given wire.
     ///
     /// To understand how Walkers are expanded, it is useful to understand how
     /// in a walker, the HUGR graph is partitioned into two parts:
-    ///  - a subgraph made of pinned nodes: this part of the HUGR is frozen: it cannot be
-    ///    modified by further expansions the Walker.
+    ///  - a subgraph made of pinned nodes: this part of the HUGR is frozen: it
+    ///    cannot be modified by further expansions the Walker.
     ///  - the complement subgraph: the unpinned part of the HUGR has not been
-    ///    explored yet. Multiple alternative HUGRs can be obtained depending
-    ///    on which commits are selected.
+    ///    explored yet. Multiple alternative HUGRs can be obtained depending on
+    ///    which commits are selected.
     ///
     /// To every walker thus corresponds a space of possible HUGRs that can be
-    /// obtained, depending on which commits are selected and which further nodes
-    /// are pinned. The expansion of a walker returns a set of walkers, which
-    /// together cover the same space of possible HUGRs, each having a different
-    /// additional node pinned.
+    /// obtained, depending on which commits are selected and which further
+    /// nodes are pinned. The expansion of a walker returns a set of
+    /// walkers, which together cover the same space of possible HUGRs, each
+    /// having a different additional node pinned.
     ///
     /// Return an iterator over all possible [`Walker`]s that can be created by
     /// pinning exactly one additional node connected to `wire`. Each returned
@@ -221,7 +199,7 @@ impl<'a> Walker<'a> {
         &'b self,
         wire: &'b PinnedWire,
         dir: impl Into<Option<Direction>>,
-    ) -> impl Iterator<Item = Walker<'a>> + 'b {
+    ) -> impl Iterator<Item = Walker<'a, R>> + 'b {
         let dir = dir.into();
 
         // Find unpinned ports on the wire (satisfying the direction constraint)
@@ -245,6 +223,33 @@ impl<'a> Walker<'a> {
             new_walker.try_pin_node(pinnable_node).ok()?;
             Some(new_walker)
         })
+    }
+}
+
+impl<R: Clone> Walker<'_, R> {
+    /// Get the wire connected to a specified port of a pinned node.
+    ///
+    /// # Panics
+    /// Panics if `node` is not already pinned in this Walker.
+    pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PinnedWire {
+        PinnedWire::from_pinned_port(node, port, self)
+    }
+
+    /// Materialise the [`PersistentHugr`] containing all the compatible commits
+    /// that have been selected during exploration.
+    pub fn into_persistent_hugr(self) -> PersistentHugr<R> {
+        self.selected_commits
+    }
+
+    /// View the [`PersistentHugr`] containing all the compatible commits that
+    /// have been selected so far during exploration.
+    ///
+    /// Of the space of all possible HUGRs that can be obtained from future
+    /// expansions of the walker, this is the HUGR corresponding to selecting
+    /// as few commits as possible (i.e. all the commits that have been selected
+    /// so far and no more).
+    pub fn as_hugr_view(&self) -> &PersistentHugr<R> {
+        &self.selected_commits
     }
 
     /// Get all equivalent ports among the commits that are descendants of the
@@ -290,7 +295,7 @@ impl<'a> Walker<'a> {
     }
 }
 
-impl CommitStateSpace {
+impl<R> CommitStateSpace<R> {
     /// Given a node and port, return all child commits of the current `node`
     /// that delete `node` but keep at least one port linked to `(node, port)`.
     /// In other words, (node, port) is a boundary port of the subgraph of
@@ -349,14 +354,14 @@ impl From<InvalidCommit> for PinNodeError {
     }
 }
 
-impl<'a> From<&'a CommitStateSpace> for Cow<'a, CommitStateSpace> {
-    fn from(value: &'a CommitStateSpace) -> Self {
+impl<'a, R: Clone> From<&'a CommitStateSpace<R>> for Cow<'a, CommitStateSpace<R>> {
+    fn from(value: &'a CommitStateSpace<R>) -> Self {
         Cow::Borrowed(value)
     }
 }
 
-impl From<CommitStateSpace> for Cow<'_, CommitStateSpace> {
-    fn from(value: CommitStateSpace) -> Self {
+impl<R: Clone> From<CommitStateSpace<R>> for Cow<'_, CommitStateSpace<R>> {
+    fn from(value: CommitStateSpace<R>) -> Self {
         Cow::Owned(value)
     }
 }
@@ -365,9 +370,8 @@ impl From<CommitStateSpace> for Cow<'_, CommitStateSpace> {
 mod tests {
     use rstest::rstest;
 
-    use crate::hugr::persistent::{state_space::CommitId, tests::test_state_space};
-    use crate::std_extensions::logic::LogicOp;
-    use crate::{IncomingPort, OutgoingPort};
+    use crate::{state_space::CommitId, tests::test_state_space};
+    use hugr_core::{IncomingPort, OutgoingPort, std_extensions::logic::LogicOp};
 
     use super::*;
 

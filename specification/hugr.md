@@ -824,6 +824,9 @@ such declarations may include (bind) any number of type parameters, of kinds as 
 TypeParam ::= Type(Any|Copyable)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
+            | String
+            | Bytes
+            | Float
             | List(TypeParam) -- homogeneous, any sized
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
@@ -841,8 +844,12 @@ TypeArgs appropriate for the function's TypeParams:
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
           | BoundedUSize(u64)
+          | String(String)
+          | Bytes([u8])
+          | Float(f64)
           | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
-          | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
+          | List([TypeArg])
+          | Tuple([TypeArg])
           | Opaque(Value)
           | Variable -- refers to an enclosing TypeParam (binder) of any kind above
 ```
@@ -856,7 +863,7 @@ Given TypeArgs, the body of the Function node's type can be converted to a monom
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
+(Note that within a polymorphic type scheme, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 #### Row Variables
@@ -868,16 +875,16 @@ treatment, as follows:
   but also a single `TypeArg::Type`. (This is purely a notational convenience.)
   For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
   for `Type::Function(#(usize), #(unit), <exts>)`.
-* When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
+* When a `TypeArg::List` is provided as argument for such a TypeParam, we allow
   elements to be a mixture of both types (including variables of kind
   `TypeParam::Type(_)`) and also row variables. When such variables are instantiated
-  (with other Sequences) the elements of the inner Sequence are spliced directly into
-  the outer (concatenating their elements), eliding the inner (Sequence) wrapper.
+  (with other `List`s) the elements of the inner `List` are spliced directly into
+  the outer (concatenating their elements), eliding the inner (`List`) wrapper.
 
 For example, a polymorphic FuncDefn might declare a row variable X of kind
 `TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
-`TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+`TypeArg::List([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
 See [Declarative Format](#declarative-format) for more examples.
 

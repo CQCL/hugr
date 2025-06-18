@@ -43,7 +43,7 @@ pub const ARRAY_VALUENAME: TypeName = TypeName::new_inline("array");
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.array");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// A linear, fixed-length collection of values.
 ///
@@ -96,7 +96,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                     ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
+                    vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
                     "Fixed-length array".into(),
                     // Default array is linear, even if the elements are copyable
                     TypeDefBound::any(),
@@ -197,7 +197,31 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     ) -> Result<Wire, BuildError> {
         self.add_new_generic_array::<Array>(elem_ty, values)
     }
-
+    /// Adds an array unpack operation to the dataflow graph.
+    ///
+    /// This operation unpacks an array into individual elements.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array to unpack.
+    ///
+    /// # Errors
+    ///
+    /// If building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// A vector of wires representing the individual elements from the array.
+    fn add_array_unpack(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<Vec<Wire>, BuildError> {
+        self.add_generic_array_unpack::<Array>(elem_ty, size, input)
+    }
     /// Adds an array clone operation to the dataflow graph and return the wires
     /// representing the originala and cloned array.
     ///

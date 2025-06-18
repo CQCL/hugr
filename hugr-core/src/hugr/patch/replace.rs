@@ -320,7 +320,10 @@ impl<HostNode: HugrNode> PatchVerification for Replacement<HostNode> {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         self.removal.iter().copied()
     }
 }

@@ -76,8 +76,8 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
 {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
-        let size = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let element_ty = Type::new_var_use(1, TypeBound::Any);
 
         let this_ty = AK::instantiate_ty(array_def, size.clone(), element_ty.clone())
@@ -202,10 +202,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeExtensionOp
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![
-            TypeArg::BoundedNat { n: self.size },
-            self.elem_ty.clone().into(),
-        ]
+        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone().into()]
     }
 }
 
@@ -234,7 +231,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> HasConcrete
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
+            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
                 Ok(GenericArrayConvert::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

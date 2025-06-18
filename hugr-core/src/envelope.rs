@@ -53,6 +53,7 @@ use header::EnvelopeHeader;
 use std::io::BufRead;
 use std::io::Write;
 use std::str::FromStr;
+use thiserror::Error;
 
 #[allow(unused_imports)]
 use itertools::Itertools as _;
@@ -128,16 +129,15 @@ pub(crate) fn write_envelope_impl<'h>(
 }
 
 /// Error type for envelope operations.
-#[derive(derive_more::Display, derive_more::Error, Debug, derive_more::From)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum EnvelopeError {
     /// Bad magic number.
-    #[display(
+    #[error(
         "Bad magic number. expected 0x{:X} found 0x{:X}",
         u64::from_be_bytes(*expected),
         u64::from_be_bytes(*found)
     )]
-    #[from(ignore)]
     MagicNumber {
         /// The expected magic number.
         ///
@@ -147,20 +147,18 @@ pub enum EnvelopeError {
         found: [u8; 8],
     },
     /// The specified payload format is invalid.
-    #[display("Format descriptor {descriptor} is invalid.")]
-    #[from(ignore)]
+    #[error("Format descriptor {descriptor} is invalid.")]
     InvalidFormatDescriptor {
         /// The unsupported format.
         descriptor: usize,
     },
     /// The specified payload format is not supported.
-    #[display("Payload format {format} is not supported.{}",
+    #[error("Payload format {format} is not supported.{}",
         match feature {
             Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
             None => String::new()
         },
     )]
-    #[from(ignore)]
     FormatUnsupported {
         /// The unsupported format.
         format: EnvelopeFormat,
@@ -170,65 +168,78 @@ pub enum EnvelopeError {
     /// Not all envelope formats can be represented as ASCII.
     ///
     /// This error is used when trying to store the envelope into a string.
-    #[display("Envelope format {format} cannot be represented as ASCII.")]
-    #[from(ignore)]
+    #[error("Envelope format {format} cannot be represented as ASCII.")]
     NonASCIIFormat {
         /// The unsupported format.
         format: EnvelopeFormat,
     },
     /// Envelope encoding required zstd compression, but the feature is not enabled.
-    #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
-    #[from(ignore)]
+    #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     ZstdUnsupported,
     /// Expected the envelope to contain a single HUGR.
-    #[display("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
+    #[error("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
         "none".to_string()
     } else {
         count.to_string()
     })]
-    #[from(ignore)]
     ExpectedSingleHugr {
         /// The number of HUGRs in the package.
         count: usize,
     },
     /// JSON serialization error.
+    #[error(transparent)]
     SerdeError {
         /// The source error.
+        #[from]
         source: serde_json::Error,
     },
     /// IO read/write error.
+    #[error(transparent)]
     IO {
         /// The source error.
+        #[from]
         source: std::io::Error,
     },
     /// Error writing a json package to the payload.
+    #[error(transparent)]
     PackageEncoding {
         /// The source error.
+        #[from]
         source: PackageEncodingError,
     },
     /// Error importing a HUGR from a hugr-model payload.
+    #[error(transparent)]
     ModelImport {
         /// The source error.
+        #[from]
         source: ImportError,
     },
     /// Error reading a HUGR model payload.
+    #[error(transparent)]
     ModelRead {
         /// The source error.
+        #[from]
         source: hugr_model::v0::binary::ReadError,
     },
     /// Error writing a HUGR model payload.
+    #[error(transparent)]
     ModelWrite {
         /// The source error.
+        #[from]
         source: hugr_model::v0::binary::WriteError,
     },
     /// Error reading a HUGR model payload.
+    #[error(transparent)]
     ModelTextRead {
         /// The source error.
+        #[from]
         source: hugr_model::v0::ast::ParseError,
     },
     /// Error reading a HUGR model payload.
+    #[error(transparent)]
     ModelTextResolve {
         /// The source error.
+        #[from]
         source: hugr_model::v0::ast::ResolveError,
     },
 }

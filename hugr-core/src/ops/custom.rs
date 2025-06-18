@@ -406,11 +406,11 @@ mod test {
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
-            vec![TypeArg::Type { ty: usize_t() }],
+            vec![usize_t().into()],
             sig.clone(),
         );
         assert_eq!(op.name(), "OpaqueOp:res.op");
-        assert_eq!(op.args(), &[TypeArg::Type { ty: usize_t() }]);
+        assert_eq!(op.args(), &[usize_t().into()]);
         assert_eq!(op.signature().as_ref(), &sig);
     }
 
