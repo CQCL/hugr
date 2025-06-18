@@ -92,8 +92,7 @@ impl FuncDefn {
         Self::new_vis(name, signature, Visibility::Public)
     }
 
-    /// The name of the function (not the name of the Op). Note
-    /// this is for human convenience and has no semantics.
+    /// The name of the function (not the name of the Op)
     pub fn func_name(&self) -> &String {
         &self.name
     }
@@ -113,12 +112,12 @@ impl FuncDefn {
         &mut self.signature
     }
 
-    /// The name of the function used for linking, if any
+    /// The visibility of the function, e.g. for linking
     pub fn visibility(&self) -> Visibility {
         self.visibility
     }
 
-    /// Allows changing the name used for linking or whether there is one
+    /// Allows changing [Self::visibliity]
     pub fn visibility_mut(&mut self) -> &mut Visibility {
         &mut self.visibility
     }
@@ -205,7 +204,7 @@ impl FuncDecl {
         &self.name
     }
 
-    /// The name of the function (for linking purposes)
+    /// The visibility of the function, e.g. for linking
     pub fn visibility(&self) -> Visibility {
         self.visibility
     }

@@ -50,7 +50,7 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
-    /// Replace a [`ops::FuncDecl`] with public [`ops::FuncDefn`] and return a builder for
+    /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
     /// # Errors
