@@ -61,7 +61,7 @@ fn inline_constant_functions_impl(hugr: &mut impl HugrMut<Node = Node>) -> Resul
                 ))?
                 .into_owned()
                 .into();
-            let func_defn = FuncDefn::new(const_fn_name(konst_n), polysignature.clone());
+            let func_defn = FuncDefn::new_private(const_fn_name(konst_n), polysignature.clone());
             func_hugr.replace_op(func_hugr.entrypoint(), func_defn);
             let func_node = hugr
                 .insert_hugr(hugr.entrypoint(), func_hugr)

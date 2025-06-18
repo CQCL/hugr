@@ -938,7 +938,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
+            let optype = OpType::FuncDefn(FuncDefn::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.into(),
+            ));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -963,7 +967,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
+            let optype = OpType::FuncDecl(FuncDecl::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.into(),
+            ));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })

@@ -29,10 +29,14 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::ComposablePass as _;
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
+use crate::{ComposablePass as _, IncludeExports};
 
-use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass};
+use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass_pub};
+
+fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
+    constant_fold_pass_pub(h, IncludeExports::Always);
+}
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]
@@ -1608,7 +1612,7 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     assert!(hugr.get_optype(hugr.entrypoint()).is_module());
     assert_eq!(
         hugr.children(hugr.entrypoint()).collect_vec(),
-        [c7.node(), ad1.node(), ad2.node(), main.node()]
+        [c7.node(), c17.node(), ad1.node(), ad2.node(), main.node()]
     );
     let tags = hugr
         .children(main.node())

@@ -16,12 +16,15 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::dataflow::{
-    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
-    partial_from_const,
-};
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
 use crate::{ComposablePass, composable::validate_if_test};
+use crate::{
+    IncludeExports,
+    dataflow::{
+        ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+        partial_from_const,
+    },
+};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -29,7 +32,7 @@ pub struct ConstantFoldPass {
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
-    ///   - the root, if the root is not a Module
+    ///   - the entrypoint, if the entrypoint is not a Module
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
@@ -185,22 +188,50 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     }
 }
 
+const NO_INPUTS: [(IncomingPort, Value); 0] = [];
+
 /// Exhaustively apply constant folding to a HUGR.
 /// If the Hugr's entrypoint is its [`Module`], assumes all [`FuncDefn`] children are reachable.
 ///
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`Module`]: hugr_core::ops::OpType::Module
+#[deprecated(note = "Use constant_fold_pass_pub, or manually configure ConstantFoldPass")]
 pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
     let h = h.as_mut();
     let c = ConstantFoldPass::default();
     let c = if h.get_optype(h.entrypoint()).is_module() {
-        let no_inputs: [(IncomingPort, _); 0] = [];
         h.children(h.entrypoint())
             .filter(|n| h.get_optype(*n).is_func_defn())
-            .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
+            .fold(c, |c, n| c.with_inputs(n, NO_INPUTS.clone()))
     } else {
         c
     };
+    validate_if_test(c, h).unwrap();
+}
+
+/// Exhaustively apply constant folding to a HUGR.
+/// Assumes that the Hugr's entrypoint is reachable (if it is not a [`Module`]).
+/// Also uses `policy` to determine which public [`FuncDefn`] children of the [`HugrView::module_root`] are reachable.
+///
+/// [`Module`]: hugr_core::ops::OpType::Module
+/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+pub fn constant_fold_pass_pub(
+    h: &mut (impl HugrMut<Node = Node> + 'static),
+    policy: IncludeExports,
+) {
+    let mut funcs = Vec::new();
+    if h.get_optype(h.entrypoint()).is_func_defn() {
+        funcs.push(h.entrypoint());
+    }
+    if policy.for_hugr(&h) {
+        funcs.extend(
+            h.children(h.module_root())
+                .filter(|n| h.get_optype(*n).is_func_defn()),
+        )
+    }
+    let c = funcs.into_iter().fold(ConstantFoldPass::default(), |c, n| {
+        c.with_inputs(n, NO_INPUTS.clone())
+    });
     validate_if_test(c, h).unwrap();
 }
 

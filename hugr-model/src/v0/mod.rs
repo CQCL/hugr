@@ -91,6 +91,16 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
 
+/// Describes how a function or symbol should be acted upon by a linker
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum Visibility {
+    /// The linker should ignore this function or symbol
+    Private,
+    /// The linker should act upon this function or symbol
+    Public,
+}
+
 /// Core function types.
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`

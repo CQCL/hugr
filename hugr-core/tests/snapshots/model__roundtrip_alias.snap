@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-alias.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -12,8 +12,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-alia
 
 (import core.type)
 
-(declare-alias local.float core.type)
+(declare-alias pub local.float core.type)
 
-(define-alias local.int core.type arithmetic.int.types.int)
+(define-alias pub local.int core.type arithmetic.int.types.int)
 
-(define-alias local.endo core.type (core.fn [] []))
+(define-alias pub local.endo core.type (core.fn [] []))

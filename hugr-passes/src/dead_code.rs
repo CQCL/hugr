@@ -1,7 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
+use hugr_core::{HugrView, Visibility, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::ComposablePass;
+use crate::{ComposablePass, IncludeExports};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -20,6 +20,7 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
+    include_exports: IncludeExports,
 }
 
 impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
@@ -27,6 +28,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
+            include_exports: IncludeExports::default(),
         }
     }
 }
@@ -94,10 +96,19 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
     /// used to evaluate these nodes.
     /// [`HugrView::entrypoint`] is assumed to be an entry point;
-    /// for Module roots the client will want to mark some of the `FuncDefn` children
-    /// as entry points too.
+    /// if the entrypoint is the `Module` root, then any public
+    /// [FuncDefn](OpType::FuncDefn)s and [Const](OpType::Const)s are also considered entry points
+    /// by default, but these can be removed by [Self::include_module_exports]`(false)`.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
+        self
+    }
+
+    /// Sets whether, for Module-rooted Hugrs, the exported [FuncDefn](OpType::FuncDefn)s
+    /// and [FuncDecl](OpType::FuncDecl)s, and all [Const](OpType::Const)s, are included
+    /// as entry points (by default they are only for module-entrypoint Hugrs).
+    pub fn include_module_exports(mut self, include: IncludeExports) -> Self {
+        self.include_exports = include;
         self
     }
 
@@ -106,6 +117,17 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
+        if self.include_exports.for_hugr(h) {
+            q.extend(
+                h.children(h.module_root())
+                    .filter(|ch| match h.get_optype(*ch) {
+                        OpType::FuncDefn(fd) => fd.visibility() == Visibility::Public,
+                        OpType::FuncDecl(fd) => fd.visibility() == Visibility::Public,
+                        OpType::Const(_) => true,
+                        _ => false,
+                    }),
+            )
+        }
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {
                 continue;
