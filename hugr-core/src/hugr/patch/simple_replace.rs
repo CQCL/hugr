@@ -516,6 +516,11 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         let subgraph = subgraph.map_nodes(node_map);
         SimpleReplacement::try_new(subgraph, new_host, replacement.clone())
     }
+
+    /// Allows to get the [Self::invalidated_nodes] without requiring a [HugrView].
+    pub fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
+        self.subgraph.nodes().iter().copied()
+    }
 }
 
 impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
@@ -527,8 +532,11 @@ impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
-        self.subgraph.nodes().iter().copied()
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
+        self.invalidation_set()
     }
 }
 
@@ -864,7 +872,7 @@ pub(in crate::hugr::patch) mod test {
 
         // Check invalidation set
         assert_eq!(
-            HashSet::<_>::from_iter(r.invalidation_set()),
+            HashSet::<_>::from_iter(r.invalidated_nodes(&h)),
             HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1]),
         );
 
