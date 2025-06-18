@@ -1,6 +1,18 @@
 # Changelog
 
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.21.0) - 2025-06-18
+
+### Bug Fixes
+
+- update CallGraph and remove_dead_funcs for module-only FuncDefns ([#2336](https://github.com/CQCL/hugr/pull/2336))
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0...hugr-passes-v0.20.1) - 2025-06-03
 
 ### Bug Fixes
