@@ -7,7 +7,7 @@ use delegate::delegate;
 use derive_more::derive::From;
 use hugr_core::{
     Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::patch::{Patch, PatchVerification, simple_replace},
+    hugr::patch::{Patch, simple_replace},
 };
 use itertools::{Either, Itertools};
 use relrc::RelRc;
@@ -97,9 +97,7 @@ impl Commit {
 
     /// Get the set of nodes invalidated by the patch in `self`.
     pub fn invalidation_set(&self) -> impl Iterator<Item = PatchNode> + '_ {
-        self.replacement()
-            .into_iter()
-            .flat_map(|r| r.invalidation_set())
+        self.replacement().into_iter().flat_map(|r| r.invalidation_set())
     }
 
     /// Get the set of nodes deleted by applying `self`.
