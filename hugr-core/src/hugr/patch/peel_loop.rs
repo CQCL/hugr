@@ -65,9 +65,7 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         let loop_ty = h.optype_mut(self.0);
         let signature = loop_ty.dataflow_signature().unwrap().into_owned();
         // Replace the TailLoop with a DFG - this maintains all external connections
-        let mut op = DFG { signature }.into();
-        std::mem::swap(loop_ty, &mut op);
-        let OpType::TailLoop(tl) = op else {
+        let OpType::TailLoop(tl) = std::mem::replace(loop_ty, DFG { signature }.into()) else {
             panic!("Wasn't a TailLoop ?!")
         };
         let sum_rows = Vec::from(tl.control_variants());
