@@ -288,7 +288,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::{monomorphize, remove_dead_funcs_vis};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -395,7 +395,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly)?;
+        remove_dead_funcs_vis(&mut nopoly)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -582,7 +582,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr).unwrap();
+        remove_dead_funcs_vis(&mut hugr).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));

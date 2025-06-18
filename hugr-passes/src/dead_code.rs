@@ -28,7 +28,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
-            include_exports: IncludeExports::default()
+            include_exports: IncludeExports::default(),
         }
     }
 }
@@ -118,13 +118,15 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
         if self.include_exports.for_hugr(h) {
-            q.extend(h.children(h.module_root()).filter(|ch| 
-                match h.get_optype(*ch) {
-                    OpType::FuncDefn(fd) => fd.visibility() == Visibility::Public,
-                    OpType::FuncDecl(fd) => fd.visibility() == Visibility::Public,
-                    OpType::Const(_) => true,
-                    _ => false
-            }))
+            q.extend(
+                h.children(h.module_root())
+                    .filter(|ch| match h.get_optype(*ch) {
+                        OpType::FuncDefn(fd) => fd.visibility() == Visibility::Public,
+                        OpType::FuncDecl(fd) => fd.visibility() == Visibility::Public,
+                        OpType::Const(_) => true,
+                        _ => false,
+                    }),
+            )
         }
         while let Some(n) = q.pop_front() {
             if !needed.insert(n) {

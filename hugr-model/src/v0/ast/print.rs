@@ -373,7 +373,7 @@ fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
         Visibility::Private => (),
         Visibility::Public => printer.text("pub"),
     }
-    
+
     print_symbol_name(printer, &symbol.name);
 
     for param in &symbol.params {

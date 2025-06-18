@@ -128,10 +128,39 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// Deletes from the Hugr any functions that are not used by either [`Call`] or
 /// [`LoadFunction`] nodes in reachable parts.
 ///
-/// `entry_points` may provide a list of entry points, which must be [`FuncDefn`] children
-/// of the root.
-/// * If the [HugrView::entrypoint] is the module root, then any [`FuncDefn`] children with
-///   [Visibility::Public] will also be considered an entry point
+/// `entry_points` may provide a list of entry points, which must be [`FuncDefn`]s (children of the root).
+/// The [HugrView::entrypoint] will also be used unless it is the [HugrView::module_root].
+/// Note that for a [`Module`]-rooted Hugr with no `entry_points` provided, this will remove
+/// all functions from the module.
+///
+/// # Errors
+/// * If any node in `entry_points` is not a [`FuncDefn`]
+///
+/// [`Call`]: hugr_core::ops::OpType::Call
+/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
+/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
+/// [`Module`]: hugr_core::ops::OpType::Module
+#[deprecated(
+    note = "Does not account for visibility; use remove_dead_funcs_vis or manually configure RemoveDeadFuncsPass"
+)]
+pub fn remove_dead_funcs(
+    h: &mut impl HugrMut<Node = Node>,
+    entry_points: impl IntoIterator<Item = Node>,
+) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
+    validate_if_test(
+        RemoveDeadFuncsPass::default()
+            .include_module_exports(IncludeExports::Never)
+            .with_module_entry_points(entry_points),
+        h,
+    )
+}
+
+/// Deletes from the Hugr any functions that are not used by either [`Call`] or
+/// [`LoadFunction`] nodes in parts reachable from the entrypoint or public
+/// [`FuncDefn`] children thereof. That is,
+///
+/// * If the [HugrView::entrypoint] is the module root, then any [`FuncDefn`] children
+///   with [Visibility::Public] will be considered reachable;
 /// * otherwise, the [HugrView::entrypoint] itself will.
 ///
 /// # Errors
@@ -141,7 +170,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
-pub fn remove_dead_funcs(
+pub fn remove_dead_funcs_vis(
     h: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
     validate_if_test(RemoveDeadFuncsPass::default(), h)

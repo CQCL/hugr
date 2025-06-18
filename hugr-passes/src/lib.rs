@@ -9,7 +9,12 @@ pub mod dataflow;
 pub mod dead_code;
 pub use dead_code::DeadCodeElimPass;
 mod dead_funcs;
-pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
+#[deprecated(
+    note = "Does not account for visibility; use remove_dead_funcs_vis or manually configure RemoveDeadFuncsPass"
+)]
+#[allow(deprecated)] // Remove this re-export when original removed
+pub use dead_funcs::remove_dead_funcs;
+pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs_vis};
 pub mod force_order;
 mod half_node;
 pub mod linearize_array;
