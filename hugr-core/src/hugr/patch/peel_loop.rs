@@ -1,7 +1,5 @@
 //! Rewrite to peel one iteration of a [TailLoop], creating a [DFG] containing a copy of
 //! the loop body, and a [Conditional] containing the original `TailLoop` node.
-use std::convert::Infallible;
-
 use derive_more::{Display, Error};
 
 use crate::core::HugrNode;
@@ -16,10 +14,7 @@ use super::{HugrMut, PatchHugrMut, PatchVerification};
 /// Rewrite that peels one iteration of a [TailLoop] by turning the
 /// iteration test into a [Conditional].
 #[derive(Clone, Debug, PartialEq)]
-pub struct PeelTailLoop<N = Node> {
-    tail_loop: N,
-    output: N,
-}
+pub struct PeelTailLoop<N = Node>(N);
 
 /// Error in performing [`PeelTailLoop`] rewrite.
 #[derive(Clone, Debug, Display, Error, PartialEq)]
@@ -35,52 +30,37 @@ pub enum PeelTailLoopError<N = Node> {
     },
 }
 
-impl<N: HugrNode> PeelTailLoop<N> {
+impl<N> PeelTailLoop<N> {
     /// Create a new instance that will peel the specified [TailLoop] node
-    ///
-    /// # Error
-    ///
-    /// If the specified node is not a [`TailLoop`], returns the actual OpType
-    pub fn try_new(
-        h: &impl HugrView<Node = N>,
-        tail_loop: N,
-    ) -> Result<Self, PeelTailLoopError<N>> {
-        match h.get_optype(tail_loop) {
-            OpType::TailLoop(_) => (),
-            op => {
-                return Err(PeelTailLoopError::NotTailLoop {
-                    node: tail_loop,
-                    op: op.clone(),
-                });
-            }
-        };
-        let [_, output] = h.get_io(tail_loop).unwrap(); // Panic if Hugr invalid
-        Ok(Self { tail_loop, output })
+    pub fn new(node: N) -> Self {
+        Self(node)
     }
 }
 
 impl<N: HugrNode> PatchVerification for PeelTailLoop<N> {
-    /// All checking is done in [Self::try_new]
-    /// (If the Hugr has been modified since, we panic.)
-    type Error = Infallible;
+    type Error = PeelTailLoopError<N>;
     type Node = N;
     fn verify(&self, h: &impl HugrView<Node = N>) -> Result<(), Self::Error> {
-        assert!(h.get_optype(self.tail_loop).is_tail_loop());
+        let opty = h.get_optype(self.0);
+        if !opty.is_tail_loop() {
+            return Err(PeelTailLoopError::NotTailLoop {
+                node: self.0,
+                op: opty.clone(),
+            });
+        }
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
-        // The TailLoop becomes a DFG; the Output becomes a Conditional.
-        // The other nodes (inc Input) keep their neighbours, albeit
-        // with a change to parent node type.
-        [self.tail_loop, self.output].into_iter()
+    fn invalidated_nodes(&self, h: &impl HugrView<Node=N>) -> impl Iterator<Item = N> {
+        h.get_io(self.0).into_iter().flat_map(|[_, output]| [self.0, output].into_iter())
     }
 }
 
 impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
     type Outcome = ();
     fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
-        let loop_ty = h.optype_mut(self.tail_loop);
+        self.verify(h)?; // Now we know we have a TailLoop!
+        let loop_ty = h.optype_mut(self.0);
         let signature = loop_ty.dataflow_signature().unwrap().into_owned();
         // Replace the TailLoop with a DFG - this maintains all external connections
         let mut op = DFG { signature }.into();
@@ -96,11 +76,11 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         } = tl.signature().into_owned();
 
         // Copy the DFG (ex-TailLoop) children into a new TailLoop *before* we add any more
-        let new_loop = h.add_node_after(self.tail_loop, tl); // Temporary parent
-        h.copy_descendants(self.tail_loop, new_loop, None);
+        let new_loop = h.add_node_after(self.0, tl); // Temporary parent
+        h.copy_descendants(self.0, new_loop, None);
 
         // Add conditional inside DFG.
-        debug_assert_eq!(self.output, h.get_io(self.tail_loop).unwrap()[1]);
+        let [_, dfg_out] = h.get_io(self.0).unwrap();
         let cond = Conditional {
             sum_rows,
             other_inputs: rest,
@@ -108,8 +88,8 @@ impl<N: HugrNode> PatchHugrMut for PeelTailLoop<N> {
         };
         let case_in_rows = [0, 1].map(|i| cond.case_input_row(i).unwrap());
         // This preserves all edges from the end of the loop body to the conditional:
-        h.replace_op(self.output, cond);
-        let cond_n = self.output;
+        h.replace_op(dfg_out, cond);
+        let cond_n = dfg_out;
         h.add_ports(cond_n, Direction::Outgoing, loop_out.len() as isize + 1);
         let dfg_out = h.add_node_before(
             cond_n,
@@ -158,7 +138,6 @@ mod test {
         Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     };
     use crate::extension::prelude::{bool_t, usize_t};
-
     use crate::ops::{OpTag, OpTrait, Tag, TailLoop, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_types::INT_TYPES;
     use crate::types::{Signature, Type, TypeRow};
@@ -168,17 +147,19 @@ mod test {
 
     #[test]
     fn bad_peel() {
-        let h = simple_dfg_hugr();
-        let op = h.entrypoint_optype().clone();
+        let backup = simple_dfg_hugr();
+        let op = backup.entrypoint_optype().clone();
         assert!(!op.is_tail_loop());
-        let rw = PeelTailLoop::try_new(&h, h.entrypoint());
+        let mut h = backup.clone();
+        let r = h.apply_patch(PeelTailLoop::new(h.entrypoint()));
         assert_eq!(
-            rw,
+            r,
             Err(PeelTailLoopError::NotTailLoop {
-                node: h.entrypoint(),
+                node: backup.entrypoint(),
                 op
             })
         );
+        assert_eq!(h, backup);
     }
 
     #[test]
@@ -217,8 +198,7 @@ mod test {
         };
         let mut h = fb.finish_hugr_with_outputs(tl.outputs()).unwrap();
 
-        h.apply_patch(PeelTailLoop::try_new(&h, tl.node()).unwrap())
-            .unwrap();
+        h.apply_patch(PeelTailLoop::new(tl.node())).unwrap();
         h.validate().unwrap();
 
         assert_eq!(
@@ -297,8 +277,7 @@ mod test {
         let mut h = fb.finish_hugr_with_outputs(dfg.outputs()).unwrap();
         let tl = tl.node();
 
-        h.apply_patch(PeelTailLoop::try_new(&h, tl).unwrap())
-            .unwrap();
+        h.apply_patch(PeelTailLoop::new(tl)).unwrap();
         h.validate().unwrap();
         let [tl] = h
             .nodes()
