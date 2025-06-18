@@ -277,13 +277,6 @@ fn print_module<'a>(printer: &mut Printer<'a>, module: &'a Module) {
     }
 }
 
-fn print_vis<'a>(printer: &mut Printer<'a>, vis: Visibility) {
-    match vis {
-        Visibility::Private => (),
-        Visibility::Public => printer.text("pub"),
-    }
-}
-
 fn print_node<'a>(printer: &mut Printer<'a>, node: &'a Node) {
     printer.parens_enter();
 
@@ -376,7 +369,11 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
 }
 
 fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
-    print_vis(printer, symbol.visibility);
+    match symbol.visibility {
+        Visibility::Private => (),
+        Visibility::Public => printer.text("pub"),
+    }
+    
     print_symbol_name(printer, &symbol.name);
 
     for param in &symbol.params {
