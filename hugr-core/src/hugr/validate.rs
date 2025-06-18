@@ -357,7 +357,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     });
                 }
             }
-
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c, self.hugr.get_optype(c)));
             if let Err(source) = op_type.validate_op_children(children_optypes) {

@@ -48,7 +48,7 @@ fn reachable_funcs<'a, H: HugrView>(
     })
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Default)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
     entry_points: Vec<Node>,

@@ -281,7 +281,10 @@ mod test {
 
             let f_build = module_builder.define_function(
                 "main",
-                Signature::new_endo(qubit_state_type.get_alias_type()),
+                Signature::new(
+                    vec![qubit_state_type.get_alias_type()],
+                    vec![qubit_state_type.get_alias_type()],
+                ),
             )?;
             n_identity(f_build)?;
             module_builder.finish_hugr()

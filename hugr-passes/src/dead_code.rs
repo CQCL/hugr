@@ -137,8 +137,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                     | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
                     | OpType::AliasDefn(_)
                     | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
-                    | OpType::Output(_) // Do not include FuncDecl / Const unless reachable by static edges
-                                                                // (from Call/LoadConst/LoadFunction)
+                    | OpType::Output(_) // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges
+                                                                // (from Call/LoadConst/LoadFunction):
                     )
                 {
                     q.push_back(ch);
