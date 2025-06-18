@@ -72,7 +72,7 @@ mod trait_impls;
 pub mod walker;
 
 pub use persistent_hugr::{Commit, PersistentHugr};
-pub use resolver::PointerEqResolver;
+pub use resolver::{PointerEqResolver, Resolver, SerdeHashResolver};
 pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
 pub use walker::{PinnedWire, Walker};
 
@@ -81,6 +81,12 @@ pub type PersistentReplacement = hugr_core::SimpleReplacement<PatchNode>;
 
 use persistent_hugr::find_conflicting_node;
 use state_space::CommitData;
+
+pub mod serial {
+    //! Serialized formats for commits, state spaces and persistent HUGRs.
+    pub use super::persistent_hugr::serial::*;
+    pub use super::state_space::serial::*;
+}
 
 #[cfg(test)]
 mod tests;

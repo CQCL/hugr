@@ -1,16 +1,19 @@
 use std::collections::{BTreeMap, HashMap};
 
+use derive_more::derive::{From, Into};
 use hugr_core::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+    envelope::serde_with::AsStringEnvelope,
     extension::prelude::bool_t,
     hugr::{Hugr, HugrView, patch::Patch, views::SiblingSubgraph},
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
 use rstest::*;
+use serde_with::serde_as;
 
-use crate::{Commit, CommitStateSpace, PatchNode, state_space::CommitId};
+use crate::{Commit, CommitStateSpace, PatchNode, Resolver, state_space::CommitId};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -201,10 +204,10 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
 /// - `commit1` and `commit2` are disjoint with `commit4` (i.e. compatible),
 /// - `commit2` depends on `commit1`
 #[fixture]
-pub(crate) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
+pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId; 4]) {
     let (base_hugr, [not0_node, not1_node, _and_node]) = simple_hugr();
 
-    let mut state_space = CommitStateSpace::with_base(base_hugr);
+    let mut state_space = CommitStateSpace::<R>::with_base(base_hugr);
 
     // Create first replacement (replace NOT0 with two NOT gates)
     let replacement1 = create_double_not_replacement(state_space.base_hugr(), not0_node);
@@ -481,4 +484,12 @@ fn test_try_add_commit(test_state_space: (CommitStateSpace, [CommitId; 4])) {
             .try_add_commit(new_commit)
             .expect_err("commit3 is incompatible with [commit1, commit2]");
     }
+}
+
+/// A Hugr that serialises with no extensions
+#[serde_as]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
+pub(crate) struct WrappedHugr {
+    #[serde_as(as = "AsStringEnvelope")]
+    pub hugr: Hugr,
 }

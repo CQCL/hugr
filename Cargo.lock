@@ -1346,6 +1346,7 @@ dependencies = [
  "delegate",
  "derive_more 1.0.0",
  "hugr-core",
+ "insta",
  "itertools 0.14.0",
  "lazy_static",
  "petgraph 0.8.2",
@@ -1353,7 +1354,11 @@ dependencies = [
  "relrc",
  "rstest",
  "semver",
+ "serde",
+ "serde_json",
+ "serde_with",
  "thiserror 2.0.12",
+ "wyhash",
 ]
 
 [[package]]
@@ -2581,6 +2586,7 @@ dependencies = [
  "fxhash",
  "itertools 0.13.0",
  "petgraph 0.8.2",
+ "serde",
  "thiserror 1.0.69",
 ]
 
@@ -3773,6 +3779,15 @@ name = "writeable"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea2f10b9bb0928dfb1b42b65e1f9e36f7f54dbdf08457afefb38afcdec4fa2bb"
+
+[[package]]
+name = "wyhash"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca4d373340c479fd1e779f7a763acee85da3e423b1a9a9acccf97babcc92edbb"
+dependencies = [
+ "rand_core 0.9.3",
+]
 
 [[package]]
 name = "wyz"
