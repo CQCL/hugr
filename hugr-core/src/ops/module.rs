@@ -61,6 +61,10 @@ pub struct FuncDefn {
     visibility: Visibility,
 }
 
+fn priv_vis() -> Visibility {
+    Visibility::Private
+}
+
 impl FuncDefn {
     #[deprecated(note = "Use new_private, or move to new_public")]
     /// Create a new, private, instance with the given name and signature
@@ -163,10 +167,6 @@ pub struct FuncDecl {
 
 fn pub_vis() -> Visibility {
     Visibility::Public
-}
-
-fn priv_vis() -> Visibility {
-    Visibility::Private
 }
 
 impl FuncDecl {
