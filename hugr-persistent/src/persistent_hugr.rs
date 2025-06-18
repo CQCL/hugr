@@ -97,7 +97,9 @@ impl Commit {
 
     /// Get the set of nodes invalidated by the patch in `self`.
     pub fn invalidation_set(&self) -> impl Iterator<Item = PatchNode> + '_ {
-        self.replacement().into_iter().flat_map(|r| r.invalidation_set())
+        self.replacement()
+            .into_iter()
+            .flat_map(|r| r.invalidation_set())
     }
 
     /// Get the set of nodes deleted by applying `self`.
