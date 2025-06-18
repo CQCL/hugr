@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-v0.20.1...hugr-v0.21.0) - 2025-06-18
+
+### Bug Fixes
+
+- update CallGraph and remove_dead_funcs for module-only FuncDefns ([#2336](https://github.com/CQCL/hugr/pull/2336))
+- Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/pull/2324))
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+
+### Documentation
+
+- Hide hugr-persistent docs ([#2357](https://github.com/CQCL/hugr/pull/2357))
+
+### New Features
+
+- Add serial data types for SimpleReplacement and PersistentHugr ([#2300](https://github.com/CQCL/hugr/pull/2300))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+- Add MermaidFormatter to replace RenderConfig ([#2275](https://github.com/CQCL/hugr/pull/2275))
+- [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
+- *(core, llvm)* add array unpack operations ([#2339](https://github.com/CQCL/hugr/pull/2339))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- *(persistent)* Add serialisation for CommitStateSpace ([#2344](https://github.com/CQCL/hugr/pull/2344))
+- Deprecate invalidation_set, add invalidated_nodes and SimpleReplacement::invalidation_set ([#2358](https://github.com/CQCL/hugr/pull/2358))
+- Rewrite for peeling a TailLoop ([#2290](https://github.com/CQCL/hugr/pull/2290))
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- *(core)* builder pattern for EnvelopeConfig ([#2330](https://github.com/CQCL/hugr/pull/2330))
+
+### Refactor
+
+- *(types.rs)* rm incorrect comment and unnecessary allow-unused ([#2340](https://github.com/CQCL/hugr/pull/2340))
+- [**breaking**] move PersistentHugr into separate crate ([#2277](https://github.com/CQCL/hugr/pull/2277))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-v0.20.0...hugr-v0.20.1) - 2025-06-03
 
 ### Bug Fixes
