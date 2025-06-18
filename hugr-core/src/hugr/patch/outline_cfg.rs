@@ -97,7 +97,10 @@ impl PatchVerification for OutlineCfg {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         self.blocks.iter().copied()
     }
 }

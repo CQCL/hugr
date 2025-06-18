@@ -118,7 +118,10 @@ impl<N: HugrNode> PatchVerification for InsertCut<N> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         iter::once(self.parent)
             .chain(self.targets.iter().map(|(n, _)| *n))
             .unique()
@@ -179,7 +182,7 @@ mod tests {
         let targets: Vec<_> = h.all_linked_inputs(i).collect();
         let inserter = InsertCut::new(h.entrypoint(), targets, replacement);
         assert_eq!(
-            inserter.invalidation_set().collect::<Vec<Node>>(),
+            inserter.invalidated_nodes(&h).collect::<Vec<Node>>(),
             vec![h.entrypoint(), o]
         );
 

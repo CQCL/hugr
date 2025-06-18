@@ -85,7 +85,7 @@ pub use resolver::PointerEqResolver;
 
 use crate::{
     Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::patch::{Patch, PatchVerification, simple_replace},
+    hugr::patch::{Patch, simple_replace},
 };
 
 /// A replacement operation that can be applied to a [`PersistentHugr`].

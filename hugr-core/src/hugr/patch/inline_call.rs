@@ -52,7 +52,7 @@ impl<N: HugrNode> PatchVerification for InlineCall<N> {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+    fn invalidated_nodes(&self, _: &impl HugrView<Node = N>) -> impl Iterator<Item = N> {
         Some(self.0).into_iter()
     }
 }

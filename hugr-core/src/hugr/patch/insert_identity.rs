@@ -67,7 +67,10 @@ impl<N: HugrNode> PatchVerification for IdentityInsertion<N> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         iter::once(self.post_node)
     }
 }
