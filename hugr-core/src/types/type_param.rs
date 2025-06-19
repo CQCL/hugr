@@ -207,7 +207,7 @@ pub enum TermEnum<'a> {
         None => "Nat".to_string()
     })]
     BoundedNatType(UpperBound),
-    /// The type of static strings. See [`Term::String`].
+    /// The type of static strings.
     StringType,
     /// The type of static byte strings.
     BytesType,
@@ -220,19 +220,19 @@ pub enum TermEnum<'a> {
     /// The type of static tuples.
     #[display("TupleType[{}]", _0.iter().map(std::string::ToString::to_string).join(", "))]
     TupleType(&'a [Term]),
-    /// A runtime type as a term. Instance of [`Term::RuntimeType`].
+    /// A runtime type as a term.
     #[display("{_0}")]
     Runtime(&'a Type),
-    /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
+    /// A 64bit unsigned integer literal.
     #[display("{_0}")]
     BoundedNat(u64),
-    /// UTF-8 encoded string literal. Instance of [`Term::StringType`].
+    /// UTF-8 encoded string literal.
     #[display("\"{_0}\"")]
     String(&'a str),
-    /// Byte string literal. Instance of [`Term::BytesType`].
+    /// Byte string literal.
     #[display("bytes")]
     Bytes(&'a Arc<[u8]>),
-    /// A 64-bit floating point number. Instance of [`Term::FloatType`].
+    /// A 64-bit floating point number.
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
     /// A list of static terms.
@@ -272,7 +272,7 @@ impl Term {
         Self::new(TermEnum::ListType(&elem.into()))
     }
 
-    /// Creates a new [`Term::TupleType`] given the types of its elements.
+    /// Creates a new tuple type given the types of its elements.
     pub fn new_tuple_type(item_types: impl IntoIterator<Item = Term>) -> Self {
         let item_types: Vec<_> = item_types.into_iter().collect();
         Self::new(TermEnum::TupleType(&item_types))
