@@ -12,7 +12,7 @@ use hugr_core::{
     types::EdgeKind,
 };
 
-use hugr_persistent::{CommitStateSpace, PersistentReplacement, PinnedWire, Walker};
+use hugr_persistent::{CommitStateSpace, PersistentReplacement, PersistentWire, Walker};
 
 /// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 2;
@@ -133,7 +133,7 @@ fn two_cz_3qb_hugr() -> Hugr {
 /// Traverse all commits in state space, enqueueing all outgoing wires of
 /// CZ nodes
 fn enqueue_all(
-    queue: &mut VecDeque<(PinnedWire, Walker<'static>)>,
+    queue: &mut VecDeque<(PersistentWire, Walker<'static>)>,
     state_space: &CommitStateSpace,
 ) {
     for id in state_space.all_commit_ids() {
@@ -169,10 +169,10 @@ fn build_state_space() -> CommitStateSpace {
     enqueue_all(&mut wire_queue, &state_space);
 
     while let Some((wire, walker)) = wire_queue.pop_front() {
-        if !wire.is_complete(None) {
+        if !walker.is_complete(&wire, None) {
             // expand the wire in all possible ways
-            let (pinned_node, pinned_port) = wire
-                .all_pinned_ports()
+            let (pinned_node, pinned_port) = walker
+                .find_pinned_ports(&wire, None)
                 .next()
                 .expect("at least one port was already pinned");
             assert!(
@@ -190,7 +190,10 @@ fn build_state_space() -> CommitStateSpace {
             // we have a complete wire, so we can commute the CZ gates (or
             // cancel them out)
 
-            let patch_nodes: BTreeSet<_> = wire.all_pinned_ports().map(|(n, _)| n).collect();
+            let patch_nodes: BTreeSet<_> = walker
+                .find_pinned_ports(&wire, None)
+                .map(|(n, _)| n)
+                .collect();
             // check that the patch applies to more than one commit (or the base),
             // otherwise we have infinite commutations back and forth
             let patch_owners: BTreeSet<_> = patch_nodes.iter().map(|n| n.0).collect();
@@ -230,14 +233,14 @@ fn build_state_space() -> CommitStateSpace {
     state_space
 }
 
-fn create_replacement(wire: PinnedWire, walker: &Walker) -> Option<PersistentReplacement> {
+fn create_replacement(wire: PersistentWire, walker: &Walker) -> Option<PersistentReplacement> {
     let hugr = walker.clone().into_persistent_hugr();
     let (out_node, _) = wire
-        .pinned_outport()
+        .single_outgoing_port(&hugr)
         .expect("outgoing port was already pinned (and is unique)");
 
     let (in_node, _) = wire
-        .pinned_inports()
+        .all_incoming_ports(&hugr)
         .exactly_one()
         .ok()
         .expect("all our wires have exactly one incoming port");
