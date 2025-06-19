@@ -231,8 +231,16 @@ pub(super) fn collect_term_exts(
             collect_term_exts(item_type, used_extensions, missing_extensions)
         }
         Term::TupleType(item_types) => {
-            for item_type in item_types {
-                collect_term_exts(item_type, used_extensions, missing_extensions);
+            collect_term_exts(item_types, used_extensions, missing_extensions)
+        }
+        Term::ListConcat(lists) => {
+            for list in lists {
+                collect_term_exts(list, used_extensions, missing_extensions);
+            }
+        }
+        Term::TupleConcat(tuples) => {
+            for tuple in tuples {
+                collect_term_exts(tuple, used_extensions, missing_extensions);
             }
         }
         Term::Variable(_)

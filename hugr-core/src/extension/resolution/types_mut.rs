@@ -222,23 +222,19 @@ pub(super) fn resolve_term_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match term {
         Term::Runtime(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        Term::List(elems) => {
-            for elem in elems.iter_mut() {
-                resolve_term_exts(node, elem, extensions, used_extensions)?;
-            }
-        }
-        Term::Tuple(elems) => {
-            for elem in elems.iter_mut() {
-                resolve_term_exts(node, elem, extensions, used_extensions)?;
+        Term::List(children)
+        | Term::ListConcat(children)
+        | Term::Tuple(children)
+        | Term::TupleConcat(children) => {
+            for child in children.iter_mut() {
+                resolve_term_exts(node, child, extensions, used_extensions)?;
             }
         }
         Term::ListType(item_type) => {
-            resolve_term_exts(node, item_type, extensions, used_extensions)?;
+            resolve_term_exts(node, item_type.as_mut(), extensions, used_extensions)?;
         }
         Term::TupleType(item_types) => {
-            for item_type in item_types.iter_mut() {
-                resolve_term_exts(node, item_type, extensions, used_extensions)?;
-            }
+            resolve_term_exts(node, item_types.as_mut(), extensions, used_extensions)?;
         }
         Term::Variable(_)
         | Term::RuntimeType(_)

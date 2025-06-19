@@ -78,7 +78,7 @@ pub(super) enum TypeParamSer {
     Float,
     StaticType,
     List { param: Box<Term> },
-    Tuple { params: Vec<Term> },
+    Tuple { params: ArrayOrTermSer },
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -104,8 +104,14 @@ pub(super) enum TypeArgSer {
     List {
         elems: Vec<Term>,
     },
+    ListConcat {
+        lists: Vec<Term>,
+    },
     Tuple {
         elems: Vec<Term>,
+    },
+    TupleConcat {
+        tuples: Vec<Term>,
     },
     Variable {
         #[serde(flatten)]
@@ -130,8 +136,10 @@ impl From<Term> for TermSer {
             Term::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
             Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
             Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
-            Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple { params }),
             Term::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
+            Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple {
+                params: (*params).into(),
+            }),
             Term::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
             Term::String(arg) => TermSer::TypeArg(TypeArgSer::String { arg }),
             Term::Bytes(value) => TermSer::TypeArg(TypeArgSer::Bytes { value }),
@@ -139,6 +147,8 @@ impl From<Term> for TermSer {
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
             Term::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v }),
+            Term::ListConcat(lists) => TermSer::TypeArg(TypeArgSer::ListConcat { lists }),
+            Term::TupleConcat(tuples) => TermSer::TypeArg(TypeArgSer::TupleConcat { tuples }),
         }
     }
 }
@@ -154,7 +164,7 @@ impl From<TermSer> for Term {
                 TypeParamSer::Bytes => Term::BytesType,
                 TypeParamSer::Float => Term::FloatType,
                 TypeParamSer::List { param } => Term::ListType(param),
-                TypeParamSer::Tuple { params } => Term::TupleType(params),
+                TypeParamSer::Tuple { params } => Term::TupleType(Box::new(params.into())),
             },
             TermSer::TypeArg(arg) => match arg {
                 TypeArgSer::Type { ty } => Term::Runtime(ty),
@@ -165,7 +175,35 @@ impl From<TermSer> for Term {
                 TypeArgSer::List { elems } => Term::List(elems),
                 TypeArgSer::Tuple { elems } => Term::Tuple(elems),
                 TypeArgSer::Variable { v } => Term::Variable(v),
+                TypeArgSer::ListConcat { lists } => Term::ListConcat(lists),
+                TypeArgSer::TupleConcat { tuples } => Term::TupleConcat(tuples),
             },
+        }
+    }
+}
+
+/// Helper type that serialises lists as JSON arrays for compatibility.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub(super) enum ArrayOrTermSer {
+    Array(Vec<Term>),
+    Term(Box<Term>),
+}
+
+impl From<ArrayOrTermSer> for Term {
+    fn from(value: ArrayOrTermSer) -> Self {
+        match value {
+            ArrayOrTermSer::Array(terms) => Term::new_list(terms),
+            ArrayOrTermSer::Term(term) => *term,
+        }
+    }
+}
+
+impl From<Term> for ArrayOrTermSer {
+    fn from(term: Term) -> Self {
+        match term {
+            Term::List(terms) => ArrayOrTermSer::Array(terms),
+            term => ArrayOrTermSer::Term(Box::new(term)),
         }
     }
 }
