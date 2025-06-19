@@ -55,9 +55,6 @@
 //! versions of the graph simultaneously, without having to materialize
 //! each version separately.
 
-mod pinned;
-pub use pinned::PinnedWire;
-
 use std::{borrow::Cow, collections::BTreeSet};
 
 use itertools::{Either, Itertools};
@@ -65,7 +62,7 @@ use thiserror::Error;
 
 use hugr_core::{Direction, HugrView, Port};
 
-use crate::{PointerEqResolver, resolver::Resolver};
+use crate::{PersistentWire, PointerEqResolver, resolver::Resolver};
 
 use super::{CommitStateSpace, InvalidCommit, PatchNode, PersistentHugr, state_space::CommitId};
 
@@ -197,13 +194,13 @@ impl<'a, R: Resolver> Walker<'a, R> {
     /// true, then an empty iterator is returned.
     pub fn expand<'b>(
         &'b self,
-        wire: &'b PinnedWire,
+        wire: &'b PersistentWire,
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = Walker<'a, R>> + 'b {
         let dir = dir.into();
 
         // Find unpinned ports on the wire (satisfying the direction constraint)
-        let unpinned_ports = wire.unpinned_ports(dir);
+        let unpinned_ports = self.find_unpinned_ports(wire, dir);
 
         // Obtain set of pinnable nodes by considering all ports (in descendant
         // commits) equivalent to currently unpinned ports.
@@ -231,8 +228,9 @@ impl<R: Clone> Walker<'_, R> {
     ///
     /// # Panics
     /// Panics if `node` is not already pinned in this Walker.
-    pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PinnedWire {
-        PinnedWire::from_pinned_port(node, port, self)
+    pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PersistentWire {
+        assert!(self.is_pinned(node), "node must be pinned");
+        self.selected_commits.get_wire(node, port)
     }
 
     /// Materialise the [`PersistentHugr`] containing all the compatible commits
@@ -290,7 +288,7 @@ impl<R: Clone> Walker<'_, R> {
         all_ports
     }
 
-    fn is_pinned(&self, node: PatchNode) -> bool {
+    pub(crate) fn is_pinned(&self, node: PatchNode) -> bool {
         self.pinned_nodes.contains(&node)
     }
 }
@@ -402,11 +400,11 @@ mod tests {
         for new_walker in out_walkers {
             // new wire is complete (and thus cannot be expanded)
             let in0 = new_walker.get_wire(base_and_node, IncomingPort::from(0));
-            assert!(in0.is_complete(None));
+            assert!(new_walker.is_complete(&in0, None));
             assert!(new_walker.expand(&in0, None).next().is_none());
 
             // all nodes on wire are pinned
-            let (not_node, _) = in0.pinned_outport().unwrap();
+            let (not_node, _) = in0.single_outgoing_port(new_walker.as_hugr_view()).unwrap();
             assert!(new_walker.is_pinned(base_and_node));
             assert!(new_walker.is_pinned(not_node));
 
@@ -487,11 +485,15 @@ mod tests {
 
             // new wire is complete (and thus cannot be expanded)
             let not4_out = new_walker.get_wire(not4_node, OutgoingPort::from(0));
-            assert!(not4_out.is_complete(None));
+            assert!(new_walker.is_complete(&not4_out, None));
             assert!(new_walker.expand(&not4_out, None).next().is_none());
 
             // all nodes on wire are pinned
-            let (next_node, _) = not4_out.pinned_inports().exactly_one().ok().unwrap();
+            let (next_node, _) = not4_out
+                .all_incoming_ports(new_walker.as_hugr_view())
+                .exactly_one()
+                .ok()
+                .unwrap();
             assert!(new_walker.is_pinned(not4_node));
             assert!(new_walker.is_pinned(next_node));
 
@@ -531,7 +533,7 @@ mod tests {
 
         let hugr = state_space.try_extract_hugr([commit4]).unwrap();
         let (second_not_node, out_port) =
-            hugr.get_single_outgoing_port(base_and_node, IncomingPort::from(1));
+            hugr.single_outgoing_port(base_and_node, IncomingPort::from(1));
         assert_eq!(second_not_node.0, commit4);
         assert_eq!(out_port, OutgoingPort::from(0));
 
@@ -539,7 +541,7 @@ mod tests {
             .try_extract_hugr([commit1, commit2, commit4])
             .unwrap();
         let (new_and_node, in_port) = hugr
-            .get_all_incoming_ports(second_not_node, out_port)
+            .all_incoming_ports(second_not_node, out_port)
             .exactly_one()
             .ok()
             .unwrap();
