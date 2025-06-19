@@ -11,8 +11,8 @@ use std::sync::Weak;
 
 use crate::Extension;
 use crate::extension::{TypeDef, TypeDefBound};
-use crate::types::type_param::TypeParam;
-use crate::types::{TypeBound, TypeName};
+use crate::types::type_param::{TermEnum, TypeParam};
+use crate::types::{Term, TypeBound, TypeName};
 
 use serde::{Deserialize, Serialize};
 
@@ -129,6 +129,6 @@ impl TypeParamDeclaration {
         _extension: &Extension,
         _ctx: DeclarationContext<'_>,
     ) -> Result<TypeParam, ExtensionDeclarationError> {
-        Ok(TypeParam::StringType)
+        Ok(Term::new(TermEnum::StringType))
     }
 }

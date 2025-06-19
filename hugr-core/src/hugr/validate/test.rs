@@ -339,7 +339,7 @@ fn invalid_types() {
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
             type_: TypeBound::Copyable.into(),
-            term: valid.into()
+            term: valid.into(),
         })
     );
 
@@ -376,7 +376,7 @@ fn invalid_types() {
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![usize_t().into(), 3u64.into()],
+        vec![usize_t().into(), Term::from(3u64)],
         EXT_ID,
         TypeBound::Any,
         &Arc::downgrade(&ext),
@@ -453,18 +453,20 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
-    const BOUND: TypeParam = TypeParam::RuntimeType(TypeBound::Copyable);
     let list_of_var = Type::new_extension(
         list::EXTENSION
             .get_type(&list::LIST_TYPENAME)
             .unwrap()
-            .instantiate(vec![TypeArg::new_var_use(0, BOUND)])?,
+            .instantiate(vec![TypeArg::new_var_use(0, TypeBound::Copyable.into())])?,
     );
     let reg = ExtensionRegistry::new([list::EXTENSION.to_owned()]);
     reg.validate()?;
     let mut def = FunctionBuilder::new(
         "myfunc",
-        PolyFuncType::new([BOUND], Signature::new(vec![], vec![list_of_var.clone()])),
+        PolyFuncType::new(
+            [TypeBound::Copyable.into()],
+            Signature::new(vec![], vec![list_of_var.clone()]),
+        ),
     )?;
     let empty_list = Value::extension(list::ListValue::new_empty(Type::new_var_use(
         0,
@@ -516,8 +518,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    fn uint_seq(i: usize) -> Term {
-        vec![usize_t().into(); i].into()
+    fn uint_seq(i: usize) -> TypeArg {
+        Term::new_list((0..i).map(|_| usize_t().into()))
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(

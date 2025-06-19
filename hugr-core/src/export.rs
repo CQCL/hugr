@@ -1,7 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
-use crate::types::type_param::Term;
+use crate::types::type_param::{Term, TermEnum};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -935,8 +935,8 @@ impl<'a> Context<'a> {
         t: &Term,
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
-        match t {
-            Term::RuntimeType(b) => {
+        match t.get() {
+            TermEnum::RuntimeType(b) => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);
@@ -945,29 +945,30 @@ impl<'a> Context<'a> {
 
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
-            Term::BoundedNatType { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
-            Term::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
-            Term::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
-            Term::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
-            Term::ListType(item_type) => {
+            TermEnum::BoundedNatType(_) => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            TermEnum::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            TermEnum::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            TermEnum::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
+            TermEnum::ListType(item_type) => {
                 let item_type = self.export_term(item_type, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            Term::TupleType(params) => {
+            TermEnum::TupleType(item_types) => {
                 let item_types = self.bump.alloc_slice_fill_iter(
-                    params
+                    item_types
                         .iter()
                         .map(|param| table::SeqPart::Item(self.export_term(param, None))),
                 );
                 let types = self.make_term(table::Term::List(item_types));
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
             }
-            Term::Runtime(ty) => self.export_type(ty),
-            Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
-            Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
-            Term::Float(value) => self.make_term(model::Literal::Float(*value).into()),
-            Term::Bytes(value) => self.make_term(model::Literal::Bytes(value.clone()).into()),
-            Term::List(elems) => {
+            TermEnum::Runtime(ty) => self.export_type(ty),
+            TermEnum::BoundedNat(value) => self.make_term(model::Literal::Nat(value).into()),
+            TermEnum::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
+            TermEnum::Float(value) => self.make_term(model::Literal::Float(value).into()),
+            TermEnum::Bytes(value) => self.make_term(model::Literal::Bytes(value.clone()).into()),
+            TermEnum::List(elems) => {
+                // For now we assume that the sequence is meant to be a list.
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
@@ -975,7 +976,7 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            Term::Tuple(elems) => {
+            TermEnum::Tuple(elems) => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     elems
                         .iter()
@@ -983,8 +984,8 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::Tuple(parts))
             }
-            Term::Variable(v) => self.export_type_arg_var(v),
-            Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
+            TermEnum::Variable(v) => self.export_type_arg_var(v),
+            TermEnum::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
         }
     }
 

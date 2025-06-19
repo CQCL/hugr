@@ -8,7 +8,7 @@ use crate::Wire;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::TypeDefBound;
 use crate::ops::OpName;
-use crate::types::{CustomType, PolyFuncType, Signature, Type, TypeBound, TypeName};
+use crate::types::{CustomType, PolyFuncType, Signature, Term, Type, TypeBound, TypeName};
 use crate::{
     Extension,
     extension::{
@@ -19,7 +19,7 @@ use crate::{
     },
     ops::custom::ExtensionOp,
     type_row,
-    types::type_param::{TypeArg, TypeParam},
+    types::type_param::TypeArg,
 };
 use lazy_static::lazy_static;
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -65,7 +65,7 @@ impl MakeOpDef for PtrOpDef {
             PtrOpDef::Write => Signature::new(vec![ptr_t, inner_t], type_row![]),
         };
 
-        PolyFuncType::new(TYPE_PARAMS, body).into()
+        PolyFuncType::new(type_params(), body).into()
     }
 
     fn extension(&self) -> ExtensionId {
@@ -89,7 +89,11 @@ impl MakeOpDef for PtrOpDef {
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("ptr");
 /// Name of pointer type.
 pub const PTR_TYPE_ID: TypeName = TypeName::new_inline("ptr");
-const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::RuntimeType(TypeBound::Copyable)];
+
+fn type_params() -> [Term; 1] {
+    [TypeBound::Copyable.into()]
+}
+
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
@@ -99,7 +103,7 @@ fn extension() -> Arc<Extension> {
         extension
             .add_type(
                 PTR_TYPE_ID,
-                TYPE_PARAMS.into(),
+                type_params().into(),
                 "Standard extension pointer type.".into(),
                 TypeDefBound::copyable(),
                 extension_ref,
@@ -207,10 +211,11 @@ impl HasConcrete for PtrOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         let ty = match type_args {
-            [TypeArg::Runtime(ty)] => ty.clone(),
+            [ty] => ty,
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
 
+        let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
         Ok(self.with_type(ty))
     }
 }

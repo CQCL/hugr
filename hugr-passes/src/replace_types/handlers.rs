@@ -106,23 +106,32 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [n, ty] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
+
+    let Some(n) = n.as_nat() else {
+        panic!("Illegal TypeArgs to array: {args:?}")
+    };
+
+    let Some(ty) = ty.as_runtime() else {
+        panic!("Illegal TypeArgs to array: {args:?}")
+    };
+
     if num_outports == 0 {
         // "Simple" discard - first map each element to unit (via type-specific discard):
         let map_fn = {
             let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
             let [to_discard] = dfb.input_wires_arr();
-            lin.copy_discard_op(ty, 0)?
+            lin.copy_discard_op(&ty, 0)?
                 .add(&mut dfb, [to_discard])
                 .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
             let ret = dfb.add_load_value(Value::unary_unit_sum());
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
         // Now array.scan that over the input array to get an array of unit (which can be discarded)
-        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
-        let in_type = AK::ty(*n, ty.clone());
+        let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], n);
+        let in_type = AK::ty(n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
             let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
             let [in_array] = dfb.input_wires_arr();
@@ -134,14 +143,14 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 .add_dataflow_op(array_scan, [in_array, map_fn])
                 .unwrap()
                 .out_wire(0);
-            AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
+            AK::build_discard(&mut dfb, Type::UNIT, n, unit_arr).unwrap();
             dfb.finish_hugr_with_outputs([]).unwrap()
         })));
     }
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
     let num_new = num_outports - 1;
-    let array_ty = AK::ty(*n, ty.clone());
+    let array_ty = AK::ty(n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
         array_ty.clone(),
         vec![array_ty.clone(); num_outports],
@@ -159,7 +168,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 .unwrap();
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
-        let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
+        let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), n); num_new];
         let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
         repeats
             .into_iter()
@@ -173,7 +182,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     // 2. use a scan through the input array, copying the element num_outputs times;
     // return the first copy, and put each of the other copies into one of the array<option>
     let i64_t = INT_TYPES[6].clone();
-    let option_array = AK::ty(*n, option_ty.clone());
+    let option_array = AK::ty(n, option_ty.clone());
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
@@ -187,14 +196,14 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .unwrap()
             .outputs_arr();
         let mut copies = lin
-            .copy_discard_op(ty, num_outports)?
+            .copy_discard_op(&ty, num_outports)?
             .add(&mut dfb, [elem])
             .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
         // Wrap each remaining copy into an option
-        let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), *n));
+        let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
             .as_sum()
             .unwrap()
@@ -238,7 +247,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         std::iter::once(i64_t)
             .chain(vec![option_array; num_new])
             .collect(),
-        *n,
+        n,
     );
 
     let copy_elem = dfb.add_load_value(Value::function(copy_elem).unwrap());
@@ -266,7 +275,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         dfb.finish_hugr_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty.clone(), ty.clone(), vec![], *n);
+    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty.clone(), ty.clone(), vec![], n);
     let unwrap_elem = dfb.add_load_value(Value::function(unwrap_elem).unwrap());
 
     let out_arrays = std::iter::once(out_array1)
@@ -307,29 +316,37 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [n, ty] = args else {
+        panic!("Illegal TypeArgs to array: {args:?}")
+    };
+
+    let Some(n) = n.as_nat() else {
+        panic!("Illegal TypeArgs to array: {args:?}")
+    };
+
+    let Some(ty) = ty.as_runtime() else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
         if num_outports == 0 {
             Ok(NodeTemplate::SingleOp(
-                ArrayDiscard::new(ty.clone(), *n).unwrap().into(),
+                ArrayDiscard::new(ty.clone(), n).unwrap().into(),
             ))
         } else if num_outports == 2 {
             Ok(NodeTemplate::SingleOp(
-                ArrayClone::new(ty.clone(), *n).unwrap().into(),
+                ArrayClone::new(ty.clone(), n).unwrap().into(),
             ))
         } else {
-            let array_ty = array_type(*n, ty.clone());
+            let array_ty = array_type(n, ty.clone());
             Ok(NodeTemplate::CompoundOp(Box::new({
                 let mut dfb =
-                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; n as usize]))
                         .unwrap();
                 let [mut arr] = dfb.input_wires_arr();
                 let mut outs = vec![];
                 for _ in 0..(num_outports - 1) {
-                    let (arr1, arr2) = dfb.add_array_clone(ty.clone(), *n, arr).unwrap();
+                    let (arr1, arr2) = dfb.add_array_clone(ty.clone(), n, arr).unwrap();
                     arr = arr1;
                     outs.push(arr2);
                 }

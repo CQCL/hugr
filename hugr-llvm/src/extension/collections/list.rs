@@ -1,10 +1,10 @@
-use anyhow::{Ok, Result, bail};
+use anyhow::{Ok, Result, anyhow, bail};
 use hugr_core::{
     HugrView, Node,
     extension::simple_op::MakeExtensionOp as _,
     ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
-    types::{SumType, Type, TypeArg},
+    types::{SumType, Type},
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
@@ -202,12 +202,16 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
     args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     op: ListOp,
 ) -> Result<()> {
-    let hugr_elem_ty = match args.node().args() {
-        [TypeArg::Runtime(ty)] => ty.clone(),
-        _ => {
-            bail!("Collections: invalid type args for list op");
-        }
+    let node = args.node();
+
+    let [ty] = node.args() else {
+        bail!("Collections: invalid type args for list op: expected one argument")
     };
+
+    let hugr_elem_ty = ty.as_runtime().ok_or_else(|| {
+        anyhow!("Collections: invalid type args for list op: expected runtime type")
+    })?;
+
     let elem_ty = ctx.llvm_type(&hugr_elem_ty)?;
     let func = ListRtFunc::get_extern(op.into(), ctx, ccg)?;
     match op {
@@ -254,8 +258,14 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .unwrap_left()
                 .into_int_value();
             let old_elem = build_load_i8_ptr(ctx, elem_ptr, elem.get_type())?;
-            let ok_or =
-                build_ok_or_else(ctx, ok, elem, hugr_elem_ty.clone(), old_elem, hugr_elem_ty)?;
+            let ok_or = build_ok_or_else(
+                ctx,
+                ok,
+                elem,
+                hugr_elem_ty.clone(),
+                old_elem,
+                hugr_elem_ty.clone(),
+            )?;
             args.outputs.finish(ctx.builder(), vec![list, ok_or])?;
         }
         ListOp::insert => {
@@ -270,7 +280,8 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
             let unit =
                 ctx.llvm_sum_type(SumType::new_unary(1))?
                     .build_tag(ctx.builder(), 0, vec![])?;
-            let ok_or = build_ok_or_else(ctx, ok, unit.into(), Type::UNIT, elem, hugr_elem_ty)?;
+            let ok_or =
+                build_ok_or_else(ctx, ok, unit.into(), Type::UNIT, elem, hugr_elem_ty.clone())?;
             args.outputs.finish(ctx.builder(), vec![list, ok_or])?;
         }
         ListOp::length => {

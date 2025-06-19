@@ -389,6 +389,7 @@ mod test {
     };
     use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
     use itertools::Itertools;
+    use once_cell::sync::Lazy;
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
@@ -404,16 +405,21 @@ mod test {
             arg_values: &[TypeArg],
             _def: &'o OpDef,
         ) -> Result<PolyFuncTypeRV, SignatureError> {
-            let [TypeArg::BoundedNat(n)] = arg_values else {
-                panic!()
+            let [n] = arg_values else {
+                panic!();
             };
-            let outs = vec![self.0.clone(); *n as usize];
+
+            let Some(n) = n.as_nat() else {
+                panic!();
+            };
+
+            let outs = vec![self.0.clone(); n as usize];
             Ok(FuncValueType::new(self.0.clone(), outs).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {
-            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
-            JUST_NAT
+            static JUST_NAT: Lazy<[TypeParam; 1]> = Lazy::new(|| [TypeParam::max_nat_type()]);
+            &*JUST_NAT
         }
     }
 

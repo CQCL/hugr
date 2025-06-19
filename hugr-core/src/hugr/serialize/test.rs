@@ -19,10 +19,9 @@ use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
-use crate::types::type_param::TypeParam;
+use crate::types::type_param::{Term, TermEnum, TypeParam};
 use crate::types::{
-    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
-    TypeRV,
+    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeBound, TypeRV,
 };
 use crate::{OutgoingPort, type_row};
 
@@ -479,12 +478,12 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([Term::new(TermEnum::StringType)], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeParam::new_list_type(TypeBound::Any)], Signature::new_endo(type_row![])))]
-#[case(PolyFuncType::new([TypeParam::TupleType([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())].into())], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([Term::new_list_type(TypeBound::Any)], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([Term::new_tuple_type([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
-    [TypeParam::new_list_type(TypeBound::Any)],
+    [Term::new_list_type(TypeBound::Any)],
     Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
@@ -492,10 +491,10 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([Term::new(TermEnum::StringType)], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_list_type(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new([TypeParam::TupleType([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())].into())], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([Term::new_list_type(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([Term::new_tuple_type([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
     [TypeParam::new_list_type(TypeBound::Any)],
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
@@ -514,7 +513,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat(1)]).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [Term::from(1u64)]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {

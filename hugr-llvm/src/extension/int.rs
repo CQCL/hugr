@@ -9,7 +9,7 @@ use hugr_core::{
         int_ops::IntOpDef,
         int_types::{self, ConstInt},
     },
-    types::{CustomType, Type, TypeArg},
+    types::{CustomType, Term, Type},
 };
 use inkwell::{
     IntPredicate,
@@ -668,8 +668,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             ])
         }),
         IntOpDef::inarrow_s => {
-            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
-            else {
+            let Some(out_log_width) = args.node().args().last().and_then(Term::as_nat) else {
                 bail!("Type arg to inarrow_s wasn't a Nat");
             };
             let (_, out_ty) = args.node.out_value_types().next().unwrap();
@@ -686,8 +685,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::inarrow_u => {
-            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
-            else {
+            let Some(out_log_width) = args.node().args().last().and_then(Term::as_nat) else {
                 bail!("Type arg to inarrow_u wasn't a Nat");
             };
             let (_, out_ty) = args.node.out_value_types().next().unwrap();
@@ -756,13 +754,21 @@ pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     args: &EmitOpArgs<'_, '_, ExtensionOp, H>,
     op: &impl MakeExtensionOp,
 ) -> Result<u64> {
-    let [TypeArg::BoundedNat(log_width)] = args.node.args() else {
+    let [log_width] = args.node.args() else {
         bail!(
             "Expected exactly one BoundedNat parameter to {}",
             op.op_id()
         )
     };
-    Ok(*log_width)
+
+    let Some(log_width) = log_width.as_nat() else {
+        bail!(
+            "Expected exactly one BoundedNat parameter to {}",
+            op.op_id()
+        )
+    };
+
+    Ok(log_width)
 }
 
 // The semantics of the hugr operation specify that the divisor argument is
@@ -1094,26 +1100,30 @@ fn llvm_type<'c>(
     context: TypingSession<'c, '_>,
     hugr_type: &CustomType,
 ) -> Result<BasicTypeEnum<'c>> {
-    if let [TypeArg::BoundedNat(n)] = hugr_type.args() {
-        let m = *n as usize;
-        if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
-            return Ok(match m {
-                0..=3 => context.iw_context().i8_type(),
-                4 => context.iw_context().i16_type(),
-                5 => context.iw_context().i32_type(),
-                6 => context.iw_context().i64_type(),
-                _ => Err(anyhow!(
-                    "IntTypesCodegenExtension: unsupported log_width: {}",
-                    m
-                ))?,
-            }
-            .into());
+    let [n] = hugr_type.args() else {
+        bail!("IntTypesCodegenExtension: invalid type args: {}", hugr_type)
+    };
+
+    let Some(n) = n.as_nat() else {
+        bail!("IntTypesCodegenExtension: unsupported type: {}", hugr_type)
+    };
+
+    let m = n as usize;
+    if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
+        return Ok(match m {
+            0..=3 => context.iw_context().i8_type(),
+            4 => context.iw_context().i16_type(),
+            5 => context.iw_context().i32_type(),
+            6 => context.iw_context().i64_type(),
+            _ => Err(anyhow!(
+                "IntTypesCodegenExtension: unsupported log_width: {}",
+                m
+            ))?,
         }
+        .into());
     }
-    Err(anyhow!(
-        "IntTypesCodegenExtension: unsupported type: {}",
-        hugr_type
-    ))
+
+    bail!("IntTypesCodegenExtension: unsupported type: {}", hugr_type)
 }
 
 fn emit_const_int<'c, H: HugrView<Node = Node>>(

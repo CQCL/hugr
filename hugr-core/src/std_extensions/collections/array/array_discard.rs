@@ -163,12 +163,18 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayDiscardDef<AK> {
     type Concrete = GenericArrayDiscard<AK>;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
-                Ok(GenericArrayDiscard::new(ty.clone(), *n).unwrap())
-            }
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
+        let [n, ty] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+
+        let n = n.as_nat().ok_or(SignatureError::InvalidTypeArgs)?;
+        let ty = ty.as_runtime().ok_or(SignatureError::InvalidTypeArgs)?;
+
+        if !ty.copyable() {
+            return Err(SignatureError::InvalidTypeArgs.into());
         }
+
+        Ok(GenericArrayDiscard::new(ty, n).unwrap())
     }
 }
 

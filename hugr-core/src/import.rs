@@ -25,7 +25,7 @@ use crate::{
     types::{
         CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
         Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
-        type_param::TypeParam, type_row::TypeRowBase,
+        type_param::TermEnum, type_row::TypeRowBase,
     },
 };
 use fxhash::FxHashMap;
@@ -1212,7 +1212,7 @@ impl<'a> Context<'a> {
     ) -> Result<Term, ImportError> {
         (|| {
             if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(Term::StringType);
+                return Ok(Term::new(TermEnum::StringType));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
@@ -1220,15 +1220,15 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(Term::BytesType);
+                return Ok(Term::new(TermEnum::BytesType));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(Term::FloatType);
+                return Ok(Term::new(TermEnum::FloatType));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeType(bound));
+                return Ok(Term::from(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1236,7 +1236,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Ok(Term::StaticType);
+                return Ok(Term::new(TermEnum::StaticType));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
@@ -1249,20 +1249,20 @@ impl<'a> Context<'a> {
                 let item_type = self
                     .import_term(item_type)
                     .map_err(|err| error_context!(err, "item type of list type"))?;
-                return Ok(TypeParam::new_list_type(item_type));
+                return Ok(Term::new_list_type(item_type));
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
                 // At present `hugr-model` has no way to express that the item
                 // types of a tuple must be copyable. Therefore we import it as `Any`.
-                let item_types = (|| {
+                let item_types: Vec<_> = (|| {
                     self.import_closed_list(item_types)?
                         .into_iter()
                         .map(|param| self.import_term(param))
                         .collect::<Result<_, _>>()
                 })()
                 .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::TupleType(item_types));
+                return Ok(Term::new_tuple_type(item_types));
             }
 
             match self.get_term(term_id)? {
@@ -1278,7 +1278,7 @@ impl<'a> Context<'a> {
                 }
 
                 table::Term::List { .. } => {
-                    let elems = (|| {
+                    let elems: Vec<_> = (|| {
                         self.import_closed_list(term_id)?
                             .iter()
                             .map(|item| self.import_term(*item))
@@ -1286,11 +1286,11 @@ impl<'a> Context<'a> {
                     })()
                     .map_err(|err| error_context!(err, "list items"))?;
 
-                    Ok(Term::List(elems))
+                    Ok(Term::new_list(elems))
                 }
 
                 table::Term::Tuple { .. } => {
-                    let elems = (|| {
+                    let elems: Vec<_> = (|| {
                         self.import_closed_list(term_id)?
                             .iter()
                             .map(|item| self.import_term(*item))
@@ -1298,24 +1298,15 @@ impl<'a> Context<'a> {
                     })()
                     .map_err(|err| error_context!(err, "tuple items"))?;
 
-                    Ok(Term::Tuple(elems))
+                    Ok(Term::new_tuple(elems))
                 }
 
-                table::Term::Literal(model::Literal::Str(value)) => {
-                    Ok(Term::String(value.to_string()))
-                }
-
-                table::Term::Literal(model::Literal::Nat(value)) => Ok(Term::BoundedNat(*value)),
-
-                table::Term::Literal(model::Literal::Bytes(value)) => {
-                    Ok(Term::Bytes(value.clone()))
-                }
-                table::Term::Literal(model::Literal::Float(value)) => Ok(Term::Float(*value)),
+                table::Term::Literal(literal) => Ok(Term::from(literal.clone())),
                 table::Term::Func { .. } => Err(error_unsupported!("function constant")),
 
                 table::Term::Apply { .. } => {
                     let ty: Type = self.import_type(term_id)?;
-                    Ok(ty.into())
+                    Ok(Term::from(ty))
                 }
             }
         })()

@@ -145,11 +145,15 @@ impl TypeDef {
                     return TypeBound::Any;
                 }
                 least_upper_bound(indices.iter().map(|i| {
-                    let ta = args.get(*i);
-                    match ta {
-                        Some(TypeArg::Runtime(s)) => s.least_upper_bound(),
-                        _ => panic!("TypeArg index does not refer to a type."),
-                    }
+                    let Some(ta) = args.get(*i) else {
+                        panic!("TypeArg index does not exist.")
+                    };
+
+                    let ty = ta
+                        .as_runtime()
+                        .expect("TypeArg index does not refer to a type.");
+
+                    ty.least_upper_bound()
                 }))
             }
         }
@@ -241,7 +245,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::TermTypeError;
     use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
@@ -250,7 +254,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::RuntimeType(TypeBound::Copyable)],
+            params: vec![TypeBound::Copyable.into()],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),
