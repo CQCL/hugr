@@ -8,7 +8,10 @@ use thiserror::Error;
 
 use crate::utils::display_list;
 
-use super::{MaybeRV, Substitution, Term, Type, type_param::SeqPart, type_row::TypeRowBase};
+use super::{
+    MaybeRV, Substitution, Term, Type, TypeBase, TypeRow, TypeRowRV, type_param::SeqPart,
+    type_row::TypeRowBase,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Hash)]
 pub struct ClosedList<T>(Arc<[T]>);
@@ -33,6 +36,25 @@ impl<T> ClosedList<T> {
 
     pub fn get(&self, index: usize) -> Option<&T> {
         self.0.get(index)
+    }
+}
+
+impl<T> ClosedList<T>
+where
+    T: Clone,
+{
+    pub fn append(&self, other: impl IntoIterator<Item = T>) -> Self {
+        let mut other = other.into_iter().peekable();
+
+        if other.peek().is_none() {
+            return self.clone();
+        }
+
+        let capacity = self.len() + other.size_hint().0;
+        let mut items = Vec::with_capacity(capacity);
+        items.extend(self.0.iter().cloned());
+        items.extend(other);
+        items.into()
     }
 }
 
@@ -120,8 +142,8 @@ where
     }
 }
 
-impl<RV: MaybeRV> From<ClosedList<Type>> for TypeRowBase<RV> {
+impl From<ClosedList<Type>> for TypeRowRV {
     fn from(value: ClosedList<Type>) -> Self {
-        value.iter().cloned().collect()
+        value.iter().cloned().map_into().collect::<Vec<_>>().into()
     }
 }

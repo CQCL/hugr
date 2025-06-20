@@ -386,7 +386,7 @@ impl BlockBuilder<Hugr> {
             }
         }
         let cfg_outputs = sum_rows.first().cloned().unwrap_or_default();
-        let cfg_outputs = cfg_outputs.extend(other_outputs.as_slice());
+        let cfg_outputs = cfg_outputs.append(other_outputs.iter().cloned());
 
         let mut cfg = CFGBuilder::new(Signature::new(inputs, cfg_outputs))?;
         let block = cfg.entry_builder(sum_rows, other_outputs)?;
