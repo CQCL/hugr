@@ -8,8 +8,8 @@ use std::{
 };
 
 use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
-    type_param::TypeParam,
+    MaybeRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
+    sequence::ClosedList, type_param::TypeParam,
 };
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
@@ -26,7 +26,7 @@ pub struct TypeRowBase<ROWVARS: MaybeRV> {
 }
 
 /// Row of single types i.e. of known length, for node inputs/outputs
-pub type TypeRow = TypeRowBase<NoRV>;
+pub type TypeRow = ClosedList<Type>;
 
 /// Row of types and/or row variables, the number of actual types is thus unknown
 pub type TypeRowRV = TypeRowBase<RowVariable>;
@@ -107,25 +107,6 @@ impl<RV: MaybeRV> Transformable for TypeRowBase<RV> {
     }
 }
 
-impl TypeRow {
-    delegate! {
-        to self.types {
-            /// Returns the number of types in the row.
-            #[must_use] pub fn len(&self) -> usize;
-
-            #[inline(always)]
-            /// Returns the type at the specified index. Returns `None` if out of bounds.
-            #[must_use] pub fn get(&self, offset: usize) -> Option<&Type>;
-        }
-
-        to self.types.to_mut() {
-            #[inline(always)]
-            /// Returns the type at the specified index. Returns `None` if out of bounds.
-            pub fn get_mut(&mut self, offset: usize) -> Option<&mut Type>;
-        }
-    }
-}
-
 impl TryFrom<TypeRowRV> for TypeRow {
     type Error = SignatureError;
 
@@ -183,14 +164,6 @@ impl<RV1: MaybeRV> From<TypeBase<RV1>> for TypeRowRV {
     fn from(t: TypeBase<RV1>) -> Self {
         Self {
             types: vec![t.into_()].into(),
-        }
-    }
-}
-
-impl From<Type> for TypeRow {
-    fn from(t: Type) -> Self {
-        Self {
-            types: vec![t].into(),
         }
     }
 }

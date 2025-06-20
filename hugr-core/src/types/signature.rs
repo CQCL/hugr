@@ -5,11 +5,10 @@ use itertools::Either;
 use std::borrow::Cow;
 use std::fmt::{self, Display};
 
+use super::sequence::ClosedList;
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer,
-};
+use super::{MaybeRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
@@ -38,12 +37,6 @@ pub struct FuncTypeBase<ROWVARS: MaybeRV> {
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
     pub output: TypeRowBase<ROWVARS>,
 }
-
-/// The concept of "signature" in the spec - the edges required to/from a node
-/// or within a [`FuncDefn`], also the target (value) of a call (static).
-///
-/// [`FuncDefn`]: crate::ops::FuncDefn
-pub type Signature = FuncTypeBase<NoRV>;
 
 /// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
 /// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
@@ -178,31 +171,6 @@ impl Signature {
         self.output.get(port.into().index())
     }
 
-    /// Returns a mutable reference to the type of a value input [`Port`]. Returns `None` if the port is out
-    /// of bounds.
-    #[inline]
-    pub fn in_port_type_mut(&mut self, port: impl Into<IncomingPort>) -> Option<&mut Type> {
-        self.input.get_mut(port.into().index())
-    }
-
-    /// Returns the type of a value output [`Port`]. Returns `None` if the port is out
-    /// of bounds.
-    #[inline]
-    pub fn out_port_type_mut(&mut self, port: impl Into<OutgoingPort>) -> Option<&mut Type> {
-        self.output.get_mut(port.into().index())
-    }
-
-    /// Returns a mutable reference to the type of a value [`Port`].
-    /// Returns `None` if the port is out of bounds.
-    #[inline]
-    pub fn port_type_mut(&mut self, port: impl Into<Port>) -> Option<&mut Type> {
-        let port = port.into();
-        match port.as_directed() {
-            Either::Left(port) => self.in_port_type_mut(port),
-            Either::Right(port) => self.out_port_type_mut(port),
-        }
-    }
-
     /// Returns the number of ports in the signature.
     #[inline]
     #[must_use]
@@ -230,7 +198,7 @@ impl Signature {
     /// Returns a slice of the types for the given direction.
     #[inline]
     #[must_use]
-    pub fn types(&self, dir: Direction) -> &[Type] {
+    pub fn types(&self, dir: Direction) -> &ClosedList<Type> {
         match dir {
             Direction::Incoming => &self.input,
             Direction::Outgoing => &self.output,
@@ -240,14 +208,14 @@ impl Signature {
     /// Returns a slice of the input types.
     #[inline]
     #[must_use]
-    pub fn input_types(&self) -> &[Type] {
+    pub fn input_types(&self) -> &ClosedList<Type> {
         self.types(Direction::Incoming)
     }
 
     /// Returns a slice of the output types.
     #[inline]
     #[must_use]
-    pub fn output_types(&self) -> &[Type] {
+    pub fn output_types(&self) -> &ClosedList<Type> {
         self.types(Direction::Outgoing)
     }
 
@@ -314,6 +282,55 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<Cow<'_, FuncTypeBase<RV1>>> for FuncT
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTypeBase<RV2>> {
     fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
         self.as_ref().eq(other)
+    }
+}
+
+/// The concept of "signature" in the spec - the edges required to/from a node
+/// or within a [`FuncDefn`], also the target (value) of a call (static).
+///
+/// [`FuncDefn`]: crate::ops::FuncDefn
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Signature {
+    /// Value inputs of the function.
+    pub input: ClosedList<Type>,
+    /// Value outputs of the function.
+    pub output: ClosedList<Type>,
+}
+
+impl Signature {
+    pub fn new(input: impl Into<ClosedList<Type>>, output: impl Into<ClosedList<Type>>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+        }
+    }
+
+    pub fn new_endo(types: impl Into<ClosedList<Type>>) -> Self {
+        let input = types.into();
+        let output = input.clone();
+        Self::new(input, output)
+    }
+
+    pub fn input(&self) -> &ClosedList<Type> {
+        &self.input
+    }
+
+    pub fn output(&self) -> &ClosedList<Type> {
+        &self.output
+    }
+
+    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+        let input = self.input.substitute(tr);
+        let output = self.output.substitute(tr);
+        Self::new(input, output)
+    }
+}
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.input.fmt(f)?;
+        f.write_str(" -> ")?;
+        self.output.fmt(f)
     }
 }
 

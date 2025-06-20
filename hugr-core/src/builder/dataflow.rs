@@ -426,8 +426,7 @@ pub(crate) mod test {
             let noop = f_build.add_dataflow_op(Noop(bool_t()), [i1])?;
             let i1 = noop.out_wire(0);
 
-            let mut nested =
-                f_build.dfg_builder(Signature::new(type_row![], vec![bool_t()]), [])?;
+            let mut nested = f_build.dfg_builder(Signature::new(vec![], vec![bool_t()]), [])?;
 
             let id = nested.add_dataflow_op(Noop(bool_t()), [i1])?;
 
@@ -482,7 +481,7 @@ pub(crate) mod test {
         let noop = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
         let i1 = noop.out_wire(0);
 
-        let mut nested = f_build.dfg_builder(Signature::new(type_row![], vec![qb_t()]), [])?;
+        let mut nested = f_build.dfg_builder(Signature::new([], vec![qb_t()]), [])?;
 
         let id_res = nested.add_dataflow_op(Noop(qb_t()), [i1]);
 

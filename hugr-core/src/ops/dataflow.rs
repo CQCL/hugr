@@ -113,7 +113,7 @@ impl DataflowOpTrait for Input {
 
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
-        Cow::Owned(Signature::new(TypeRow::new(), self.types.clone()))
+        Cow::Owned(Signature::new([], self.types.clone()))
     }
 
     fn substitute(&self, subst: &Substitution) -> Self {
@@ -133,7 +133,7 @@ impl DataflowOpTrait for Output {
     // instantiated Signature instead
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
-        Cow::Owned(Signature::new(self.types.clone(), TypeRow::new()))
+        Cow::Owned(Signature::new(self.types.clone(), []))
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -309,12 +309,12 @@ impl DataflowOpTrait for CallIndirect {
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
-        // TODO: Store a cached signature
-        let mut s = self.signature.clone();
-        s.input
-            .to_mut()
-            .insert(0, Type::new_function(self.signature.clone()));
-        Cow::Owned(s)
+        let mut input = Vec::new();
+        input.push(Type::new_function(self.signature.clone()));
+        input.extend(self.signature.input().iter().cloned());
+
+        let output = self.signature.output.clone();
+        Cow::Owned(Signature::new(input, output))
     }
 
     fn substitute(&self, subst: &Substitution) -> Self {
@@ -341,7 +341,7 @@ impl DataflowOpTrait for LoadConstant {
 
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
-        Cow::Owned(Signature::new(TypeRow::new(), vec![self.datatype.clone()]))
+        Cow::Owned(Signature::new([], [self.datatype.clone()]))
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -405,8 +405,8 @@ impl DataflowOpTrait for LoadFunction {
 
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Owned(Signature::new(
-            type_row![],
-            Type::new_function(self.instantiation.clone()),
+            [],
+            [Type::new_function(self.instantiation.clone())],
         ))
     }
 

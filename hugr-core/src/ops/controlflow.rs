@@ -31,9 +31,15 @@ impl DataflowOpTrait for TailLoop {
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
+        let mut inputs = Vec::new();
+        inputs.extend(self.just_inputs.iter().cloned());
+        inputs.extend(self.rest.iter().cloned());
+
+        let mut outputs = Vec::new();
+        outputs.extend(self.just_outputs.iter().cloned());
+        outputs.extend(self.rest.iter().cloned());
+
         // TODO: Store a cached signature
-        let [inputs, outputs] =
-            [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         Cow::Owned(Signature::new(inputs, outputs))
     }
 
@@ -60,7 +66,7 @@ impl TailLoop {
     /// Build the output `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
         let mut outputs = vec![Type::new_sum(self.control_variants())];
-        outputs.extend_from_slice(&self.rest);
+        outputs.extend(self.rest.iter().cloned());
         outputs.into()
     }
 
@@ -71,7 +77,10 @@ impl TailLoop {
 
     /// Build the input `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_input_row(&self) -> TypeRow {
-        self.just_inputs.extend(self.rest.iter())
+        let mut types = Vec::new();
+        types.extend(self.just_inputs.iter().cloned());
+        types.extend(self.rest.iter().cloned());
+        types.into()
     }
 }
 
@@ -106,12 +115,14 @@ impl DataflowOpTrait for Conditional {
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
+        let mut inputs = Vec::new();
+        inputs.push(Type::new_sum(self.sum_rows.clone()));
+        inputs.extend(self.other_inputs.iter().cloned());
+
+        let outputs = self.outputs.clone();
+
         // TODO: Store a cached signature
-        let mut inputs = self.other_inputs.clone();
-        inputs
-            .to_mut()
-            .insert(0, Type::new_sum(self.sum_rows.clone()));
-        Cow::Owned(Signature::new(inputs, self.outputs.clone()))
+        Cow::Owned(Signature::new(inputs, outputs))
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -126,7 +137,13 @@ impl DataflowOpTrait for Conditional {
 impl Conditional {
     /// Build the input `TypeRow` of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
-        Some(self.sum_rows.get(case)?.extend(self.other_inputs.iter()))
+        let case_types = self.sum_rows.get(case)?;
+
+        let mut types = Vec::new();
+        types.extend(case_types.iter().cloned());
+        types.extend(self.other_inputs.iter().cloned());
+
+        Some(types.into())
     }
 }
 
@@ -194,7 +211,7 @@ impl DataflowParent for DataflowBlock {
         // The node outputs a Sum before the data outputs of the block node
         let sum_type = Type::new_sum(self.sum_rows.clone());
         let mut node_outputs = vec![sum_type];
-        node_outputs.extend_from_slice(&self.other_outputs);
+        node_outputs.extend(self.other_outputs.iter().cloned());
         Cow::Owned(Signature::new(
             self.inputs.clone(),
             TypeRow::from(node_outputs),
@@ -282,11 +299,13 @@ impl DataflowBlock {
     /// valid index.
     #[must_use]
     pub fn successor_input(&self, successor: usize) -> Option<TypeRow> {
-        Some(
-            self.sum_rows
-                .get(successor)?
-                .extend(self.other_outputs.iter()),
-        )
+        let successor_types = self.sum_rows.get(successor)?;
+
+        let mut types = Vec::new();
+        types.extend(successor_types.iter().cloned());
+        types.extend(self.other_outputs.iter().cloned());
+
+        Some(types.into())
     }
 }
 
