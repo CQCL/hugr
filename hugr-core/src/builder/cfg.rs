@@ -150,7 +150,12 @@ impl CFGBuilder<Hugr> {
 
         let base = Hugr::new_with_entrypoint(cfg_op).expect("CFG entrypoints be valid");
         let cfg_node = base.entrypoint();
-        CFGBuilder::create(base, cfg_node, signature.input, signature.output)
+        CFGBuilder::create(
+            base,
+            cfg_node,
+            signature.input().clone(),
+            signature.output().clone(),
+        )
     }
 }
 
@@ -240,9 +245,9 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
         n_cases: usize,
     ) -> Result<BlockBuilder<&mut Hugr>, BuildError> {
         self.block_builder(
-            signature.input,
+            signature.input().clone(),
             vec![type_row![]; n_cases],
-            signature.output,
+            signature.output().clone(),
         )
     }
 

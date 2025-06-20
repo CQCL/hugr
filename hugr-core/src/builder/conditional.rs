@@ -179,8 +179,11 @@ impl CaseBuilder<Hugr> {
     /// Initialize a Case rooted HUGR
     pub fn new(signature: Signature) -> Result<Self, BuildError> {
         // Start by building a conditional with a single case
-        let mut conditional =
-            ConditionalBuilder::new([signature.input.clone()], vec![], signature.output.clone())?;
+        let mut conditional = ConditionalBuilder::new(
+            [signature.input().clone()],
+            vec![],
+            signature.output().clone(),
+        )?;
         let case = conditional.case_builder(0)?.finish_sub_container()?.node();
 
         // Extract the half-finished hugr, and wrap it in an owned case builder

@@ -8,7 +8,10 @@ use std::fmt::{self, Display};
 use super::sequence::ClosedList;
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{MaybeRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer};
+use super::{
+    MaybeRV, PolyFuncTypeBase, RowVariable, Substitution, Transformable, Type, TypeRow,
+    TypeTransformer,
+};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
@@ -258,7 +261,7 @@ impl TryFrom<FuncValueType> for Signature {
     }
 }
 
-impl From<Signature> for FuncValueType {
+impl<RV: MaybeRV> From<Signature> for FuncTypeBase<RV> {
     fn from(value: Signature) -> Self {
         Self {
             input: value.input.into(),
@@ -292,9 +295,9 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTy
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Value inputs of the function.
-    pub input: ClosedList<Type>,
+    input: ClosedList<Type>,
     /// Value outputs of the function.
-    pub output: ClosedList<Type>,
+    output: ClosedList<Type>,
 }
 
 impl Signature {
@@ -331,6 +334,12 @@ impl Display for Signature {
         self.input.fmt(f)?;
         f.write_str(" -> ")?;
         self.output.fmt(f)
+    }
+}
+
+impl<RV: MaybeRV> From<Signature> for PolyFuncTypeBase<RV> {
+    fn from(value: Signature) -> Self {
+        PolyFuncTypeBase::new(Vec::new(), value)
     }
 }
 

@@ -8,7 +8,7 @@ use thiserror::Error;
 
 use crate::utils::display_list;
 
-use super::{Substitution, Term, Type, type_param::SeqPart};
+use super::{MaybeRV, Substitution, Term, Type, type_param::SeqPart, type_row::TypeRowBase};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, Hash)]
 pub struct ClosedList<T>(Arc<[T]>);
@@ -117,5 +117,11 @@ where
             })
             .try_collect()?;
         Ok(Self(items.into()))
+    }
+}
+
+impl<RV: MaybeRV> From<ClosedList<Type>> for TypeRowBase<RV> {
+    fn from(value: ClosedList<Type>) -> Self {
+        value.iter().cloned().collect()
     }
 }

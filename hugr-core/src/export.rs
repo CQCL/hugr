@@ -1,7 +1,9 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
+use crate::types::sequence::ClosedList;
 use crate::types::type_param::Term;
+use crate::types::{Signature, Type};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -390,8 +392,8 @@ impl<'a> Context<'a> {
 
                 // TODO PERFORMANCE: Avoid exporting the signature here again.
                 let signature = call.signature();
-                let inputs = self.export_type_row(&signature.input);
-                let outputs = self.export_type_row(&signature.output);
+                let inputs = self.export_closed_type_list(signature.input());
+                let outputs = self.export_closed_type_list(signature.output());
                 let operation = self.make_term_apply(model::CORE_CALL, &[inputs, outputs, func]);
                 table::Operation::Custom(operation)
             }
@@ -431,8 +433,8 @@ impl<'a> Context<'a> {
             }
 
             OpType::CallIndirect(call) => {
-                let inputs = self.export_type_row(&call.signature.input);
-                let outputs = self.export_type_row(&call.signature.output);
+                let inputs = self.export_closed_type_list(call.signature.input());
+                let outputs = self.export_closed_type_list(call.signature.output());
                 let operation = self.make_term_apply(model::CORE_CALL_INDIRECT, &[inputs, outputs]);
                 table::Operation::Custom(operation)
             }
@@ -491,7 +493,7 @@ impl<'a> Context<'a> {
                 Some(signature) => {
                     let num_inputs = signature.input_types().len();
                     let num_outputs = signature.output_types().len();
-                    let signature = self.export_func_type(signature);
+                    let signature = self.export_signature(signature);
                     (Some(signature), num_inputs, num_outputs)
                 }
                 None => (None, 0, 0),
@@ -576,18 +578,18 @@ impl<'a> Context<'a> {
     /// like for the other nodes since the ports are control flow ports.
     pub fn export_block_signature(&mut self, block: &DataflowBlock) -> table::TermId {
         let inputs = {
-            let inputs = self.export_type_row(&block.inputs);
+            let inputs = self.export_closed_type_list(&block.inputs);
             self.make_term(table::Term::List(
                 self.bump.alloc_slice_copy(&[table::SeqPart::Item(inputs)]),
             ))
         };
 
-        let tail = self.export_type_row(&block.other_outputs);
+        let tail = self.export_closed_type_list(&block.other_outputs);
 
         let outputs = {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in &block.sum_rows {
-                let variant = self.export_type_row_with_tail(sum_row, Some(tail));
+                let variant = self.export_closed_type_list_with_tail(sum_row, Some(tail));
                 outputs.push(table::SeqPart::Item(variant));
             }
             self.make_term(table::Term::List(outputs.into_bump_slice()))
@@ -669,8 +671,8 @@ impl<'a> Context<'a> {
         }
 
         let signature = {
-            let inputs = self.export_type_row(input_types.unwrap());
-            let outputs = self.export_type_row(output_types.unwrap());
+            let inputs = self.export_closed_type_list(input_types.unwrap());
+            let outputs = self.export_closed_type_list(output_types.unwrap());
             Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
         };
 
@@ -738,14 +740,14 @@ impl<'a> Context<'a> {
             let node_signature = self.hugr.signature(node).unwrap();
 
             let inputs = {
-                let types = self.export_type_row(node_signature.input());
+                let types = self.export_closed_type_list(node_signature.input());
                 self.make_term(table::Term::List(
                     self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
                 ))
             };
 
             let outputs = {
-                let types = self.export_type_row(node_signature.output());
+                let types = self.export_closed_type_list(node_signature.output());
                 self.make_term(table::Term::List(
                     self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
                 ))
@@ -848,6 +850,12 @@ impl<'a> Context<'a> {
         self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
+    pub fn export_signature(&mut self, t: &Signature) -> table::TermId {
+        let inputs = self.export_closed_type_list(t.input());
+        let outputs = self.export_closed_type_list(t.output());
+        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
+    }
+
     pub fn export_custom_type(&mut self, t: &CustomType) -> table::TermId {
         let symbol = self.make_named_global_ref(t.extension(), t.name());
 
@@ -890,6 +898,27 @@ impl<'a> Context<'a> {
     pub fn export_sum_type(&mut self, t: &SumType) -> table::TermId {
         let variants = self.export_sum_variants(t);
         self.make_term_apply(model::CORE_ADT, &[variants])
+    }
+
+    pub fn export_closed_type_list_with_tail(
+        &mut self,
+        list: &ClosedList<Type>,
+        tail: Option<table::TermId>,
+    ) -> table::TermId {
+        let mut parts =
+            BumpVec::with_capacity_in(list.len() + usize::from(tail.is_some()), self.bump);
+
+        for type_ in list.iter() {
+            parts.push(table::SeqPart::Item(self.export_type(type_)));
+        }
+
+        parts.extend(tail.map(table::SeqPart::Splice));
+
+        self.make_term(table::Term::List(parts.into_bump_slice()))
+    }
+
+    pub fn export_closed_type_list(&mut self, list: &ClosedList<Type>) -> table::TermId {
+        self.export_closed_type_list_with_tail(list, None)
     }
 
     #[inline]
