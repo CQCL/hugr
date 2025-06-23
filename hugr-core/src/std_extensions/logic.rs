@@ -99,7 +99,7 @@ impl MakeOpDef for LogicOp {
         match self {
             LogicOp::And => "logical 'and'",
             LogicOp::Or => "logical 'or'",
-            LogicOp::Eq => " test if bools are equal",
+            LogicOp::Eq => "test if bools are equal",
             LogicOp::Not => "logical 'not'",
             LogicOp::Xor => "logical 'xor'",
         }
@@ -122,7 +122,7 @@ impl MakeOpDef for LogicOp {
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
 
 /// Extension for basic logical operations.
 fn extension() -> Arc<Extension> {

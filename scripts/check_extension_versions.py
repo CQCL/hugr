@@ -6,14 +6,14 @@ import sys
 from pathlib import Path
 
 
-def get_changed_files() -> list[Path]:
+def get_changed_files(target: str) -> list[Path]:
     """Get list of changed extension files in the PR"""
     # Use git to get the list of files changed compared to main
     cmd = [
         "git",
         "diff",
         "--name-only",
-        "origin/main",
+        target,
         "--",
         "specification/std_extensions/",
     ]
@@ -22,7 +22,7 @@ def get_changed_files() -> list[Path]:
     return changed_files
 
 
-def check_version_changes(changed_files: list[Path]):
+def check_version_changes(changed_files: list[Path], target: str) -> list[str]:
     """Check if versions have been updated in changed files"""
     errors = []
 
@@ -63,14 +63,15 @@ def check_version_changes(changed_files: list[Path]):
 
 
 def main() -> int:
-    changed_files = get_changed_files()
+    target = sys.argv[1] if len(sys.argv) > 1 else "origin/main"
+    changed_files = get_changed_files(target)
     if not changed_files:
         print("No extension files changed.")
         return 0
 
-    print(f"Changed extension files: {', '.join(map(str,changed_files))}")
+    print(f"Changed extension files: {', '.join(map(str, changed_files))}")
 
-    errors = check_version_changes(changed_files)
+    errors = check_version_changes(changed_files, target)
     if errors:
         for error in errors:
             print(error)

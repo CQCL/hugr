@@ -196,7 +196,13 @@ jobs:
           python-version: '3.10'
 
       - name: Check if extension versions are updated
-        run: python ./scripts/check_extension_versions.py
+        # check against latest tag on the target branch
+        # base_ref should be empty if not a pull request, so goes from HEAD
+        run: |
+            LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" ${{github.base_ref}})
+            echo "Latest tag on target: $LAST_TAG"
+            
+            python ./scripts/check_extension_versions.py $LAST_TAG
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
