@@ -99,7 +99,7 @@ impl MakeOpDef for LogicOp {
         match self {
             LogicOp::And => "logical 'and'",
             LogicOp::Or => "logical 'or'",
-            LogicOp::Eq => "test if bools are equal",
+            LogicOp::Eq => " test if bools are equal",
             LogicOp::Not => "logical 'not'",
             LogicOp::Xor => "logical 'xor'",
         }
