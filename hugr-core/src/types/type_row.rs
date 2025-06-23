@@ -8,8 +8,8 @@ use std::{
 };
 
 use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
-    type_param::TypeParam,
+    MaybeRV, NoRV, RowVariable, Substitution, Term, Transformable, Type, TypeArg, TypeBase, TypeRV,
+    TypeTransformer, type_param::TypeParam,
 };
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
@@ -192,6 +192,81 @@ impl From<Type> for TypeRow {
         Self {
             types: vec![t].into(),
         }
+    }
+}
+
+// Fallibly convert a [Term] to a [TypeRV].
+//
+// This will fail if `arg` is of non-type kind (e.g. String).
+impl TryFrom<Term> for TypeRV {
+    type Error = SignatureError;
+
+    fn try_from(value: Term) -> Result<Self, Self::Error> {
+        match value {
+            TypeArg::Runtime(ty) => Ok(ty.into()),
+            TypeArg::Variable(v) => Ok(TypeRV::new_row_var_use(
+                v.index(),
+                v.bound_if_row_var()
+                    .ok_or(SignatureError::InvalidTypeArgs)?,
+            )),
+            _ => Err(SignatureError::InvalidTypeArgs),
+        }
+    }
+}
+
+// Fallibly convert a [Term] to a [TypeRow].
+//
+// This will fail if `arg` is of non-sequence kind (e.g. Type)
+// or if the sequence contains row variables.
+impl TryFrom<Term> for TypeRow {
+    type Error = SignatureError;
+
+    fn try_from(value: TypeArg) -> Result<Self, Self::Error> {
+        match value {
+            TypeArg::Tuple(elems) => elems
+                .into_iter()
+                .map(|ta| ta.as_runtime())
+                .collect::<Option<Vec<_>>>()
+                .map(|x| x.into())
+                .ok_or(SignatureError::InvalidTypeArgs),
+            _ => Err(SignatureError::InvalidTypeArgs),
+        }
+    }
+}
+
+// Fallibly convert a [TypeArg] to a [TypeRowRV].
+//
+// This will fail if `arg` is of non-sequence kind (e.g. Type).
+impl TryFrom<Term> for TypeRowRV {
+    type Error = SignatureError;
+
+    fn try_from(value: Term) -> Result<Self, Self::Error> {
+        match value {
+            TypeArg::Tuple(elems) => elems
+                .into_iter()
+                .map(TypeRV::try_from)
+                .collect::<Result<Vec<_>, _>>()
+                .map(|vec| vec.into()),
+            TypeArg::Variable(v) => Ok(vec![TypeRV::new_row_var_use(
+                v.index(),
+                v.bound_if_row_var()
+                    .ok_or(SignatureError::InvalidTypeArgs)?,
+            )]
+            .into()),
+            _ => Err(SignatureError::InvalidTypeArgs),
+        }
+    }
+}
+
+impl From<TypeRow> for Term {
+    fn from(value: TypeRow) -> Self {
+        Term::Tuple(value.into_owned().into_iter().map_into().collect())
+    }
+}
+
+impl From<TypeRowRV> for Term {
+    fn from(value: TypeRowRV) -> Self {
+        Term::Tuple(value.into_owned().into_iter().map_into().collect())
     }
 }
 
