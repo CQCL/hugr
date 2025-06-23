@@ -427,8 +427,7 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
         let result = persistent_hugr.try_add_replacement(repl4.clone());
         assert!(
             result.is_ok(),
-            "[commit1, commit2] + [commit4] are compatible. Got {:?}",
-            result
+            "[commit1, commit2] + [commit4] are compatible. Got {result:?}"
         );
         let hugr = persistent_hugr.to_hugr();
         let exp_hugr = state_space
@@ -444,8 +443,7 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
         let result = persistent_hugr.try_add_replacement(repl3.clone());
         assert!(
             result.is_err(),
-            "[commit1, commit2] + [commit3] are incompatible. Got {:?}",
-            result
+            "[commit1, commit2] + [commit3] are incompatible. Got {result:?}"
         );
     }
 }
