@@ -199,7 +199,8 @@ jobs:
         # check against latest tag on the target branch
         # base_ref should be empty if not a pull request, so goes from HEAD
         run: |
-            LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" ${{github.base_ref}})
+            BASE_SHA=$(git rev-parse origin/${{ github.base_ref }})
+            LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" $BASE_SHA)
             echo "Latest tag on target: $LAST_TAG"
             
             python ./scripts/check_extension_versions.py $LAST_TAG
