@@ -135,7 +135,7 @@ mod test {
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{
-        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
     };
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::ops::{OpTag, OpTrait, Tag, TailLoop, handle::NodeHandle};
@@ -165,13 +165,8 @@ mod test {
     #[test]
     fn peel_loop_incoming_edges() {
         let i32_t = || INT_TYPES[5].clone();
-        let mut fb = FunctionBuilder::new(
-            "main",
-            Signature::new(vec![bool_t(), usize_t(), i32_t()], usize_t()),
-        )
-        .unwrap();
-        let helper = fb
-            .module_root_builder()
+        let mut mb = crate::builder::ModuleBuilder::new();
+        let helper = mb
             .declare(
                 "helper",
                 Signature::new(
@@ -179,6 +174,12 @@ mod test {
                     vec![Type::new_sum([vec![bool_t(); 2], vec![]]), usize_t()],
                 )
                 .into(),
+            )
+            .unwrap();
+        let mut fb = mb
+            .define_function(
+                "main",
+                Signature::new(vec![bool_t(), usize_t(), i32_t()], usize_t()),
             )
             .unwrap();
         let [b, u, i] = fb.input_wires_arr();
@@ -196,7 +197,8 @@ mod test {
             let [pred, other] = c.outputs_arr();
             (tlb.finish_with_outputs(pred, [other]).unwrap(), c.node())
         };
-        let mut h = fb.finish_hugr_with_outputs(tl.outputs()).unwrap();
+        let _ = fb.finish_with_outputs(tl.outputs()).unwrap();
+        let mut h = mb.finish_hugr().unwrap();
 
         h.apply_patch(PeelTailLoop::new(tl.node())).unwrap();
         h.validate().unwrap();
