@@ -8,7 +8,7 @@ from pathlib import Path
 
 def get_changed_files(target: str) -> list[Path]:
     """Get list of changed extension files in the PR"""
-    # Use git to get the list of files changed compared to main
+    # Use git to get the list of files changed compared to target
     cmd = [
         "git",
         "diff",
@@ -36,19 +36,20 @@ def check_version_changes(changed_files: list[Path], target: str) -> list[str]:
             current = json.load(f)
             current_version = current.get("version")
 
-        # Get the version in the main branch
+        # Get the version in the target branch
         try:
-            cmd = ["git", "show", f"origin/main:{file_path}"]
+            cmd = ["git", "show", f"{target}:{file_path}"]
             result = subprocess.run(cmd, capture_output=True, text=True)  # noqa: S603
 
             if result.returncode == 0:
-                # File exists in main
-                main_content = json.loads(result.stdout)
-                main_version = main_content.get("version")
+                # File exists in target
+                target_content = json.loads(result.stdout)
+                target_version = target_content.get("version")
 
-                if current_version == main_version:
+                if current_version == target_version:
                     errors.append(
-                        f"Error: {file_path} was modified but version was not updated"
+                        f"Error: {file_path} was modified but version was not updated. "
+                        f"Current: {current_version}, base: {target_version}"
                     )
 
             else:
@@ -56,7 +57,7 @@ def check_version_changes(changed_files: list[Path], target: str) -> list[str]:
                 pass
 
         except json.JSONDecodeError:
-            # File is new or not valid JSON in main
+            # File is new or not valid JSON in target
             pass
 
     return errors
