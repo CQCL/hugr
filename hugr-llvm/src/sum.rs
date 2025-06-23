@@ -783,10 +783,10 @@ mod test {
 
     #[rstest]
     #[case::unit(HugrSumType::new_unary(1), 0)]
-    #[case::unit_elided_fields(HugrSumType::new([HugrType::UNIT]), 0)]
+    #[case::unit_elided_fields(HugrSumType::new([[HugrType::UNIT]]), 0)]
     #[case::nofields(HugrSumType::new_unary(4), 2)]
     #[case::nofields_elided_fields(HugrSumType::new([vec![HugrType::UNIT], vec![]]), 0)]
-    #[case::one_variant_one_field(HugrSumType::new([bool_t()]), 0)]
+    #[case::one_variant_one_field(HugrSumType::new([[bool_t()]]), 0)]
     #[case::one_variant_one_field_elided_fields(HugrSumType::new([vec![HugrType::UNIT,bool_t()]]), 0)]
     #[case::one_variant_two_fields(HugrSumType::new([vec![bool_t(),bool_t()]]), 0)]
     #[case::one_variant_two_fields_elided_fields(HugrSumType::new([vec![bool_t(),HugrType::UNIT,bool_t()]]), 0)]

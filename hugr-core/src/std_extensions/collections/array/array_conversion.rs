@@ -86,8 +86,8 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
             OtherAK::ty_parametric(size, element_ty).expect("Array type instantiation failed");
 
         let sig = match DIR {
-            INTO => FuncValueType::new(this_ty, other_ty),
-            FROM => FuncValueType::new(other_ty, this_ty),
+            INTO => FuncValueType::new([this_ty], [other_ty]),
+            FROM => FuncValueType::new([other_ty], [this_ty]),
         };
         PolyFuncTypeRV::new(params, sig).into()
     }

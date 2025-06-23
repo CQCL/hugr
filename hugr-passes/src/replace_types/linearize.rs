@@ -245,12 +245,15 @@ impl DelegatingLinearizer {
 }
 
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
-    tmpl.check_signature(&typ.clone().into(), &vec![typ.clone(); num_outports].into())
-        .map_err(|sig| LinearizeError::WrongSignature {
-            typ: typ.clone(),
-            num_outports,
-            sig,
-        })
+    tmpl.check_signature(
+        &[typ.clone()].into(),
+        &vec![typ.clone(); num_outports].into(),
+    )
+    .map_err(|sig| LinearizeError::WrongSignature {
+        typ: typ.clone(),
+        num_outports,
+        sig,
+    })
 }
 
 impl Linearizer for DelegatingLinearizer {
@@ -317,7 +320,7 @@ impl Linearizer for DelegatingLinearizer {
                         discard.clone()
                     } else {
                         let mut dfb = DFGBuilder::new(inout_sig(
-                            typ.clone(),
+                            [typ.clone()],
                             vec![typ.clone(); num_outports],
                         ))
                         .unwrap();
@@ -387,7 +390,7 @@ mod test {
     use hugr_core::types::{
         FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
     };
-    use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
+    use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList};
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -408,7 +411,7 @@ mod test {
                 panic!()
             };
             let outs = vec![self.0.clone(); *n as usize];
-            Ok(FuncValueType::new(self.0.clone(), outs).into())
+            Ok(FuncValueType::new([self.0.clone()], outs).into())
         }
 
         fn static_params(&self) -> &[TypeParam] {
@@ -432,7 +435,7 @@ mod test {
                 e.add_op(
                     "discard".into(),
                     String::new(),
-                    Signature::new(lin.clone(), vec![]),
+                    Signature::new([lin.clone()], []),
                     w,
                 )
                 .unwrap();
@@ -501,10 +504,10 @@ mod test {
     }
 
     fn copy_n_discard_one(ty: Type, n: usize) -> (Hugr, Node) {
-        let mut outer = DFGBuilder::new(inout_sig(ty.clone(), vec![ty.clone(); n - 1])).unwrap();
+        let mut outer = DFGBuilder::new(inout_sig([ty.clone()], vec![ty.clone(); n - 1])).unwrap();
         let [inp] = outer.input_wires_arr();
         let inner = outer
-            .dfg_builder(inout_sig(ty, vec![]), [inp])
+            .dfg_builder(inout_sig([ty], vec![]), [inp])
             .unwrap()
             .finish_with_outputs([])
             .unwrap();
@@ -514,13 +517,13 @@ mod test {
 
     #[rstest]
     fn sums_2way_copy(#[values(2, 3, 4)] num_copies: usize) {
-        let (mut h, inner) = copy_n_discard_one(option_type(usize_t()).into(), num_copies);
+        let (mut h, inner) = copy_n_discard_one(option_type([usize_t()]).into(), num_copies);
 
         let (e, lowerer) = ext_lowerer();
         assert!(lowerer.run(&mut h).unwrap());
 
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let sum_ty: Type = option_type(lin_t.clone()).into();
+        let sum_ty: Type = option_type([lin_t.clone()]).into();
         let count_tags = |n| h.children(n).filter(|n| h.get_optype(*n).is_tag()).count();
 
         // Check we've inserted one Conditional into outer (for copy) and inner (for discard)...
@@ -644,7 +647,7 @@ mod test {
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
         );
-        let sig3 = Some(Signature::new(lin_t.clone(), vec![lin_t.clone(); 3]));
+        let sig3 = Some(Signature::new([lin_t.clone()], vec![lin_t.clone(); 3]));
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {
@@ -677,7 +680,7 @@ mod test {
             });
 
         // A hugr that copies a usize
-        let dfb = DFGBuilder::new(inout_sig(usize_t(), vec![usize_t(); 2])).unwrap();
+        let dfb = DFGBuilder::new(inout_sig([usize_t()], vec![usize_t(); 2])).unwrap();
         let [inp] = dfb.input_wires_arr();
         let mut h = dfb.finish_hugr_with_outputs([inp, inp]).unwrap();
 
@@ -702,14 +705,14 @@ mod test {
             .linearizer()
             .register_callback(value_array_type_def(), linearize_value_array);
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let opt_lin_ty = Type::from(option_type(lin_t.clone()));
+        let opt_lin_ty = Type::from(option_type([lin_t.clone()]));
         let array_ty = || value_array_type(5, usize_t());
-        let mut dfb = DFGBuilder::new(inout_sig(array_ty(), vec![array_ty(); num_new])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig([array_ty()], vec![array_ty(); num_new])).unwrap();
         let [array_in] = dfb.input_wires_arr();
         // The outer DFG passes the input array into (1) a DFG that discards it
         let discard = dfb
             .dfg_builder(
-                Signature::new(value_array_type(5, usize_t()), type_row![]),
+                Signature::new([value_array_type(5, usize_t())], []),
                 [array_in],
             )
             .unwrap()
@@ -748,7 +751,7 @@ mod test {
         for rpt in rpts {
             assert_eq!(
                 rpt.signature().output(),
-                &TypeRow::from(value_array_type(5, opt_lin_ty.clone()))
+                &TypeRow::from([value_array_type(5, opt_lin_ty.clone())])
             );
         }
         let unwrap_scans = copy_ops
@@ -777,7 +780,7 @@ mod test {
                 [value_array_type(5, lin_t.clone()), INT_TYPES[6].clone()]
                     .into_iter()
                     .chain(vec![
-                        value_array_type(5, option_type(lin_t.clone()).into());
+                        value_array_type(5, option_type([lin_t.clone()]).into());
                         num_new
                     ])
                     .collect_vec()
@@ -798,11 +801,11 @@ mod test {
         let lin_t: Type = lin_ct.clone().into();
 
         // A simple Hugr that discards a usize_t, with a "drop" function
-        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), type_row![])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig([usize_t()], [])).unwrap();
         let discard_fn = {
             let mut mb = dfb.module_root_builder();
             let mut fb = mb
-                .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
+                .define_function("drop", Signature::new([lin_t.clone()], []))
                 .unwrap();
             let ins = fb.input_wires();
             fb.add_dataflow_op(

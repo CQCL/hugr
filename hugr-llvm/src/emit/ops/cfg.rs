@@ -240,8 +240,8 @@ mod test {
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![t1.clone(), t2.clone()])
-            .with_outs(t2.clone())
+            .with_ins([t1.clone(), t2.clone()])
+            .with_outs([t2.clone()])
             .with_extensions(ExtensionRegistry::new([
                 int_types::EXTENSION.to_owned(),
                 prelude::PRELUDE.to_owned(),
@@ -249,7 +249,7 @@ mod test {
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let mut cfg_builder = builder
-                    .cfg_builder([(t1.clone(), in1), (t2.clone(), in2)], t2.clone().into())
+                    .cfg_builder([(t1.clone(), in1), (t2.clone(), in2)], [t2.clone()].into())
                     .unwrap();
 
                 // entry block takes (t1,t2) and unconditionally branches to b1 with no other outputs
@@ -261,12 +261,12 @@ mod test {
                 let entry_block = entry_builder.finish_with_outputs(r, []).unwrap();
 
                 // b1 takes (t1,t2) and branches to either entry or exit, with sum type [(t1) + ()] and other outputs [t2]
-                let variants = vec![t1.clone().into(), type_row![]];
+                let variants = vec![[t1.clone()].into(), type_row![]];
                 let mut b1_builder = cfg_builder
                     .block_builder(
                         vec![t1.clone(), t2.clone()].into(),
                         variants.clone(),
-                        t2.clone().into(),
+                        [t2.clone()].into(),
                     )
                     .unwrap();
                 let [b1_in1, b1_in2] = b1_builder.input_wires_arr();
@@ -289,14 +289,14 @@ mod test {
     fn nested(llvm_ctx: TestContext) {
         let t1 = HugrType::new_unit_sum(3);
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![t1.clone(), bool_t()])
-            .with_outs(bool_t())
+            .with_ins([t1.clone(), bool_t()])
+            .with_outs([bool_t()])
             .finish(|mut builder| {
                 let [in1, in2] = builder.input_wires_arr();
                 let unit_val = builder.add_load_value(Value::unit());
                 let [outer_cfg_out] = {
                     let mut outer_cfg_builder = builder
-                        .cfg_builder([(t1.clone(), in1), (bool_t(), in2)], bool_t().into())
+                        .cfg_builder([(t1.clone(), in1), (bool_t(), in2)], [bool_t()].into())
                         .unwrap();
 
                     let outer_entry_block = {
@@ -307,7 +307,7 @@ mod test {
                             outer_entry_builder.input_wires_arr();
                         let [outer_entry_out] = {
                             let mut inner_cfg_builder = outer_entry_builder
-                                .cfg_builder([], bool_t().into())
+                                .cfg_builder([], [bool_t()].into())
                                 .unwrap();
                             let inner_exit_block = inner_cfg_builder.exit_block();
                             let inner_entry_block = {
@@ -328,7 +328,7 @@ mod test {
                                         .block_builder(
                                             type_row![],
                                             vec![type_row![]],
-                                            bool_t().into(),
+                                            [bool_t()].into(),
                                         )
                                         .unwrap();
                                     let output = match i {
@@ -368,7 +368,7 @@ mod test {
                     let [b1, b2] = (0..2)
                         .map(|i| {
                             let mut b_builder = outer_cfg_builder
-                                .block_builder(type_row![], vec![type_row![]], bool_t().into())
+                                .block_builder(type_row![], vec![type_row![]], [bool_t()].into())
                                 .unwrap();
                             let output = match i {
                                 0 => b_builder.add_load_value(Value::true_val()),

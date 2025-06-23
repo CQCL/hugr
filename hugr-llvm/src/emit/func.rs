@@ -327,7 +327,7 @@ pub fn build_option<'c, H: HugrView<Node = Node>>(
     some_value: BasicValueEnum<'c>,
     hugr_ty: HugrType,
 ) -> Result<BasicValueEnum<'c>> {
-    let option_ty = ctx.llvm_sum_type(option_type(hugr_ty))?;
+    let option_ty = ctx.llvm_sum_type(option_type([hugr_ty]))?;
     let builder = ctx.builder();
     let some = option_ty.build_tag(builder, 1, vec![some_value])?;
     let none = option_ty.build_tag(builder, 0, vec![])?;
@@ -345,7 +345,7 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     else_value: BasicValueEnum<'c>,
     else_hugr_ty: HugrType,
 ) -> Result<BasicValueEnum<'c>> {
-    let either_ty = ctx.llvm_sum_type(either_type(else_hugr_ty, ok_hugr_ty))?;
+    let either_ty = ctx.llvm_sum_type(either_type([else_hugr_ty], [ok_hugr_ty]))?;
     let builder = ctx.builder();
     let left = either_ty.build_tag(builder, 0, vec![else_value])?;
     let right = either_ty.build_tag(builder, 1, vec![ok_value])?;

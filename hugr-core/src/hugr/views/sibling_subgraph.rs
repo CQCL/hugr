@@ -1084,7 +1084,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(bool_t(), vec![bool_t(), bool_t()]).into(),
+            Signature::new([bool_t()], [bool_t(), bool_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -1102,7 +1102,7 @@ mod tests {
     /// A HUGR with a copy
     fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo(bool_t()).into())?;
+        let func = mod_builder.declare("test", Signature::new_endo([bool_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let in_wire = dfg.input_wires().exactly_one().unwrap();
@@ -1333,7 +1333,7 @@ mod tests {
     #[test]
     fn test_unconnected() {
         // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let mut b = DFGBuilder::new(Signature::new([bool_t()], [])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -1344,7 +1344,7 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         //  TODO create a valid replacement
         let replacement = {
-            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let mut rep_b = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
             let inw = rep_b.input_wires().exactly_one().unwrap();
 
             let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
@@ -1359,7 +1359,7 @@ mod tests {
     #[test]
     fn single_node_subgraph() {
         // A hugr with a single NOT operation, with disconnected output.
-        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let mut b = DFGBuilder::new(Signature::new([bool_t()], [])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded

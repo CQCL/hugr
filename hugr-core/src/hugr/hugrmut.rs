@@ -630,10 +630,7 @@ mod test {
         // Start a main function with two nat inputs.
         let f: Node = hugr.add_node_with_parent(
             module,
-            ops::FuncDefn::new(
-                "main",
-                Signature::new(usize_t(), vec![usize_t(), usize_t()]),
-            ),
+            ops::FuncDefn::new("main", Signature::new([usize_t()], [usize_t(), usize_t()])),
         );
 
         {
@@ -677,9 +674,9 @@ mod test {
         let root = hugr.entrypoint();
         let [foo, bar] = ["foo", "bar"].map(|name| {
             let fd = hugr
-                .add_node_with_parent(root, FuncDefn::new(name, Signature::new_endo(usize_t())));
-            let inp = hugr.add_node_with_parent(fd, Input::new(usize_t()));
-            let out = hugr.add_node_with_parent(fd, Output::new(usize_t()));
+                .add_node_with_parent(root, FuncDefn::new(name, Signature::new_endo([usize_t()])));
+            let inp = hugr.add_node_with_parent(fd, Input::new([usize_t()]));
+            let out = hugr.add_node_with_parent(fd, Output::new([usize_t()]));
             hugr.connect(inp, 0, out, 0);
             fd
         });

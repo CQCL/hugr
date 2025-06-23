@@ -14,7 +14,7 @@ fn make_complex_type() -> Type {
     let q_register = Type::new_tuple(vec![qb; 8]);
     let b_register = Type::new_tuple(vec![int; 8]);
     let q_alias = Type::new_alias(AliasDecl::new("QReg", TypeBound::Any));
-    let sum = Type::new_sum([q_register, q_alias]);
+    let sum = Type::new_sum([[q_register], [q_alias]]);
     Type::new_function(Signature::new(vec![sum], vec![b_register]))
 }
 

@@ -41,7 +41,7 @@ impl ConstFold for PopFold {
             let elem_type = list.1.clone();
             Some(vec![
                 (0.into(), list.into()),
-                (1.into(), const_none(elem_type)),
+                (1.into(), const_none([elem_type])),
             ])
         }
     }
@@ -75,7 +75,7 @@ impl ConstFold for GetFold {
 
         match list.0.get(idx) {
             Some(elem) => Some(vec![(0.into(), const_some(elem.clone()))]),
-            None => Some(vec![(0.into(), const_none(list.1.clone()))]),
+            None => Some(vec![(0.into(), const_none([list.1.clone()]))]),
         }
     }
 }
@@ -95,9 +95,9 @@ impl ConstFold for SetFold {
         let res_elem: Value = match list.0.get_mut(idx) {
             Some(old_elem) => {
                 std::mem::swap(old_elem, &mut elem);
-                const_ok(elem, list.1.clone())
+                const_ok(elem, [list.1.clone()])
             }
-            None => const_fail(elem, list.1.clone()),
+            None => const_fail(elem, [list.1.clone()]),
         };
         Some(vec![(0.into(), list.into()), (1.into(), res_elem)])
     }
@@ -117,9 +117,9 @@ impl ConstFold for InsertFold {
         let elem = elem.clone();
         let res_elem: Value = if list.0.len() > idx {
             list.0.insert(idx, elem);
-            const_ok_tuple([], list.1.clone())
+            const_ok_tuple([], [list.1.clone()])
         } else {
-            const_fail(elem, Type::UNIT)
+            const_fail(elem, [Type::UNIT])
         };
         Some(vec![(0.into(), list.into()), (1.into(), res_elem)])
     }

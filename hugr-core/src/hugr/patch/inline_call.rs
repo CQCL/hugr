@@ -145,7 +145,7 @@ mod test {
     fn test_inline() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
         let cst3 = mb.add_constant(Value::from(ConstInt::new_u(4, 3)?));
-        let sig = Signature::new_endo(INT_TYPES[4].clone());
+        let sig = Signature::new_endo([INT_TYPES[4].clone()]);
         let func = {
             let mut fb = mb.define_function("foo", sig.clone())?;
             let c1 = fb.load_const(&cst3);
@@ -203,7 +203,7 @@ mod test {
     #[test]
     fn test_recursion() -> Result<(), Box<dyn std::error::Error>> {
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(INT_TYPES[5].clone());
+        let sig = Signature::new_endo([INT_TYPES[5].clone()]);
         let (func, rec_call) = {
             let mut fb = mb.define_function("foo", sig.clone())?;
             let cst1 = fb.add_load_value(ConstInt::new_u(5, 1)?);
@@ -252,11 +252,11 @@ mod test {
         let decl = modb
             .declare(
                 "UndefinedFunc",
-                Signature::new_endo(INT_TYPES[3].clone()).into(),
+                Signature::new_endo([INT_TYPES[3].clone()]).into(),
             )
             .unwrap();
         let mut main = modb
-            .define_function("main", Signature::new_endo(INT_TYPES[3].clone()))
+            .define_function("main", Signature::new_endo([INT_TYPES[3].clone()]))
             .unwrap();
         let call = main.call(&decl, &[], main.input_wires()).unwrap();
         let main = main.finish_with_outputs(call.outputs()).unwrap();
@@ -280,7 +280,7 @@ mod test {
             Err(InlineCallError::NotCallNode(
                 inp,
                 Input {
-                    types: INT_TYPES[3].clone().into()
+                    types: [INT_TYPES[3].clone()].into()
                 }
                 .into()
             ))
@@ -290,14 +290,15 @@ mod test {
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
         let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
-        let mut fb = FunctionBuilder::new("mkpair", Signature::new(usize_t(), tuple_ty.clone()))?;
+        let mut fb =
+            FunctionBuilder::new("mkpair", Signature::new([usize_t()], [tuple_ty.clone()]))?;
         let helper = {
             let mut mb = fb.module_root_builder();
             let fb2 = mb.define_function(
                 "id",
                 PolyFuncType::new(
                     [TypeBound::Copyable.into()],
-                    Signature::new_endo(Type::new_var_use(0, TypeBound::Copyable)),
+                    Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)]),
                 ),
             )?;
             let inps = fb2.input_wires();

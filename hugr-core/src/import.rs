@@ -23,10 +23,9 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, FuncValueType, MaybeRV, NoRV, PolyFuncType, Polymorphic, RowVariable,
-        Signature, Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
+        CustomType, FuncValueType, MaybeRV, PolyFuncType, Polymorphic, RowVariable, Signature,
+        Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRV, TypeRow, TypeRowRV,
         type_param::{SeqPart, TypeParam},
-        type_row::TypeRowBase,
     },
 };
 use fxhash::FxHashMap;
@@ -1340,7 +1339,7 @@ impl<'a> Context<'a> {
                 let variants = (|| {
                     self.import_closed_list(variants)?
                         .iter()
-                        .map(|variant| self.import_type_row::<RowVariable>(*variant))
+                        .map(|variant| self.import_type_row_rv(*variant))
                         .collect::<Result<Vec<_>, _>>()
                 })()
                 .map_err(|err| error_context!(err, "adt variants"))?;
@@ -1424,10 +1423,10 @@ impl<'a> Context<'a> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
             let inputs = self
-                .import_type_row::<RowVariable>(inputs)
+                .import_type_row_rv(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
             let outputs = self
-                .import_type_row::<RowVariable>(outputs)
+                .import_type_row_rv(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
             Ok(FuncValueType::new(inputs, outputs))
         })()
@@ -1438,10 +1437,10 @@ impl<'a> Context<'a> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
             let inputs = self
-                .import_type_row::<NoRV>(inputs)
+                .import_type_row(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
             let outputs = self
-                .import_type_row::<NoRV>(outputs)
+                .import_type_row(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
             Ok(Signature::new(inputs, outputs))
         })()
@@ -1483,6 +1482,13 @@ impl<'a> Context<'a> {
         Ok(types)
     }
 
+    fn import_type_row(&mut self, term_id: table::TermId) -> Result<TypeRow, ImportError> {
+        self.import_closed_list(term_id)?
+            .into_iter()
+            .map(|item| self.import_type(item))
+            .try_collect()
+    }
+
     fn import_closed_tuple(
         &mut self,
         term_id: table::TermId,
@@ -1518,24 +1524,18 @@ impl<'a> Context<'a> {
         Ok(types)
     }
 
-    fn import_type_rows<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<Vec<TypeRowBase<RV>>, ImportError> {
+    fn import_type_rows(&mut self, term_id: table::TermId) -> Result<Vec<TypeRow>, ImportError> {
         self.import_closed_list(term_id)?
             .into_iter()
-            .map(|term_id| self.import_type_row::<RV>(term_id))
+            .map(|term_id| self.import_type_row(term_id))
             .collect()
     }
 
-    fn import_type_row<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<TypeRowBase<RV>, ImportError> {
-        fn import_into<RV: MaybeRV>(
+    fn import_type_row_rv(&mut self, term_id: table::TermId) -> Result<TypeRowRV, ImportError> {
+        fn import_into(
             ctx: &mut Context,
             term_id: table::TermId,
-            types: &mut Vec<TypeBase<RV>>,
+            types: &mut Vec<TypeRV>,
         ) -> Result<(), ImportError> {
             match ctx.get_term(term_id)? {
                 table::Term::List(parts) => {
@@ -1544,7 +1544,7 @@ impl<'a> Context<'a> {
                     for item in *parts {
                         match item {
                             table::SeqPart::Item(term_id) => {
-                                types.push(ctx.import_type::<RV>(*term_id)?);
+                                types.push(ctx.import_type::<RowVariable>(*term_id)?);
                             }
                             table::SeqPart::Splice(term_id) => {
                                 import_into(ctx, *term_id, types)?;
@@ -1553,9 +1553,8 @@ impl<'a> Context<'a> {
                     }
                 }
                 table::Term::Var(table::VarId(_, index)) => {
-                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Any))
-                        .map_err(|_| error_invalid!("expected a closed list"))?;
-                    types.push(TypeBase::new(TypeEnum::RowVar(var)));
+                    let var = RowVariable(*index as _, TypeBound::Any);
+                    types.push(TypeRV::new(TypeEnum::RowVar(var)));
                 }
                 _ => return Err(error_invalid!("expected a list")),
             }

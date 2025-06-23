@@ -120,7 +120,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
                     let int_out_type = INT_TYPES[logwidth1 as usize].clone();
-                    let sum_type = sum_with_error(int_out_type.clone());
+                    let sum_type = sum_with_error([int_out_type.clone()]);
 
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
                         mb_v.and_then(|v| Value::sum(i, [v], sum_type))
@@ -148,7 +148,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     (logwidth0 >= logwidth1 && n0.log_width() == logwidth0).then_some(())?;
 
                     let int_out_type = INT_TYPES[logwidth1 as usize].clone();
-                    let sum_type = sum_with_error(int_out_type.clone());
+                    let sum_type = sum_with_error([int_out_type.clone()]);
                     let mk_out_const = |i, mb_v: Result<Value, _>| {
                         mb_v.and_then(|v| Value::sum(i, [v], sum_type))
                             .unwrap_or_else(|e| panic!("Invalid computed sum, {e}"))
@@ -591,7 +591,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(qr_type)
+                            .as_either([qr_type])
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -652,7 +652,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(qr_type)
+                            .as_either([qr_type])
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -710,7 +710,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(int_out_type.clone())
+                            .as_either([int_out_type.clone()])
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -762,7 +762,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(int_out_type.clone())
+                            .as_either([int_out_type.clone()])
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
@@ -814,7 +814,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(int_out_type.clone())
+                            .as_either([int_out_type.clone()])
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();
@@ -868,7 +868,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                                 signal: 0,
                                 message: "Division by zero".to_string(),
                             }
-                            .as_either(int_out_type.clone())
+                            .as_either([int_out_type.clone()])
                         };
                         let nval = n.value_s();
                         let mval = m.value_u();

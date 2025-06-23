@@ -1088,7 +1088,7 @@ pub(in crate::hugr::patch) mod test {
             .unwrap();
 
         // build a nested identity dfg
-        let mut nest_build = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
+        let mut nest_build = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
         let [input] = nest_build.input_wires_arr();
         let inner_build = nest_build.dfg_builder_endo([(qb_t(), input)]).unwrap();
         let inner_dfg = n_identity(inner_build).unwrap();

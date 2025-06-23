@@ -267,7 +267,7 @@ mod test {
     }
     impl CondThenLoopCfg {
         fn new() -> Result<CondThenLoopCfg, BuildError> {
-            let block_ty = Signature::new_endo(usize_t());
+            let block_ty = Signature::new_endo([usize_t()]);
             let mut cfg_builder = CFGBuilder::new(block_ty.clone())?;
             let pred_const = cfg_builder.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
             let const_unit = cfg_builder.add_constant(Value::unary_unit_sum());
@@ -284,7 +284,7 @@ mod test {
             };
 
             let entry = n_identity(
-                cfg_builder.simple_entry_builder(usize_t().into(), 2)?,
+                cfg_builder.simple_entry_builder([usize_t()].into(), 2)?,
                 &pred_const,
             )?;
 
@@ -300,7 +300,7 @@ mod test {
             let head = id_block(&mut cfg_builder)?;
             cfg_builder.branch(&merge, 0, &head)?;
             let tail = n_identity(
-                cfg_builder.simple_block_builder(Signature::new_endo(usize_t()), 2)?,
+                cfg_builder.simple_block_builder(Signature::new_endo([usize_t()]), 2)?,
                 &pred_const,
             )?;
             cfg_builder.branch(&tail, 1, &head)?;

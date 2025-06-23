@@ -324,8 +324,7 @@ mod test {
     #[test]
     fn test_force_order_const() {
         let mut hugr = {
-            let mut builder =
-                DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new([], [Type::UNIT])).unwrap();
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
@@ -336,7 +335,7 @@ mod test {
     #[test]
     /// test for <https://github.com/CQCL/hugr/issues/2005>
     fn call_indirect_bug() {
-        let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
+        let fn_type = Signature::new([Type::UNIT], vec![Type::UNIT]);
         let mut hugr = {
             let mut builder = DFGBuilder::new(Signature::new(
                 vec![Type::new_function(fn_type.clone()), Type::UNIT],

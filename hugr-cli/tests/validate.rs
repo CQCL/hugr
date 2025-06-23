@@ -42,7 +42,7 @@ const FLOAT_EXT_FILE: &str = concat!(
 fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     let mut module = ModuleBuilder::new();
     let df = module
-        .define_function("test", Signature::new_endo(id_type))
+        .define_function("test", Signature::new_endo([id_type]))
         .unwrap();
     let [i] = df.input_wires_arr();
     df.finish_with_outputs([i]).unwrap();

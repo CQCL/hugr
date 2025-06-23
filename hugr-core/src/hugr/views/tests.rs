@@ -182,11 +182,11 @@ fn test_dataflow_ports_only() {
 
     use itertools::Itertools;
 
-    let mut dfg = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+    let mut dfg = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
     let local_and = {
         let mut mb = dfg.module_root_builder();
         let local_and = mb
-            .define_function("and", Signature::new(vec![bool_t(); 2], bool_t()))
+            .define_function("and", Signature::new(vec![bool_t(); 2], [bool_t()]))
             .unwrap();
         let first_input = local_and.input().out_wire(0);
         local_and.finish_with_outputs([first_input]).unwrap()

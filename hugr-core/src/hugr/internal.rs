@@ -420,7 +420,7 @@ mod test {
     #[test]
     fn insert_ports() {
         let (nop, mut hugr) = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(Type::UNIT)).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo([Type::UNIT])).unwrap();
             let [nop_in] = builder.input_wires_arr();
             let nop = builder
                 .add_dataflow_op(Noop::new(Type::UNIT), [nop_in])

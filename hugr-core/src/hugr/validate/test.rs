@@ -32,7 +32,7 @@ use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file,
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType =
-        ops::FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
+        ops::FuncDefn::new("main", Signature::new([bool_t()], vec![bool_t(); copies])).into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
@@ -227,7 +227,7 @@ fn test_ext_edge() {
 
 #[test]
 fn test_local_const() {
-    let mut h = closed_dfg_root_hugr(Signature::new_endo(bool_t()));
+    let mut h = closed_dfg_root_hugr(Signature::new_endo([bool_t()]));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
     let and = h.add_node_with_parent(h.entrypoint(), and_op());
     h.connect(input, 0, and, 0);
@@ -425,10 +425,10 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
 /// Test that `FuncDefns` cannot be nested.
 #[test]
 fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
-    let mut outer = FunctionBuilder::new("outer", Signature::new_endo(usize_t()))?;
+    let mut outer = FunctionBuilder::new("outer", Signature::new_endo([usize_t()]))?;
     let inner = outer
         .add_hugr({
-            let inner = FunctionBuilder::new("inner", Signature::new_endo(bool_t()))?;
+            let inner = FunctionBuilder::new("inner", Signature::new_endo([bool_t()]))?;
             let [w] = inner.input_wires_arr();
             inner.finish_hugr_with_outputs([w])?
         })
@@ -490,10 +490,11 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
-        let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
+        let evaled_fn =
+            TypeRV::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new(vec![evaled_fn, inputs], outputs),
+            FuncValueType::new([evaled_fn, inputs], [outputs]),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
@@ -502,11 +503,14 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
-                vec![
-                    Type::new_function(FuncValueType::new(rv(0), rv(2))),
-                    Type::new_function(FuncValueType::new(rv(1), rv(3))),
+                [
+                    Type::new_function(FuncValueType::new([rv(0)], [rv(2)])),
+                    Type::new_function(FuncValueType::new([rv(1)], [rv(3)])),
                 ],
-                Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
+                [Type::new_function(FuncValueType::new(
+                    vec![rv(0), rv(1)],
+                    vec![rv(2), rv(3)],
+                ))],
             )
             .into(),
         );
@@ -523,7 +527,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
         vec![
-            Type::new_function(Signature::new(usize_t(), vec![usize_t(), usize_t()])),
+            Type::new_function(Signature::new([usize_t()], [usize_t(), usize_t()])),
             usize_t(),
         ], // inputs: function + its argument
         vec![usize_t(); 4], // outputs (*2^2, three calls)
@@ -550,20 +554,20 @@ fn list1ty(t: TypeRV) -> Term {
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
-    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
+    let inner_ft = Type::new_function(FuncValueType::new_endo([tv.clone()]));
+    let ft_usz = Type::new_function(FuncValueType::new_endo([tv.clone(), usize_t().into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
             [TypeParam::new_list_type(TypeBound::Any)],
-            Signature::new(inner_ft.clone(), ft_usz),
+            Signature::new([inner_ft.clone()], [ft_usz]),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let id_usz = {
         let mut mb = fb.module_root_builder();
-        let bldr = mb.define_function("id_usz", Signature::new_endo(usize_t()))?;
+        let bldr = mb.define_function("id_usz", Signature::new_endo([usize_t()]))?;
         let vals = bldr.input_wires();
         let helper_def = bldr.finish_with_outputs(vals)?;
         fb.load_func(helper_def.handle(), &[])?
@@ -708,14 +712,14 @@ fn cfg_children_restrictions() {
 fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
     use crate::builder::CFGBuilder;
 
-    let mut hugr = CFGBuilder::new(Signature::new_endo(usize_t()))?;
+    let mut hugr = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
     let unary_pred = hugr.add_constant(Value::unary_unit_sum());
     let mut entry = hugr.simple_entry_builder(vec![usize_t()].into(), 1)?;
     let p = entry.load_const(&unary_pred);
     let ins = entry.input_wires();
     let entry = entry.finish_with_outputs(p, ins)?;
 
-    let mut middle = hugr.simple_block_builder(Signature::new_endo(usize_t()), 1)?;
+    let mut middle = hugr.simple_block_builder(Signature::new_endo([usize_t()]), 1)?;
     let p = middle.load_const(&unary_pred);
     let ins = middle.input_wires();
     let middle = middle.finish_with_outputs(p, ins)?;

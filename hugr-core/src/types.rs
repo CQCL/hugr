@@ -35,7 +35,6 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::AliasDecl;
 
 use self::type_param::TypeParam;
-use self::type_row::TypeRowBase;
 
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
@@ -425,16 +424,19 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeBase<RV1>> for TypeBase<RV2> {
     }
 }
 
+impl TypeRV {
+    /// An empty `TypeRowRV`. Provided here for convenience
+    pub const EMPTY_TYPEROW: TypeRowRV = TypeRowRV::new();
+
+    const EMPTY_TYPEROW_REF: &'static TypeRowRV = &Self::EMPTY_TYPEROW;
+}
+
 impl<RV: MaybeRV> TypeBase<RV> {
-    /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
-    pub const EMPTY_TYPEROW: TypeRowBase<RV> = TypeRowBase::<RV>::new();
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(
         TypeEnum::Sum(SumType::Unit { size: 1 }),
         TypeBound::Copyable,
     );
-
-    const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
@@ -898,7 +900,7 @@ pub(crate) mod test {
 
     #[test]
     fn as_option() {
-        let opt = option_type(usize_t());
+        let opt = option_type([usize_t()]);
 
         assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
         assert_eq!(
@@ -927,7 +929,7 @@ pub(crate) mod test {
     #[test]
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
-            TypeRV::UNIT.into(),
+            [TypeRV::UNIT].into(),
             vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
         ];
         let t = SumType::new(variants.clone());
@@ -1008,7 +1010,7 @@ pub(crate) mod test {
         });
 
         let cpy = e.get_type(&CPY).unwrap().instantiate([]).unwrap();
-        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from(t)]);
+        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from([t])]);
 
         let cpy_to_qb = FnTransformer(|ct: &CustomType| (ct == &cpy).then_some(qb_t()));
 

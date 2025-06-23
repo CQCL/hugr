@@ -60,14 +60,14 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ext.add_op(
                 OpName::new_inline("H"),
                 String::new(),
-                Signature::new_endo(qb_t()),
+                Signature::new_endo([qb_t()]),
                 extension_ref,
             )
             .unwrap();
             ext.add_op(
                 OpName::new_inline("Rz"),
                 String::new(),
-                Signature::new(vec![qb_t(), float64_type()], vec![qb_t()]),
+                Signature::new([qb_t(), float64_type()], [qb_t()]),
                 extension_ref,
             )
             .unwrap();

@@ -58,7 +58,7 @@ impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
             .expect("Array type instantiation failed");
         PolyFuncTypeRV::new(
             params,
-            FuncValueType::new(array_ty.clone(), vec![array_ty; 2]),
+            FuncValueType::new([array_ty.clone()], vec![array_ty; 2]),
         )
         .into()
     }

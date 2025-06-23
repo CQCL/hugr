@@ -111,13 +111,16 @@ mod tests {
 
     #[test]
     fn test_build_unwrap() {
-        let mut builder =
-            DFGBuilder::new(Signature::new(Type::from(option_type(bool_t())), bool_t())).unwrap();
+        let mut builder = DFGBuilder::new(Signature::new(
+            [Type::from(option_type([bool_t()]))],
+            [bool_t()],
+        ))
+        .unwrap();
 
         let [opt] = builder.input_wires_arr();
 
         let [res] = builder
-            .build_unwrap_sum(1, option_type(bool_t()), opt)
+            .build_unwrap_sum(1, option_type([bool_t()]), opt)
             .unwrap();
         builder.finish_hugr_with_outputs([res]).unwrap();
     }

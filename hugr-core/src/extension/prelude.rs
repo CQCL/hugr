@@ -284,7 +284,7 @@ pub const ERROR_TYPE_NAME: TypeName = TypeName::new_inline("error");
 
 /// Return a Sum type with the second variant as the given type and the first an Error.
 pub fn sum_with_error(ty: impl Into<TypeRowRV>) -> SumType {
-    either_type(error_type(), ty)
+    either_type([error_type()], ty)
 }
 
 /// An optional type, i.e. a Sum type with the second variant as the given type and the first as an empty tuple.
@@ -618,10 +618,10 @@ impl MakeOpDef for TupleOpDef {
         let param = TypeParam::new_list_type(TypeBound::Any);
         match self {
             TupleOpDef::MakeTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new(rv, tuple_type))
+                PolyFuncTypeRV::new([param], FuncValueType::new([rv], [tuple_type]))
             }
             TupleOpDef::UnpackTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new(tuple_type, rv))
+                PolyFuncTypeRV::new([param], FuncValueType::new([tuple_type], [rv]))
             }
         }
         .into()
@@ -787,7 +787,7 @@ impl MakeOpDef for NoopDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let tv = Type::new_var_use(0, TypeBound::Any);
-        PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
+        PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo([tv])).into()
     }
 
     fn description(&self) -> String {
@@ -899,7 +899,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Any)],
-            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any)),
+            FuncValueType::new_endo([TypeRV::new_row_var_use(0, TypeBound::Any)]),
         )
         .into()
     }
@@ -1066,9 +1066,9 @@ mod test {
 
     #[test]
     fn test_option() {
-        let typ: Type = option_type(bool_t()).into();
+        let typ: Type = option_type([bool_t()]).into();
         let const_val1 = const_some(Value::true_val());
-        let const_val2 = const_none(bool_t());
+        let const_val2 = const_none([bool_t()]);
 
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
 
@@ -1080,9 +1080,9 @@ mod test {
 
     #[test]
     fn test_result() {
-        let typ: Type = either_type(bool_t(), float64_type()).into();
-        let const_bool = const_left(Value::true_val(), float64_type());
-        let const_float = const_right(bool_t(), ConstF64::new(0.5).into());
+        let typ: Type = either_type([bool_t()], [float64_type()]).into();
+        let const_bool = const_left(Value::true_val(), [float64_type()]);
+        let const_float = const_right([bool_t()], ConstF64::new(0.5).into());
 
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![typ.clone(), typ])).unwrap();
 

@@ -167,7 +167,7 @@ mod test {
         let i32_t = || INT_TYPES[5].clone();
         let mut fb = FunctionBuilder::new(
             "main",
-            Signature::new(vec![bool_t(), usize_t(), i32_t()], usize_t()),
+            Signature::new(vec![bool_t(), usize_t(), i32_t()], [usize_t()]),
         )
         .unwrap();
         let helper = fb
@@ -244,12 +244,12 @@ mod test {
     fn peel_loop_order_output() {
         let i16_t = || INT_TYPES[4].clone();
         let mut fb =
-            FunctionBuilder::new("main", Signature::new(vec![i16_t(), bool_t()], i16_t())).unwrap();
+            FunctionBuilder::new("main", Signature::new([i16_t(), bool_t()], [i16_t()])).unwrap();
 
         let [i, b] = fb.input_wires_arr();
         let tl = {
             let mut tlb = fb
-                .tail_loop_builder([(i16_t(), i), (bool_t(), b)], [], i16_t().into())
+                .tail_loop_builder([(i16_t(), i), (bool_t(), b)], [], [i16_t()].into())
                 .unwrap();
             let [i, _b] = tlb.input_wires_arr();
             // This loop only goes round once. However, we do not expect this to affect
@@ -270,7 +270,7 @@ mod test {
         let [i2] = tl.outputs_arr();
         // Create a DFG (no inputs, one output) that reads the result of the TailLoop via an 'ext` edge
         let dfg = fb
-            .dfg_builder(Signature::new(vec![], i16_t()), [])
+            .dfg_builder(Signature::new([], [i16_t()]), [])
             .unwrap()
             .finish_with_outputs([i2])
             .unwrap();

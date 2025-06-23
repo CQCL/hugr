@@ -110,27 +110,38 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
         // `match` must deal with everything inside the node, and update the signature (per OpType)
         let start_new_port_index = match hugr.optype_mut(node) {
             OpType::DFG(dfg) => {
-                let ins = dfg.signature.input.to_mut();
-                let start_new_port_index = ins.len();
+                let mut ins = dfg.signature.input.to_vec();
                 ins.extend(just_types(&sources));
+                let start_new_port_index = ins.len();
+                dfg.signature.input = ins.into();
 
                 self.thread_dataflow_parent(hugr, node, start_new_port_index, sources);
                 start_new_port_index
             }
             OpType::Conditional(cond) => {
-                let start_new_port_index = cond.signature().input.len();
-                cond.other_inputs.to_mut().extend(just_types(&sources));
+                let mut inputs = cond.other_inputs.to_vec();
+                inputs.extend(just_types(&sources));
+                cond.other_inputs = inputs.into();
 
+                let start_new_port_index = cond.signature().input.len();
                 self.thread_conditional(hugr, node, sources);
                 start_new_port_index
             }
             OpType::TailLoop(tail_op) => {
-                vec_prepend(tail_op.just_inputs.to_mut(), just_types(&sources));
+                let mut inputs = Vec::new();
+                inputs.extend(just_types(&sources));
+                inputs.extend(tail_op.just_inputs.iter().cloned());
+                tail_op.just_inputs = inputs.into();
+
                 self.thread_tailloop(hugr, node, sources);
                 0
             }
             OpType::CFG(cfg) => {
-                vec_prepend(cfg.signature.input.to_mut(), just_types(&sources));
+                let mut inputs = Vec::new();
+                inputs.extend(just_types(&sources));
+                inputs.extend(cfg.signature.input.iter().cloned());
+                cfg.signature.input = inputs.into();
+
                 assert_eq!(
                     self.get(node).collect::<Vec<_>>(),
                     self.get(hugr.children(node).next().unwrap())
@@ -177,7 +188,11 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
             let OpType::Input(in_op) = hugr.optype_mut(inp) else {
                 panic!("Expected Input node")
             };
-            vec_insert(in_op.types.to_mut(), tys, start_new_port_index);
+
+            let mut types = in_op.types.to_vec();
+            vec_insert(&mut types, tys, start_new_port_index);
+            in_op.types = types.into();
+
             let new_outports =
                 hugr.insert_ports(inp, Direction::Outgoing, start_new_port_index, srcs.len());
 
@@ -212,9 +227,10 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
             let OpType::Case(case_op) = hugr.optype_mut(case) else {
                 continue;
             };
-            let ins = case_op.signature.input.to_mut();
+            let mut ins = case_op.signature.input.to_vec();
             let start_case_port_index = ins.len();
             ins.extend(just_types(&srcs));
+            case_op.signature.input = ins.into();
             self.thread_dataflow_parent(hugr, case, start_case_port_index, srcs.clone());
         }
     }
@@ -242,7 +258,12 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
             panic!("Expected dataflow block")
         };
         let my_inputs: Vec<_> = self.get(node).map(|(w, t)| (*w, t.clone())).collect();
-        vec_prepend(this_dfb.inputs.to_mut(), just_types(&my_inputs));
+
+        let mut inputs = Vec::new();
+        inputs.extend(just_types(&my_inputs));
+        inputs.extend(this_dfb.inputs.iter().cloned());
+        this_dfb.inputs = inputs.into();
+
         let locals = self.thread_dataflow_parent(hugr, node, 0, my_inputs);
         let variant_source_prefixes: Vec<Vec<(Wire<N>, Type)>> = hugr
             .output_neighbours(node)
@@ -269,7 +290,10 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
             .iter()
             .zip_eq(this_dfb.sum_rows.iter_mut())
         {
-            vec_prepend(sum_row.to_mut(), just_types(source_prefix));
+            let mut types = Vec::new();
+            types.extend(just_types(source_prefix));
+            types.extend(sum_row.iter().cloned());
+            *sum_row = types.into();
         }
         let [_, output_node] = hugr.get_io(node).unwrap();
         add_control_prefixes(hugr, output_node, variant_source_prefixes);
@@ -323,7 +347,7 @@ fn add_control_prefixes<H: HugrMut>(
         let mut cond = ConditionalBuilder::new(
             old_sum_rows.clone(),
             just_types(needed_sources.values()).collect_vec(),
-            new_control_type.clone(),
+            [new_control_type.clone()],
         )
         .unwrap();
         for (i, new_sources) in variant_source_prefixes.into_iter().enumerate() {
@@ -362,11 +386,10 @@ fn add_control_prefixes<H: HugrMut>(
     let OpType::Output(output) = hugr.optype_mut(output_node) else {
         panic!("impossible")
     };
-    output.types.to_mut()[0] = new_control_type;
-}
 
-fn vec_prepend<T>(v: &mut Vec<T>, ts: impl IntoIterator<Item = T>) {
-    vec_insert(v, ts, 0)
+    let mut types = output.types.to_vec();
+    types[0] = new_control_type;
+    output.types = types.into();
 }
 
 fn vec_insert<T>(v: &mut Vec<T>, ts: impl IntoIterator<Item = T>, index: usize) {

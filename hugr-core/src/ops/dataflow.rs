@@ -4,10 +4,10 @@ use std::borrow::Cow;
 
 use super::{OpTag, OpTrait, impl_op_name};
 
+use crate::IncomingPort;
 use crate::extension::SignatureError;
 use crate::ops::StaticTag;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
-use crate::{IncomingPort, type_row};
 
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -310,11 +310,11 @@ impl DataflowOpTrait for CallIndirect {
 
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
-        let mut s = self.signature.clone();
-        s.input
-            .to_mut()
-            .insert(0, Type::new_function(self.signature.clone()));
-        Cow::Owned(s)
+        let mut input = Vec::new();
+        input.push(Type::new_function(self.signature.clone()));
+        input.extend(self.signature.input().iter().cloned());
+        let output = self.signature.output().clone();
+        Cow::Owned(Signature::new(input, output))
     }
 
     fn substitute(&self, subst: &Substitution) -> Self {
@@ -405,8 +405,8 @@ impl DataflowOpTrait for LoadFunction {
 
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Owned(Signature::new(
-            type_row![],
-            Type::new_function(self.instantiation.clone()),
+            [],
+            [Type::new_function(self.instantiation.clone())],
         ))
     }
 

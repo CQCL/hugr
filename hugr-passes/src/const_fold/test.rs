@@ -138,7 +138,7 @@ fn test_big() {
        let x = (5.6, 3.2);
        int(x.0 - x.1) == 2
     */
-    let sum_type = sum_with_error(INT_TYPES[5].clone());
+    let sum_type = sum_with_error([INT_TYPES[5].clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
 
     let tup = build.add_load_const(Value::tuple([f2c(5.6), f2c(3.2)]));
@@ -162,7 +162,7 @@ fn test_big() {
 
     constant_fold_pass(&mut h);
 
-    let expected = const_ok(i2c(2).clone(), error_type());
+    let expected = const_ok(i2c(2).clone(), [error_type()]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -212,7 +212,7 @@ fn test_fold_and() {
     // x0, x1 := bool(true), bool(true)
     // x2 := and(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
+    let mut build = DFGBuilder::new(noargfn([bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::true_val());
     let x2 = build.add_dataflow_op(LogicOp::And, [x0, x1]).unwrap();
@@ -228,7 +228,7 @@ fn test_fold_or() {
     // x0, x1 := bool(true), bool(false)
     // x2 := or(x0, x1)
     // output x2 == true;
-    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
+    let mut build = DFGBuilder::new(noargfn([bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_load_const(Value::false_val());
     let x2 = build.add_dataflow_op(LogicOp::Or, [x0, x1]).unwrap();
@@ -244,7 +244,7 @@ fn test_fold_not() {
     // x0 := bool(true)
     // x1 := not(x0)
     // output x1 == false;
-    let mut build = DFGBuilder::new(noargfn(bool_t())).unwrap();
+    let mut build = DFGBuilder::new(noargfn([bool_t()])).unwrap();
     let x0 = build.add_load_const(Value::true_val());
     let x1 = build.add_dataflow_op(LogicOp::Not, [x0]).unwrap();
     let mut h = build.finish_hugr_with_outputs(x1.outputs()).unwrap();
@@ -410,7 +410,7 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
 
     use hugr_core::extension::prelude::const_ok;
     let elem_type = INT_TYPES[to_log_width as usize].clone();
-    let sum_type = sum_with_error(elem_type.clone());
+    let sum_type = sum_with_error([elem_type.clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(mk_const(from_log_width, val).unwrap().into());
     let x1 = build
@@ -428,9 +428,9 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
         };
     }
     let expected = if succeeds {
-        const_ok(mk_const(to_log_width, val).unwrap().into(), error_type())
+        const_ok(mk_const(to_log_width, val).unwrap().into(), [error_type()])
     } else {
-        INARROW_ERROR_VALUE.clone().as_either(elem_type)
+        INARROW_ERROR_VALUE.clone().as_either([elem_type])
     };
     assert_fully_folded(&h, &expected);
 }
@@ -802,7 +802,7 @@ fn test_fold_idivmod_checked_u() {
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let elem_type = Type::new_tuple(intpair);
-    let sum_type = sum_with_error(elem_type.clone());
+    let sum_type = sum_with_error([elem_type.clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -815,7 +815,7 @@ fn test_fold_idivmod_checked_u() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(elem_type);
+    .as_either([elem_type]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -850,7 +850,7 @@ fn test_fold_idivmod_checked_s() {
     // output x2 == error
     let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let elem_type = Type::new_tuple(intpair);
-    let sum_type = sum_with_error(elem_type.clone());
+    let sum_type = sum_with_error([elem_type.clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -863,7 +863,7 @@ fn test_fold_idivmod_checked_s() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(elem_type);
+    .as_either([elem_type]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -898,7 +898,7 @@ fn test_fold_idiv_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := idiv_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].clone());
+    let sum_type = sum_with_error([INT_TYPES[5].clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -911,7 +911,7 @@ fn test_fold_idiv_checked_u() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].clone());
+    .as_either([INT_TYPES[5].clone()]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -939,7 +939,7 @@ fn test_fold_imod_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].clone());
+    let sum_type = sum_with_error([INT_TYPES[5].clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_u(5, 20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -952,7 +952,7 @@ fn test_fold_imod_checked_u() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].clone());
+    .as_either([INT_TYPES[5].clone()]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -980,7 +980,7 @@ fn test_fold_idiv_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := idiv_checked_s(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].clone());
+    let sum_type = sum_with_error([INT_TYPES[5].clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -993,7 +993,7 @@ fn test_fold_idiv_checked_s() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].clone());
+    .as_either([INT_TYPES[5].clone()]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -1021,7 +1021,7 @@ fn test_fold_imod_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := imod_checked_u(x0, x1)
     // output x2 == error
-    let sum_type = sum_with_error(INT_TYPES[5].clone());
+    let sum_type = sum_with_error([INT_TYPES[5].clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
     let x0 = build.add_load_const(Value::extension(ConstInt::new_s(5, -20).unwrap()));
     let x1 = build.add_load_const(Value::extension(ConstInt::new_u(5, 0).unwrap()));
@@ -1034,7 +1034,7 @@ fn test_fold_imod_checked_s() {
         signal: 0,
         message: "Division by zero".to_string(),
     }
-    .as_either(INT_TYPES[5].clone());
+    .as_either([INT_TYPES[5].clone()]);
     assert_fully_folded(&h, &expected);
 }
 
@@ -1292,7 +1292,7 @@ fn test_fold_int_ops() {
 fn test_via_part_unknown_tuple() {
     // fn(x) -> let (a,_b,c) = (4,x,5) // make tuple, unpack tuple
     //          in a+b
-    let mut builder = DFGBuilder::new(endo_sig(INT_TYPES[3].clone())).unwrap();
+    let mut builder = DFGBuilder::new(endo_sig([INT_TYPES[3].clone()])).unwrap();
     let [x] = builder.input_wires_arr();
     let cst4 = builder.add_load_value(ConstInt::new_u(3, 4).unwrap());
     let cst5 = builder.add_load_value(ConstInt::new_u(3, 5).unwrap());
@@ -1336,7 +1336,7 @@ fn test_via_part_unknown_tuple() {
 fn tail_loop_hugr(int_cst: ConstInt) -> Hugr {
     let int_ty = int_cst.get_type();
     let lw = int_cst.log_width();
-    let mut builder = DFGBuilder::new(inout_sig(bool_t(), int_ty.clone())).unwrap();
+    let mut builder = DFGBuilder::new(inout_sig([bool_t()], [int_ty.clone()])).unwrap();
     let [bool_w] = builder.input_wires_arr();
     let lcst = builder.add_load_value(int_cst);
     let tlb = builder
@@ -1462,7 +1462,7 @@ fn test_tail_loop_increase_termination() {
 
 fn cfg_hugr() -> Hugr {
     let int_ty = INT_TYPES[4].clone();
-    let mut builder = DFGBuilder::new(inout_sig(vec![bool_t(); 2], int_ty.clone())).unwrap();
+    let mut builder = DFGBuilder::new(inout_sig(vec![bool_t(); 2], [int_ty.clone()])).unwrap();
     let [p, q] = builder.input_wires_arr();
     let int_cst = builder.add_load_value(ConstInt::new_u(4, 1).unwrap());
     let mut nested = builder
@@ -1470,9 +1470,11 @@ fn cfg_hugr() -> Hugr {
         .unwrap();
     let [i] = nested.input_wires_arr();
     let mut cfg = nested
-        .cfg_builder([(int_ty.clone(), i)], int_ty.clone().into())
+        .cfg_builder([(int_ty.clone(), i)], [int_ty.clone()].into())
         .unwrap();
-    let mut entry = cfg.simple_entry_builder(int_ty.clone().into(), 2).unwrap();
+    let mut entry = cfg
+        .simple_entry_builder([int_ty.clone()].into(), 2)
+        .unwrap();
     let [e_i] = entry.input_wires_arr();
     let e_cst7 = entry.add_load_value(ConstInt::new_u(4, 7).unwrap());
     let e_add = entry
@@ -1481,7 +1483,7 @@ fn cfg_hugr() -> Hugr {
     let entry = entry.finish_with_outputs(p, e_add.outputs()).unwrap();
 
     let mut a = cfg
-        .simple_block_builder(endo_sig(int_ty.clone()), 2)
+        .simple_block_builder(endo_sig([int_ty.clone()]), 2)
         .unwrap();
     let [a_i] = a.input_wires_arr();
     let a_cst3 = a.add_load_value(ConstInt::new_u(4, 3).unwrap());

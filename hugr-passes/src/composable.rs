@@ -242,12 +242,12 @@ mod test {
     fn test_then() {
         let mut mb = ModuleBuilder::new();
         let id1 = mb
-            .define_function("id1", Signature::new_endo(usize_t()))
+            .define_function("id1", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id1.input_wires();
         let id1 = id1.finish_with_outputs(inps).unwrap();
         let id2 = mb
-            .define_function("id2", Signature::new_endo(usize_t()))
+            .define_function("id2", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id2.input_wires();
         let id2 = id2.finish_with_outputs(inps).unwrap();
@@ -278,19 +278,19 @@ mod test {
     #[test]
     fn test_validation() {
         let mut h = Hugr::new_with_entrypoint(DFG {
-            signature: Signature::new(usize_t(), bool_t()),
+            signature: Signature::new([usize_t()], [bool_t()]),
         })
         .unwrap();
         let inp = h.add_node_with_parent(
             h.entrypoint(),
             Input {
-                types: usize_t().into(),
+                types: [usize_t()].into(),
             },
         );
         let outp = h.add_node_with_parent(
             h.entrypoint(),
             Output {
-                types: bool_t().into(),
+                types: [bool_t()].into(),
             },
         );
         h.connect(inp, 0, outp, 0);

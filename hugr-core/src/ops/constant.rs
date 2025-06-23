@@ -601,6 +601,7 @@ pub(crate) mod test {
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::std_extensions::collections::array::{ArrayValue, array_type};
     use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
+    use crate::types::TypeRowRV;
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -660,7 +661,7 @@ pub(crate) mod test {
     #[test]
     fn test_sum() -> Result<(), BuildError> {
         use crate::builder::Container;
-        let pred_rows = vec![vec![usize_t(), float64_type()].into(), Type::EMPTY_TYPEROW];
+        let pred_rows: Vec<TypeRow> = vec![[usize_t(), float64_type()].into(), [].into()];
         let pred_ty = SumType::new(pred_rows.clone());
 
         let mut b = DFGBuilder::new(inout_sig(

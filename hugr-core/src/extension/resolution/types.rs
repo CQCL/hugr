@@ -10,8 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
-use crate::types::type_row::TypeRowBase;
-use crate::types::{MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum};
+use crate::types::{MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum, TypeRow, TypeRowRV};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -146,8 +145,26 @@ pub(crate) fn collect_signature_exts(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-fn collect_type_row_exts<RV: MaybeRV>(
-    row: &TypeRowBase<RV>,
+fn collect_type_row_exts(
+    row: &TypeRow,
+    used_extensions: &mut WeakExtensionRegistry,
+    missing_extensions: &mut ExtensionSet,
+) {
+    for ty in row.iter() {
+        collect_type_exts(ty, used_extensions, missing_extensions);
+    }
+}
+
+/// Collect the Extension pointers in the [`CustomType`]s inside a type row.
+///
+/// # Attributes
+///
+/// - `row`: The type row to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+fn collect_type_row_rv_exts(
+    row: &TypeRowRV,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
@@ -186,12 +203,12 @@ pub(crate) fn collect_type_exts<RV: MaybeRV>(
             }
         }
         TypeEnum::Function(f) => {
-            collect_type_row_exts(&f.input, used_extensions, missing_extensions);
-            collect_type_row_exts(&f.output, used_extensions, missing_extensions);
+            collect_type_row_rv_exts(&f.input, used_extensions, missing_extensions);
+            collect_type_row_rv_exts(&f.output, used_extensions, missing_extensions);
         }
         TypeEnum::Sum(SumType::General { rows }) => {
             for row in rows {
-                collect_type_row_exts(row, used_extensions, missing_extensions);
+                collect_type_row_rv_exts(row, used_extensions, missing_extensions);
             }
         }
         // Other types do not store extensions.
@@ -281,7 +298,7 @@ fn collect_value_exts(
         Value::Sum(s) => {
             if let SumType::General { rows } = &s.sum_type {
                 for row in rows {
-                    collect_type_row_exts(row, used_extensions, missing_extensions);
+                    collect_type_row_rv_exts(row, used_extensions, missing_extensions);
                 }
             }
             s.values

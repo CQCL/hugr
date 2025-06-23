@@ -116,8 +116,8 @@ pub mod test {
 
     #[rstest]
     #[case(0,HugrFuncType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]
-    #[case(1, HugrFuncType::new(Type::new_unit_sum(1), Type::new_unit_sum(3)))]
-    #[case(2,HugrFuncType::new(vec![], vec![Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
+    #[case(1, HugrFuncType::new([Type::new_unit_sum(1)], [Type::new_unit_sum(3)]))]
+    #[case(2,HugrFuncType::new([], [Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
     fn func_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] ft: HugrFuncType) {
         assert_snapshot!(
             "func_type_to_llvm",
@@ -150,7 +150,7 @@ pub mod test {
     #[case(4, INT_TYPES[6].clone())]
     #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()]]))]
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), INT_TYPES[2].clone()]]))]
-    #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
+    #[case(7, Type::new_function(HugrFuncType::new([Type::new_unit_sum(2)], [Type::new_unit_sum(3)])))]
     fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
         use crate::CodegenExtsBuilder;
 

@@ -675,7 +675,7 @@ pub(crate) mod test {
     }
 
     fn hugr_failing_2262() -> Hugr {
-        let sig = Signature::new(vec![bool_t(); 2], bool_t());
+        let sig = Signature::new(vec![bool_t(); 2], [bool_t()]);
         let mut mb = ModuleBuilder::new();
         let mut fa = mb.define_function("a", sig.clone()).unwrap();
         let mut dfg = fa.dfg_builder(sig.clone(), fa.input_wires()).unwrap();

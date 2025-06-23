@@ -104,7 +104,7 @@ fn test_tail_loop_never_iterates() {
     let r_w = builder.add_load_value(r_v.clone());
     let tag = Tag::new(
         TailLoop::BREAK_TAG,
-        vec![type_row![], r_v.get_type().into()],
+        vec![type_row![], [r_v.get_type()].into()],
     );
     let tagged = builder.add_dataflow_op(tag, [r_w]).unwrap();
 
@@ -132,7 +132,7 @@ fn test_tail_loop_always_iterates() {
         Value::sum(
             TailLoop::CONTINUE_TAG,
             [],
-            SumType::new([type_row![], bool_t().into()]),
+            SumType::new([type_row![], [bool_t()].into()]),
         )
         .unwrap(),
     );
@@ -201,7 +201,7 @@ fn test_tail_loop_containing_conditional() {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![])).unwrap();
     let control_variants = vec![vec![bool_t(); 2].into(); 2];
     let control_t = Type::new_sum(control_variants.clone());
-    let body_out_variants = vec![TypeRow::from(control_t.clone()), vec![bool_t(); 2].into()];
+    let body_out_variants = vec![TypeRow::from([control_t.clone()]), vec![bool_t(); 2].into()];
 
     let init = builder.add_load_value(
         Value::sum(
@@ -223,7 +223,7 @@ fn test_tail_loop_containing_conditional() {
         .conditional_builder(
             (control_variants.clone(), in_w),
             [],
-            Type::new_sum(body_out_variants.clone()).into(),
+            [Type::new_sum(body_out_variants.clone())].into(),
         )
         .unwrap();
     let mut case0_b = cond.case_builder(0).unwrap();
@@ -261,9 +261,9 @@ fn test_tail_loop_containing_conditional() {
 
 #[test]
 fn test_conditional() {
-    let variants = vec![type_row![], type_row![], bool_t().into()];
+    let variants = vec![type_row![], type_row![], [bool_t()].into()];
     let cond_t = Type::new_sum(variants.clone());
-    let mut builder = DFGBuilder::new(Signature::new(cond_t, type_row![])).unwrap();
+    let mut builder = DFGBuilder::new(Signature::new([cond_t], [])).unwrap();
     let [arg_w] = builder.input_wires_arr();
 
     let true_w = builder.add_load_value(Value::true_val());
@@ -412,7 +412,7 @@ fn test_call(
     let func_defn = {
         let mut mb = builder.module_root_builder();
         let func_bldr = mb
-            .define_function("id", Signature::new_endo(bool_t()))
+            .define_function("id", Signature::new_endo([bool_t()]))
             .unwrap();
         let [v] = func_bldr.input_wires_arr();
         func_bldr.finish_with_outputs([v]).unwrap()
@@ -448,7 +448,7 @@ fn test_region() {
     // Create a nested DFG which gets in_w passed as an input, but has a nonlocal edge
     // from the LoadConstant
     let nested = builder
-        .dfg_builder(Signature::new(bool_t(), vec![bool_t(); 2]), [in_w])
+        .dfg_builder(Signature::new([bool_t()], vec![bool_t(); 2]), [in_w])
         .unwrap();
     let [nested_in] = nested.input_wires_arr();
     let nested = nested.finish_with_outputs([nested_in, cst_w]).unwrap();
@@ -486,7 +486,7 @@ fn test_module() {
     let leaf_fn = leaf_fn.finish_with_outputs(outs).unwrap();
 
     let mut f2 = modb
-        .define_function("f2", Signature::new(bool_t(), vec![bool_t(); 2]))
+        .define_function("f2", Signature::new([bool_t()], vec![bool_t(); 2]))
         .unwrap();
     let [inp] = f2.input_wires_arr();
     let cst_true = f2.add_load_value(Value::true_val());
@@ -494,7 +494,7 @@ fn test_module() {
     let f2 = f2.finish_with_outputs(f2_call.outputs()).unwrap();
 
     let mut main = modb
-        .define_function("main", Signature::new(bool_t(), vec![bool_t(); 2]))
+        .define_function("main", Signature::new([bool_t()], vec![bool_t(); 2]))
         .unwrap();
     let [inp] = main.input_wires_arr();
     let cst_false = main.add_load_value(Value::false_val());
@@ -553,7 +553,7 @@ fn test_module() {
 #[case(pv_true(), pv_false())]
 #[case(pv_true(), pv_true())]
 fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Void>) {
-    let b2b = || Signature::new_endo(bool_t());
+    let b2b = || Signature::new_endo([bool_t()]);
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
 
     let [id1, id2] = ["id1", "[id2]"].map(|name| {
@@ -578,7 +578,7 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
         .conditional_builder(
             (vec![type_row![]; 2], which),
             [(bool_func(), lf1), (bool_func(), lf2)],
-            bool_func().into(),
+            [bool_func()].into(),
         )
         .unwrap();
     let case_false = cond.case_builder(0).unwrap();

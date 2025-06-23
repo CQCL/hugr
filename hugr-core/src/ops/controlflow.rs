@@ -107,10 +107,9 @@ impl DataflowOpTrait for Conditional {
 
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
-        let mut inputs = self.other_inputs.clone();
-        inputs
-            .to_mut()
-            .insert(0, Type::new_sum(self.sum_rows.clone()));
+        let mut inputs = Vec::new();
+        inputs.push(Type::new_sum(self.sum_rows.clone()));
+        inputs.extend(self.other_inputs.iter().cloned());
         Cow::Owned(Signature::new(inputs, self.outputs.clone()))
     }
 
@@ -363,7 +362,7 @@ mod test {
         let dfb = DataflowBlock {
             inputs: vec![usize_t(), tv0.clone()].into(),
             other_outputs: vec![tv0.clone()].into(),
-            sum_rows: vec![usize_t().into(), vec![qb_t(), tv0.clone()].into()],
+            sum_rows: vec![[usize_t()].into(), vec![qb_t(), tv0.clone()].into()],
         };
         let dfb2 = dfb.substitute(&Substitution::new(&[qb_t().into()]));
         let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
@@ -377,15 +376,19 @@ mod test {
     fn test_subst_conditional() {
         let tv1 = Type::new_var_use(1, TypeBound::Any);
         let cond = Conditional {
-            sum_rows: vec![usize_t().into(), tv1.clone().into()],
-            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any))].into(),
+            sum_rows: vec![[usize_t()].into(), [tv1.clone()].into()],
+            other_inputs: vec![Type::new_tuple([TypeRV::new_row_var_use(
+                0,
+                TypeBound::Any,
+            )])]
+            .into(),
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
             TypeArg::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
             qb_t().into(),
         ]));
-        let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
+        let st = Type::new_sum([[usize_t()], [qb_t()]]); //both single-element variants
         assert_eq!(
             cond2.signature().as_ref(),
             &Signature::new(

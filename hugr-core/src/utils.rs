@@ -141,7 +141,7 @@ pub(crate) mod test_quantum_extension {
     use lazy_static::lazy_static;
 
     fn one_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(qb_t()).into()
+        FuncValueType::new_endo([qb_t()]).into()
     }
 
     fn two_qb_func() -> PolyFuncTypeRV {

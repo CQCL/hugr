@@ -63,8 +63,7 @@ macro_rules! type_row {
     ($($t:expr),+ $(,)?) => {
         {
             use $crate::types;
-            static ROW: &[types::Type] = &[$($t),*];
-            let row: types::TypeRow = ROW.into();
+            let row: types::TypeRow = [$($t),*].into();
             row
         }
     };

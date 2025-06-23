@@ -125,7 +125,7 @@ impl MakeOpDef for IntOpDef {
             )
             .into(),
             inarrow_s | inarrow_u => CustomValidator::new(
-                int_polytype(2, tv0, sum_ty_with_err(int_tv(1))),
+                int_polytype(2, [tv0], [sum_ty_with_err(int_tv(1))]),
                 IOValidator { f_ge_s: true },
             )
             .into(),
@@ -141,7 +141,7 @@ impl MakeOpDef for IntOpDef {
                 int_polytype(
                     1,
                     intpair.clone(),
-                    sum_ty_with_err(Type::new_tuple(intpair)),
+                    [sum_ty_with_err(Type::new_tuple(intpair))],
                 )
             }
             .into(),
@@ -152,10 +152,10 @@ impl MakeOpDef for IntOpDef {
             .into(),
             idiv_u | idiv_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             idiv_checked_u | idiv_checked_s => {
-                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
+                int_polytype(1, vec![tv0.clone(); 2], [sum_ty_with_err(tv0)]).into()
             }
             imod_checked_u | imod_checked_s => {
-                int_polytype(1, vec![tv0.clone(); 2], sum_ty_with_err(tv0)).into()
+                int_polytype(1, vec![tv0.clone(); 2], [sum_ty_with_err(tv0)]).into()
             }
             imod_u | imod_s => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
             ishl | ishr | irotl | irotr => int_polytype(1, vec![tv0.clone(); 2], vec![tv0]).into(),
@@ -352,7 +352,7 @@ impl IntOpDef {
 }
 
 fn sum_ty_with_err(t: Type) -> Type {
-    sum_with_error(t).into()
+    sum_with_error([t]).into()
 }
 
 #[cfg(test)]
@@ -384,7 +384,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(3), int_type(4))
+            &Signature::new([int_type(3)], [int_type(4)])
         );
         assert_eq!(
             IntOpDef::iwiden_s
@@ -393,7 +393,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new_endo(int_type(3))
+            &Signature::new_endo([int_type(3)])
         );
         assert_eq!(
             IntOpDef::inarrow_s
@@ -402,7 +402,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(3), sum_ty_with_err(int_type(3)))
+            &Signature::new([int_type(3)], [sum_ty_with_err(int_type(3))])
         );
         assert!(
             IntOpDef::iwiden_u
@@ -419,7 +419,7 @@ mod test {
                 .unwrap()
                 .signature()
                 .as_ref(),
-            &Signature::new(int_type(2), sum_ty_with_err(int_type(1)))
+            &Signature::new([int_type(2)], [sum_ty_with_err(int_type(1))])
         );
 
         assert!(

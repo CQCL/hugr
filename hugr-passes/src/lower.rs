@@ -94,7 +94,7 @@ mod test {
 
     #[fixture]
     fn noop_hugr() -> Hugr {
-        let mut b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+        let mut b = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
         let out = b
             .add_dataflow_op(Noop::new(bool_t()), [b.input_wires().next().unwrap()])
             .unwrap()
@@ -104,7 +104,7 @@ mod test {
 
     #[fixture]
     fn identity_hugr() -> Hugr {
-        let b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+        let b = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
         let out = b.input_wires().next().unwrap();
         b.finish_hugr_with_outputs([out]).unwrap()
     }

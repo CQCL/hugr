@@ -53,12 +53,12 @@ fn fold_trunc(
             signal: 0,
             message: "Can't truncate non-finite float".to_string(),
         }
-        .as_either(int_type.clone())
+        .as_either([int_type.clone()])
     };
     let out_const: ops::Value = if f.is_finite() {
         let cv = convert(f, log_width);
         if let Ok(cv) = cv {
-            const_ok(cv, error_type())
+            const_ok(cv, [error_type()])
         } else {
             err_value()
         }

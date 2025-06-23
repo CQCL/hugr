@@ -437,8 +437,7 @@ mod test {
     #[test]
     /// Test building a HUGR involving a `new_array` operation.
     fn test_new_array() {
-        let mut b =
-            DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();
+        let mut b = DFGBuilder::new(inout_sig([qb_t(), qb_t()], [array_type(2, qb_t())])).unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 

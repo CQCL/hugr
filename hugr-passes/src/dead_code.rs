@@ -194,7 +194,7 @@ mod test {
         let cst_used = cb.add_constant(Value::unary_unit_sum());
         let mut block = cb.entry_builder([type_row![]], type_row![]).unwrap();
         let mut dfg_unused = block
-            .dfg_builder(Signature::new(type_row![], usize_t()), [])
+            .dfg_builder(Signature::new([], [usize_t()]), [])
             .unwrap();
         let lc_unused = dfg_unused.load_const(&cst_unused);
         let lc1 = dfg_unused.load_const(&cst_used_in_dfg);

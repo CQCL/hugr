@@ -66,7 +66,7 @@ impl MakeOpDef for ConvertOpDef {
             trunc_s | trunc_u => int_polytype(
                 1,
                 vec![float64_type()],
-                TypeRV::from(sum_with_error(int_tv(0))),
+                [TypeRV::from(sum_with_error([int_tv(0)]))],
             ),
             convert_s | convert_u => int_polytype(1, vec![int_tv(0)], vec![float64_type()]),
             itobool => int_polytype(0, vec![int_type(0)], vec![bool_t()]),

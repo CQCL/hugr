@@ -724,7 +724,7 @@ mod test {
     }
 
     fn simple_unary_plus(t: TypeRow) -> TypeRow {
-        let mut v = t.into_owned();
+        let mut v = t.to_vec();
         v.insert(0, Type::new_unit_sum(1));
         v.into()
     }

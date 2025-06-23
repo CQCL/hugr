@@ -56,7 +56,7 @@ impl<AK: ArrayKind> GenericArrayDiscardDef<AK> {
         let element_ty = Type::new_var_use(1, TypeBound::Copyable);
         let array_ty = AK::instantiate_ty(array_def, size, element_ty)
             .expect("Array type instantiation failed");
-        PolyFuncTypeRV::new(params, FuncValueType::new(array_ty, type_row![])).into()
+        PolyFuncTypeRV::new(params, FuncValueType::new([array_ty], type_row![])).into()
     }
 }
 

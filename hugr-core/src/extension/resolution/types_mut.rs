@@ -9,9 +9,9 @@ use super::types::collect_type_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
-use crate::types::type_row::TypeRowBase;
 use crate::types::{
-    CustomType, FuncValueType, MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum,
+    CustomType, FuncValueType, MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum, TypeRow,
+    TypeRowRV,
 };
 use crate::{Extension, Node};
 
@@ -150,17 +150,32 @@ pub(super) fn resolve_func_type_exts(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    resolve_type_row_exts(node, &mut func_type.input, extensions, used_extensions)?;
-    resolve_type_row_exts(node, &mut func_type.output, extensions, used_extensions)?;
+    resolve_type_row_rv_exts(node, &mut func_type.input, extensions, used_extensions)?;
+    resolve_type_row_rv_exts(node, &mut func_type.output, extensions, used_extensions)?;
     Ok(())
 }
 
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
-pub(super) fn resolve_type_row_exts<RV: MaybeRV>(
+pub(super) fn resolve_type_row_exts(
     node: Option<Node>,
-    row: &mut TypeRowBase<RV>,
+    row: &mut TypeRow,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    for ty in row.iter_mut() {
+        resolve_type_exts(node, ty, extensions, used_extensions)?;
+    }
+    Ok(())
+}
+
+/// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
+///
+/// Adds the extensions used in the row to the `used_extensions` registry.
+pub(super) fn resolve_type_row_rv_exts(
+    node: Option<Node>,
+    row: &mut TypeRowRV,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
@@ -184,12 +199,12 @@ pub(super) fn resolve_type_exts<RV: MaybeRV>(
             resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
         }
         TypeEnum::Function(f) => {
-            resolve_type_row_exts(node, &mut f.input, extensions, used_extensions)?;
-            resolve_type_row_exts(node, &mut f.output, extensions, used_extensions)?;
+            resolve_type_row_rv_exts(node, &mut f.input, extensions, used_extensions)?;
+            resolve_type_row_rv_exts(node, &mut f.output, extensions, used_extensions)?;
         }
         TypeEnum::Sum(SumType::General { rows }) => {
             for row in rows.iter_mut() {
-                resolve_type_row_exts(node, row, extensions, used_extensions)?;
+                resolve_type_row_rv_exts(node, row, extensions, used_extensions)?;
             }
         }
         // Other types do not store extensions.
@@ -302,7 +317,7 @@ pub(super) fn resolve_value_exts(
         Value::Sum(s) => {
             if let SumType::General { rows } = &mut s.sum_type {
                 for row in rows.iter_mut() {
-                    resolve_type_row_exts(node, row, extensions, used_extensions)?;
+                    resolve_type_row_rv_exts(node, row, extensions, used_extensions)?;
                 }
             }
             s.values

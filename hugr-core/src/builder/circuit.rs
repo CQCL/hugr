@@ -345,7 +345,7 @@ mod test {
 
     #[test]
     fn ancillae() {
-        let build_res = build_main(Signature::new_endo(qb_t()).into(), |mut f_build| {
+        let build_res = build_main(Signature::new_endo([qb_t()]).into(), |mut f_build| {
             let mut circ = f_build.as_circuit(f_build.input_wires());
             assert_eq!(circ.n_wires(), 1);
 

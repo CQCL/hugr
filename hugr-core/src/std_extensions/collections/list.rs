@@ -185,22 +185,22 @@ impl ListOp {
         let l = self.list_type(list_type_def, 0);
         match self {
             pop => self
-                .list_polytype(vec![l.clone()], vec![l, Type::from(option_type(e))])
+                .list_polytype(vec![l.clone()], vec![l, Type::from(option_type([e]))])
                 .into(),
             push => self.list_polytype(vec![l.clone(), e], vec![l]).into(),
             get => self
-                .list_polytype(vec![l, usize_t()], vec![Type::from(option_type(e))])
+                .list_polytype(vec![l, usize_t()], vec![Type::from(option_type([e]))])
                 .into(),
             set => self
                 .list_polytype(
                     vec![l.clone(), usize_t(), e.clone()],
-                    vec![l, Type::from(either_type(e.clone(), e))],
+                    vec![l, Type::from(either_type([e.clone()], [e]))],
                 )
                 .into(),
             insert => self
                 .list_polytype(
                     vec![l.clone(), usize_t(), e.clone()],
-                    vec![l, either_type(e, Type::UNIT).into()],
+                    vec![l, either_type([e], [Type::UNIT]).into()],
                 )
                 .into(),
             length => self
@@ -431,7 +431,7 @@ mod test {
 
         let list_t = list_type(qb_t());
 
-        let both_row: TypeRow = vec![list_t.clone(), option_type(qb_t()).into()].into();
+        let both_row: TypeRow = vec![list_t.clone(), option_type([qb_t()]).into()].into();
         let just_list_row: TypeRow = vec![list_t].into();
         assert_eq!(pop_sig.input(), &just_list_row);
         assert_eq!(pop_sig.output(), &both_row);
@@ -500,7 +500,7 @@ mod test {
     #[case::get(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1)], &[TestVal::Some(vec![TestVal::Elem(88)])])]
     #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::None(vec![usize_t()].into())])]
     #[case::insert(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,88,42]), TestVal::Ok(vec![], vec![usize_t()].into())])]
-    #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(Type::UNIT.into(), vec![TestVal::Elem(99)])])]
+    #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err([Type::UNIT].into(), vec![TestVal::Elem(99)])])]
     #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::Elem(3)])]
     fn list_fold(#[case] op: ListOp, #[case] inputs: &[TestVal], #[case] outputs: &[TestVal]) {
         let consts: Vec<_> = inputs

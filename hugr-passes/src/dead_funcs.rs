@@ -162,18 +162,18 @@ mod test {
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut hb = ModuleBuilder::new();
-        let o2 = hb.define_function("other2", Signature::new_endo(usize_t()))?;
+        let o2 = hb.define_function("other2", Signature::new_endo([usize_t()]))?;
         let o2inp = o2.input_wires();
         let o2 = o2.finish_with_outputs(o2inp)?;
-        let mut o1 = hb.define_function("other1", Signature::new_endo(usize_t()))?;
+        let mut o1 = hb.define_function("other1", Signature::new_endo([usize_t()]))?;
 
         let o1c = o1.call(o2.handle(), &[], o1.input_wires())?;
         o1.finish_with_outputs(o1c.outputs())?;
 
-        let fm = hb.define_function("from_main", Signature::new_endo(usize_t()))?;
+        let fm = hb.define_function("from_main", Signature::new_endo([usize_t()]))?;
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp)?;
-        let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
+        let mut m = hb.define_function("main", Signature::new_endo([usize_t()]))?;
         let mc = m.call(fm.handle(), &[], m.input_wires())?;
         let m = m.finish_with_outputs(mc.outputs())?;
 

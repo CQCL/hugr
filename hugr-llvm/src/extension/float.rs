@@ -193,7 +193,7 @@ mod test {
     fn const_float(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_float_extensions);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(float64_type())
+            .with_outs([float64_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let c = builder.add_load_value(ConstF64::new(3.12));

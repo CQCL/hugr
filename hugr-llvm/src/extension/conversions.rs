@@ -346,7 +346,7 @@ mod test {
                 .add_default_prelude_extensions()
         });
         let in_ty = float64_type();
-        let out_ty = sum_with_error(INT_TYPES[log_width as usize].clone());
+        let out_ty = sum_with_error([INT_TYPES[log_width as usize].clone()]);
         let hugr = test_conversion_op(op_name, in_ty, out_ty.into(), log_width);
         check_emission!(op_name, hugr, llvm_ctx);
     }
@@ -389,7 +389,7 @@ mod test {
     #[rstest]
     fn my_test_exec(mut exec_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));
@@ -405,7 +405,7 @@ mod test {
     #[case(18_446_744_073_709_551_615)]
     fn usize_roundtrip(mut exec_ctx: TestContext, #[case] val: u64) -> () {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(STD_REG.clone())
             .finish(|mut builder: DFGW| {
                 let k = builder.add_load_value(ConstUsize::new(val));
@@ -431,7 +431,7 @@ mod test {
     fn roundtrip_hugr(val: u64, signed: bool) -> Hugr {
         let int64 = INT_TYPES[6].clone();
         SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(STD_REG.clone())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(val));
@@ -456,7 +456,7 @@ mod test {
                     };
                     builder.add_dataflow_op(op, [flt]).unwrap().outputs_arr()
                 };
-                let sum_ty = sum_with_error(int64.clone());
+                let sum_ty = sum_with_error([int64.clone()]);
                 let variants = (0..sum_ty.num_variants())
                     .map(|i| sum_ty.get_variant(i).unwrap().clone().try_into().unwrap());
                 let mut cond_b = builder
@@ -655,7 +655,7 @@ mod test {
     #[case(0.0f64)]
     fn bytecast_int64_to_float64(mut exec_ctx: TestContext, #[case] f: f64) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(float64_type())
+            .with_outs([float64_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstInt::new_u(6, f.to_bits()).unwrap());
@@ -682,7 +682,7 @@ mod test {
     #[case(0.0f64)]
     fn bytecast_float64_to_int64(mut exec_ctx: TestContext, #[case] f: f64) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(INT_TYPES[6].clone())
+            .with_outs([INT_TYPES[6].clone()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let f = builder.add_load_value(ConstF64::new(f));

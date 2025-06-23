@@ -178,7 +178,7 @@ mod test {
 
     #[test]
     fn all_value_array_ops() {
-        let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
+        let sig = Signature::new_endo([]);
         let mut hugr = build_all_value_array_ops(DFGBuilder::new(sig.clone()).unwrap())
             .finish_hugr()
             .unwrap();
@@ -201,15 +201,12 @@ mod test {
     fn repeat(#[case] elem_ty: Type, #[case] size: u64) {
         let mut builder = ModuleBuilder::new();
         let repeat_decl = builder
-            .declare(
-                "foo",
-                Signature::new(Type::EMPTY_TYPEROW, elem_ty.clone()).into(),
-            )
+            .declare("foo", Signature::new([], [elem_ty.clone()]).into())
             .unwrap();
         let mut f = builder
             .define_function(
                 "bar",
-                Signature::new(Type::EMPTY_TYPEROW, value_array_type(size, elem_ty.clone())),
+                Signature::new([], [value_array_type(size, elem_ty.clone())]),
             )
             .unwrap();
         let repeat_f = f.load_func(&repeat_decl, &[]).unwrap();
@@ -235,14 +232,17 @@ mod test {
     fn scan(#[case] src_ty: Type, #[case] tgt_ty: Type, #[case] size: u64) {
         let mut builder = ModuleBuilder::new();
         let scan_decl = builder
-            .declare("foo", Signature::new(src_ty.clone(), tgt_ty.clone()).into())
+            .declare(
+                "foo",
+                Signature::new([src_ty.clone()], [tgt_ty.clone()]).into(),
+            )
             .unwrap();
         let mut f = builder
             .define_function(
                 "bar",
                 Signature::new(
-                    value_array_type(size, src_ty.clone()),
-                    value_array_type(size, tgt_ty.clone()),
+                    [value_array_type(size, src_ty.clone())],
+                    [value_array_type(size, tgt_ty.clone())],
                 ),
             )
             .unwrap();
@@ -290,7 +290,7 @@ mod test {
                 value_array_type(size, elem_ty.clone()),
             ),
         };
-        let sig = Signature::new(src, tgt);
+        let sig = Signature::new([src], [tgt]);
         let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         let op: OpType = match dir {
@@ -316,7 +316,7 @@ mod test {
     #[case(value_array_type(2, value_array_type(4, usize_t())))]
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_clone(#[case] array_ty: Type) {
-        let sig = Signature::new(array_ty.clone(), vec![array_ty; 2]);
+        let sig = Signature::new([array_ty.clone()], vec![array_ty; 2]);
         let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         builder.set_outputs(vec![arr, arr]).unwrap();
@@ -332,7 +332,7 @@ mod test {
     #[case(value_array_type(2, value_array_type(4, usize_t())))]
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_discard(#[case] array_ty: Type) {
-        let sig = Signature::new(array_ty, Type::EMPTY_TYPEROW);
+        let sig = Signature::new([array_ty], []);
         let mut builder = DFGBuilder::new(sig).unwrap();
         builder.set_outputs(vec![]).unwrap();
 

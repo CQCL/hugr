@@ -271,7 +271,7 @@ pub trait StaticArrayCodegen: Clone {
 
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
 
-                let result_sum_ty = option_type(op.elem_ty);
+                let result_sum_ty = option_type([op.elem_ty]);
                 let rmb = context.new_row_mail_box([&result_sum_ty.clone().into()], "")?;
                 let result_llvm_sum_ty = context.llvm_sum_type(result_sum_ty)?;
 
@@ -440,7 +440,7 @@ mod test {
     #[case(0, StaticArrayValue::try_new("a", usize_t(), (0..10).map(|x| ConstUsize::new(x).into())).unwrap())]
     #[case(1, StaticArrayValue::try_new("b", float64_type(), (0..10).map(|x| ConstF64::new(f64::from(x)).into())).unwrap())]
     #[case(2, StaticArrayValue::try_new("c", bool_t(), (0..10).map(|x| Value::from_bool(x % 2 == 0))).unwrap())]
-    #[case(3, StaticArrayValue::try_new("d", option_type(usize_t()).into(), (0..10).map(|x| Value::some([ConstUsize::new(x)]))).unwrap())]
+    #[case(3, StaticArrayValue::try_new("d", option_type([usize_t()]).into(), (0..10).map(|x| Value::some([ConstUsize::new(x)]))).unwrap())]
     fn static_array_const_codegen(
         #[case] _i: i32,
         #[with(_i)] mut llvm_ctx: TestContext,
@@ -453,7 +453,7 @@ mod test {
         });
 
         let hugr = SimpleHugrConfig::new()
-            .with_outs(value.get_type())
+            .with_outs([value.get_type()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),
                 float_types::EXTENSION.to_owned(),
@@ -476,7 +476,7 @@ mod test {
         #[case] expected: u64,
     ) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),
             ]))
@@ -496,9 +496,9 @@ mod test {
                 let [out] = {
                     let mut cond = builder
                         .conditional_builder(
-                            ([type_row!(), usize_t().into()], get_r),
+                            ([type_row!(), [usize_t()].into()], get_r),
                             [],
-                            usize_t().into(),
+                            [usize_t()].into(),
                         )
                         .unwrap();
                     {
@@ -527,7 +527,7 @@ mod test {
     #[rstest]
     fn len_0_array(mut exec_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),
             ]))
@@ -552,7 +552,7 @@ mod test {
                 .add_default_prelude_extensions()
         });
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),
             ]))

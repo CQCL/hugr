@@ -207,10 +207,12 @@ impl StaticArrayOpDef {
         match self {
             Self::get => PolyFuncType::new(
                 [t_param],
-                Signature::new(vec![array_ty, usize_t()], Type::from(option_type(elem_ty))),
+                Signature::new([array_ty, usize_t()], [Type::from(option_type([elem_ty]))]),
             )
             .into(),
-            Self::len => PolyFuncType::new([t_param], Signature::new(array_ty, usize_t())).into(),
+            Self::len => {
+                PolyFuncType::new([t_param], Signature::new([array_ty], [usize_t()])).into()
+            }
         }
     }
 }
@@ -405,7 +407,6 @@ mod test {
     use crate::{
         builder::{DFGBuilder, DataflowHugr as _},
         extension::prelude::{ConstUsize, qb_t},
-        type_row,
     };
 
     use super::*;
@@ -419,11 +420,9 @@ mod test {
     #[test]
     fn all_ops() {
         let _ = {
-            let mut builder = DFGBuilder::new(Signature::new(
-                type_row![],
-                Type::from(option_type(usize_t())),
-            ))
-            .unwrap();
+            let mut builder =
+                DFGBuilder::new(Signature::new([], [Type::from(option_type([usize_t()]))]))
+                    .unwrap();
             let array = builder.add_load_value(
                 StaticArrayValue::try_new(
                     "t",

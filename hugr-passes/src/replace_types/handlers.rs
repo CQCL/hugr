@@ -112,7 +112,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     if num_outports == 0 {
         // "Simple" discard - first map each element to unit (via type-specific discard):
         let map_fn = {
-            let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
+            let mut dfb = DFGBuilder::new(inout_sig([ty.clone()], [Type::UNIT])).unwrap();
             let [to_discard] = dfb.input_wires_arr();
             lin.copy_discard_op(ty, 0)?
                 .add(&mut dfb, [to_discard])
@@ -124,7 +124,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
         let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::CompoundOp(Box::new({
-            let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
+            let mut dfb = DFGBuilder::new(inout_sig([in_type], [])).unwrap();
             let [in_array] = dfb.input_wires_arr();
             let map_fn = dfb.add_load_value(Value::Function {
                 hugr: Box::new(map_fn),
@@ -143,19 +143,19 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let num_new = num_outports - 1;
     let array_ty = AK::ty(*n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
-        array_ty.clone(),
+        [array_ty.clone()],
         vec![array_ty.clone(); num_outports],
     ))
     .unwrap();
 
     // 1. make num_new array<SZ, Option<T>>, initialized to None...
-    let option_sty = option_type(ty.clone());
+    let option_sty = option_type([ty.clone()]);
     let option_ty = Type::from(option_sty.clone());
     let arrays_of_none = {
         let fn_none = {
-            let mut dfb = DFGBuilder::new(inout_sig(vec![], option_ty.clone())).unwrap();
+            let mut dfb = DFGBuilder::new(inout_sig([], [option_ty.clone()])).unwrap();
             let none = dfb
-                .add_dataflow_op(Tag::new(0, vec![type_row![], ty.clone().into()]), [])
+                .add_dataflow_op(Tag::new(0, vec![type_row![], [ty.clone()].into()]), [])
                 .unwrap();
             dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
         };
@@ -204,7 +204,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .zip_eq(copies)
             .map(|(opt_array, copy1)| {
                 let [tag] = dfb
-                    .add_dataflow_op(Tag::new(1, vec![type_row![], ty.clone().into()]), [copy1])
+                    .add_dataflow_op(Tag::new(1, vec![type_row![], [ty.clone()].into()]), [copy1])
                     .unwrap()
                     .outputs_arr();
                 let [set_result] = dfb
@@ -217,7 +217,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                     .unwrap();
                 //the removed element is an option, which should always be none (and thus discardable)
                 let [] = dfb
-                    .build_unwrap_sum(0, SumType::new_option(ty.clone()), none)
+                    .build_unwrap_sum(0, SumType::new_option([ty.clone()]), none)
                     .unwrap();
                 opt_array
             })
@@ -260,7 +260,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     //3. Scan each array-of-options, 'unwrapping' each element into a non-option
     let unwrap_elem = {
         let mut dfb =
-            DFGBuilder::new(inout_sig(Type::from(option_ty.clone()), ty.clone())).unwrap();
+            DFGBuilder::new(inout_sig([Type::from(option_ty.clone())], [ty.clone()])).unwrap();
         let [opt] = dfb.input_wires_arr();
         let [val] = dfb.build_unwrap_sum(1, option_sty.clone(), opt).unwrap();
         dfb.finish_hugr_with_outputs([val]).unwrap()
@@ -324,7 +324,7 @@ pub fn copy_discard_array(
             let array_ty = array_type(*n, ty.clone());
             Ok(NodeTemplate::CompoundOp(Box::new({
                 let mut dfb =
-                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                    DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; *n as usize]))
                         .unwrap();
                 let [mut arr] = dfb.input_wires_arr();
                 let mut outs = vec![];

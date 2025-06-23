@@ -308,15 +308,15 @@ mod test {
         // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
         let e = extension();
         let tst_op: OpType = e.instantiate_extension_op("Test", &[])?.into();
-        let [res_t] = tst_op
+        let res_t = tst_op
             .dataflow_signature()
             .unwrap()
             .into_owned()
             .output
-            .into_owned()
-            .try_into()
-            .unwrap();
-        let mut h = CFGBuilder::new(inout_sig(qb_t(), res_t.clone()))?;
+            .first()
+            .unwrap()
+            .clone();
+        let mut h = CFGBuilder::new(inout_sig([qb_t()], [res_t.clone()]))?;
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
@@ -333,9 +333,9 @@ mod test {
         let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
 
         let mut bb3 = h.block_builder(
-            vec![qb_t(), usize_t()].into(),
-            vec![type_row![]],
-            res_t.clone().into(),
+            [qb_t(), usize_t()].into(),
+            [type_row![]],
+            [res_t.clone()].into(),
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;

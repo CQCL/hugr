@@ -16,7 +16,7 @@ use crate::extension::{
 use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncValueType, PolyFuncTypeRV, Term, Type, TypeBound};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Term, Type, TypeBound, TypeRowRV};
 use crate::utils::Never;
 
 use super::array_kind::ArrayKind;
@@ -78,19 +78,19 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
         let poly_func_ty = match self {
             GenericArrayOpDef::new_array => PolyFuncTypeRV::new(
                 params,
-                FuncValueType::new(vec![elem_ty_var.clone(); n as usize], array_ty),
+                FuncValueType::new(vec![elem_ty_var.clone(); n as usize], [array_ty]),
             ),
             GenericArrayOpDef::unpack => PolyFuncTypeRV::new(
                 params,
-                FuncValueType::new(array_ty, vec![elem_ty_var.clone(); n as usize]),
+                FuncValueType::new([array_ty], vec![elem_ty_var.clone(); n as usize]),
             ),
             GenericArrayOpDef::pop_left | GenericArrayOpDef::pop_right => {
                 let popped_array_ty = AK::ty(n - 1, elem_ty_var.clone());
                 PolyFuncTypeRV::new(
                     params,
                     FuncValueType::new(
-                        array_ty,
-                        Type::from(option_type(vec![elem_ty_var, popped_array_ty])),
+                        [array_ty],
+                        [Type::from(option_type(vec![elem_ty_var, popped_array_ty]))],
                     ),
                 )
             }
@@ -156,7 +156,7 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
                     let copy_array_ty =
                         AK::instantiate_ty(array_def, size_var, copy_elem_ty.clone())
                             .expect("Array type instantiation failed");
-                    let option_type: Type = option_type(copy_elem_ty).into();
+                    let option_type: Type = option_type([copy_elem_ty]).into();
                     PolyFuncTypeRV::new(
                         params,
                         FuncValueType::new(
@@ -170,25 +170,25 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
                     let result_type: Type = either_type(result_row.clone(), result_row).into();
                     PolyFuncTypeRV::new(
                         standard_params,
-                        FuncValueType::new(
-                            vec![array_ty.clone(), usize_t, elem_ty_var],
-                            result_type,
-                        ),
+                        FuncValueType::new([array_ty.clone(), usize_t, elem_ty_var], [result_type]),
                     )
                 }
                 swap => {
-                    let result_type: Type = either_type(array_ty.clone(), array_ty.clone()).into();
+                    let result_type: Type =
+                        either_type([array_ty.clone()], [array_ty.clone()]).into();
                     PolyFuncTypeRV::new(
                         standard_params,
-                        FuncValueType::new(vec![array_ty, usize_t.clone(), usize_t], result_type),
+                        FuncValueType::new([array_ty, usize_t.clone(), usize_t], [result_type]),
                     )
                 }
                 discard_empty => PolyFuncTypeRV::new(
                     vec![TypeBound::Any.into()],
                     FuncValueType::new(
-                        AK::instantiate_ty(array_def, 0, Type::new_var_use(0, TypeBound::Any))
-                            .expect("Array type instantiation failed"),
-                        type_row![],
+                        [
+                            AK::instantiate_ty(array_def, 0, Type::new_var_use(0, TypeBound::Any))
+                                .expect("Array type instantiation failed"),
+                        ],
+                        TypeRowRV::new(),
                     ),
                 ),
                 _phantom(_, never) => match *never {},
@@ -375,7 +375,7 @@ mod tests {
     #[case(ValueArray)]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array<AK: ArrayKind>(#[case] _kind: AK) {
-        let mut b = DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], AK::ty(2, qb_t()))).unwrap();
+        let mut b = DFGBuilder::new(inout_sig([qb_t(), qb_t()], [AK::ty(2, qb_t())])).unwrap();
 
         let [q1, q2] = b.input_wires_arr();
 
@@ -391,7 +391,7 @@ mod tests {
     #[case(ValueArray)]
     /// Test building a HUGR involving an unpack operation.
     fn test_unpack<AK: ArrayKind>(#[case] _kind: AK) {
-        let mut b = DFGBuilder::new(inout_sig(AK::ty(2, qb_t()), vec![qb_t(), qb_t()])).unwrap();
+        let mut b = DFGBuilder::new(inout_sig([AK::ty(2, qb_t())], [qb_t(), qb_t()])).unwrap();
 
         let [array] = b.input_wires_arr();
 
@@ -419,7 +419,7 @@ mod tests {
             (
                 &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
                 &vec![
-                    option_type(element_ty.clone()).into(),
+                    option_type([element_ty.clone()]).into(),
                     AK::ty(size, element_ty.clone())
                 ]
                 .into()
@@ -465,7 +465,7 @@ mod tests {
             sig.io(),
             (
                 &vec![array_ty.clone(), usize_t(), usize_t()].into(),
-                &vec![either_type(array_ty.clone(), array_ty).into()].into()
+                &vec![either_type([array_ty.clone()], [array_ty]).into()].into()
             )
         );
     }
@@ -538,7 +538,7 @@ mod tests {
             (
                 &vec![AK::ty(size, element_ty.clone()), usize_t()].into(),
                 &vec![
-                    option_type(element_ty.clone()).into(),
+                    option_type([element_ty.clone()]).into(),
                     AK::ty(size, element_ty.clone())
                 ]
                 .into()

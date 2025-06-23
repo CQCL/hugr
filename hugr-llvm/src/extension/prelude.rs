@@ -475,7 +475,7 @@ mod test {
     #[rstest]
     fn prelude_const_usize(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
@@ -510,8 +510,8 @@ mod test {
     #[rstest]
     fn prelude_noop(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(usize_t())
-            .with_outs(usize_t())
+            .with_ins([usize_t()])
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -527,8 +527,8 @@ mod test {
     #[rstest]
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(vec![bool_t(), bool_t()])
-            .with_outs(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_ins([bool_t(), bool_t()])
+            .with_outs([Type::new_tuple(vec![bool_t(), bool_t()])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -541,8 +541,8 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(Type::new_tuple(vec![bool_t(), bool_t()]))
-            .with_outs(vec![bool_t(), bool_t()])
+            .with_ins([Type::new_tuple(vec![bool_t(), bool_t()])])
+            .with_outs([bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let unpack = builder
@@ -627,7 +627,7 @@ mod test {
     #[rstest]
     fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
@@ -642,7 +642,7 @@ mod test {
     #[fixture]
     fn barrier_hugr() -> Hugr {
         SimpleHugrConfig::new()
-            .with_outs(vec![usize_t()])
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstUsize::new(42));

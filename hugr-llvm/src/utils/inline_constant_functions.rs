@@ -99,7 +99,7 @@ mod test {
 
     fn build_const(go: impl FnOnce(&mut DFGBuilder<Hugr>) -> Wire) -> Const {
         Value::function({
-            let mut builder = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
             let r = go(&mut builder);
             builder.finish_hugr_with_outputs([r]).unwrap()
         })
@@ -109,7 +109,7 @@ mod test {
 
     #[test]
     fn simple() {
-        let qb_sig: Signature = Signature::new_endo(qb_t());
+        let qb_sig: Signature = Signature::new_endo([qb_t()]);
         let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let const_node = builder.add_constant(build_const(|builder| {
@@ -146,7 +146,7 @@ mod test {
 
     #[test]
     fn nested() {
-        let qb_sig: Signature = Signature::new_endo(qb_t());
+        let qb_sig: Signature = Signature::new_endo([qb_t()]);
         let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let const_node = builder.add_constant(build_const(|builder| {

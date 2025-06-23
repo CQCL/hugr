@@ -58,7 +58,7 @@ impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
         let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
         let array_ty =
             AK::instantiate_ty(array_def, n, t).expect("Array type instantiation failed");
-        PolyFuncTypeRV::new(params, FuncValueType::new(vec![func], array_ty)).into()
+        PolyFuncTypeRV::new(params, FuncValueType::new([func], [array_ty])).into()
     }
 }
 

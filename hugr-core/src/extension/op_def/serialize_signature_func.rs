@@ -119,7 +119,7 @@ mod test {
     #[test]
     fn test_serial_sig_func() {
         // test round-trip
-        let sig: FuncValueType = Signature::new_endo(usize_t().clone()).into();
+        let sig: FuncValueType = Signature::new_endo([usize_t().clone()]).into();
         let simple: SignatureFunc = sig.clone().into();
         let ser: SerSignatureFunc = simple.into();
         let expected_ser = SerSignatureFunc {

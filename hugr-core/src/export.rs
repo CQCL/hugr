@@ -2,7 +2,7 @@
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::types::type_param::Term;
-use crate::types::{FuncValueType, Polymorphic, Signature};
+use crate::types::{FuncValueType, Polymorphic, Signature, TypeRow, TypeRowRV};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -16,7 +16,7 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, TypeEnum,
-        type_param::TermVar, type_row::TypeRowBase,
+        type_param::TermVar,
     },
 };
 
@@ -590,7 +590,7 @@ impl<'a> Context<'a> {
         let outputs = {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in &block.sum_rows {
-                let variant = self.export_type_row_with_tail(sum_row, Some(tail));
+                let variant = self.export_type_row_with_tail(sum_row, tail);
                 outputs.push(table::SeqPart::Item(variant));
             }
             self.make_term(table::Term::List(outputs.into_bump_slice()))
@@ -846,8 +846,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_func_type(&mut self, t: &FuncValueType) -> table::TermId {
-        let inputs = self.export_type_row(t.input());
-        let outputs = self.export_type_row(t.output());
+        let inputs = self.export_type_row_rv(t.input());
+        let outputs = self.export_type_row_rv(t.output());
         self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
@@ -889,7 +889,7 @@ impl<'a> Context<'a> {
             SumType::General { rows } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     rows.iter()
-                        .map(|row| table::SeqPart::Item(self.export_type_row(row))),
+                        .map(|row| table::SeqPart::Item(self.export_type_row_rv(row))),
                 );
                 self.make_term(table::Term::List(parts))
             }
@@ -902,17 +902,33 @@ impl<'a> Context<'a> {
     }
 
     #[inline]
-    pub fn export_type_row<RV: MaybeRV>(&mut self, row: &TypeRowBase<RV>) -> table::TermId {
-        self.export_type_row_with_tail(row, None)
+    pub fn export_type_row(&mut self, row: &TypeRow) -> table::TermId {
+        let parts: &[_] = self.bump.alloc_slice_fill_iter(
+            row.iter()
+                .map(|t| table::SeqPart::Item(self.export_type(t))),
+        );
+        self.make_term(table::Term::List(parts))
     }
 
-    pub fn export_type_row_with_tail<RV: MaybeRV>(
+    #[inline]
+    pub fn export_type_row_with_tail(
         &mut self,
-        row: &TypeRowBase<RV>,
-        tail: Option<table::TermId>,
+        row: &TypeRow,
+        tail: table::TermId,
     ) -> table::TermId {
-        let mut parts =
-            BumpVec::with_capacity_in(row.len() + usize::from(tail.is_some()), self.bump);
+        let mut parts = BumpVec::with_capacity_in(row.len() + 1, self.bump);
+        parts.extend(
+            row.iter()
+                .map(|t| table::SeqPart::Item(self.export_type(t))),
+        );
+        parts.push(table::SeqPart::Splice(tail));
+        let parts = parts.into_bump_slice();
+        self.make_term(table::Term::List(parts))
+    }
+
+    #[inline]
+    pub fn export_type_row_rv(&mut self, row: &TypeRowRV) -> table::TermId {
+        let mut parts = BumpVec::with_capacity_in(row.len(), self.bump);
 
         for t in row.iter() {
             match t.as_type_enum() {
@@ -923,10 +939,6 @@ impl<'a> Context<'a> {
                     parts.push(table::SeqPart::Item(self.export_type(t)));
                 }
             }
-        }
-
-        if let Some(tail) = tail {
-            parts.push(table::SeqPart::Splice(tail));
         }
 
         let parts = parts.into_bump_slice();
