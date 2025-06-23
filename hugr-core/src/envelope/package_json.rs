@@ -32,6 +32,7 @@ pub(super) fn from_json_reader(
     combined_registry.extend(&pkg_extensions);
 
     for module in &mut modules {
+        super::check_breaking_extensions(&module, &combined_registry)?;
         module.resolve_extension_defs(&combined_registry)?;
     }
 
@@ -65,6 +66,8 @@ pub enum PackageEncodingError {
     IOError(io::Error),
     /// Could not resolve the extension needed to encode the hugr.
     ExtensionResolution(ExtensionResolutionError),
+    /// Error raised while checking for breaking extension version mismatch.
+    ExtensionVersion(super::ExtensionBreakingError),
     /// Could not resolve the runtime extensions for the hugr.
     RuntimeExtensionResolution(ExtensionError),
 }
