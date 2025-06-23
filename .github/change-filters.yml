@@ -26,6 +26,9 @@ rust: &rust
   - "hugr-passes/**"
   - "specification/schema/**"
 
+std-extensions:
+  - "specification/std_extensions/**"
+
 python:
   - *rust
   - "hugr-py/**"
