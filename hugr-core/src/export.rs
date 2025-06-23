@@ -1,6 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
+use crate::types::Polymorphic;
 use crate::types::type_param::Term;
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
@@ -14,8 +15,8 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeBase, TypeBound, TypeEnum, type_param::TermVar, type_row::TypeRowBase,
+        CustomType, EdgeKind, FuncTypeBase, MaybeRV, RowVariable, SumType, TypeBase, TypeBound,
+        TypeEnum, type_param::TermVar, type_row::TypeRowBase,
     },
 };
 
@@ -339,7 +340,8 @@ impl<'a> Context<'a> {
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol =
+                    this.export_symbol(name, func.signature(), |this, t| this.export_func_type(t));
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -350,7 +352,8 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol =
+                    this.export_symbol(name, func.signature(), |this, t| this.export_func_type(t));
                 table::Operation::DeclareFunc(symbol)
             }),
 
@@ -545,7 +548,7 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, poly_func_type)
+            this.export_symbol(name, poly_func_type, |this, t| this.export_func_type(t))
         });
 
         let meta = {
@@ -792,18 +795,18 @@ impl<'a> Context<'a> {
         regions.into_bump_slice()
     }
 
-    /// Exports a polymorphic function type.
-    pub fn export_poly_func_type<RV: MaybeRV>(
+    pub fn export_symbol<T>(
         &mut self,
         name: &'a str,
-        t: &PolyFuncTypeBase<RV>,
+        poly: &Polymorphic<T>,
+        export_body: impl FnOnce(&mut Self, &T) -> table::TermId,
     ) -> &'a table::Symbol<'a> {
-        let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
+        let mut params = BumpVec::with_capacity_in(poly.params().len(), self.bump);
         let scope = self
             .local_scope
             .expect("exporting poly func type outside of local scope");
 
-        for (i, param) in t.params().iter().enumerate() {
+        for (i, param) in poly.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_term(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
@@ -811,15 +814,44 @@ impl<'a> Context<'a> {
         }
 
         let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
-        let body = self.export_func_type(t.body());
+        let signature = export_body(self, poly.body());
 
         self.bump.alloc(table::Symbol {
             name,
             params: params.into_bump_slice(),
             constraints,
-            signature: body,
+            signature,
         })
     }
+
+    // /// Exports a polymorphic function type.
+    // pub fn export_poly_func_type<RV: MaybeRV>(
+    //     &mut self,
+    //     name: &'a str,
+    //     t: &PolyFuncTypeBase<RV>,
+    // ) -> &'a table::Symbol<'a> {
+    //     let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
+    //     let scope = self
+    //         .local_scope
+    //         .expect("exporting poly func type outside of local scope");
+
+    //     for (i, param) in t.params().iter().enumerate() {
+    //         let name = self.bump.alloc_str(&i.to_string());
+    //         let r#type = self.export_term(param, Some((scope, i as _)));
+    //         let param = table::Param { name, r#type };
+    //         params.push(param);
+    //     }
+
+    //     let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
+    //     let body = self.export_func_type(t.body());
+
+    //     self.bump.alloc(table::Symbol {
+    //         name,
+    //         params: params.into_bump_slice(),
+    //         constraints,
+    //         signature: body,
+    //     })
+    // }
 
     pub fn export_type<RV: MaybeRV>(&mut self, t: &TypeBase<RV>) -> table::TermId {
         self.export_type_enum(t.as_type_enum())

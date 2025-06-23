@@ -507,7 +507,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
                     Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 Type::new_function(FuncValueType::new(vec![rv(0), rv(1)], vec![rv(2), rv(3)])),
-            ),
+            )
+            .into(),
         );
         ext.add_op("parallel".into(), String::new(), pf, extension_ref)
             .unwrap();

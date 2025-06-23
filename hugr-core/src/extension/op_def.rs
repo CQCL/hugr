@@ -165,7 +165,7 @@ impl<T: CustomSignatureFunc + 'static> From<T> for SignatureFunc {
 
 impl From<PolyFuncType> for SignatureFunc {
     fn from(value: PolyFuncType) -> Self {
-        Self::PolyFuncType(value.into())
+        Self::PolyFuncType(value.map_into())
     }
 }
 
@@ -659,7 +659,8 @@ pub(super) mod test {
             const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
-            let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
+            let type_scheme =
+                PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]).into());
 
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
@@ -712,7 +713,7 @@ pub(super) mod test {
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.clone()],
-                    Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
+                    Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]).into(),
                 ))
             }
 
@@ -792,7 +793,7 @@ pub(super) mod test {
                 String::new(),
                 PolyFuncTypeRV::new(
                     vec![TypeBound::Any.into()],
-                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]).into(),
                 ),
                 extension_ref,
             )?;

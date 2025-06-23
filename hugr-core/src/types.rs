@@ -19,13 +19,11 @@ use crate::types::type_param::check_term_type;
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
+pub use poly_func::{PolyFuncType, PolyFuncTypeRV, Polymorphic};
 pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
-
-pub(crate) use poly_func::PolyFuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{Either, Itertools as _};

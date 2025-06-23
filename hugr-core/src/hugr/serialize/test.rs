@@ -140,7 +140,7 @@ impl_sertesting_from!(SimpleOpDef, op_def);
 
 impl From<PolyFuncType> for SerTestingLatest {
     fn from(v: PolyFuncType) -> Self {
-        let v: PolyFuncTypeRV = v.into();
+        let v: PolyFuncTypeRV = v.map_into();
         v.into()
     }
 }

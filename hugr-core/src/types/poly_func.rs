@@ -8,15 +8,12 @@ use crate::extension::SignatureError;
 use {
     crate::proptest::RecursionDepth,
     ::proptest::{collection::vec, prelude::*},
-    proptest_derive::Arbitrary,
 };
 
-use super::{FuncValueType, MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
 use super::{
-    Signature,
-    type_param::{TypeArg, TypeParam, check_term_types},
+    FuncValueType, Signature, Substitution, Term,
+    type_param::{TypeParam, check_term_types},
 };
-use super::{Substitution, Term};
 
 /// A polymorphic object.
 #[derive(
@@ -68,14 +65,30 @@ impl<T> Polymorphic<T> {
         }
     }
 
-    /// The types of the parameters.
+    /// Returns the types of the parameters.
     pub fn params(&self) -> &[TypeParam] {
         &self.params
     }
 
-    /// The body of the polymorphic object.
+    /// Returns the body of the polymorphic object.
     pub fn body(&self) -> &T {
         &self.body
+    }
+
+    /// Returns a mutable reference to the body of the polymorphic object.
+    pub fn body_mut(&mut self) -> &mut T {
+        &mut self.body
+    }
+
+    /// Convert the body of the polymorphic object.
+    pub fn map_into<S>(self) -> Polymorphic<S>
+    where
+        S: From<T>,
+    {
+        Polymorphic {
+            params: self.params,
+            body: self.body.into(),
+        }
     }
 
     /// Helper function for the Display implementation
@@ -131,26 +144,19 @@ impl Polymorphic<FuncValueType> {
     }
 }
 
-/// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
-/// (Nodes/operations in the Hugr are not polymorphic.)
-///
-/// [`FuncDecl`]: crate::ops::module::FuncDecl
-/// [`FuncDefn`]: crate::ops::module::FuncDefn
-/// [`OpDef`]: crate::extension::OpDef
-#[derive(
-    Clone, PartialEq, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-#[display("{}{body}", self.display_params())]
-pub struct PolyFuncTypeBase<RV: MaybeRV> {
-    /// The declared type parameters, i.e., these must be instantiated with
-    /// the same number of [`TypeArg`]s before the function can be called. This
-    /// defines the indices used by variables inside the body.
-    #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
-    params: Vec<TypeParam>,
-    /// Template for the function. May contain variables up to length of [`Self::params`]
-    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<RV>>(params)"))]
-    body: FuncTypeBase<RV>,
+#[cfg(test)]
+impl<T> Arbitrary for Polymorphic<T>
+where
+    T: Arbitrary<Parameters = RecursionDepth> + 'static,
+{
+    type Parameters = RecursionDepth;
+    type Strategy = BoxedStrategy<Polymorphic<T>>;
+
+    fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        (vec(any_with::<Term>(args), 0..3), any_with::<T>(args))
+            .prop_map(|(params, body)| Self::new(params, body))
+            .boxed()
+    }
 }
 
 /// The polymorphic type of a [`Call`]-able function ([`FuncDecl`] or [`FuncDefn`]).
@@ -159,113 +165,13 @@ pub struct PolyFuncTypeBase<RV: MaybeRV> {
 /// [`Call`]: crate::ops::Call
 /// [`FuncDefn`]: crate::ops::FuncDefn
 /// [`FuncDecl`]: crate::ops::FuncDecl
-pub type PolyFuncType = PolyFuncTypeBase<NoRV>;
+pub type PolyFuncType = Polymorphic<Signature>;
 
 /// The polymorphic type of an [`OpDef`], whose number of input and outputs
 /// may vary according to how [`RowVariable`]s therein are instantiated.
 ///
 /// [`OpDef`]: crate::extension::OpDef
-pub type PolyFuncTypeRV = PolyFuncTypeBase<RowVariable>;
-
-// deriving Default leads to an impl that only applies for RV: Default
-impl<RV: MaybeRV> Default for PolyFuncTypeBase<RV> {
-    fn default() -> Self {
-        Self {
-            params: Default::default(),
-            body: Default::default(),
-        }
-    }
-}
-
-impl<RV: MaybeRV> From<FuncTypeBase<RV>> for PolyFuncTypeBase<RV> {
-    fn from(body: FuncTypeBase<RV>) -> Self {
-        Self {
-            params: vec![],
-            body,
-        }
-    }
-}
-
-impl From<PolyFuncType> for PolyFuncTypeRV {
-    fn from(value: PolyFuncType) -> Self {
-        Self {
-            params: value.params,
-            body: value.body.into(),
-        }
-    }
-}
-
-impl<RV: MaybeRV> TryFrom<PolyFuncTypeBase<RV>> for FuncTypeBase<RV> {
-    /// If the `PolyFuncTypeBase` is not monomorphic, fail with its binders
-    type Error = Vec<TypeParam>;
-
-    fn try_from(value: PolyFuncTypeBase<RV>) -> Result<Self, Self::Error> {
-        if value.params.is_empty() {
-            Ok(value.body)
-        } else {
-            Err(value.params)
-        }
-    }
-}
-
-impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
-    /// The type parameters, aka binders, over which this type is polymorphic
-    pub fn params(&self) -> &[TypeParam] {
-        &self.params
-    }
-
-    /// The body of the type, a function type.
-    pub fn body(&self) -> &FuncTypeBase<RV> {
-        &self.body
-    }
-
-    /// Create a new `PolyFuncTypeBase` given the kinds of the variables it declares
-    /// and the underlying [`FuncTypeBase`].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<RV>>) -> Self {
-        Self {
-            params: params.into(),
-            body: body.into(),
-        }
-    }
-
-    /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
-    /// (as ensured by [`Self::validate`]), into a monomorphic type.
-    ///
-    /// # Errors
-    /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
-    /// or an arg does not fit into its corresponding [`TypeParam`]
-    pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<RV>, SignatureError> {
-        // Check that args are applicable, and that we have a value for each binder,
-        // i.e. each possible free variable within the body.
-        check_term_types(args, &self.params)?;
-        Ok(self.body.substitute(&Substitution(args)))
-    }
-
-    /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self) -> Result<(), SignatureError> {
-        self.body.validate(&self.params)
-    }
-
-    /// Helper function for the Display implementation
-    fn display_params(&self) -> Cow<'static, str> {
-        if self.params.is_empty() {
-            return Cow::Borrowed("");
-        }
-        let params_list = self
-            .params
-            .iter()
-            .enumerate()
-            .map(|(i, param)| format!("(#{i} : {param})"))
-            .join(" ");
-        Cow::Owned(format!("∀ {params_list}. ",))
-    }
-
-    /// Returns a mutable reference to the body of the function type.
-    pub fn body_mut(&mut self) -> &mut FuncTypeBase<RV> {
-        &mut self.body
-    }
-}
+pub type PolyFuncTypeRV = Polymorphic<FuncValueType>;
 
 #[cfg(test)]
 pub(crate) mod test {
@@ -280,23 +186,33 @@ pub(crate) mod test {
     use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE, SignatureError, TypeDefBound};
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
-    use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
     use crate::types::{
-        CustomType, FuncValueType, MaybeRV, Signature, Term, Type, TypeBound, TypeName, TypeRV,
+        CustomType, FuncValueType, Signature, Term, Type, TypeBound, TypeName, TypeRV,
     };
 
-    use super::PolyFuncTypeBase;
+    use super::{PolyFuncType, PolyFuncTypeRV};
 
     lazy_static! {
         static ref REGISTRY: ExtensionRegistry =
             ExtensionRegistry::new([PRELUDE.to_owned(), list::EXTENSION.to_owned()]);
     }
 
-    impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
+    impl PolyFuncType {
         fn new_validated(
-            params: impl Into<Vec<TypeParam>>,
-            body: FuncTypeBase<RV>,
+            params: impl IntoIterator<Item = Term>,
+            body: Signature,
+        ) -> Result<Self, SignatureError> {
+            let res = Self::new(params, body);
+            res.validate()?;
+            Ok(res)
+        }
+    }
+
+    impl PolyFuncTypeRV {
+        fn new_validated(
+            params: impl IntoIterator<Item = Term>,
+            body: FuncValueType,
         ) -> Result<Self, SignatureError> {
             let res = Self::new(params, body);
             res.validate()?;
@@ -309,7 +225,7 @@ pub(crate) mod test {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
-        let list_len = PolyFuncTypeBase::new_validated(
+        let list_len = PolyFuncType::new_validated(
             [TypeBound::Any.into()],
             Signature::new(vec![list_of_var], vec![usize_t()]),
         )?;
@@ -337,7 +253,7 @@ pub(crate) mod test {
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
         let good_ts =
-            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(good_array))?;
+            PolyFuncType::new_validated(type_params.clone(), Signature::new_endo(good_array))?;
 
         // Sanity check (good args)
         good_ts.instantiate(&[5u64.into(), usize_t().into()])?;
@@ -371,7 +287,7 @@ pub(crate) mod test {
             &Arc::downgrade(&array::EXTENSION),
         ));
         let bad_ts =
-            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(bad_array));
+            PolyFuncType::new_validated(type_params.clone(), Signature::new_endo(bad_array));
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -388,7 +304,7 @@ pub(crate) mod test {
             Term::StringType,
             Term::new_tuple_type([TypeBound::Any.into(), Term::max_nat_type()]),
         ] {
-            let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
+            let invalid_ts = PolyFuncType::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
@@ -398,7 +314,7 @@ pub(crate) mod test {
             );
         }
         // Variable not declared at all
-        let invalid_ts = PolyFuncTypeBase::new_validated([], body_type);
+        let invalid_ts = PolyFuncType::new_validated([], body_type);
         assert_eq!(
             invalid_ts.err(),
             Some(SignatureError::FreeTypeVar {
@@ -433,7 +349,7 @@ pub(crate) mod test {
         reg.validate().unwrap();
 
         let make_scheme = |tp: TypeParam| {
-            PolyFuncTypeBase::new_validated(
+            PolyFuncType::new_validated(
                 [tp.clone()],
                 Signature::new_endo(Type::new_extension(CustomType::new(
                     TYPE_NAME,
@@ -493,7 +409,7 @@ pub(crate) mod test {
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
         let decl = Term::new_list_type(TP_ANY);
-        let e = PolyFuncTypeBase::new_validated(
+        let e = PolyFuncTypeRV::new_validated(
             [decl.clone()],
             FuncValueType::new(
                 vec![usize_t()],
@@ -506,7 +422,7 @@ pub(crate) mod test {
             assert_eq!(cached, TypeParam::new_list_type(TypeBound::Copyable));
         });
         // Declared as row variable, used as type variable
-        let e = PolyFuncTypeBase::new_validated(
+        let e = PolyFuncType::new_validated(
             [decl.clone()],
             Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         )
@@ -520,7 +436,7 @@ pub(crate) mod test {
     #[test]
     fn row_variables() {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
-        let pf = PolyFuncTypeBase::new_validated(
+        let pf = PolyFuncTypeRV::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(
                 vec![usize_t().into(), rty.clone()],
@@ -552,7 +468,7 @@ pub(crate) mod test {
             0,
             TypeBound::Copyable,
         )));
-        let pf = PolyFuncTypeBase::new_validated(
+        let pf = PolyFuncType::new_validated(
             [Term::new_list_type(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
         )

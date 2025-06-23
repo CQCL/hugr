@@ -23,8 +23,8 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
-        Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
+        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, Polymorphic, RowVariable, Signature, Term,
+        Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
         type_param::{SeqPart, TypeParam},
         type_row::TypeRowBase,
     },
@@ -424,7 +424,9 @@ impl<'a> Context<'a> {
             }
         };
 
-        self.import_poly_func_type(func_node, *symbol, |_, signature| Ok(signature))
+        let params = self.import_symbol_params(func_node, symbol)?;
+        let signature = self.import_func_type(symbol.signature)?;
+        Ok(Polymorphic::new(params, signature))
     }
 
     /// Import the root region of the module.
@@ -938,23 +940,25 @@ impl<'a> Context<'a> {
         node_data: &'a table::Node<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
-        self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
+        let params = self.import_symbol_params(node_id, symbol)?;
+        let signature = self.import_func_type(symbol.signature)?;
+        let poly = Polymorphic::new(params, signature);
 
-            let node = ctx.make_node(node_id, optype, parent)?;
+        let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, poly));
 
-            let [region] = node_data.regions else {
-                return Err(error_invalid!(
-                    "function definition nodes expect a single region"
-                ));
-            };
+        let node = self.make_node(node_id, optype, parent)?;
 
-            ctx.import_dfg_region(*region, node).map_err(|err| {
-                error_context!(err, "function body defined by region with id {}", *region)
-            })?;
+        let [region] = node_data.regions else {
+            return Err(error_invalid!(
+                "function definition nodes expect a single region"
+            ));
+        };
 
-            Ok(node)
-        })
+        self.import_dfg_region(*region, node).map_err(|err| {
+            error_context!(err, "function body defined by region with id {}", *region)
+        })?;
+
+        Ok(node)
     }
 
     fn import_node_declare_func(
@@ -963,11 +967,12 @@ impl<'a> Context<'a> {
         symbol: &'a table::Symbol<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
-        self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
-            let node = ctx.make_node(node_id, optype, parent)?;
-            Ok(node)
-        })
+        let params = self.import_symbol_params(node_id, symbol)?;
+        let signature = self.import_func_type(symbol.signature)?;
+        let poly = Polymorphic::new(params, signature);
+        let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, poly));
+        let node = self.make_node(node_id, optype, parent)?;
+        Ok(node)
     }
 
     fn import_node_custom(
@@ -1155,50 +1160,45 @@ impl<'a> Context<'a> {
         Ok(node)
     }
 
-    fn import_poly_func_type<RV: MaybeRV, T>(
+    fn import_symbol_params(
         &mut self,
         node: table::NodeId,
-        symbol: table::Symbol<'a>,
-        in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportError>,
-    ) -> Result<T, ImportError> {
-        (|| {
-            let mut imported_params = Vec::with_capacity(symbol.params.len());
+        symbol: &'a table::Symbol<'a>,
+    ) -> Result<Vec<Term>, ImportError> {
+        let mut imported_params = Vec::with_capacity(symbol.params.len());
 
-            for (index, param) in symbol.params.iter().enumerate() {
+        for (index, param) in symbol.params.iter().enumerate() {
+            self.local_vars
+                .insert(table::VarId(node, index as _), LocalVar::new(param.r#type));
+        }
+
+        for constraint in symbol.constraints {
+            if let Some([term]) = self.match_symbol(*constraint, model::CORE_NON_LINEAR)? {
+                let table::Term::Var(var) = self.get_term(term)? else {
+                    return Err(error_unsupported!(
+                        "constraint on term that is not a variable"
+                    ));
+                };
+
                 self.local_vars
-                    .insert(table::VarId(node, index as _), LocalVar::new(param.r#type));
+                    .get_mut(var)
+                    .ok_or_else(|| error_invalid!("unknown variable {}", var))?
+                    .bound = TypeBound::Copyable;
+            } else {
+                return Err(error_unsupported!("constraint other than copy or discard"));
             }
+        }
 
-            for constraint in symbol.constraints {
-                if let Some([term]) = self.match_symbol(*constraint, model::CORE_NON_LINEAR)? {
-                    let table::Term::Var(var) = self.get_term(term)? else {
-                        return Err(error_unsupported!(
-                            "constraint on term that is not a variable"
-                        ));
-                    };
+        for (index, param) in symbol.params.iter().enumerate() {
+            // NOTE: `PolyFuncType` only has explicit type parameters at present.
+            let bound = self.local_vars[&table::VarId(node, index as _)].bound;
+            imported_params.push(
+                self.import_term_with_bound(param.r#type, bound)
+                    .map_err(|err| error_context!(err, "type of parameter `{}`", param.name))?,
+            );
+        }
 
-                    self.local_vars
-                        .get_mut(var)
-                        .ok_or_else(|| error_invalid!("unknown variable {}", var))?
-                        .bound = TypeBound::Copyable;
-                } else {
-                    return Err(error_unsupported!("constraint other than copy or discard"));
-                }
-            }
-
-            for (index, param) in symbol.params.iter().enumerate() {
-                // NOTE: `PolyFuncType` only has explicit type parameters at present.
-                let bound = self.local_vars[&table::VarId(node, index as _)].bound;
-                imported_params.push(
-                    self.import_term_with_bound(param.r#type, bound)
-                        .map_err(|err| error_context!(err, "type of parameter `{}`", param.name))?,
-                );
-            }
-
-            let body = self.import_func_type::<RV>(symbol.signature)?;
-            in_scope(self, PolyFuncTypeBase::new(imported_params, body))
-        })()
-        .map_err(|err| error_context!(err, "symbol `{}` defined by node {}", symbol.name, node))
+        Ok(imported_params)
     }
 
     /// Import a [`Term`] from a term that represents a static type or value.

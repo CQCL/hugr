@@ -365,9 +365,9 @@ fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
         hugr_root_type: h.entrypoint_optype().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
-        match pf.try_into() {
-            Ok(sig) => return Ok(Cow::Owned(sig)),
-            Err(_) => return Err(err()),
+        match pf.into_mono() {
+            Some(sig) => return Ok(Cow::Owned(sig)),
+            None => return Err(err()),
         };
     }
 
