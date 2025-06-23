@@ -52,6 +52,7 @@ lazy_static! {
             // would try to access the `PRELUDE` lazy static recursively,
             // causing a deadlock.
             let string_type: Type = string_custom_type(extension_ref).into();
+            let usize_type: Type = usize_custom_t(extension_ref).into();
             let error_type: CustomType = error_custom_type(extension_ref);
 
             prelude
@@ -74,7 +75,7 @@ lazy_static! {
             prelude.add_op(
                     PRINT_OP_ID,
                     "Print the string to standard output".to_string(),
-                    Signature::new(vec![string_type], type_row![]),
+                    Signature::new(vec![string_type.clone()], type_row![]),
                     extension_ref,
                 )
                 .unwrap();
@@ -93,6 +94,14 @@ lazy_static! {
                     vec![],
                     "Simple opaque error type.".into(),
                     TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_op(
+                    MAKE_ERROR_OP_ID,
+                    "Create an error value".to_string(),
+                    Signature::new(vec![string_type, usize_type], vec![error_type.clone().into()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -171,6 +180,11 @@ pub fn usize_t() -> Type {
 pub fn bool_t() -> Type {
     Type::new_unit_sum(2)
 }
+
+/// Name of the prelude `MakeError` operation.
+///
+/// This operation can be used to dynamically create error values.
+pub const MAKE_ERROR_OP_ID: OpName = OpName::new_inline("MakeError");
 
 /// Name of the prelude panic operation.
 ///
