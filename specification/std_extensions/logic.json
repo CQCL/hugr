@@ -36,7 +36,7 @@
     "Eq": {
       "extension": "logic",
       "name": "Eq",
-      "description": " test if bools are equal",
+      "description": "test if bools are equal",
       "signature": {
         "params": [],
         "body": {
