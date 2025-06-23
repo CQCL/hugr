@@ -1,8 +1,7 @@
 //! Polymorphic Function Types
 
-use std::borrow::Cow;
-
 use itertools::Itertools;
+use std::borrow::Cow;
 
 use crate::extension::SignatureError;
 #[cfg(test)]
@@ -12,9 +11,125 @@ use {
     proptest_derive::Arbitrary,
 };
 
-use super::Substitution;
-use super::type_param::{TypeArg, TypeParam, check_term_types};
-use super::{MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
+use super::{FuncValueType, MaybeRV, NoRV, RowVariable, signature::FuncTypeBase};
+use super::{
+    Signature,
+    type_param::{TypeArg, TypeParam, check_term_types},
+};
+use super::{Substitution, Term};
+
+/// A polymorphic object.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Display,
+)]
+#[display("{}{body}", self.display_params())]
+pub struct Polymorphic<T> {
+    params: Vec<Term>,
+    body: T,
+}
+
+impl<T> From<T> for Polymorphic<T> {
+    fn from(body: T) -> Self {
+        Self::new_mono(body)
+    }
+}
+
+impl<T> Polymorphic<T> {
+    /// Create a new polymorphic `T` given the types of its parameters.
+    pub fn new(params: impl IntoIterator<Item = Term>, body: T) -> Self {
+        Self {
+            params: params.into_iter().collect(),
+            body: body.into(),
+        }
+    }
+
+    /// Create a new monomorphic
+    pub fn new_mono(body: T) -> Self {
+        Self {
+            params: Default::default(),
+            body,
+        }
+    }
+
+    /// Returns the `T` if there are no parameters.
+    pub fn into_mono(self) -> Option<T> {
+        if self.params.is_empty() {
+            Some(self.body)
+        } else {
+            None
+        }
+    }
+
+    /// The types of the parameters.
+    pub fn params(&self) -> &[TypeParam] {
+        &self.params
+    }
+
+    /// The body of the polymorphic object.
+    pub fn body(&self) -> &T {
+        &self.body
+    }
+
+    /// Helper function for the Display implementation
+    fn display_params(&self) -> Cow<'static, str> {
+        if self.params.is_empty() {
+            return Cow::Borrowed("");
+        }
+        let params_list = self
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, param)| format!("(#{i} : {param})"))
+            .join(" ");
+        Cow::Owned(format!("∀ {params_list}. ",))
+    }
+}
+
+impl Polymorphic<Signature> {
+    /// Instantiates this polymorphic signature by providing arguments for each parameter.
+    ///
+    /// # Errors
+    ///
+    /// - If there is not exactly one argument for each parameter.
+    /// - If an argument does not have the correct type.
+    pub fn instantiate(&self, args: &[Term]) -> Result<Signature, SignatureError> {
+        check_term_types(args, &self.params)?;
+        Ok(self.body.substitute(&Substitution(args)))
+    }
+
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self) -> Result<(), SignatureError> {
+        self.body.validate(&self.params)
+    }
+}
+
+impl Polymorphic<FuncValueType> {
+    /// Instantiates this polymorphic function type by providing arguments for each parameter.
+    ///
+    /// # Errors
+    ///
+    /// - If there is not exactly one argument for each parameter.
+    /// - If an argument does not have the correct type.
+    pub fn instantiate(&self, args: &[Term]) -> Result<FuncValueType, SignatureError> {
+        check_term_types(args, &self.params)?;
+        Ok(self.body.substitute(&Substitution(args)))
+    }
+
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self) -> Result<(), SignatureError> {
+        self.body.validate(&self.params)
+    }
+}
 
 /// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
 /// (Nodes/operations in the Hugr are not polymorphic.)
