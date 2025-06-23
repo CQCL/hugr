@@ -481,8 +481,7 @@ mod tests {
                 .collect::<BTreeSet<_>>();
             assert!(
                 exp_options.remove(&commit_ids),
-                "{:?} not an expected set of commit IDs (or duplicate)",
-                commit_ids
+                "{commit_ids:?} not an expected set of commit IDs (or duplicate)"
             );
 
             // new wire is complete (and thus cannot be expanded)
@@ -512,8 +511,7 @@ mod tests {
 
         assert!(
             exp_options.is_empty(),
-            "missing expected options: {:?}",
-            exp_options
+            "missing expected options: {exp_options:?}"
         );
     }
 
