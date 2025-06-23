@@ -37,7 +37,7 @@ use crate::core::HugrNode;
 use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType, Value};
-use crate::types::{CustomType, FuncTypeBase, MaybeRV, TypeArg, TypeBase, TypeName};
+use crate::types::{CustomType, MaybeRV, Signature, TypeArg, TypeBase, TypeName};
 
 /// Update all weak Extension pointers inside a type.
 pub fn resolve_type_extensions<RV: MaybeRV>(
@@ -242,8 +242,8 @@ impl<N: HugrNode> ExtensionCollectionError<N> {
     }
 
     /// Create a new error when signature extensions have been dropped.
-    pub fn dropped_signature<RV: MaybeRV>(
-        signature: &FuncTypeBase<RV>,
+    pub fn dropped_signature(
+        signature: &Signature,
         missing_extension: impl IntoIterator<Item = ExtensionId>,
     ) -> Self {
         Self::DroppedSignatureExtensions {

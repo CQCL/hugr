@@ -13,7 +13,7 @@ use crate::extension::simple_op::{
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound, TypeRV};
 
 use super::array_kind::ArrayKind;
 
@@ -67,12 +67,12 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let s = TypeRV::new_row_var_use(3, TypeBound::Any);
         PolyFuncTypeRV::new(
             params,
-            FuncTypeBase::<RowVariable>::new(
+            FuncValueType::new(
                 vec![
                     AK::instantiate_ty(array_def, n.clone(), t1.clone())
                         .expect("Array type instantiation failed")
                         .into(),
-                    Type::new_function(FuncTypeBase::<RowVariable>::new(
+                    Type::new_function(FuncValueType::new(
                         vec![t1.into(), s.clone()],
                         vec![t2.clone().into(), s.clone()],
                     ))

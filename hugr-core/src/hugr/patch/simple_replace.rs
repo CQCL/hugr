@@ -60,7 +60,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
                     node: replacement.entrypoint(),
                     op: replacement.get_optype(replacement.entrypoint()).to_owned(),
                 })?;
-        if subgraph_sig != repl_sig {
+        if &subgraph_sig != repl_sig.as_ref() {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: subgraph_sig,
                 actual: Some(repl_sig.into_owned()),

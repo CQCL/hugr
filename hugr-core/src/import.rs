@@ -23,8 +23,8 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, Polymorphic, RowVariable, Signature, Term,
-        Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
+        CustomType, FuncValueType, MaybeRV, NoRV, PolyFuncType, Polymorphic, RowVariable,
+        Signature, Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
         type_param::{SeqPart, TypeParam},
         type_row::TypeRowBase,
     },
@@ -235,7 +235,7 @@ impl<'a> Context<'a> {
         let signature = node_data
             .signature
             .ok_or_else(|| error_uninferred!("node signature"))?;
-        self.import_func_type(signature)
+        self.import_signature(signature)
     }
 
     /// Get the node with the given `NodeId`, or return an error if it does not exist.
@@ -425,7 +425,7 @@ impl<'a> Context<'a> {
         };
 
         let params = self.import_symbol_params(func_node, symbol)?;
-        let signature = self.import_func_type(symbol.signature)?;
+        let signature = self.import_signature(symbol.signature)?;
         Ok(Polymorphic::new(params, signature))
     }
 
@@ -581,7 +581,7 @@ impl<'a> Context<'a> {
         }
 
         let signature = self
-            .import_func_type(
+            .import_signature(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -796,7 +796,7 @@ impl<'a> Context<'a> {
 
         for region in node_data.regions {
             let region_data = self.get_region(*region)?;
-            let signature = self.import_func_type(
+            let signature = self.import_signature(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -941,7 +941,7 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let params = self.import_symbol_params(node_id, symbol)?;
-        let signature = self.import_func_type(symbol.signature)?;
+        let signature = self.import_signature(symbol.signature)?;
         let poly = Polymorphic::new(params, signature);
 
         let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, poly));
@@ -968,7 +968,7 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         let params = self.import_symbol_params(node_id, symbol)?;
-        let signature = self.import_func_type(symbol.signature)?;
+        let signature = self.import_signature(symbol.signature)?;
         let poly = Polymorphic::new(params, signature);
         let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, poly));
         let node = self.make_node(node_id, optype, parent)?;
@@ -1332,7 +1332,7 @@ impl<'a> Context<'a> {
     ) -> Result<TypeBase<RV>, ImportError> {
         (|| {
             if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
-                let func_type = self.import_func_type::<RowVariable>(term_id)?;
+                let func_type = self.import_func_type(term_id)?;
                 return Ok(TypeBase::new_function(func_type));
             }
 
@@ -1420,21 +1420,32 @@ impl<'a> Context<'a> {
             .ok_or(error_invalid!("expected a control type"))
     }
 
-    fn import_func_type<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<FuncTypeBase<RV>, ImportError> {
+    fn import_func_type(&mut self, term_id: table::TermId) -> Result<FuncValueType, ImportError> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
             let inputs = self
-                .import_type_row(inputs)
+                .import_type_row::<RowVariable>(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
             let outputs = self
-                .import_type_row(outputs)
+                .import_type_row::<RowVariable>(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
-            Ok(FuncTypeBase::new(inputs, outputs))
+            Ok(FuncValueType::new(inputs, outputs))
         })()
         .map_err(|err| error_context!(err, "function type"))
+    }
+
+    fn import_signature(&mut self, term_id: table::TermId) -> Result<Signature, ImportError> {
+        (|| {
+            let [inputs, outputs] = self.get_func_type(term_id)?;
+            let inputs = self
+                .import_type_row::<NoRV>(inputs)
+                .map_err(|err| error_context!(err, "function inputs"))?;
+            let outputs = self
+                .import_type_row::<NoRV>(outputs)
+                .map_err(|err| error_context!(err, "function outputs"))?;
+            Ok(Signature::new(inputs, outputs))
+        })()
+        .map_err(|err| error_context!(err, "signature"))
     }
 
     fn import_closed_list(

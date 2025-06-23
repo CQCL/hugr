@@ -368,8 +368,8 @@ mod test {
         let dfb2 = dfb.substitute(&Substitution::new(&[qb_t().into()]));
         let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
         assert_eq!(
-            dfb2.inner_signature(),
-            Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
+            dfb2.inner_signature().as_ref(),
+            &Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
         );
     }
 
@@ -387,8 +387,8 @@ mod test {
         ]));
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants
         assert_eq!(
-            cond2.signature(),
-            Signature::new(
+            cond2.signature().as_ref(),
+            &Signature::new(
                 vec![st, Type::new_tuple(vec![usize_t(); 3])],
                 vec![usize_t(), qb_t()]
             )
@@ -405,8 +405,8 @@ mod test {
         };
         let tail2 = tail_loop.substitute(&Substitution::new(&[usize_t().into()]));
         assert_eq!(
-            tail2.signature(),
-            Signature::new(
+            tail2.signature().as_ref(),
+            &Signature::new(
                 vec![qb_t(), usize_t(), usize_t()],
                 vec![usize_t(), qb_t(), usize_t()]
             )

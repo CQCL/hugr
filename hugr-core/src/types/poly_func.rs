@@ -455,7 +455,7 @@ pub(crate) mod test {
         let t2 = pf.instantiate(&[Term::new_list(seq2())]).unwrap();
         assert_eq!(
             t2,
-            Signature::new(
+            FuncValueType::new(
                 vec![usize_t(), usize_t(), bool_t()],
                 vec![Type::new_tuple(vec![usize_t(), bool_t()])]
             )

@@ -11,7 +11,7 @@ use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
 use crate::types::type_row::TypeRowBase;
-use crate::types::{FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
+use crate::types::{MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -129,8 +129,8 @@ pub(crate) fn collect_op_types_extensions(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(crate) fn collect_signature_exts<RV: MaybeRV>(
-    signature: &FuncTypeBase<RV>,
+pub(crate) fn collect_signature_exts(
+    signature: &Signature,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {

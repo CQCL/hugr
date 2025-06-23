@@ -2,14 +2,8 @@
 
 use itertools::Either;
 
-use std::borrow::Cow;
-use std::fmt::{self, Display};
-
 use super::type_param::TypeParam;
-use super::type_row::TypeRowBase;
-use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer,
-};
+use super::{RowVariable, Substitution, Transformable, Type, TypeRow, TypeRowRV, TypeTransformer};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
@@ -21,62 +15,47 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-/// Describes the edges required to/from a node or inside a [`FuncDefn`] (when ROWVARS=[`NoRV`]);
-/// or (when ROWVARS=[`RowVariable`]) the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`
-///
-/// ROWVARS specifies whether it may contain [`RowVariable`]s or not.
-///
-/// [`function value`]: crate::ops::constant::Value::Function
-/// [`FuncDefn`]: crate::ops::FuncDefn
-pub struct FuncTypeBase<ROWVARS: MaybeRV> {
-    /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
-    pub input: TypeRowBase<ROWVARS>,
-    /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
-    pub output: TypeRowBase<ROWVARS>,
-}
-
 /// The concept of "signature" in the spec - the edges required to/from a node
 /// or within a [`FuncDefn`], also the target (value) of a call (static).
 ///
 /// [`FuncDefn`]: crate::ops::FuncDefn
-pub type Signature = FuncTypeBase<NoRV>;
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Display,
+)]
+#[display("{input} -> {output}")]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
+pub struct Signature {
+    /// The input types of the signature.
+    pub input: TypeRow,
 
-/// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
-/// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
-/// but not a valid node type.
-///
-/// [`OpDef`]: crate::extension::OpDef
-pub type FuncValueType = FuncTypeBase<RowVariable>;
+    /// The output types of the signature.
+    pub output: TypeRow,
+}
 
-impl<RV: MaybeRV> FuncTypeBase<RV> {
-    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
-        Self {
-            input: self.input.substitute(tr),
-            output: self.output.substitute(tr),
-        }
-    }
-
+impl Signature {
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRowBase<RV>>, output: impl Into<TypeRowBase<RV>>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-        }
+    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+        let input = input.into();
+        let output = output.into();
+        Self { input, output }
     }
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    pub fn new_endo(row: impl Into<TypeRowBase<RV>>) -> Self {
+    pub fn new_endo(row: impl Into<TypeRow>) -> Self {
         let row = row.into();
         Self::new(row.clone(), row)
     }
 
     /// True if both inputs and outputs are necessarily empty.
-    /// (For [`FuncValueType`], even after any possible substitution of row variables)
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -86,22 +65,29 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     #[inline]
     /// Returns a row of the value inputs of the function.
     #[must_use]
-    pub fn input(&self) -> &TypeRowBase<RV> {
+    pub fn input(&self) -> &TypeRow {
         &self.input
     }
 
     #[inline]
     /// Returns a row of the value outputs of the function.
     #[must_use]
-    pub fn output(&self) -> &TypeRowBase<RV> {
+    pub fn output(&self) -> &TypeRow {
         &self.output
     }
 
     #[inline]
     /// Returns a tuple with the input and output rows of the function.
     #[must_use]
-    pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
+    pub fn io(&self) -> (&TypeRow, &TypeRow) {
         (&self.input, &self.output)
+    }
+
+    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+        Self {
+            input: self.input.substitute(tr),
+            output: self.output.substitute(tr),
+        }
     }
 
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
@@ -122,37 +108,7 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
             Err(ExtensionCollectionError::dropped_signature(self, missing))
         }
     }
-}
 
-impl<RV: MaybeRV> Transformable for FuncTypeBase<RV> {
-    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        // TODO handle extension sets?
-        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
-    }
-}
-
-impl FuncValueType {
-    /// If this `FuncValueType` contains any row variables, return one.
-    #[must_use]
-    pub fn find_rowvar(&self) -> Option<RowVariable> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .find_map(|t| Type::try_from(t.clone()).err())
-    }
-}
-
-// deriving Default leads to an impl that only applies for RV: Default
-impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
-    fn default() -> Self {
-        Self {
-            input: Default::default(),
-            output: Default::default(),
-        }
-    }
-}
-
-impl Signature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
     #[inline]
@@ -272,11 +228,107 @@ impl Signature {
     }
 }
 
-impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.input.fmt(f)?;
-        f.write_str(" -> ")?;
-        self.output.fmt(f)
+impl Transformable for Signature {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        // TODO handle extension sets?
+        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
+    }
+}
+
+/// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
+/// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
+/// but not a valid node type.
+///
+/// [`OpDef`]: crate::extension::OpDef
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    derive_more::Display,
+)]
+#[display("{input} -> {output}")]
+#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
+pub struct FuncValueType {
+    /// The inputs of the function type.
+    pub input: TypeRowRV,
+    /// The outputs of the function type.
+    pub output: TypeRowRV,
+}
+
+impl FuncValueType {
+    /// Create a new function type with specified inputs and outputs.
+    pub fn new(input: impl Into<TypeRowRV>, output: impl Into<TypeRowRV>) -> Self {
+        let input = input.into();
+        let output = output.into();
+        Self { input, output }
+    }
+
+    /// Create a new function type with the same input and output types (signature of an endomorphic
+    /// function).
+    pub fn new_endo(row: impl Into<TypeRowRV>) -> Self {
+        let row = row.into();
+        Self::new(row.clone(), row)
+    }
+
+    /// True if both inputs and outputs are necessarily empty, even after any possible substitution of row variables.
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty() && self.output.is_empty()
+    }
+
+    #[inline]
+    /// Returns a row of the value inputs of the function.
+    #[must_use]
+    pub fn input(&self) -> &TypeRowRV {
+        &self.input
+    }
+
+    #[inline]
+    /// Returns a row of the value outputs of the function.
+    #[must_use]
+    pub fn output(&self) -> &TypeRowRV {
+        &self.output
+    }
+
+    #[inline]
+    /// Returns a tuple with the input and output rows of the function.
+    #[must_use]
+    pub fn io(&self) -> (&TypeRowRV, &TypeRowRV) {
+        (&self.input, &self.output)
+    }
+
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.input.validate(var_decls)?;
+        self.output.validate(var_decls)
+    }
+
+    /// If this `FuncValueType` contains any row variables, return one.
+    #[must_use]
+    pub fn find_rowvar(&self) -> Option<RowVariable> {
+        self.input
+            .iter()
+            .chain(self.output.iter())
+            .find_map(|t| Type::try_from(t.clone()).err())
+    }
+
+    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+        Self {
+            input: self.input.substitute(tr),
+            output: self.output.substitute(tr),
+        }
+    }
+}
+
+impl Transformable for FuncValueType {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        // TODO handle extension sets?
+        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
     }
 }
 
@@ -296,24 +348,6 @@ impl From<Signature> for FuncValueType {
             input: value.input.into(),
             output: value.output.into(),
         }
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
-    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
-        self.input == other.input && self.output == other.output
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<Cow<'_, FuncTypeBase<RV1>>> for FuncTypeBase<RV2> {
-    fn eq(&self, other: &Cow<'_, FuncTypeBase<RV1>>) -> bool {
-        self.eq(other.as_ref())
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTypeBase<RV2>> {
-    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
-        self.as_ref().eq(other)
     }
 }
 

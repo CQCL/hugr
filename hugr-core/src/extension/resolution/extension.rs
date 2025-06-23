@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::extension::{Extension, ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, TypeDef};
 
-use super::types_mut::resolve_signature_exts;
+use super::types_mut::resolve_func_type_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 
 impl ExtensionRegistry {
@@ -155,5 +155,5 @@ pub(super) fn resolve_signature_func_exts(
             return Ok(());
         }
     };
-    resolve_signature_exts(None, signature_body, extensions, used_extensions)
+    resolve_func_type_exts(None, signature_body, extensions, used_extensions)
 }
