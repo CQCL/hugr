@@ -122,7 +122,7 @@ impl MakeOpDef for LogicOp {
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("logic");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// Extension for basic logical operations.
 fn extension() -> Arc<Extension> {
