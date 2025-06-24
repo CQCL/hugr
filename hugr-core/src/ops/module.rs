@@ -121,7 +121,7 @@ impl FuncDefn {
         self.visibility
     }
 
-    /// Allows changing [Self::visibliity]
+    /// Allows changing [Self::visibility]
     pub fn visibility_mut(&mut self) -> &mut Visibility {
         &mut self.visibility
     }
