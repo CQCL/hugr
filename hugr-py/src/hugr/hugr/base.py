@@ -231,7 +231,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """Returns an iterator for a valid topological ordering of the hugr nodes."""
         # A dict to keep track of how many times we see a node
         visit_dict: dict[Node, int] = {
-            node: self.num_incoming(node) for node in self.descendants(parent)
+            node: self.num_incoming(node) for node in self.children(parent)
         }
 
         queue: Queue[Node] = Queue()
