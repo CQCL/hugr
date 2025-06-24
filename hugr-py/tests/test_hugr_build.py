@@ -5,15 +5,16 @@ import pytest
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
-from hugr.build.dfg import Dfg, _ancestral_sibling
+from hugr.build.dfg import Dfg, Function, _ancestral_sibling
 from hugr.build.function import Module
 from hugr.hugr import Hugr
 from hugr.hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
+from hugr.package import Package
 from hugr.std.int import INT_T, DivMod, IntVal
 from hugr.std.logic import Not
 
-from .conftest import validate
+from .conftest import QUANTUM_EXT, H, validate
 
 
 def test_stable_indices():
@@ -404,3 +405,19 @@ def test_option() -> None:
     dfg.set_outputs(b)
 
     validate(dfg.hugr)
+
+
+def test_toposort() -> None:
+    f = Function("prepare_qubit", [tys.Bool, tys.Qubit])
+    [b, q] = f.inputs()
+
+    q = f.add_op(H, q).out(0)
+    b0 = f.add_op(Not, b)
+    b1 = b
+
+    f.set_outputs(q, b0, b1)
+
+    validate(Package([f.hugr], [QUANTUM_EXT]))
+
+    sorted_nodes = f.hugr.get_sorted_nodes(f.hugr.module_root)
+    assert len(list(sorted_nodes)) == len(list(f.hugr))
