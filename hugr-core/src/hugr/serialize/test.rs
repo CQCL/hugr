@@ -175,6 +175,18 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
     serde_json::from_value(val).unwrap()
 }
 
+/// Serialize a Hugr and check that it is valid against the schema.
+///
+/// # Panics
+///
+/// Panics if the serialization fails or if the schema validation fails.
+pub(crate) fn check_hugr_serialization_schema(hugr: &Hugr) {
+    let schemas = get_schemas(true);
+    let hugr_ser = HugrSer(hugr);
+    let val = serde_json::to_value(hugr_ser).unwrap();
+    NamedSchema::check_schemas(&val, schemas);
+}
+
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
 ///
 /// If `check_schema` is true, checks the serialized json against the in-tree schema.
