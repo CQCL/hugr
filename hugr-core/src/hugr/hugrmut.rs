@@ -1,8 +1,10 @@
 //! Low-level interface for modifying a HUGR.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::fmt::Display;
 use std::sync::Arc;
 
+use itertools::Either;
 use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
@@ -178,23 +180,102 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert another hugr into this one, under a given parent node.
+    /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
+    /// Unless `other.entrypoint() == other.module_root()`, then any children of
+    /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
+    /// inserted under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
+    ///
+    /// Note there are two cases here which produce an invalid Hugr:
+    /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
+    ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
+    ///    its root is to set the entrypoint to a child of the root.
+    /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and
+    ///    contains a (recursive) [`OpType::Call`] (or `LoadFunction`) to that ancestor
+    ///    FuncDefn. In such a case, the containing FuncDefn will not be inserted, so the
+    ///    `Call` will have no callee.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
-    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node>;
+    fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
+        let mut n = other.entrypoint();
+        let mut children = HashMap::new();
+        if n != other.module_root() {
+            children.extend(
+                other
+                    .children(other.module_root())
+                    .map(|n| (n, InsertDefnMode::Add)),
+            );
+            while children.remove(&n).is_none() {
+                n = other.get_parent(n).unwrap()
+            }
+        };
 
-    /// Copy another hugr into this one, under a given parent node.
+        self.insert_hugr_with_defns(root, other, children)
+            .expect("Construction of `children` should ensure no possibility of InsertDefnError")
+    }
+
+    /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
+    /// specified `parent` in this Hugr, and `children` of the Module root of `other`
+    /// are either inserted with their subtrees or linked according to their [InsertDefnMode].
+    ///
+    /// # Errors
+    ///
+    /// * If `children` are not `children` of the root of `other`
+    /// * If `other`s entrypoint is among `children`, or descends from an element
+    ///   of `children` with [InsertDefnMode::Add]
     ///
     /// # Panics
     ///
-    /// If the root node is not in the graph.
+    /// If `parent` is not in this graph.
+    fn insert_hugr_with_defns(
+        &mut self,
+        parent: Self::Node,
+        other: Hugr,
+        children: HashMap<Node, InsertDefnMode<Self::Node>>,
+    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>>;
+
+    /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
+    /// This will result in an invalid Hugr (with disconnected edges) if there are any
+    /// nonlocal edges (including [Const] / [Function]) into the entrypoint-subtree.
+    /// (See [Self::insert_from_view_with_defns].)
+    ///
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
+    ///
+    /// [Const]: crate::types::EdgeKind::Const
+    /// [Function]: crate::types::EdgeKind::Function
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
-    ) -> InsertionResult<H::Node, Self::Node>;
+    ) -> InsertionResult<H::Node, Self::Node> {
+        self.insert_from_view_with_defns(root, other, HashMap::new())
+            .expect("No defns being inserted so no possibility of error")
+    }
+
+    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
+    /// is copied under the specified `parent` of this; each element of `children`,
+    /// which must be a child of `other.module_root()`, will be copied with its subtree,
+    /// or linked according to its [InsertDefnMode].
+    ///
+    /// # Errors
+    ///
+    /// * If `children` are not `children` of the root of `other`
+    /// * If `other`s entrypoint is among `children`, or descends from an element
+    ///   of `children` with [InsertDefnMode::Add]
+    ///
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
+    #[allow(clippy::type_complexity)]
+    fn insert_from_view_with_defns<H: HugrView>(
+        &mut self,
+        parent: Self::Node,
+        other: &H,
+        children: HashMap<H::Node, InsertDefnMode<Self::Node>>,
+    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -394,18 +475,13 @@ impl HugrMut for Hugr {
         (src_port, dst_port)
     }
 
-    fn insert_hugr(
+    fn insert_hugr_with_defns(
         &mut self,
-        root: Self::Node,
+        parent: Self::Node,
         mut other: Hugr,
-    ) -> InsertionResult<Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, &other, other.entry_descendants(), |&n| {
-            if n == other.entrypoint() {
-                Some(root)
-            } else {
-                None
-            }
-        });
+        children: HashMap<Node, InsertDefnMode>,
+    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>> {
+        let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, taking them from the other graph.
@@ -419,24 +495,19 @@ impl HugrMut for Hugr {
             let meta = other.metadata.take(node_pg);
             self.metadata.set(new_node_pg, meta);
         }
-        InsertionResult {
+        Ok(InsertionResult {
             inserted_entrypoint: node_map[&other.entrypoint()],
             node_map,
-        }
+        })
     }
 
-    fn insert_from_view<H: HugrView>(
+    fn insert_from_view_with_defns<H: HugrView>(
         &mut self,
-        root: Self::Node,
+        parent: Self::Node,
         other: &H,
-    ) -> InsertionResult<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, other.entry_descendants(), |&n| {
-            if n == other.entrypoint() {
-                Some(root)
-            } else {
-                None
-            }
-        });
+        children: HashMap<H::Node, InsertDefnMode>,
+    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>> {
+        let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -452,10 +523,10 @@ impl HugrMut for Hugr {
                     .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        InsertionResult {
+        Ok(InsertionResult {
             inserted_entrypoint: node_map[&other.entrypoint()],
             node_map,
-        }
+        })
     }
 
     fn insert_subgraph<H: HugrView>(
@@ -464,7 +535,7 @@ impl HugrMut for Hugr {
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
     ) -> HashMap<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().copied(), |_| {
+        let node_map = insert_hugr_nodes(self, other, subgraph.nodes().iter().copied(), |_| {
             Some(root)
         });
         // Update the optypes and metadata, copying them from the other graph.
@@ -535,6 +606,107 @@ impl HugrMut for Hugr {
     }
 }
 
+/// An instruction to [HugrMut::insert_hugr_with_defns] or [HugrMut::insert_from_view_with_defns]
+/// as to how to insert a child of the module root from the inserted Hugr.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum InsertDefnMode<N = Node> {
+    /// Add the module child to the Module root of the target Hugr,
+    /// with its subtree of the hierarchy
+    Add,
+    /// Do not copy the module child into the target Hugr, but do
+    /// copy all edges from it, changing their source to the specified
+    /// node already existing in the target
+    Replace(N),
+}
+
+/// An error from an [InsertDefnMode] passed to [HugrMut::insert_hugr_with_defns]
+/// or [HugrMut::insert_from_view_with_defns].
+#[derive(Clone, Debug, PartialEq, thiserror::Error)]
+#[non_exhaustive]
+pub enum InsertDefnError<N: Display> {
+    /// Module-children were requested in addition to the module entrypoint
+    // ALAN is this worth bothering with as a separate case? Inserting a hugr
+    // whose entrypoint is the module is a strange case, as you'll get two Module
+    // nodes in the target Hugr!
+    #[error(
+        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
+    )]
+    ChildOfEntrypoint(N),
+    /// A module-child requested contained (or was) the entrypoint
+    #[error("Requested to insert module-child {_0} but this contains the entrypoint")]
+    ChildContainsEntrypoint(N),
+    /// A module-child requested was not a child of the module root
+    #[error("{_0} was not a child of the module root")]
+    NotChildOfRoot(N),
+}
+
+fn insert_hugr_internal<H: HugrView>(
+    hugr: &mut Hugr,
+    parent: Node,
+    other: &H,
+    children: HashMap<H::Node, InsertDefnMode>,
+) -> Result<HashMap<H::Node, Node>, InsertDefnError<H::Node>> {
+    if other.entrypoint() == other.module_root() {
+        if let Some(c) = children.keys().next() {
+            return Err(InsertDefnError::ChildOfEntrypoint(*c));
+        }
+    } else {
+        let mut n = other.entrypoint();
+        if children.contains_key(&n) {
+            return Err(InsertDefnError::ChildContainsEntrypoint(n));
+        }
+        while let Some(p) = other.get_parent(n) {
+            if children.get(&p) == Some(&InsertDefnMode::Add) {
+                return Err(InsertDefnError::ChildContainsEntrypoint(p));
+            }
+            n = p
+        }
+        for &c in children.keys() {
+            if other.get_parent(c) != Some(other.module_root()) {
+                return Err(InsertDefnError::NotChildOfRoot(c));
+            }
+        }
+    }
+    // In fact we'll copy all `children`, but only including subtrees
+    // for children that should be `Add`ed. This ensures we copy
+    // edges from any of those children to any other copied nodes.
+    let nodes = children
+        .iter()
+        .flat_map(|(&ch, m)| match m {
+            InsertDefnMode::Add => Either::Left(other.descendants(ch)),
+            InsertDefnMode::Replace(_) => Either::Right(std::iter::once(ch)),
+        })
+        .chain(other.entry_descendants());
+    let hugr_root = hugr.module_root();
+    let mut node_map = insert_hugr_nodes(hugr, &other, nodes, |&n| {
+        if n == other.entrypoint() {
+            Some(parent)
+        } else {
+            children.contains_key(&n).then_some(hugr_root)
+        }
+    });
+    // Now enact any `Replace`s, removing the copied children
+    for (ch, m) in children {
+        let InsertDefnMode::Replace(replace_with) = m else {
+            continue;
+        };
+        let copy = node_map.remove(&ch).unwrap();
+
+        // Node types in `hugr` are not reliable here (and it is not easy to tell
+        // which edges from `other` have been copied).
+        let targets = hugr.all_linked_inputs(copy).collect::<Vec<_>>();
+        for (target, inport) in targets {
+            let (src_node, outport) = hugr.single_linked_output(target, inport).unwrap();
+            debug_assert_eq!(src_node, copy);
+            hugr.disconnect(target, inport);
+            hugr.connect(replace_with, outport, target, inport);
+        }
+        hugr.remove_node(copy);
+    }
+    Ok(node_map)
+}
+
 /// Internal implementation of `insert_hugr`, `insert_view`, and
 /// `insert_subgraph`.
 ///
@@ -553,7 +725,7 @@ impl HugrMut for Hugr {
 /// - `reroot`: A function that returns the new parent for each inserted node.
 ///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
 ///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
-fn insert_hugr_internal<H: HugrView>(
+fn insert_hugr_nodes<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node>,
@@ -610,12 +782,15 @@ fn insert_hugr_internal<H: HugrView>(
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+
+    use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::extension::PRELUDE;
-    use crate::{
-        extension::prelude::{Noop, usize_t},
-        ops::{self, FuncDefn, Input, Output, dataflow::IOTrait},
-        types::Signature,
-    };
+    use crate::extension::prelude::{Noop, usize_t};
+    use crate::hugr::ValidationError;
+    use crate::ops::handle::NodeHandle;
+    use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
+    use crate::types::Signature;
 
     use super::*;
 
@@ -694,4 +869,182 @@ mod test {
         hugr.validate().unwrap();
         assert_eq!(hugr.num_nodes(), 1);
     }
+
+    // Tests of insert_{hugr,from_view}(_with_defns) ====================================
+    #[test]
+    fn test_insert_with_defns_add() {
+        let mut h = simple_dfg_hugr();
+        let (insert, _, _) = dfg_calling_defn_decl();
+
+        // Defaults
+        h.insert_from_view(h.entrypoint(), &insert);
+        check_insertion(h, false, false);
+
+        let mut h = simple_dfg_hugr();
+        h.insert_hugr(h.entrypoint(), insert);
+        check_insertion(h, true, true);
+
+        // Specify which decls to transfer
+        for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
+            let (insert, defn, decl) = dfg_calling_defn_decl();
+            let mod_children = HashMap::from_iter(
+                call1
+                    .then_some((defn.node(), InsertDefnMode::Add))
+                    .into_iter()
+                    .chain(call2.then_some((decl.node(), InsertDefnMode::Add))),
+            );
+
+            let mut h = simple_dfg_hugr();
+            h.insert_from_view_with_defns(h.entrypoint(), &insert, mod_children.clone())
+                .unwrap();
+            check_insertion(h, call1, call2);
+
+            let mut h = simple_dfg_hugr();
+            h.insert_hugr_with_defns(h.entrypoint(), insert, mod_children)
+                .unwrap();
+            check_insertion(h, call1, call2);
+        }
+    }
+
+    fn check_insertion(h: Hugr, call1_ok: bool, call2_ok: bool) {
+        if call1_ok && call2_ok {
+            h.validate().unwrap();
+        } else {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
+        }
+        assert_eq!(
+            h.children(h.module_root()).count(),
+            1 + (call1_ok as usize) + (call2_ok as usize)
+        );
+        let [call1, call2] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect_array()
+            .unwrap();
+
+        let tgt1 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_defn()
+                .is_some_and(|fd| fd.func_name() == "helper_id")
+        });
+        assert_eq!(tgt1.is_some(), call1_ok);
+        assert_eq!(h.static_source(call1), tgt1);
+
+        let tgt2 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_decl()
+                .is_some_and(|fd| fd.func_name() == "helper2")
+        });
+        assert_eq!(tgt2.is_some(), call2_ok);
+        assert_eq!(h.static_source(call2), tgt2);
+    }
+
+    #[test]
+    fn insert_with_defns_replace() {
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let mut chmap = HashMap::from([defn.node(), decl.node()].map(|n| (n, InsertDefnMode::Add)));
+        let (h, res) = {
+            let mut h = simple_dfg_hugr();
+            let res = h
+                .insert_from_view_with_defns(h.entrypoint(), &insert, chmap.clone())
+                .unwrap();
+            (h, res)
+        };
+        h.validate().unwrap();
+        let num_nodes = h.num_nodes();
+        let num_ep_nodes = h.descendants(res.inserted_entrypoint).count();
+        let [inserted_defn, inserted_decl] =
+            [defn.node(), decl.node()].map(|n| *res.node_map.get(&n).unwrap());
+
+        // No reason we can't add the decl again, or replace the defn with the decl,
+        // but here we'll limit to the "interesting" (likely) cases
+        for decl_replacement in [inserted_defn, inserted_decl] {
+            let decl_mode = InsertDefnMode::Replace(decl_replacement);
+            chmap.insert(decl.node(), decl_mode);
+            for defn_mode in [InsertDefnMode::Add, InsertDefnMode::Replace(inserted_defn)] {
+                chmap.insert(defn.node(), defn_mode);
+                let mut h = h.clone();
+                h.insert_hugr_with_defns(h.entrypoint(), insert.clone(), chmap.clone())
+                    .unwrap();
+                h.validate().unwrap();
+                if defn_mode != InsertDefnMode::Add {
+                    assert_eq!(h.num_nodes(), num_nodes + num_ep_nodes);
+                }
+                assert_eq!(
+                    h.children(h.module_root()).count(),
+                    3 + (defn_mode == InsertDefnMode::Add) as usize
+                );
+                let expected_defn_uses = 1
+                    + (defn_mode == InsertDefnMode::Replace(inserted_defn)) as usize
+                    + (decl_replacement == inserted_defn) as usize;
+                assert_eq!(
+                    h.static_targets(inserted_defn).unwrap().count(),
+                    expected_defn_uses
+                );
+                assert_eq!(
+                    h.static_targets(inserted_decl).unwrap().count(),
+                    1 + (decl_replacement == inserted_decl) as usize
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bad_insert_with_defns() {
+        let backup = simple_dfg_hugr();
+        let mut h = backup.clone();
+
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let (defn, decl) = (defn.node(), decl.node());
+
+        let epp = insert.get_parent(insert.entrypoint()).unwrap();
+        let r = h.insert_from_view_with_defns(
+            h.entrypoint(),
+            &insert,
+            HashMap::from([(epp, InsertDefnMode::Add)]),
+        );
+        assert_eq!(
+            r.err().unwrap(),
+            InsertDefnError::ChildContainsEntrypoint(epp)
+        );
+        assert_eq!(h, backup);
+
+        let [inp, _] = insert.get_io(defn).unwrap();
+        let r = h.insert_from_view_with_defns(
+            h.entrypoint(),
+            &insert,
+            HashMap::from([(inp, InsertDefnMode::Add)]),
+        );
+        assert_eq!(r.err().unwrap(), InsertDefnError::NotChildOfRoot(inp));
+        assert_eq!(h, backup);
+
+        let mut insert = insert;
+        insert.set_entrypoint(defn);
+        let r = h.insert_from_view_with_defns(
+            h.module_root(),
+            &insert,
+            HashMap::from([(
+                defn,
+                InsertDefnMode::Replace(h.get_parent(h.entrypoint()).unwrap()),
+            )]),
+        );
+        assert_eq!(
+            r.err().unwrap(),
+            InsertDefnError::ChildContainsEntrypoint(defn)
+        );
+
+        assert_eq!(h, backup);
+        insert.set_entrypoint(insert.module_root());
+        let r = h.insert_hugr_with_defns(
+            h.module_root(),
+            insert,
+            HashMap::from([(decl, InsertDefnMode::Add)]),
+        );
+        assert_eq!(r.err().unwrap(), InsertDefnError::ChildOfEntrypoint(decl));
+    }
+
+    // (End) tests of insert_{hugr,from_view}(_with_defns) ====================================
 }
