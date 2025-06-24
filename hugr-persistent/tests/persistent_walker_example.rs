@@ -172,7 +172,7 @@ fn build_state_space() -> CommitStateSpace {
         if !walker.is_complete(&wire, None) {
             // expand the wire in all possible ways
             let (pinned_node, pinned_port) = walker
-                .find_pinned_ports(&wire, None)
+                .wire_pinned_ports(&wire, None)
                 .next()
                 .expect("at least one port was already pinned");
             assert!(
@@ -191,7 +191,7 @@ fn build_state_space() -> CommitStateSpace {
             // cancel them out)
 
             let patch_nodes: BTreeSet<_> = walker
-                .find_pinned_ports(&wire, None)
+                .wire_pinned_ports(&wire, None)
                 .map(|(n, _)| n)
                 .collect();
             // check that the patch applies to more than one commit (or the base),

@@ -169,9 +169,9 @@ impl PersistentWire {
     }
 }
 
-impl<'a, R: Resolver> Walker<'a, R> {
+impl<R: Resolver> Walker<'_, R> {
     /// Get all ports on a wire that are not pinned in `self`.
-    pub(crate) fn find_unpinned_ports(
+    pub(crate) fn wire_unpinned_ports(
         &self,
         wire: &PersistentWire,
         dir: impl Into<Option<Direction>>,
@@ -181,7 +181,7 @@ impl<'a, R: Resolver> Walker<'a, R> {
     }
 
     /// Get the ports of the wire that are on pinned nodes of `self`.
-    pub fn find_pinned_ports(
+    pub fn wire_pinned_ports(
         &self,
         wire: &PersistentWire,
         dir: impl Into<Option<Direction>>,
@@ -190,10 +190,28 @@ impl<'a, R: Resolver> Walker<'a, R> {
         ports.filter(|(node, _)| self.is_pinned(*node))
     }
 
+    /// Get the outgoing port of a wire if it is pinned in `walker`.
+    pub fn wire_pinned_outport(&self, wire: &PersistentWire) -> Option<(PatchNode, OutgoingPort)> {
+        self.wire_pinned_ports(wire, Direction::Outgoing)
+            .at_most_one()
+            .ok()
+            .expect("valid dfg wire")
+            .map(|(node, port)| (node, port.as_outgoing().expect("outgoing port")))
+    }
+
+    /// Get all pinned incoming ports of a wire.
+    pub fn wire_pinned_inports(
+        &self,
+        wire: &PersistentWire,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
+        self.wire_pinned_ports(wire, Direction::Incoming)
+            .map(|(node, port)| (node, port.as_incoming().expect("incoming port")))
+    }
+
     /// Whether a wire is complete in the specified direction, i.e. there are no
     /// unpinned ports left.
     pub fn is_complete(&self, wire: &PersistentWire, dir: impl Into<Option<Direction>>) -> bool {
-        self.find_unpinned_ports(wire, dir).next().is_none()
+        self.wire_unpinned_ports(wire, dir).next().is_none()
     }
 }
 

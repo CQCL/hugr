@@ -200,7 +200,7 @@ impl<'a, R: Resolver> Walker<'a, R> {
         let dir = dir.into();
 
         // Find unpinned ports on the wire (satisfying the direction constraint)
-        let unpinned_ports = self.find_unpinned_ports(wire, dir);
+        let unpinned_ports = self.wire_unpinned_ports(wire, dir);
 
         // Obtain set of pinnable nodes by considering all ports (in descendant
         // commits) equivalent to currently unpinned ports.
