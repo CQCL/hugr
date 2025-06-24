@@ -227,6 +227,28 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         return self.items()
 
+    def get_sorted_nodes(self, parent: Node) -> Iterator[Node]:
+        nodes_without_dependencies = [
+            n for n in self.children(parent) if self.num_incoming(n) == 0
+        ]
+        visited = set()
+        queue = Queue()
+        for node in nodes_without_dependencies:
+            queue.put(node)
+        while not queue.empty():
+            new_node = queue.get()
+            yield new_node
+            visited.add(new_node)
+
+            # A dict to keep track of how many times we see a node
+            visit_dict: dict[Node, int] = {
+                node: self.num_incoming(node) for node in self.children(new_node)
+            }
+            for node in self.children(new_node):
+                visit_dict[node] -= 1
+                if visit_dict[node] == 0:
+                    queue.put(node)
+
     def links(self) -> Iterator[tuple[OutPort, InPort]]:
         """Iterator over all the links in the HUGR.
 
