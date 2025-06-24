@@ -234,7 +234,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             node: self.num_incoming(node) for node in self.descendants(parent)
         }
 
-        queue = Queue()
+        queue: Queue[Node] = Queue()
         for node in visit_dict:
             if visit_dict[node] == 0:
                 queue.put(node)
