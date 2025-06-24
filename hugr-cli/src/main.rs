@@ -47,7 +47,7 @@ fn run_external(args: Vec<OsString>) -> Result<()> {
         std::process::exit(1);
     }
     let subcmd = args[0].to_string_lossy();
-    let exe = format!("hugr-{}", subcmd);
+    let exe = format!("hugr-{subcmd}");
     let rest: Vec<_> = args[1..]
         .iter()
         .map(|s| s.to_string_lossy().to_string())

@@ -256,7 +256,7 @@ impl<R> HugrView for PersistentHugr<R> {
                 // replace node labels with patch node IDs
                 let node_labels_map: HashMap<_, _> = node_map
                     .into_iter()
-                    .map(|(k, v)| (v, format!("{:?}", k)))
+                    .map(|(k, v)| (v, format!("{k:?}")))
                     .collect();
                 NodeLabel::Custom(node_labels_map)
             }
