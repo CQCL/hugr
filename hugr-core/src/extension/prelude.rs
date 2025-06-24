@@ -101,7 +101,7 @@ lazy_static! {
                 .add_op(
                     MAKE_ERROR_OP_ID,
                     "Create an error value".to_string(),
-                    Signature::new(vec![string_type, usize_type], vec![error_type.clone().into()]),
+                    Signature::new(vec![usize_type, string_type], vec![error_type.clone().into()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -1137,6 +1137,24 @@ mod test {
 
         b.add_dataflow_op(op, [err]).unwrap();
 
+        b.finish_hugr_with_outputs([]).unwrap();
+    }
+
+    #[test]
+    /// test the prelude make error op with the panic op.
+    fn test_make_error() {
+        let err_op = PRELUDE
+            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+            .unwrap();
+        let panic_op = PRELUDE
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .unwrap();
+
+        let mut b =
+            DFGBuilder::new(Signature::new(vec![usize_t(), string_type()], type_row![])).unwrap();
+        let [signal, message] = b.input_wires_arr();
+        let err_value = b.add_dataflow_op(err_op, [signal, message]).unwrap();
+        b.add_dataflow_op(panic_op, err_value.outputs()).unwrap();
         b.finish_hugr_with_outputs([]).unwrap();
     }
 
