@@ -229,22 +229,20 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def get_sorted_nodes(self, parent: Node) -> Iterator[Node]:
         """Returns an iterator for a valid topological ordering of the hugr nodes."""
-        nodes_without_dependencies = [
-            n for n in self.children(parent) if self.num_incoming(n) == 0
-        ]
-        visited = set()
+        # A dict to keep track of how many times we see a node
+        visit_dict: dict[Node, int] = {node: self.num_incoming(node) for node in self}
+
+        visit_dict[parent] = 0
+
         queue = Queue()
-        for node in nodes_without_dependencies:
-            queue.put(node)
+        for node in visit_dict:
+            if visit_dict[node] == 0:
+                queue.put(node)
+
         while not queue.empty():
             new_node = queue.get()
             yield new_node
-            visited.add(new_node)
 
-            # A dict to keep track of how many times we see a node
-            visit_dict: dict[Node, int] = {
-                node: self.num_incoming(node) for node in self.children(new_node)
-            }
             for node in self.children(new_node):
                 visit_dict[node] -= 1
                 if visit_dict[node] == 0:
