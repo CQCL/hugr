@@ -5,7 +5,6 @@ use std::io;
 
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
-use crate::hugr::ExtensionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
 
@@ -65,8 +64,6 @@ pub enum PackageEncodingError {
     IOError(io::Error),
     /// Could not resolve the extension needed to encode the hugr.
     ExtensionResolution(ExtensionResolutionError),
-    /// Could not resolve the runtime extensions for the hugr.
-    RuntimeExtensionResolution(ExtensionError),
 }
 
 /// A private package structure implementing the serde traits.
