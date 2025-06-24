@@ -60,6 +60,9 @@
 //! To obtain a [`PersistentHugr`] from your state space, use
 //! [`CommitStateSpace::try_extract_hugr`]. A [`PersistentHugr`] can always be
 //! materialized into a [`Hugr`] type using [`PersistentHugr::to_hugr`].
+//!
+//!
+//! [`PatchVerification`]: crate::hugr::patch::PatchVerification
 
 mod parents_view;
 mod resolver;
@@ -264,6 +267,9 @@ impl<'a> From<&'a RelRc<CommitData, ()>> for &'a Commit {
 ///
 /// Currently, only patches that apply to subgraphs within dataflow regions
 /// are supported.
+///
+/// [`PatchVerification`]: crate::hugr::patch::PatchVerification
+
 #[derive(Clone, Debug)]
 pub struct PersistentHugr {
     /// The state space of all commits.
