@@ -228,6 +228,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self.items()
 
     def get_sorted_nodes(self, parent: Node) -> Iterator[Node]:
+        """Returns an iterator for a valid topological ordering of the hugr nodes."""
         nodes_without_dependencies = [
             n for n in self.children(parent) if self.num_incoming(n) == 0
         ]
