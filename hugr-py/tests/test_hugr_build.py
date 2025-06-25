@@ -422,7 +422,10 @@ def test_toposort() -> None:
 
     validate(Package([f.hugr], [QUANTUM_EXT]))
 
-    sorted_nodes = list(f.hugr.get_sorted_nodes(f))
+    nodes = list(f.hugr)
+    func_node = nodes[1]
+
+    sorted_nodes = list(f.hugr.get_sorted_nodes(func_node))
     assert set(sorted_nodes) == {f.input_node, f.output_node, h, nnot}
     assert sorted_nodes[0] == f.input_node
     assert sorted_nodes[-1] == f.output_node
