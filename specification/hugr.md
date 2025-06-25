@@ -778,11 +778,14 @@ existing metadata, given the node ID.
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
 
+Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
+Use of this prefix by external tooling may cause issues. 
+
 #### Generator Metadata
 Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
 purposes.
 
-The key `__generator` when used on the module root node is
+The key `core.generator` when used on the module root node is
 used to specify the tooling used to generate the module.
 The associated value must be an object/dictionary containing the fields `name`
 and `version`, each with string values. Extra fields may be used to include
@@ -790,11 +793,11 @@ additional data about generating tooling that may be useful for debugging. Examp
 
 ```json
 {
-  "__generator": { "name": "my_compiler", "version": "1.0.0" }
+  "core.generator": { "name": "my_compiler", "version": "1.0.0" }
 }
 ```
 
-The key `__used_extensions` when used on the module root node is
+The key `core.used_extensions` when used on the module root node is
 used to specify the names and versions of all the extensions used in the module.
 Some of these may correspond to extensions packaged with the module, but they
 may also be extensions the consuming tooling has pre-loaded. They can be used by the
@@ -803,7 +806,7 @@ must be an array of objects/dictionaries containing the keys `name` and `version
 with string values. Example:
 ```json
 {
-  "__used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
+  "core.used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
 }
 ```
 
