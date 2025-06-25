@@ -3,6 +3,7 @@ use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::io;
 
+use super::{ExtensionBreakingError, WithGenerator, check_breaking_extensions};
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::package::Package;
@@ -20,19 +21,24 @@ pub(super) fn from_json_reader(
         extensions: pkg_extensions,
     } = serde_json::from_value::<PackageDeser>(val.clone())?;
     let mut modules = modules.into_iter().map(|h| h.0).collect_vec();
-
     let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
         pkg_extensions,
         &extension_registry.into(),
-    )?;
+    )
+    .map_err(|err| WithGenerator::new(err, &modules))?;
 
     // Resolve the operations in the modules using the defined registries.
     let mut combined_registry = extension_registry.clone();
     combined_registry.extend(&pkg_extensions);
 
-    for module in &mut modules {
-        module.resolve_extension_defs(&combined_registry)?;
+    for module in &modules {
+        check_breaking_extensions(module, &combined_registry)
+            .map_err(|err| WithGenerator::new(err, &modules))?;
     }
+    modules
+        .iter_mut()
+        .try_for_each(|module| module.resolve_extension_defs(&combined_registry))
+        .map_err(|err| WithGenerator::new(err, &modules))?;
 
     Ok(Package {
         modules,
@@ -63,7 +69,9 @@ pub enum PackageEncodingError {
     /// Error raised while reading from a file.
     IOError(io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    ExtensionResolution(ExtensionResolutionError),
+    ExtensionResolution(WithGenerator<ExtensionResolutionError>),
+    /// Error raised while checking for breaking extension version mismatch.
+    ExtensionVersion(WithGenerator<ExtensionBreakingError>),
 }
 
 /// A private package structure implementing the serde traits.
