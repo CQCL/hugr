@@ -53,7 +53,6 @@ use crate::{
     package::Package,
 };
 use header::EnvelopeHeader;
-use std::collections::HashSet;
 use std::io::BufRead;
 use std::io::Write;
 use std::str::FromStr;
@@ -69,18 +68,20 @@ use crate::{Extension, import::import_package};
 pub const GENERATOR_KEY: &str = "__generator";
 
 /// Get the name of the generator from the metadata of the HUGR modules.
-/// If multiple modules have different generators, only the first one is returned.
+/// If multiple modules have different generators, a comma-separated list is returned in
+/// module order.
+/// If no generator is found, `None` is returned.
 fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
-    let generators: HashSet<String> = modules
+    let generators: Vec<String> = modules
         .iter()
         .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
         .map(|v| v.to_string())
         .collect();
-    debug_assert!(
-        generators.len() <= 1,
-        "Multiple generators found in the package metadata: {generators:?}"
-    );
-    generators.into_iter().next()
+    if generators.is_empty() {
+        return None;
+    }
+
+    Some(generators.join(", "))
 }
 
 fn gen_str(generator: &Option<String>) -> String {
