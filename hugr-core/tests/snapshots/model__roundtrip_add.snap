@@ -15,7 +15,6 @@ expression: ast
 (import arithmetic.int.types.int)
 
 (declare-operation
-  pub
   arithmetic.int.iadd
   (param ?0 core.nat)
   (core.fn

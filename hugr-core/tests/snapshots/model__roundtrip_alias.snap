@@ -12,8 +12,8 @@ expression: ast
 
 (import core.type)
 
-(declare-alias pub local.float core.type)
+(declare-alias local.float core.type)
 
-(define-alias pub local.int core.type arithmetic.int.types.int)
+(define-alias local.int core.type arithmetic.int.types.int)
 
-(define-alias pub local.endo core.type (core.fn [] []))
+(define-alias local.endo core.type (core.fn [] []))
