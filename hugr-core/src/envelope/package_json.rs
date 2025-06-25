@@ -6,7 +6,6 @@ use std::io;
 use super::{ExtensionBreakingError, WithGenerator, check_breaking_extensions};
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
-use crate::hugr::ExtensionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
 
@@ -73,8 +72,6 @@ pub enum PackageEncodingError {
     ExtensionResolution(WithGenerator<ExtensionResolutionError>),
     /// Error raised while checking for breaking extension version mismatch.
     ExtensionVersion(WithGenerator<ExtensionBreakingError>),
-    /// Could not resolve the runtime extensions for the hugr.
-    RuntimeExtensionResolution(ExtensionError),
 }
 
 /// A private package structure implementing the serde traits.
