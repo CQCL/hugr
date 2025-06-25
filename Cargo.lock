@@ -1256,6 +1256,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema",
  "lazy_static",
+ "log",
  "ordered-float",
  "paste",
  "petgraph 0.8.2",
