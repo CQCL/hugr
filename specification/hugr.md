@@ -788,7 +788,7 @@ additional data about generating tooling that may be useful for debugging. Examp
 
 The key `__used_extensions` when used on the module root node is
 used to specify the names and versions of all the extensions used in the module.
-Some of these may correspond to extensions packaged with the modules, but they
+Some of these may correspond to extensions packaged with the module, but they
 may also be extensions the consuming tooling has pre-loaded. They can be used by the
 tooling to check for extension version mismatches. The value associated with the key
 must be an array of objects/dictionaries containing the keys `name` and `version`, each
