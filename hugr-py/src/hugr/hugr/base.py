@@ -230,14 +230,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def get_sorted_nodes(self, parent: Node) -> Iterator[Node]:
         """Returns an iterator for a valid topological ordering of the hugr nodes."""
         # A dict to keep track of how many times we see a node
-        visit_dict: dict[Node, int] = {
-            node: self.num_incoming(node) for node in self.children(parent)
-        }
-
+        visit_dict: dict[Node, int] = {}
         queue: Queue[Node] = Queue()
-        for node in visit_dict:
-            if visit_dict[node] == 0:
+        for node in self.children(parent):
+            incoming = sum(self.parent(n) == parent for n in self.input_neighbours(node))
+            visit_dict[node] = incoming
+            if not incoming:
                 queue.put(node)
+        }
 
         while not queue.empty():
             new_node = queue.get()
