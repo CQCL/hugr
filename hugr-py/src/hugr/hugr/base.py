@@ -243,11 +243,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             new_node = queue.get()
             yield new_node
 
-            for node in self.children(new_node):
-                if self.has_link(new_node.out(1), node.inp(1)):
-                    visit_dict[node] -= 1
-                if visit_dict[node] == 0:
-                    queue.put(node)
+            for neigh in self.output_neighbours(new_node):
+                visit_dict[neigh] -= 1
+                if visit_dict[neigh] == 0:
+                    del visit_dict[neigh]
+                    queue.put(neigh)
 
     def links(self) -> Iterator[tuple[OutPort, InPort]]:
         """Iterator over all the links in the HUGR.
