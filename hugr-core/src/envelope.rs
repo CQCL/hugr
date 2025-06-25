@@ -65,7 +65,9 @@ use crate::import::ImportError;
 use crate::{Extension, import::import_package};
 
 /// Key used to store the name of the generator that produced the envelope.
-pub const GENERATOR_KEY: &str = "__generator";
+pub const GENERATOR_KEY: &str = "core.generator";
+/// Key used to store the list of used extensions in the metadata of a HUGR.
+pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 
 /// Get the name of the generator from the metadata of the HUGR modules.
 /// If multiple modules have different generators, a comma-separated list is returned in
@@ -458,9 +460,6 @@ fn encode_model<'h>(
 
     Ok(())
 }
-
-/// Key used to store the list of used extensions in the metadata of a HUGR.
-pub const USED_EXTENSIONS_KEY: &str = "__used_extensions";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
 struct UsedExtension {
