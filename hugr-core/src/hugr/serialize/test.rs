@@ -508,8 +508,6 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Module::new())]
 #[case(ops::FuncDefn::new_private("polyfunc1", polyfunctype1()))]
 #[case(ops::FuncDefn::new_public("pubfunc1", polyfunctype1()))]
-#[case(ops::FuncDecl::new_public("polyfunc2", polyfunctype1()))]
-#[case(ops::FuncDecl::new_private("privfunc1", polyfunctype1()))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]

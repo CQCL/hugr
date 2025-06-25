@@ -66,11 +66,16 @@ fn priv_vis() -> Visibility {
 }
 
 impl FuncDefn {
-    #[deprecated(note = "Use new_private, or move to new_public")]
-    /// Create a new, private, instance with the given name and signature
-    /// Deprecated: use [Self::new_private]
+    /// Create a new instance with the given name and signature. If `name` is `"main"`,
+    /// it will be [Visibility::Public], otherwise [Visibility::Private]
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
-        Self::new_private(name, signature)
+        let name = name.into();
+        let vis = if name == "main" {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        Self::new_vis(name, signature, vis)
     }
 
     /// Create a new function that is not for external calls or linkage

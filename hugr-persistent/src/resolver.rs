@@ -139,7 +139,7 @@ mod tests {
 
         // Check that the original and replacement data are considered different
         let repl_data = CommitData::Base(
-            Hugr::new_with_entrypoint(FuncDefn::new_private("dummy", endo_sig(vec![]))).unwrap(),
+            Hugr::new_with_entrypoint(FuncDefn::new("dummy", endo_sig(vec![]))).unwrap(),
         );
         let result = resolver.try_merge_mapping(&base_data, &[], &repl_data, &[]);
         assert!(result.is_err());
