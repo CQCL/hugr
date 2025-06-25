@@ -202,7 +202,7 @@ jobs:
             BASE_SHA=$(git rev-parse origin/${{ github.base_ref }})
             LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" $BASE_SHA)
             echo "Latest tag on target: $LAST_TAG"
-            
+
             python ./scripts/check_extension_versions.py $LAST_TAG
 
   # This is a meta job to mark successful completion of the required checks,

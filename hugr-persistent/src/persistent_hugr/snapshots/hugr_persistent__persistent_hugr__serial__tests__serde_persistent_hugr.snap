@@ -6,13 +6,13 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
   "state_space": {
     "graph": {
       "nodes": {
-        "16b2e9a04376ba38": {
+        "110f8b756b76b211": {
           "value": {
             "Replacement": {
               "subgraph": {
                 "nodes": [
                   [
-                    "881c0aa6a9d30735",
+                    "df2d1b6f2c53a3f7",
                     8
                   ]
                 ],
@@ -20,7 +20,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                   [
                     [
                       [
-                        "881c0aa6a9d30735",
+                        "df2d1b6f2c53a3f7",
                         8
                       ],
                       {
@@ -32,7 +32,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 "outputs": [
                   [
                     [
-                      "881c0aa6a9d30735",
+                      "df2d1b6f2c53a3f7",
                       8
                     ],
                     {
@@ -42,28 +42,28 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 ]
               },
               "replacement": {
-                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[4,0],[3,0]],[[5,0],[7,0]],[[7,0],[8,0]],[[8,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.1\",\"entrypoint\":4}],\"extensions\":[]}"
+                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[4,0],[3,0]],[[5,0],[7,0]],[[7,0],[8,0]],[[8,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.2\",\"entrypoint\":4}],\"extensions\":[]}"
               }
             }
           },
           "incoming": [
             [
-              "881c0aa6a9d30735",
+              "df2d1b6f2c53a3f7",
               null
             ]
           ]
         },
-        "601f9f872992eda5": {
+        "82e05c6bb8fe490e": {
           "value": {
             "Replacement": {
               "subgraph": {
                 "nodes": [
                   [
-                    "881c0aa6a9d30735",
+                    "df2d1b6f2c53a3f7",
                     9
                   ],
                   [
-                    "8ac2181d41d63052",
+                    "c16f9adebeacc1d1",
                     8
                   ]
                 ],
@@ -71,7 +71,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                   [
                     [
                       [
-                        "8ac2181d41d63052",
+                        "c16f9adebeacc1d1",
                         8
                       ],
                       {
@@ -82,7 +82,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                   [
                     [
                       [
-                        "881c0aa6a9d30735",
+                        "df2d1b6f2c53a3f7",
                         9
                       ],
                       {
@@ -94,7 +94,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 "outputs": [
                   [
                     [
-                      "881c0aa6a9d30735",
+                      "df2d1b6f2c53a3f7",
                       9
                     ],
                     {
@@ -104,36 +104,28 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 ]
               },
               "replacement": {
-                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Xor\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[2,1],[4,1]],[[4,0],[3,0]],[[5,0],[7,0]],[[5,1],[7,1]],[[7,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.1\",\"entrypoint\":4}],\"extensions\":[]}"
+                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Xor\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[2,1],[4,1]],[[4,0],[3,0]],[[5,0],[7,0]],[[5,1],[7,1]],[[7,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.2\",\"entrypoint\":4}],\"extensions\":[]}"
               }
             }
           },
           "incoming": [
             [
-              "881c0aa6a9d30735",
+              "df2d1b6f2c53a3f7",
               null
             ],
             [
-              "8ac2181d41d63052",
+              "c16f9adebeacc1d1",
               null
             ]
           ]
         },
-        "881c0aa6a9d30735": {
-          "value": {
-            "Base": {
-              "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"And\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[2,1],[4,1]],[[4,0],[3,0]],[[5,0],[7,0]],[[5,1],[8,0]],[[7,0],[9,0]],[[8,0],[9,1]],[[9,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.1\",\"entrypoint\":4}],\"extensions\":[]}"
-            }
-          },
-          "incoming": []
-        },
-        "8ac2181d41d63052": {
+        "c16f9adebeacc1d1": {
           "value": {
             "Replacement": {
               "subgraph": {
                 "nodes": [
                   [
-                    "881c0aa6a9d30735",
+                    "df2d1b6f2c53a3f7",
                     7
                   ]
                 ],
@@ -141,7 +133,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                   [
                     [
                       [
-                        "881c0aa6a9d30735",
+                        "df2d1b6f2c53a3f7",
                         7
                       ],
                       {
@@ -153,7 +145,7 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 "outputs": [
                   [
                     [
-                      "881c0aa6a9d30735",
+                      "df2d1b6f2c53a3f7",
                       7
                     ],
                     {
@@ -163,22 +155,30 @@ expression: "serde_json::to_string_pretty(&ser_per_hugr).unwrap()"
                 ]
               },
               "replacement": {
-                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[4,0],[3,0]],[[5,0],[7,0]],[[7,0],[8,0]],[[8,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.1\",\"entrypoint\":4}],\"extensions\":[]}"
+                "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[4,0],[3,0]],[[5,0],[7,0]],[[7,0],[8,0]],[[8,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.2\",\"entrypoint\":4}],\"extensions\":[]}"
               }
             }
           },
           "incoming": [
             [
-              "881c0aa6a9d30735",
+              "df2d1b6f2c53a3f7",
               null
             ]
           ]
+        },
+        "df2d1b6f2c53a3f7": {
+          "value": {
+            "Base": {
+              "hugr": "HUGRiHJv?@{\"modules\":[{\"version\":\"live\",\"nodes\":[{\"parent\":0,\"op\":\"Module\"},{\"parent\":0,\"op\":\"FuncDefn\",\"name\":\"main\",\"signature\":{\"params\":[],\"body\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}},{\"parent\":1,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":1,\"op\":\"DFG\",\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Input\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Output\",\"types\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"Not\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}},{\"parent\":4,\"op\":\"Extension\",\"extension\":\"logic\",\"name\":\"And\",\"args\":[],\"signature\":{\"input\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2},{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}],\"output\":[{\"t\":\"Sum\",\"s\":\"Unit\",\"size\":2}]}}],\"edges\":[[[2,0],[4,0]],[[2,1],[4,1]],[[4,0],[3,0]],[[5,0],[7,0]],[[5,1],[8,0]],[[7,0],[9,0]],[[8,0],[9,1]],[[9,0],[6,0]]],\"metadata\":[null,null,null,null,null,null,null,null,null,null],\"encoder\":\"hugr-rs v0.20.2\",\"entrypoint\":4}],\"extensions\":[]}"
+            }
+          },
+          "incoming": []
         }
       },
       "resolver_id": {
         "id": "SerdeHashResolver"
       }
     },
-    "base_commit": "881c0aa6a9d30735"
+    "base_commit": "df2d1b6f2c53a3f7"
   }
 }
