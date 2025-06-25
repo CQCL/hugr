@@ -147,8 +147,9 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR; the function will be private.
-    /// (See also [Self::new_pub], [Self::new_vis]
+    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR;
+    /// the function will be public if `name` is `"main"`, otherwise private.
+    /// (See also [Self::new_vis].)
     ///
     /// # Errors
     ///
@@ -157,19 +158,9 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        Self::new_vis(name, signature, Visibility::Private)
-    }
-
-    /// Initialize a builder for a FuncDefn-rooted HUGR; the function will be [Visibility::Public].
-    ///
-    /// # Errors
-    ///
-    /// Error in adding DFG child nodes.
-    pub fn new_pub(
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<Self, BuildError> {
-        Self::new_vis(name, signature, Visibility::Public)
+        let name = name.into();
+        let vis = Visibility::default_for_name(name.as_str());
+        Self::new_vis(name, signature, vis)
     }
 
     /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified

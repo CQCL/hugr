@@ -262,6 +262,19 @@ pub enum Visibility {
     Private,
 }
 
+impl Visibility {
+    /// The default visibility for a function of the given name.
+    /// Functions called "main" are considered [Self::Public] as this is the
+    /// external entrypoint. Any other function is [Self::Private].
+    pub fn default_for_name<'a>(name: impl Into<&'a str>) -> Self {
+        if name.into() == "main" {
+            Self::Public
+        } else {
+            Self::Private
+        }
+    }
+}
+
 impl From<hugr_model::v0::Visibility> for Visibility {
     fn from(value: hugr_model::v0::Visibility) -> Self {
         match value {

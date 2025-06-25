@@ -352,7 +352,7 @@ mod test {
         };
         {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function_pub("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?

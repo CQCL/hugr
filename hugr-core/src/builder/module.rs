@@ -165,35 +165,21 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(declare_n.into())
     }
 
-    /// Adds a private [`ops::FuncDefn`] node and returns a builder to define the function
-    /// body graph.
+    /// Adds a [`ops::FuncDefn`] node and returns a builder to define the function
+    /// body graph. The function will be public if `name` is `"main"`, otherwise private.
     ///
     /// # Errors
     ///
     /// This function will return an error if there is an error in adding the
     /// [`ops::FuncDefn`] node.
-    // ALAN TODO? deprecate and rename to define_private_func(tion)? (Rather long...)
     pub fn define_function(
         &mut self,
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        self.define_function_vis(name, signature, Visibility::Private)
-    }
-
-    /// Adds a public [`ops::FuncDefn`] node with the specified `name`
-    /// and returns a builder to define the function body graph.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`ops::FuncDefn`] node.
-    pub fn define_function_pub(
-        &mut self,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        self.define_function_vis(name, signature, Visibility::Public)
+        let name = name.into();
+        let vis = Visibility::default_for_name(name.as_str());
+        self.define_function_vis(name, signature, vis)
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.

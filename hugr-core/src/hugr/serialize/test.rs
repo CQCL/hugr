@@ -24,7 +24,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{OutgoingPort, type_row};
+use crate::{OutgoingPort, Visibility, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
@@ -506,8 +506,8 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 
 #[rstest]
 #[case(ops::Module::new())]
-#[case(ops::FuncDefn::new_private("polyfunc1", polyfunctype1()))]
-#[case(ops::FuncDefn::new_public("pubfunc1", polyfunctype1()))]
+#[case(ops::FuncDefn::new_vis("polyfunc1", polyfunctype1(), Visibility::Private))]
+#[case(ops::FuncDefn::new_vis("pubfunc1", polyfunctype1(), Visibility::Public))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
 #[case(ops::Const::new(Value::false_val()))]

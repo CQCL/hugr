@@ -193,40 +193,45 @@ mod test {
 
     #[rstest]
     #[case(false, IncludeExports::default(), [], vec!["from_pub", "pubfunc"])]
-    #[case(false, IncludeExports::Never, ["main"], vec!["from_main", "main"])]
-    #[case(false, IncludeExports::Never, ["from_main", "from_pub"], vec!["from_main", "from_pub"])]
-    #[case(false, IncludeExports::default(), ["from_main"], vec!["from_main", "from_pub", "pubfunc"])]
-    #[case(false, IncludeExports::Always, ["main"], vec!["from_main", "from_pub", "main", "pubfunc"])]
-    #[case(true, IncludeExports::default(), [], vec!["from_main", "main"])]
-    #[case(true, IncludeExports::Always, [], vec!["from_main", "from_pub", "main", "pubfunc"])]
-    #[case(true, IncludeExports::Never, ["from_pub"], vec!["from_main", "from_pub", "main"])]
+    #[case(false, IncludeExports::Never, ["ment"], vec!["from_ment", "ment"])]
+    #[case(false, IncludeExports::Never, ["from_ment", "from_pub"], vec!["from_ment", "from_pub"])]
+    #[case(false, IncludeExports::default(), ["from_ment"], vec!["from_ment", "from_pub", "pubfunc"])]
+    #[case(false, IncludeExports::Always, ["ment"], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
+    #[case(true, IncludeExports::default(), [], vec!["from_ment", "ment"])]
+    #[case(true, IncludeExports::Always, [], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
+    #[case(true, IncludeExports::Never, ["from_pub"], vec!["from_ment", "from_pub", "ment"])]
     fn remove_dead_funcs_entry_points(
         #[case] use_hugr_entrypoint: bool,
         #[case] inc: IncludeExports,
         #[case] entry_points: impl IntoIterator<Item = &'static str>,
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        use hugr_core::Visibility;
+
         let mut hb = ModuleBuilder::new();
         let o2 = hb.define_function("from_pub", Signature::new_endo(usize_t()))?;
         let o2inp = o2.input_wires();
         let o2 = o2.finish_with_outputs(o2inp)?;
-        let mut o1 = hb.define_function_pub("pubfunc", Signature::new_endo(usize_t()))?;
+        let mut o1 = hb.define_function_vis(
+            "pubfunc",
+            Signature::new_endo(usize_t()),
+            Visibility::Public,
+        )?;
 
         let o1c = o1.call(o2.handle(), &[], o1.input_wires())?;
         o1.finish_with_outputs(o1c.outputs())?;
 
-        let fm = hb.define_function("from_main", Signature::new_endo(usize_t()))?;
+        let fm = hb.define_function("from_ment", Signature::new_endo(usize_t()))?;
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp)?;
-        // Note main here is private, but sometimes we use it as entrypoint.
-        // This could be confusing if ppl expect it to be public - rename main->entryfunc, pubfunc->main?
-        let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
-        let mc = m.call(fm.handle(), &[], m.input_wires())?;
-        let m = m.finish_with_outputs(mc.outputs())?;
+
+        let mut me = hb.define_function("ment", Signature::new_endo(usize_t()))?;
+        let mc = me.call(fm.handle(), &[], me.input_wires())?;
+        let me = me.finish_with_outputs(mc.outputs())?;
 
         let mut hugr = hb.finish_hugr()?;
         if use_hugr_entrypoint {
-            hugr.set_entrypoint(m.node());
+            hugr.set_entrypoint(me.node());
         }
 
         let avail_funcs = hugr
