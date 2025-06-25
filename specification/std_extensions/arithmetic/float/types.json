@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "name": "arithmetic.float.types",
+  "name": " arithmetic.float.types",
   "types": {
     "float64": {
       "extension": "arithmetic.float.types",
