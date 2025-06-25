@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{self, DataflowParent, Input, OpParent, Output};
+use crate::ops::{self, DataflowParent, FuncDefn, Input, OpParent, Output};
 use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
 
@@ -158,9 +158,7 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let name = name.into();
-        let vis = Visibility::default_for_name(name.as_str());
-        Self::new_vis(name, signature, vis)
+        Self::new_with_op(FuncDefn::new(name, signature))
     }
 
     /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified
@@ -174,7 +172,10 @@ impl FunctionBuilder<Hugr> {
         signature: impl Into<PolyFuncType>,
         visibility: Visibility,
     ) -> Result<Self, BuildError> {
-        let op = ops::FuncDefn::new_vis(name, signature, visibility);
+        Self::new_with_op(FuncDefn::new_vis(name, signature, visibility))
+    }
+
+    fn new_with_op(op: FuncDefn) -> Result<Self, BuildError> {
         let body = op.signature().body().clone();
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");

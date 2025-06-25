@@ -71,7 +71,11 @@ impl FuncDefn {
     /// See also [Self::new_vis].
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
         let name = name.into();
-        let vis = Visibility::default_for_name(name.as_str());
+        let vis = if name == "main" {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
         Self::new_vis(name, signature, vis)
     }
 

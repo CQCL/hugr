@@ -4,13 +4,13 @@ use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
 };
 
-use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::ops;
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::types::{PolyFuncType, Type, TypeBound};
 use crate::{Hugr, Node, Visibility};
+use crate::{hugr::ValidationError, ops::FuncDefn};
 
 use smol_str::SmolStr;
 
@@ -95,9 +95,15 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         signature: impl Into<PolyFuncType>,
         visibility: Visibility,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let f_node = self.add_child_node(ops::FuncDefn::new_vis(name, signature, visibility));
+        self.define_function_op(FuncDefn::new_vis(name, signature, visibility))
+    }
+
+    fn define_function_op(
+        &mut self,
+        op: FuncDefn,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let body = op.signature().body().clone();
+        let f_node = self.add_child_node(op);
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -177,9 +183,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
-        let name = name.into();
-        let vis = Visibility::default_for_name(name.as_str());
-        self.define_function_vis(name, signature, vis)
+        self.define_function_op(FuncDefn::new(name, signature))
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
