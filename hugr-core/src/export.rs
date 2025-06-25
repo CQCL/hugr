@@ -355,7 +355,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::Public, // Not spec'd in hugr-core
+                    visibility: Visibility::default(), // Not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -369,7 +369,7 @@ impl<'a> Context<'a> {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::Public, // Not spec'd in hugr-core
+                    visibility: Visibility::default(), // Not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -544,8 +544,8 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            // Assume all OpDef's are public
-            this.export_poly_func_type(name, Visibility::Public, poly_func_type)
+            // Visibility of OpDef's has no effect
+            this.export_poly_func_type(name, Visibility::default(), poly_func_type)
         });
 
         let meta = {
