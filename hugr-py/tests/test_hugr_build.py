@@ -411,13 +411,18 @@ def test_toposort() -> None:
     f = Function("prepare_qubit", [tys.Bool, tys.Qubit])
     [b, q] = f.inputs()
 
-    q = f.add_op(H, q).out(0)
-    b0 = f.add_op(Not, b)
+    h = f.add_op(H, q)
+    q = h.out(0)
+
+    nnot = f.add_op(Not, b)
+    b0 = nnot
     b1 = b
 
     f.set_outputs(q, b0, b1)
 
     validate(Package([f.hugr], [QUANTUM_EXT]))
 
-    sorted_nodes = f.hugr.get_sorted_nodes(f.hugr.module_root)
-    assert len(list(sorted_nodes)) == len(list(f.hugr))
+    sorted_nodes = list(f.hugr.get_sorted_nodes(f))
+    assert set(sorted_nodes) == {f.input_node, f.output_node, h, nnot}
+    assert sorted_nodes[0] == f.input_node
+    assert sorted_nodes[-1] == f.output_node
