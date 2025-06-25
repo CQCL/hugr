@@ -695,6 +695,75 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """  # noqa: E501
         return self._node_links(node, self._links.bck)
 
+    def neighbours(
+        self, node: ToNode, direction: Direction | None = None
+    ) -> Iterable[Node]:
+        """Iterator over the neighbours of a node.
+
+        Args:
+            node: Node to query.
+            direction: If given, only return neighbours in that direction.
+
+        Returns:
+            Iterator of nodes connected to `node`, ordered by direction and port
+            offset. Nodes connected via multiple links will be returned multiple times.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
+            >>> list(df.hugr.neighbours(df.input_node))
+            [Node(6), Node(6)]
+            >>> list(df.hugr.neighbours(df.output_node, Direction.OUTGOING))
+            []
+        """
+        if direction is None or direction == Direction.INCOMING:
+            for _, linked_outputs in self.incoming_links(node):
+                for out_port in linked_outputs:
+                    yield out_port.node
+        if direction is None or direction == Direction.OUTGOING:
+            for _, linked_inputs in self.outgoing_links(node):
+                for in_port in linked_inputs:
+                    yield in_port.node
+
+    def input_neighbours(self, node: ToNode) -> Iterable[Node]:
+        """Iterator over the input neighbours of a node.
+
+        Args:
+            node: Node to query.
+
+        Returns:
+            Iterator of nodes connected to `node` via incoming links.
+            Nodes connected via multiple links will be returned multiple times.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
+            >>> list(df.hugr.input_neighbours(df.output_node))
+            [Node(5), Node(5)]
+        """
+        return self.neighbours(node, Direction.INCOMING)
+
+    def output_neighbours(self, node: ToNode) -> Iterable[Node]:
+        """Iterator over the output neighbours of a node.
+
+        Args:
+            node: Node to query.
+
+        Returns:
+            Iterator of nodes connected to `node` via outgoing links.
+            Nodes connected via multiple links will be returned multiple times.
+
+        Examples:
+            >>> df = dfg.Dfg()
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
+            >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
+            >>> list(df.hugr.output_neighbours(df.input_node))
+            [Node(6), Node(6)]
+        """
+        return self.neighbours(node, Direction.OUTGOING)
+
     def num_incoming(self, node: Node) -> int:
         """The number of incoming links to a `node`.
 
