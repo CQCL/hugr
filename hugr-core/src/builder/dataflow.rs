@@ -170,6 +170,31 @@ impl FunctionBuilder<Hugr> {
         let db = DFGBuilder::create_with_io(base, root, body)?;
         Ok(Self::from_dfg_builder(db))
     }
+}
+
+impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
+    /// Initialize a new function definition on the root module of an existing HUGR.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn with_hugr(
+        mut hugr: B,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<Self, BuildError> {
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let op = ops::FuncDefn::new(name, signature);
+
+        let module = hugr.as_ref().module_root();
+        let func = hugr.as_mut().add_node_with_parent(module, op);
+
+        let db = DFGBuilder::create_with_io(hugr, func, body)?;
+        Ok(Self::from_dfg_builder(db))
+    }
 
     /// Add a new input to the function being constructed.
     ///
@@ -256,31 +281,6 @@ impl FunctionBuilder<Hugr> {
         };
         *fd.signature_mut() = f(fd.inner_signature().into_owned()).into();
         &*fd
-    }
-}
-
-impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
-    /// Initialize a new function definition on the root module of an existing HUGR.
-    ///
-    /// The HUGR's entrypoint will **not** be modified.
-    ///
-    /// # Errors
-    ///
-    /// Error in adding DFG child nodes.
-    pub fn with_hugr(
-        mut hugr: B,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<Self, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let op = ops::FuncDefn::new(name, signature);
-
-        let module = hugr.as_ref().module_root();
-        let func = hugr.as_mut().add_node_with_parent(module, op);
-
-        let db = DFGBuilder::create_with_io(hugr, func, body)?;
-        Ok(Self::from_dfg_builder(db))
     }
 }
 
