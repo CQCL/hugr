@@ -697,6 +697,35 @@ mod test {
     }
 
     #[rstest]
+    fn prelude_make_error_and_panic(prelude_llvm_ctx: TestContext) {
+        let sig: ConstUsize = ConstUsize::new(100);
+        let msg: ConstString = ConstString::new("Error!".into());
+
+        let make_error_op = PRELUDE
+            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+            .unwrap();
+
+        let panic_op = PRELUDE
+            .instantiate_extension_op(&PANIC_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder| {
+                let sig_out = builder.add_load_value(sig);
+                let msg_out = builder.add_load_value(msg);
+                let [err] = builder
+                    .add_dataflow_op(make_error_op, [sig_out, msg_out])
+                    .unwrap()
+                    .outputs_arr();
+                builder.add_dataflow_op(panic_op, [err]).unwrap();
+                builder.finish_hugr_with_outputs([]).unwrap()
+            });
+
+        check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
     fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
