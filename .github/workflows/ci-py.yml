@@ -196,14 +196,20 @@ jobs:
           python-version: '3.10'
 
       - name: Check if extension versions are updated
-        # check against latest tag on the target branch
-        # base_ref should be empty if not a pull request, so goes from HEAD
         run: |
-            BASE_SHA=$(git rev-parse origin/${{ github.base_ref }})
+            # Check against latest tag on the target branch
+            # When not on a pull request, base_ref should be empty so we default to HEAD
+            if [ -z "$TARGET_REF" ]; then
+              BASE_SHA=""
+            else
+              BASE_SHA=$(git rev-parse origin/$TARGET_REF)
+            fi
             LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" $BASE_SHA)
             echo "Latest tag on target: $LAST_TAG"
 
             python ./scripts/check_extension_versions.py $LAST_TAG
+        env:
+          TARGET_REF: ${{ github.base_ref }}
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.

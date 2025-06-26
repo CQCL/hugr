@@ -5,6 +5,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.1...hugr-llvm-v0.20.2) - 2025-06-25
+
+### New Features
+
+- *(core, llvm)* add array unpack operations ([#2339](https://github.com/CQCL/hugr/pull/2339))
+
+### Refactor
+
+- *(llvm)* replace HashMap with BTreeMap ([#2313](https://github.com/CQCL/hugr/pull/2313))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.0...hugr-llvm-v0.20.1) - 2025-06-03
 
 ### Bug Fixes
