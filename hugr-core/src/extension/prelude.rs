@@ -1020,6 +1020,8 @@ mod test {
         type_row,
     };
 
+    use crate::hugr::views::HugrView;
+
     #[test]
     fn test_make_tuple() {
         let op = MakeTuple::new(type_row![Type::UNIT]);
@@ -1155,7 +1157,9 @@ mod test {
         let [signal, message] = b.input_wires_arr();
         let err_value = b.add_dataflow_op(err_op, [signal, message]).unwrap();
         b.add_dataflow_op(panic_op, err_value.outputs()).unwrap();
-        b.finish_hugr_with_outputs([]).unwrap();
+
+        let h = b.finish_hugr_with_outputs([]).unwrap();
+        h.validate().unwrap();
     }
 
     #[test]
