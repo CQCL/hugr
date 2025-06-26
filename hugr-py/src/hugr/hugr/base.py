@@ -248,6 +248,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                     del visit_dict[neigh]
                     queue.put(neigh)
 
+        # If our dict is non-empty here then our graph contains a cycle
+        if visit_dict:
+            err = "Graph contains a cycle. No topological ordering exists."
+            raise ValueError(err)
+
     def links(self) -> Iterator[tuple[OutPort, InPort]]:
         """Iterator over all the links in the HUGR.
 
