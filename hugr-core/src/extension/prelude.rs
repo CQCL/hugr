@@ -39,7 +39,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
 lazy_static! {
     /// Prelude extension, containing common types and operations.
     pub static ref PRELUDE: Arc<Extension> = {
