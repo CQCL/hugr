@@ -233,11 +233,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         visit_dict: dict[Node, int] = {}
         queue: Queue[Node] = Queue()
         for node in self.children(parent):
-            incoming = sum(self.parent(n) == parent for n in self.input_neighbours(node))
+            incoming = sum(self[n] == parent for n in self.input_neighbours(node))
             visit_dict[node] = incoming
             if not incoming:
                 queue.put(node)
-        }
 
         while not queue.empty():
             new_node = queue.get()
