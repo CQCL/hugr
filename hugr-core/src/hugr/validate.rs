@@ -22,7 +22,6 @@ use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
 use crate::{Direction, Port, Visibility};
 
-use super::ExtensionError;
 use super::internal::PortgraphNodeMap;
 use super::views::HugrView;
 
@@ -742,10 +741,6 @@ pub enum ValidationError<N: HugrNode> {
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError<N>),
-    /// There are errors in the extension deltas.
-    #[deprecated(note = "Never returned since hugr-core-v0.20.0")]
-    #[error(transparent)]
-    ExtensionError(#[from] ExtensionError),
     /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
     #[error(
         "{node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only"

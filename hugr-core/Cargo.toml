@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.20.1"
+version = "0.20.2"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -28,7 +28,7 @@ bench = false
 name = "model"
 
 [dependencies]
-hugr-model = { version = "0.20.1", path = "../hugr-model" }
+hugr-model = { version = "0.20.2", path = "../hugr-model" }
 
 cgmath = { workspace = true, features = ["serde"] }
 delegate = { workspace = true }
@@ -63,6 +63,9 @@ semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
 ordered-float = { workspace = true, features = ["serde"] }
 base64.workspace = true
+relrc = { workspace = true, features = ["petgraph", "serde"] }
+smallvec = "1.15.0"
+tracing = "0.1.41"
 
 [dev-dependencies]
 rstest = { workspace = true }

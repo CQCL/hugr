@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-v0.20.1...hugr-v0.20.2) - 2025-06-25
+
+### Bug Fixes
+
+- update CallGraph and remove_dead_funcs for module-only FuncDefns ([#2336](https://github.com/CQCL/hugr/pull/2336))
+
+### Documentation
+
+- fix doc links in persistent
+
+### New Features
+
+- Add serial data types for SimpleReplacement and PersistentHugr ([#2300](https://github.com/CQCL/hugr/pull/2300))
+- Add MermaidFormatter to replace RenderConfig ([#2275](https://github.com/CQCL/hugr/pull/2275))
+- *(core, llvm)* add array unpack operations ([#2339](https://github.com/CQCL/hugr/pull/2339))
+- Deprecate invalidation_set, add invalidated_nodes and SimpleReplacement::invalidation_set ([#2358](https://github.com/CQCL/hugr/pull/2358))
+- Rewrite for peeling a TailLoop ([#2290](https://github.com/CQCL/hugr/pull/2290))
+- Create Module/FunctionBuilders from existing Hugrs ([#2359](https://github.com/CQCL/hugr/pull/2359))
+- better errors using metadata from generator ([#2368](https://github.com/CQCL/hugr/pull/2368))
+- use `core.` prefixes for generator metadata keys ([#2371](https://github.com/CQCL/hugr/pull/2371))
+- *(core)* builder pattern for EnvelopeConfig ([#2330](https://github.com/CQCL/hugr/pull/2330))
+
+### Refactor
+
+- *(types.rs)* rm incorrect comment and unnecessary allow-unused ([#2340](https://github.com/CQCL/hugr/pull/2340))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-v0.20.0...hugr-v0.20.1) - 2025-06-03
 
 ### Bug Fixes

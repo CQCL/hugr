@@ -327,6 +327,28 @@ class ListArg(TypeArg):
 
 
 @dataclass(frozen=True)
+class ListConcatArg(TypeArg):
+    """Sequence of lists to concatenate for a :class:`ListParam`."""
+
+    lists: list[TypeArg]
+
+    def _to_serial(self) -> stys.ListConcatArg:
+        return stys.ListConcatArg(lists=ser_it(self.lists))
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return ListConcatArg([arg.resolve(registry) for arg in self.lists])
+
+    def __str__(self) -> str:
+        lists = comma_sep_str(f"... {list}" for list in self.lists)
+        return f"[{lists}]"
+
+    def to_model(self) -> model.Term:
+        return model.List(
+            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
+        )
+
+
+@dataclass(frozen=True)
 class TupleArg(TypeArg):
     """Sequence of type arguments for a :class:`TupleParam`."""
 
@@ -343,6 +365,28 @@ class TupleArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
+
+
+@dataclass(frozen=True)
+class TupleConcatArg(TypeArg):
+    """Sequence of tuples to concatenate for a :class:`TupleParam`."""
+
+    tuples: list[TypeArg]
+
+    def _to_serial(self) -> stys.TupleConcatArg:
+        return stys.TupleConcatArg(tuples=ser_it(self.tuples))
+
+    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
+        return TupleConcatArg([arg.resolve(registry) for arg in self.tuples])
+
+    def __str__(self) -> str:
+        tuples = comma_sep_str(f"... {tuple}" for tuple in self.tuples)
+        return f"({tuples})"
+
+    def to_model(self) -> model.Term:
+        return model.Tuple(
+            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
+        )
 
 
 @dataclass(frozen=True)

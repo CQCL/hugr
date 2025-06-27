@@ -50,6 +50,12 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
+    /// Continue building a module from an existing hugr.
+    #[must_use]
+    pub fn with_hugr(hugr: T) -> Self {
+        ModuleBuilder(hugr)
+    }
+
     /// Replace a [`ops::FuncDecl`] with [`ops::FuncDefn`] and return a builder for
     /// the defining graph.
     ///
@@ -281,6 +287,21 @@ mod test {
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
+        Ok(())
+    }
+
+    #[test]
+    fn builder_from_existing() -> Result<(), BuildError> {
+        let hugr = Hugr::new();
+
+        let fn_builder = FunctionBuilder::with_hugr(hugr, "main", Signature::new_endo(vec![]))?;
+        let mut hugr = fn_builder.finish_hugr()?;
+
+        let mut module_builder = ModuleBuilder::with_hugr(&mut hugr);
+        module_builder.declare("other", Signature::new_endo(vec![]).into())?;
+
+        hugr.validate()?;
+
         Ok(())
     }
 }

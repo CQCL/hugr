@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.20.2) - 2025-06-25
+
+### Bug Fixes
+
+- update CallGraph and remove_dead_funcs for module-only FuncDefns ([#2336](https://github.com/CQCL/hugr/pull/2336))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.0...hugr-passes-v0.20.1) - 2025-06-03
 
 ### Bug Fixes

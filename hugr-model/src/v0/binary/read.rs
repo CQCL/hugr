@@ -5,12 +5,12 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::io::BufRead;
 
-/// An error encounted while deserialising a model.
+/// An error encountered while deserialising a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
 pub enum ReadError {
     #[from(forward)]
-    /// An error encounted while decoding a model from a `capnproto` buffer.
+    /// An error encountered while decoding a model from a `capnproto` buffer.
     DecodingError(capnp::Error),
 }
 

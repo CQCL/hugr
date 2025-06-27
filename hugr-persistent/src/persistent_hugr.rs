@@ -7,7 +7,7 @@ use delegate::delegate;
 use derive_more::derive::From;
 use hugr_core::{
     Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::patch::{Patch, PatchVerification, simple_replace},
+    hugr::patch::{Patch, simple_replace},
 };
 use itertools::{Either, Itertools};
 use relrc::RelRc;
@@ -170,7 +170,8 @@ impl<'a> From<&'a RelRc<CommitData, ()>> for &'a Commit {
 /// [`PersistentHugr`] implements [`HugrView`], so that it can used as
 /// a drop-in substitute for a Hugr wherever read-only access is required. It
 /// does not implement [`HugrMut`](hugr_core::hugr::hugrmut::HugrMut), however.
-/// Mutations must be performed by applying patches (see [`PatchVerification`]
+/// Mutations must be performed by applying patches (see
+/// [`PatchVerification`](hugr_core::hugr::patch::PatchVerification)
 /// and [`Patch`]). Currently, only [`SimpleReplacement`] patches are supported.
 /// You can use [`Self::add_replacement`] to add a patch to `self`, or use the
 /// aforementioned patch traits.
