@@ -1,5 +1,5 @@
 use hugr_core::{
-    HugrView, Node, NodeIndex as _, Visibility,
+    HugrView, Node, NodeIndex as _,
     hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
     ops::{FuncDefn, LoadFunction, Value},
     types::PolyFuncType,
