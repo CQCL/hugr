@@ -184,13 +184,13 @@ pub fn remove_dead_funcs2(
 mod test {
     use std::collections::HashMap;
 
-    use hugr_core::ops::handle::NodeHandle;
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
+    use hugr_core::ops::handle::NodeHandle;
+    use hugr_core::{HugrView, Visibility, extension::prelude::usize_t, types::Signature};
 
     use super::RemoveDeadFuncsPass;
     use crate::{ComposablePass, IncludeExports};
@@ -210,8 +210,6 @@ mod test {
         #[case] entry_points: impl IntoIterator<Item = &'static str>,
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        use hugr_core::Visibility;
-
         let mut hb = ModuleBuilder::new();
         let o2 = hb.define_function("from_pub", Signature::new_endo(usize_t()))?;
         let o2inp = o2.input_wires();
