@@ -419,14 +419,12 @@ def simple_fn() -> Function:
     nnot = f.add_op(Not, b)
 
     f.set_outputs(q, nnot, b)
+    validate(Package([simple_fn.hugr], [QUANTUM_EXT]))
     return f
 
 
 # https://github.com/CQCL/hugr/issues/2350
 def test_toposort(simple_fn: Function) -> None:
-
-    validate(Package([simple_fn.hugr], [QUANTUM_EXT]))
-
     nodes = list(simple_fn.hugr)
     func_node = nodes[1]
 
