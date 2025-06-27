@@ -147,8 +147,7 @@ impl<'py> pyo3::FromPyObject<'py> for Visibility {
             "Public" => Ok(Visibility::Public),
             "Private" => Ok(Visibility::Private),
             s => Err(PyTypeError::new_err(format!(
-                "Expected Public or Private, got {}",
-                s
+                "Expected \"Public\" or \"Private\", got {s}",
             ))),
         }
     }
