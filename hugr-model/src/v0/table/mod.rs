@@ -304,7 +304,7 @@ pub struct RegionScope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol<'a> {
     /// The visibility of the symbol.
-    pub visibility: Visibility,
+    pub visibility: &'a Visibility,
     /// The name of the symbol.
     pub name: &'a str,
     /// The static parameters.

@@ -941,7 +941,7 @@ impl<'a> Context<'a> {
             let optype = OpType::FuncDefn(FuncDefn::new_vis(
                 symbol.name,
                 signature,
-                symbol.visibility.into(),
+                symbol.visibility.clone().into(),
             ));
 
             let node = ctx.make_node(node_id, optype, parent)?;
@@ -970,7 +970,7 @@ impl<'a> Context<'a> {
             let optype = OpType::FuncDecl(FuncDecl::new_vis(
                 symbol.name,
                 signature,
-                symbol.visibility.into(),
+                symbol.visibility.clone().into(),
             ));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)

@@ -289,7 +289,7 @@ impl<'a> Context<'a> {
 
     fn resolve_symbol(&mut self, symbol: &'a Symbol) -> BuildResult<&'a table::Symbol<'a>> {
         let name = symbol.name.as_ref();
-        let visibility = symbol.visibility;
+        let visibility = &symbol.visibility;
         let params = self.resolve_params(&symbol.params)?;
         let constraints = self.resolve_terms(&symbol.constraints)?;
         let signature = self.resolve_term(&symbol.signature)?;

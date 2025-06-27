@@ -202,6 +202,7 @@ fn read_symbol<'a>(
         Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public,
         Err(_) => model::Visibility::default(),
     };
+    let visibility= bump.alloc(visibility);
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {
         Some(cs) => cs,

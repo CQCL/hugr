@@ -354,8 +354,10 @@ impl<'a> Context<'a> {
             OpType::AliasDecl(alias) => self.with_local_scope(node_id, |this| {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::default(), // Not spec'd in hugr-core
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -368,8 +370,10 @@ impl<'a> Context<'a> {
                 let value = this.export_type(&alias.definition);
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility: Visibility::default(), // Not spec'd in hugr-core
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -803,7 +807,7 @@ impl<'a> Context<'a> {
         let scope = self
             .local_scope
             .expect("exporting poly func type outside of local scope");
-
+        let visibility = self.bump.alloc(visibility);
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_term(param, Some((scope, i as _)));
