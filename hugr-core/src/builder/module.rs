@@ -136,20 +136,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         self.declare_vis(name, signature, Visibility::Public)
     }
 
-    /// Declare a [Visibility::Private] function with `signature` and return a handle to the declaration.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`crate::ops::OpType::FuncDecl`] node.
-    pub fn declare_private(
-        &mut self,
-        name: impl Into<String>,
-        signature: PolyFuncType,
-    ) -> Result<FuncID<false>, BuildError> {
-        self.declare_vis(name, signature, Visibility::Private)
-    }
-
     /// Declare a function with the specified `signature` and [Visibility],
     /// and return a handle to the declaration.
     ///
