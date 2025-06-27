@@ -431,7 +431,7 @@ def test_toposort() -> None:
     func_node = nodes[1]
 
     sorted_nodes = list(f.hugr.sort_region_nodes(func_node))
-    assert set(sorted_nodes) == {f.input_node, f.output_node, nodes[4], nodes[5]}
+    assert set(sorted_nodes) == set(f.hugr.children(f))
     assert sorted_nodes[0] == f.input_node
     assert sorted_nodes[-1] == f.output_node
 
