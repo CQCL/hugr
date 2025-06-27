@@ -820,10 +820,7 @@ fn validate_linkage(
                 children,
             }) = r
             else {
-                panic!(
-                    "validate() should have produced DuplicateExport error not {:?}",
-                    r
-                )
+                panic!("validate() should have produced DuplicateExport error not {r:?}")
             };
             assert_eq!(link_name, name);
             assert!(children == [n1, n2] || children == [n2, n1]);
