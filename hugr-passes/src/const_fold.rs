@@ -215,10 +215,7 @@ pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H
 ///
 /// [`Module`]: hugr_core::ops::OpType::Module
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-pub fn fold_constants(
-    h: &mut (impl HugrMut<Node = Node> + 'static),
-    policy: IncludeExports,
-) {
+pub fn fold_constants(h: &mut (impl HugrMut<Node = Node> + 'static), policy: IncludeExports) {
     let mut funcs = Vec::new();
     if h.get_optype(h.entrypoint()).is_func_defn() {
         funcs.push(h.entrypoint());

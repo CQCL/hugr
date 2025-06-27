@@ -288,7 +288,7 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs_vis};
+    use crate::{monomorphize, remove_dead_funcs2};
 
     use super::{is_polymorphic, mangle_name};
 
