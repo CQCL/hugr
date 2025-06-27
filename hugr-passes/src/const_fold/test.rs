@@ -1612,7 +1612,7 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     assert!(hugr.get_optype(hugr.entrypoint()).is_module());
     assert_eq!(
         hugr.children(hugr.entrypoint()).collect_vec(),
-        [c7.node(), c17.node(), ad1.node(), ad2.node(), main.node()]
+        [c7.node(), ad1.node(), ad2.node(), main.node()]
     );
     let tags = hugr
         .children(main.node())
