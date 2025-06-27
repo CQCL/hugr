@@ -163,6 +163,9 @@ pub fn remove_dead_funcs(
 ///   with [Visibility::Public] will be considered reachable;
 /// * otherwise, the [HugrView::entrypoint] itself will.
 ///
+/// Note that, unlike [`DeadCodeElimPass`], this can remove functions *outside* the
+/// [HugrView::entrypoint].
+///
 /// # Errors
 /// * If any node in `entry_points` is not a [`FuncDefn`]
 ///
@@ -170,6 +173,7 @@ pub fn remove_dead_funcs(
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
+/// [`DeadCodeElimPass`]: super::DeadCodeElimPass
 pub fn remove_dead_funcs2(
     h: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
