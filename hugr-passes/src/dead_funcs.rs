@@ -86,7 +86,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
             entry_points.extend(hugr.children(hugr.module_root()).filter(|ch| {
                 hugr.get_optype(*ch)
                     .as_func_defn()
-                    .is_some_and(|fd| fd.visibility() == Visibility::Public)
+                    .is_some_and(|fd| fd.visibility() == &Visibility::Public)
             }));
         }
 

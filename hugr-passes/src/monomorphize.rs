@@ -144,7 +144,7 @@ fn instantiate(
     let name = mangle_name(defn.func_name(), &type_args);
     let mono_tgt = h.add_node_after(
         poly_func,
-        FuncDefn::new_vis(name, mono_sig, defn.visibility()),
+        FuncDefn::new_vis(name, mono_sig, defn.visibility().clone()),
     );
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);

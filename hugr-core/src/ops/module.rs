@@ -113,8 +113,8 @@ impl FuncDefn {
     }
 
     /// The visibility of the function, e.g. for linking
-    pub fn visibility(&self) -> Visibility {
-        self.visibility
+    pub fn visibility(&self) -> &Visibility {
+        &self.visibility
     }
 
     /// Allows changing [Self::visibility]
@@ -191,8 +191,8 @@ impl FuncDecl {
     }
 
     /// The visibility of the function, e.g. for linking
-    pub fn visibility(&self) -> Visibility {
-        self.visibility
+    pub fn visibility(&self) -> &Visibility {
+        &self.visibility
     }
 
     /// Allows mutating the name of the function (as per [Self::func_name])

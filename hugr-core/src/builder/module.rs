@@ -74,7 +74,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         *opty = ops::FuncDefn::new_vis(
             decl.func_name(),
             decl.signature().clone(),
-            decl.visibility(),
+            decl.visibility().clone(),
         )
         .into();
 

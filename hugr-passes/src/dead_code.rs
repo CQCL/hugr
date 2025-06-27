@@ -121,8 +121,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             q.extend(
                 h.children(h.module_root())
                     .filter(|ch| match h.get_optype(*ch) {
-                        OpType::FuncDefn(fd) => fd.visibility() == Visibility::Public,
-                        OpType::FuncDecl(fd) => fd.visibility() == Visibility::Public,
+                        OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public,
+                        OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public,
                         OpType::Const(_) => true,
                         _ => false,
                     }),

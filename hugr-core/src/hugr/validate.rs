@@ -92,10 +92,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
         for c in self.hugr.children(self.hugr.module_root()) {
             let (func_name, sig, is_defn) = match self.hugr.get_optype(c) {
-                OpType::FuncDecl(fd) if fd.visibility() == Visibility::Public => {
+                OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
                     (fd.func_name(), fd.signature(), false)
                 }
-                OpType::FuncDefn(fd) if fd.visibility() == Visibility::Public => {
+                OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
                     (fd.func_name(), fd.signature(), true)
                 }
                 _ => continue,

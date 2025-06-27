@@ -242,7 +242,6 @@ impl<N: HugrNode> std::fmt::Display for Wire<N> {
 /// to whether they should be considered for linking, and as reachable (starting points)
 /// for optimization/analysis.
 #[derive(
-    Copy,
     Clone,
     Debug,
     derive_more::Display,
