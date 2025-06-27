@@ -266,7 +266,6 @@ impl From<hugr_model::v0::Visibility> for Visibility {
         match value {
             hugr_model::v0::Visibility::Private => Self::Private,
             hugr_model::v0::Visibility::Public => Self::Public,
-            _ => unimplemented!(),
         }
     }
 }

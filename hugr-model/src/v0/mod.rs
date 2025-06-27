@@ -93,7 +93,6 @@ use table::LinkIndex;
 
 /// Describes how a function or symbol should be acted upon by a linker
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[non_exhaustive]
 pub enum Visibility {
     /// The linker should ignore this function or symbol
     #[default]
