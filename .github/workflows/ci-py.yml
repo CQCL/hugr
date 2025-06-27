@@ -200,14 +200,13 @@ jobs:
             # Check against latest tag on the target branch
             # When not on a pull request, base_ref should be empty so we default to HEAD
             if [ -z "$TARGET_REF" ]; then
-              BASE_SHA=""
+              BASE_SHA="HEAD~1"
             else
               BASE_SHA=$(git rev-parse origin/$TARGET_REF)
             fi
-            LAST_TAG=$(git describe --abbrev=0 --match="hugr-*" $BASE_SHA)
-            echo "Latest tag on target: $LAST_TAG"
+            echo "Comparing to ref: $BASE_SHA"
 
-            python ./scripts/check_extension_versions.py $LAST_TAG
+            python ./scripts/check_extension_versions.py $BASE_SHA
         env:
           TARGET_REF: ${{ github.base_ref }}
 
