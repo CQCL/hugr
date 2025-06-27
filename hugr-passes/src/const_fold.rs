@@ -195,7 +195,7 @@ const NO_INPUTS: [(IncomingPort, Value); 0] = [];
 ///
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(note = "Use constant_fold_pass_pub, or manually configure ConstantFoldPass")]
+#[deprecated(note = "Use fold_constants, or manually configure ConstantFoldPass")]
 pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
     let h = h.as_mut();
     let c = ConstantFoldPass::default();
@@ -215,7 +215,7 @@ pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H
 ///
 /// [`Module`]: hugr_core::ops::OpType::Module
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-pub fn constant_fold_pass_pub(
+pub fn fold_constants(
     h: &mut (impl HugrMut<Node = Node> + 'static),
     policy: IncludeExports,
 ) {

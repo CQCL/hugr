@@ -32,10 +32,10 @@ use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
 use crate::{ComposablePass as _, IncludeExports};
 
-use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass_pub};
+use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, fold_constants};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
-    constant_fold_pass_pub(h, IncludeExports::Always);
+    fold_constants(h, IncludeExports::Always);
 }
 
 #[rstest]

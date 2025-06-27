@@ -140,8 +140,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(
-    note = "Does not account for visibility; use remove_dead_funcs_vis or manually configure RemoveDeadFuncsPass"
+#[deprecated( // TODO When removing, rename remove_dead_funcs2 over this
+    note = "Does not account for visibility; use remove_dead_funcs2 or manually configure RemoveDeadFuncsPass"
 )]
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
@@ -170,7 +170,7 @@ pub fn remove_dead_funcs(
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
-pub fn remove_dead_funcs_vis(
+pub fn remove_dead_funcs2(
     h: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
     validate_if_test(RemoveDeadFuncsPass::default(), h)
