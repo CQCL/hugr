@@ -119,7 +119,7 @@ pub enum Term {
     /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
     #[display("[{}]", {
         use itertools::Itertools as _;
-        _0.iter().map(|t| format!("... {}", t)).join(",")
+        _0.iter().map(|t| format!("... {t}")).join(",")
     })]
     ListConcat(Vec<TypeArg>),
     /// Instance of [`TypeParam::Tuple`] defined by a sequence of elements of varying type.
@@ -131,7 +131,7 @@ pub enum Term {
     /// Instance of [`TypeParam::Tuple`] defined by a sequence of concatenated tuples.
     #[display("({})", {
         use itertools::Itertools as _;
-        _0.iter().map(|tuple| format!("... {}", tuple)).join(",")
+        _0.iter().map(|tuple| format!("... {tuple}")).join(",")
     })]
     TupleConcat(Vec<TypeArg>),
     /// Variable (used in type schemes or inside polymorphic functions),
