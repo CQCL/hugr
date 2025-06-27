@@ -419,7 +419,7 @@ def simple_fn() -> Function:
     nnot = f.add_op(Not, b)
 
     f.set_outputs(q, nnot, b)
-    validate(Package([simple_fn.hugr], [QUANTUM_EXT]))
+    validate(Package([f.hugr], [QUANTUM_EXT]))
     return f
 
 
