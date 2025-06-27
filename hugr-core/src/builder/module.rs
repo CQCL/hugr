@@ -173,6 +173,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
     /// Adds a [`ops::FuncDefn`] node and returns a builder to define the function
     /// body graph. The function will be public if `name` is `"main"`, otherwise private.
+    /// (See [Self::define_function_vis].)
     ///
     /// # Errors
     ///

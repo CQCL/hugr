@@ -166,7 +166,7 @@ fn pub_vis() -> Visibility {
 }
 
 impl FuncDecl {
-    /// Create a new [Visibility::public] instance with the given name and signature.
+    /// Create a new [Visibility::Public] instance with the given name and signature.
     /// See also [Self::new_vis]
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
         Self::new_vis(name, signature, Visibility::Public)
