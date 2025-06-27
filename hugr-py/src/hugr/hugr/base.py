@@ -233,9 +233,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         visit_dict: dict[Node, int] = {}
         queue: Queue[Node] = Queue()
         for node in self.children(parent):
-            incoming = sum(self[n] == parent for n in self.input_neighbours(node))
-            visit_dict[node] = incoming
-            if not incoming:
+            incoming = 0
+            for n in self.input_neighbours(node):
+                same_region = self[n].parent == parent
+                if same_region:
+                    incoming += 1
+            if incoming:
+                visit_dict[node] = incoming
+            else:
                 queue.put(node)
 
         while not queue.empty():
@@ -247,6 +252,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 if visit_dict[neigh] == 0:
                     del visit_dict[neigh]
                     queue.put(neigh)
+
+        print(visit_dict)
 
         # If our dict is non-empty here then our graph contains a cycle
         if visit_dict:
