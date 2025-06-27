@@ -228,7 +228,18 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self.items()
 
     def sort_region_nodes(self, parent: Node) -> Iterator[Node]:
-        """Iterator over topological ordering of all the hugr nodes within a region."""
+        """Iterator over a topological ordering of all the hugr nodes.
+
+        Note that the sort is performed within a hugr region and non-local
+        edges are ignored.
+
+        Args:
+            parent: The parent node of the region.
+
+        Raises:
+            ValueError: If the hugr contains a cycle.
+
+        """
         # A dict to keep track of how many times we see a node.
         # Store the Nodes with the input degrees as values.
         # Implementation uses Kahn's algorithm
