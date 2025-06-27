@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
 use cool_asserts::assert_matches;
+use rstest::rstest;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
@@ -15,9 +17,9 @@ use crate::extension::prelude::{bool_t, qb_t, usize_t};
 use crate::extension::{Extension, ExtensionRegistry, PRELUDE, TypeDefBound};
 use crate::hugr::HugrMut;
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::dataflow::IOTrait;
+use crate::ops::dataflow::{DataflowParent, IOTrait};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, OpType, Value};
+use crate::ops::{self, FuncDecl, FuncDefn, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TermTypeError, TypeArg};
@@ -32,7 +34,7 @@ use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file,
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
     let def_op: OpType =
-        ops::FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
+        FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
@@ -126,7 +128,7 @@ fn children_restrictions() {
 
     // Add a definition without children
     let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
-    let new_def = b.add_node_with_parent(root, ops::FuncDefn::new("main", def_sig));
+    let new_def = b.add_node_with_parent(root, FuncDefn::new("main", def_sig));
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
@@ -276,7 +278,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 
     let def = b.add_node_with_parent(
         b.entrypoint(),
-        ops::FuncDefn::new("main", Signature::new_endo(row.clone())),
+        FuncDefn::new("main", Signature::new_endo(row.clone())),
     );
 
     let input = b.add_node_with_parent(def, ops::Input::new(row.clone()));
@@ -753,4 +755,78 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     Ok(())
+}
+
+fn sig1() -> Signature {
+    Signature::new_endo(bool_t())
+}
+
+fn sig2() -> Signature {
+    Signature::new_endo(usize_t())
+}
+
+#[rstest]
+// Private FuncDefns never conflict even if different sig
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDefn::new("foo", sig2()),
+    None
+)]
+#[case(FuncDefn::new("foo", sig1()), FuncDecl::new("foo", sig2()), None)]
+// Public FuncDefn conflicts with anything Public even if same sig
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    Some("foo")
+)]
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDecl::new("foo", sig1()),
+    Some("foo")
+)]
+// Two public FuncDecls are ok with same sig
+#[case(FuncDecl::new("foo", sig1()), FuncDecl::new("foo", sig1()), None)]
+// But two public FuncDecls not ok if different sigs
+#[case(
+    FuncDecl::new("foo", sig1()),
+    FuncDecl::new("foo", sig2()),
+    Some("foo")
+)]
+fn validate_linkage(
+    #[case] f1: impl Into<OpType>,
+    #[case] f2: impl Into<OpType>,
+    #[case] err: Option<&str>,
+) {
+    let mut h = Hugr::new();
+    let [n1, n2] = [f1.into(), f2.into()].map(|f| {
+        let def_sig = f
+            .as_func_defn()
+            .map(FuncDefn::inner_signature)
+            .map(Cow::into_owned);
+        let n = h.add_node_with_parent(h.module_root(), f);
+        if let Some(Signature { input, output }) = def_sig {
+            let i = h.add_node_with_parent(n, ops::Input::new(input));
+            let o = h.add_node_with_parent(n, ops::Output::new(output));
+            h.connect(i, 0, o, 0); // Assume all sig's used in test are 1-ary endomorphic
+        }
+        n
+    });
+    let r = h.validate();
+    match err {
+        None => r.unwrap(),
+        Some(name) => {
+            let Err(ValidationError::DuplicateExport {
+                link_name,
+                children,
+            }) = r
+            else {
+                panic!(
+                    "validate() should have produced DuplicateExport error not {:?}",
+                    r
+                )
+            };
+            assert_eq!(link_name, name);
+            assert!(children == [n1, n2] || children == [n2, n1]);
+        }
+    }
 }

@@ -105,11 +105,11 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                     ve.insert((c, sig, is_defn));
                 }
                 Entry::Occupied(oe) => {
-                    // Do not allow two defns, or a defn and a decl (should have been resolved).
-                    // Do allow two decls of the same sig (aliasing - we are allowing some laziness here).
+                    // Allow two decls of the same sig (aliasing - we are allowing some laziness here).
+                    // Reject if at least one Defn - either two conflicting impls,
+                    //                               or Decl+Defn which should have been linked
                     let (prev_c, prev_sig, prev_defn) = oe.get();
                     if prev_sig != &sig || is_defn || *prev_defn {
-                        // Either they are different (import<->export, or import signature), or both are exports
                         return Err(ValidationError::DuplicateExport {
                             link_name: func_name.clone(),
                             children: [*prev_c, c],
