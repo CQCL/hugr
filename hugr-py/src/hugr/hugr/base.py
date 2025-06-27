@@ -227,19 +227,25 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         return self.items()
 
-    def get_sorted_nodes(self, parent: Node) -> Iterator[Node]:
-        """Returns an iterator for a valid topological ordering of the hugr nodes."""
-        # A dict to keep track of how many times we see a node
+    def sort_region_nodes(self, parent: Node) -> Iterator[Node]:
+        """Iterator over topological ordering of all the hugr nodes within a region."""
+        # A dict to keep track of how many times we see a node.
+        # Store the Nodes with the input degrees as values.
+        # Implementation uses Kahn's algorithm
+        # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
         visit_dict: dict[Node, int] = {}
         queue: Queue[Node] = Queue()
         for node in self.children(parent):
             incoming = 0
             for n in self.input_neighbours(node):
                 same_region = self[n].parent == parent
+                # Only update the degree of the node if edge is within the same region.
+                # We do not count non-local edges.
                 if same_region:
                     incoming += 1
             if incoming:
                 visit_dict[node] = incoming
+            # If a Node has no dependencies, add it to the queue.
             else:
                 queue.put(node)
 
@@ -252,8 +258,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 if visit_dict[neigh] == 0:
                     del visit_dict[neigh]
                     queue.put(neigh)
-
-        print(visit_dict)
 
         # If our dict is non-empty here then our graph contains a cycle
         if visit_dict:
