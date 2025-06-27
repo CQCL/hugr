@@ -163,7 +163,6 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
-        #[allow(deprecated)]
         let res = match self.preserve_callback.as_ref()(h, n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,
