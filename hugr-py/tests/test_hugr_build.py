@@ -408,7 +408,8 @@ def test_option() -> None:
 
 
 # a helper for the toposort tests
-def _build_test_hugrfn() -> Function:
+@pytest.fixture
+def simple_fn() -> Function:
     f = Function("prepare_qubit", [tys.Bool, tys.Qubit])
     [b, q] = f.inputs()
 
@@ -422,30 +423,27 @@ def _build_test_hugrfn() -> Function:
 
 
 # https://github.com/CQCL/hugr/issues/2350
-def test_toposort() -> None:
-    f = _build_test_hugrfn()
+def test_toposort(simple_fn: Function) -> None:
 
-    validate(Package([f.hugr], [QUANTUM_EXT]))
+    validate(Package([simple_fn.hugr], [QUANTUM_EXT]))
 
-    nodes = list(f.hugr)
+    nodes = list(simple_fn.hugr)
     func_node = nodes[1]
 
-    sorted_nodes = list(f.hugr.sort_region_nodes(func_node))
-    assert set(sorted_nodes) == set(f.hugr.children(f))
-    assert sorted_nodes[0] == f.input_node
-    assert sorted_nodes[-1] == f.output_node
+    sorted_nodes = list(simple_fn.hugr.sort_region_nodes(func_node))
+    assert set(sorted_nodes) == set(simple_fn.hugr.children(simple_fn))
+    assert sorted_nodes[0] == simple_fn.input_node
+    assert sorted_nodes[-1] == simple_fn.output_node
 
 
-def test_toposort_error() -> None:
+def test_toposort_error(simple_fn: Function) -> None:
     # Test that we get an error if we toposort an invalid hugr containing a cycle
-    f = _build_test_hugrfn()
-
-    nodes = list(f.hugr)
+    nodes = list(simple_fn.hugr)
     func_node = nodes[1]
 
     # Add a loop, invalidating the HUGR
-    f.hugr.add_link(nodes[4].out_port(), nodes[4].inp(0))
+    simple_fn.hugr.add_link(nodes[4].out_port(), nodes[4].inp(0))
     with pytest.raises(
         ValueError, match="Graph contains a cycle. No topological ordering exists."
     ):
-        list(f.hugr.sort_region_nodes(func_node))
+        list(simple_fn.hugr.sort_region_nodes(func_node))
