@@ -148,7 +148,8 @@ pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
     /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR;
-    /// the function will have [Visibility::Private]. (See also [Self::new_vis].)
+    /// the function will be public if `name` is `"main"`, otherwise private.
+    /// (See also [Self::new_vis].)
     ///
     /// # Errors
     ///

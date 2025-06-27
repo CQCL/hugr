@@ -66,14 +66,17 @@ fn priv_vis() -> Visibility {
 }
 
 impl FuncDefn {
-    /// Create a new [Visibility::Private] instance with the given name and signature.
+    /// Create a new instance with the given name and signature. If `name` is `"main"`,
+    /// it will be [Visibility::Public], otherwise [Visibility::Private].
     /// See also [Self::new_vis].
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
         let name = name.into();
-        if name == "main" {
-            log::warn!("Function main is declared as private, most likely should be public. Use FuncDefn::new_vis to specify or avoid warning");
-        }
-        Self::new_vis(name, signature, Visibility::Private)
+        let vis = if name == "main" {
+            Visibility::Public
+        } else {
+            Visibility::Private
+        };
+        Self::new_vis(name, signature, vis)
     }
 
     /// Create a new instance with the specified name and visibility

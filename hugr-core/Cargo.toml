@@ -63,7 +63,6 @@ semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
 ordered-float = { workspace = true, features = ["serde"] }
 base64.workspace = true
-log = "0.4.27"
 
 [dev-dependencies]
 rstest = { workspace = true }
