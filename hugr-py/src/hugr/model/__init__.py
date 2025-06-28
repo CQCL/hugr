@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Protocol
 
 import hugr._hugr as rust
+from hugr.tys import Visibility
 
 
 class Term(Protocol):
@@ -101,6 +102,7 @@ class Symbol:
     """A named symbol."""
 
     name: str
+    visibility: Visibility
     params: Sequence[Param] = field(default_factory=list)
     constraints: Sequence[Term] = field(default_factory=list)
     signature: Term = field(default_factory=Wildcard)

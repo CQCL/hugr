@@ -28,7 +28,7 @@ use thiserror::Error;
 use crate::v0::ast::{LinkName, Module, Operation, SeqPart};
 use crate::v0::{Literal, RegionKind};
 
-use super::{Node, Package, Param, Region, Symbol, VarName};
+use super::{Node, Package, Param, Region, Symbol, VarName, Visibility};
 use super::{SymbolName, Term};
 
 mod pest_parser {
@@ -292,6 +292,14 @@ fn parse_param(pair: Pair<Rule>) -> ParseResult<Param> {
 
 fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     debug_assert_eq!(Rule::symbol, pair.as_rule());
+    // The optional "pub" in the grammar seems to disappear in the Rule, making this
+    // a bit hacky. If we defined a rule for visibility as a choice between different
+    // specifiers (i.e. pub / empty), then presumably we could avoid this `starts-with`.
+    let visibility = if pair.as_str().starts_with("pub") {
+        Visibility::Public
+    } else {
+        Visibility::Private
+    };
     let mut pairs = pair.into_inner();
     let name = parse_symbol_name(pairs.next().unwrap())?;
     let params = parse_params(&mut pairs)?;
@@ -299,6 +307,7 @@ fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     let signature = parse_term(pairs.next().unwrap())?;
 
     Ok(Symbol {
+        visibility,
         name,
         params,
         constraints,

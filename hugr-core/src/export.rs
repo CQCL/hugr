@@ -20,6 +20,7 @@ use crate::{
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
+use hugr_model::v0::Visibility;
 use hugr_model::v0::{
     self as model,
     bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
@@ -230,16 +231,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Get the name of a function definition or declaration node. Returns `None` if not
-    /// one of those operations.
-    fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
-        match self.hugr.get_optype(func_node) {
-            OpType::FuncDecl(func_decl) => Some(func_decl.func_name()),
-            OpType::FuncDefn(func_defn) => Some(func_defn.func_name()),
-            _ => None,
-        }
-    }
-
     fn with_local_scope<T>(&mut self, node: table::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
         let prev_local_scope = self.local_scope.replace(node);
         let prev_local_constraints = std::mem::take(&mut self.local_constraints);
@@ -338,8 +329,11 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().clone().into(),
+                    func.signature(),
+                );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -349,15 +343,21 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().clone().into(),
+                    func.signature(),
+                );
                 table::Operation::DeclareFunc(symbol)
             }),
 
             OpType::AliasDecl(alias) => self.with_local_scope(node_id, |this| {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -370,7 +370,10 @@ impl<'a> Context<'a> {
                 let value = this.export_type(&alias.definition);
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -545,7 +548,8 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, poly_func_type)
+            // Visibility of OpDef's has no effect
+            this.export_poly_func_type(name, Visibility::default(), poly_func_type)
         });
 
         let meta = {
@@ -796,13 +800,14 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         name: &'a str,
+        visibility: Visibility,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
             .local_scope
             .expect("exporting poly func type outside of local scope");
-
+        let visibility = self.bump.alloc(visibility);
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_term(param, Some((scope, i as _)));
@@ -814,6 +819,7 @@ impl<'a> Context<'a> {
         let body = self.export_func_type(t.body());
 
         self.bump.alloc(table::Symbol {
+            visibility,
             name,
             params: params.into_bump_slice(),
             constraints,

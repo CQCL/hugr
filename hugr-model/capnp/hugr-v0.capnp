@@ -61,6 +61,7 @@ struct Operation {
 }
 
 struct Symbol {
+    visibility @4 :Visibility;
     name @0 :Text;
     params @1 :List(Param);
     constraints @2 :List(TermId);
@@ -119,4 +120,9 @@ struct Term {
 struct Param {
     name @0 :Text;
     type @1 :TermId;
+}
+
+enum Visibility {
+    private @0;
+    public @1;
 }
