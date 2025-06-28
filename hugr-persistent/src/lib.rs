@@ -70,6 +70,7 @@ mod parents_view;
 mod persistent_hugr;
 mod resolver;
 pub mod state_space;
+pub mod subgraph;
 mod trait_impls;
 pub mod walker;
 mod wire;
@@ -77,6 +78,7 @@ mod wire;
 pub use persistent_hugr::{Commit, PersistentHugr};
 pub use resolver::{PointerEqResolver, Resolver, SerdeHashResolver};
 pub use state_space::{CommitId, CommitStateSpace, InvalidCommit, PatchNode};
+pub use subgraph::PinnedSubgraph;
 pub use walker::Walker;
 pub use wire::PersistentWire;
 

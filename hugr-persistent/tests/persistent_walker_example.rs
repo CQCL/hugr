@@ -5,14 +5,14 @@ use std::collections::{BTreeSet, VecDeque};
 use itertools::{Either, Itertools};
 
 use hugr_core::{
-    Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
-    builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
+    builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
     extension::prelude::qb_t,
     ops::OpType,
     types::EdgeKind,
+    Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
 };
 
-use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, Walker};
+use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, PinnedSubgraph, Walker};
 
 /// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 4;
@@ -23,10 +23,10 @@ use walker_example_extension::cz_gate;
 mod walker_example_extension {
     use std::sync::Arc;
 
-    use hugr_core::Extension;
     use hugr_core::extension::ExtensionId;
     use hugr_core::ops::{ExtensionOp, OpName};
     use hugr_core::types::{FuncValueType, PolyFuncTypeRV};
+    use hugr_core::Extension;
 
     use lazy_static::lazy_static;
     use semver::Version;
@@ -247,12 +247,16 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
                 .map(|[out_port, _]| walker.get_wire(out_node, out_port));
 
             // Create the commit
-            walker.try_create_commit(wires, empty_2qb_hugr(add_swap), |_, port| {
-                // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
-                // HUGR
-                let dir = port.direction();
-                Port::new(dir.reverse(), port.index())
-            })
+            walker.try_create_commit(
+                PinnedSubgraph::try_from_wires(wires, walker).unwrap(),
+                empty_2qb_hugr(add_swap),
+                |_, port| {
+                    // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
+                    // HUGR
+                    let dir = port.direction();
+                    Port::new(dir.reverse(), port.index())
+                },
+            )
         }
         1 => {
             // out_node and in_node share just one qubit
@@ -265,39 +269,43 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
             let shared_qb_out = out_port.index();
             let shared_qb_in = in_port.index();
 
-            walker.try_create_commit([wire], repl_hugr, |node, port| {
-                // map the incoming/outgoing ports of the subgraph to the replacement as
-                // follows:
-                //  - the first qubit is the one that is shared between the two CZ gates
-                //  - the second qubit only touches the first CZ (out_node)
-                //  - the third qubit only touches the second CZ (in_node)
-                match port.as_directed() {
-                    Either::Left(incoming) => {
-                        let in_boundary: [(_, IncomingPort); 3] = [
-                            (out_node, shared_qb_out.into()),
-                            (out_node, (1 - shared_qb_out).into()),
-                            (in_node, (1 - shared_qb_in).into()),
-                        ];
-                        let out_index = in_boundary
-                            .iter()
-                            .position(|&(n, p)| n == node && p == incoming)
-                            .expect("invalid input port");
-                        OutgoingPort::from(out_index).into()
+            walker.try_create_commit(
+                PinnedSubgraph::try_from_wires([wire], walker).unwrap(),
+                repl_hugr,
+                |node, port| {
+                    // map the incoming/outgoing ports of the subgraph to the replacement as
+                    // follows:
+                    //  - the first qubit is the one that is shared between the two CZ gates
+                    //  - the second qubit only touches the first CZ (out_node)
+                    //  - the third qubit only touches the second CZ (in_node)
+                    match port.as_directed() {
+                        Either::Left(incoming) => {
+                            let in_boundary: [(_, IncomingPort); 3] = [
+                                (out_node, shared_qb_out.into()),
+                                (out_node, (1 - shared_qb_out).into()),
+                                (in_node, (1 - shared_qb_in).into()),
+                            ];
+                            let out_index = in_boundary
+                                .iter()
+                                .position(|&(n, p)| n == node && p == incoming)
+                                .expect("invalid input port");
+                            OutgoingPort::from(out_index).into()
+                        }
+                        Either::Right(outgoing) => {
+                            let out_boundary: [(_, OutgoingPort); 3] = [
+                                (in_node, shared_qb_in.into()),
+                                (out_node, (1 - shared_qb_out).into()),
+                                (in_node, (1 - shared_qb_in).into()),
+                            ];
+                            let in_index = out_boundary
+                                .iter()
+                                .position(|&(n, p)| n == node && p == outgoing)
+                                .expect("invalid output port");
+                            IncomingPort::from(in_index).into()
+                        }
                     }
-                    Either::Right(outgoing) => {
-                        let out_boundary: [(_, OutgoingPort); 3] = [
-                            (in_node, shared_qb_in.into()),
-                            (out_node, (1 - shared_qb_out).into()),
-                            (in_node, (1 - shared_qb_in).into()),
-                        ];
-                        let in_index = out_boundary
-                            .iter()
-                            .position(|&(n, p)| n == node && p == outgoing)
-                            .expect("invalid output port");
-                        IncomingPort::from(in_index).into()
-                    }
-                }
-            })
+                },
+            )
         }
         _ => unreachable!(),
     }

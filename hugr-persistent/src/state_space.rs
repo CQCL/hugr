@@ -13,7 +13,7 @@ use hugr_core::{
             BoundaryPort,
             simple_replace::{BoundaryMode, InvalidReplacement},
         },
-        views::{InvalidSignature, sibling_subgraph::InvalidSubgraph},
+        views::InvalidSignature,
     },
     ops::OpType,
 };
@@ -23,7 +23,7 @@ use thiserror::Error;
 
 use crate::{
     Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
-    find_conflicting_node, parents_view::ParentsView,
+    find_conflicting_node, parents_view::ParentsView, subgraph::InvalidPinnedSubgraph,
 };
 
 pub mod serial;
@@ -618,7 +618,7 @@ pub enum InvalidCommit {
 
     #[error("Invalid subgraph: {0}")]
     /// The subgraph of the replacement is not convex.
-    InvalidSubgraph(#[from] InvalidSubgraph<PatchNode>),
+    InvalidSubgraph(#[from] InvalidPinnedSubgraph),
 
     /// The replacement of the commit is invalid.
     #[error("Invalid replacement: {0}")]
