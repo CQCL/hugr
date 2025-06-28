@@ -5,25 +5,25 @@ use std::collections::{BTreeSet, VecDeque};
 use delegate::delegate;
 use derive_more::From;
 use hugr_core::{
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
     hugr::{
         self,
         internal::HugrInternals,
         patch::{
-            BoundaryPort,
             simple_replace::{IncludeReplacementNodes, InvalidReplacement},
+            BoundaryPort,
         },
-        views::{InvalidSignature, sibling_subgraph::InvalidSubgraph},
+        views::InvalidSignature,
     },
     ops::OpType,
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
 };
 use itertools::{Either, Itertools};
 use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
 use crate::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
-    find_conflicting_node, parents_view::ParentsView,
+    find_conflicting_node, parents_view::ParentsView, subgraph::InvalidPinnedSubgraph, Commit,
+    PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
 };
 
 pub mod serial;
@@ -595,7 +595,7 @@ pub enum InvalidCommit {
 
     #[error("Invalid subgraph: {0}")]
     /// The subgraph of the replacement is not convex.
-    InvalidSubgraph(#[from] InvalidSubgraph<PatchNode>),
+    InvalidSubgraph(#[from] InvalidPinnedSubgraph),
 
     /// The replacement of the commit is invalid.
     #[error("Invalid replacement: {0}")]
