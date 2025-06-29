@@ -5,7 +5,7 @@ use hugr_core::{
         sibling_subgraph::{IncomingPorts, InvalidSubgraph, OutgoingPorts},
         SiblingSubgraph,
     },
-    IncomingPort, OutgoingPort,
+    HugrView, IncomingPort, OutgoingPort,
 };
 use itertools::Itertools;
 use thiserror::Error;
@@ -59,22 +59,25 @@ impl PinnedSubgraph {
     /// Nodes that are not isolated, i.e. are attached to at least one wire in
     /// `wires` will be added implicitly to the graph and do not need to be
     /// explicitly listed in `nodes`.
-    pub fn try_from_pinned<R: Resolver>(
-        nodes: impl IntoIterator<Item = PatchNode>,
-        wires: impl IntoIterator<Item = PersistentWire>,
+    pub fn try_from_pinned<R, Wires, Nodes>(
+        nodes: impl IntoIterator<IntoIter = Nodes>,
+        wires: impl IntoIterator<IntoIter = Wires>,
         walker: &Walker<R>,
-    ) -> Result<Self, InvalidPinnedSubgraph> {
-        let mut wire_ports_incoming = BTreeSet::new();
-        let mut wire_ports_outgoing = BTreeSet::new();
+    ) -> Result<Self, InvalidPinnedSubgraph>
+    where
+        R: Resolver,
+        Wires: Iterator<Item = PersistentWire> + Clone,
+        Nodes: Iterator<Item = PatchNode> + Clone,
+    {
         let mut selected_commits = BTreeSet::new();
         let host = walker.as_hugr_view();
+        let wires = wires.into_iter();
+        let nodes = nodes.into_iter();
 
-        for w in wires {
+        for w in wires.clone() {
             if !walker.is_complete(&w, None) {
                 return Err(InvalidPinnedSubgraph::IncompleteWire(w));
             }
-            wire_ports_incoming.extend(w.all_incoming_ports(host));
-            wire_ports_outgoing.extend(w.single_outgoing_port(host));
             for id in w.owners() {
                 if host.contains_id(id) {
                     selected_commits.insert(id);
@@ -84,33 +87,60 @@ impl PinnedSubgraph {
             }
         }
 
-        let mut nodes = BTreeSet::from_iter(nodes);
-        if let Some(unpinned) = nodes.iter().find(|&&n| !walker.is_pinned(n)) {
-            return Err(InvalidPinnedSubgraph::UnpinnedNode(*unpinned));
+        if let Some(unpinned) = nodes.clone().find(|&n| !walker.is_pinned(n)) {
+            return Err(InvalidPinnedSubgraph::UnpinnedNode(unpinned));
         }
-        nodes.extend(wire_ports_incoming.iter().map(|&(n, _)| n));
-        nodes.extend(wire_ports_outgoing.iter().map(|&(n, _)| n));
+
+        let (inputs, outputs, all_nodes) = Self::compute_io_ports(nodes, wires, host);
+
+        Ok(Self {
+            selected_commits,
+            nodes: all_nodes,
+            inputs,
+            outputs,
+        })
+    }
+
+    /// Compute the input and output ports for the given pinned nodes and wires.
+    ///
+    /// Return the input boundary ports, output boundary ports as well as the
+    /// set of all nodes in the subgraph.
+    pub fn compute_io_ports<R: Resolver>(
+        nodes: impl IntoIterator<Item = PatchNode>,
+        wires: impl IntoIterator<Item = PersistentWire>,
+        host: &PersistentHugr<R>,
+    ) -> (
+        Vec<Vec<(PatchNode, IncomingPort)>>,
+        Vec<(PatchNode, OutgoingPort)>,
+        BTreeSet<PatchNode>,
+    ) {
+        let mut wire_ports_incoming = BTreeSet::new();
+        let mut wire_ports_outgoing = BTreeSet::new();
+
+        for w in wires {
+            wire_ports_incoming.extend(w.all_incoming_ports(host));
+            wire_ports_outgoing.extend(w.single_outgoing_port(host));
+        }
+
+        let mut all_nodes = BTreeSet::from_iter(nodes);
+        all_nodes.extend(wire_ports_incoming.iter().map(|&(n, _)| n));
+        all_nodes.extend(wire_ports_outgoing.iter().map(|&(n, _)| n));
 
         // (in/out) boundary: all in/out ports on the nodes of the wire, minus ports
         // that are part of the wires
-        let inputs = nodes
+        let inputs = all_nodes
             .iter()
             .flat_map(|&n| host.input_value_ports(n))
             .filter(|node_port| !wire_ports_incoming.contains(node_port))
             .map(|np| vec![np])
             .collect_vec();
-        let outputs = nodes
+        let outputs = all_nodes
             .iter()
             .flat_map(|&n| host.output_value_ports(n))
             .filter(|node_port| !wire_ports_outgoing.contains(node_port))
             .collect_vec();
 
-        Ok(Self {
-            selected_commits,
-            nodes,
-            inputs,
-            outputs,
-        })
+        (inputs, outputs, all_nodes)
     }
 
     /// Convert the pinned subgraph to a [`SiblingSubgraph`] for the given
