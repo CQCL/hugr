@@ -5,7 +5,7 @@ use hugr_core::{
         sibling_subgraph::{IncomingPorts, InvalidSubgraph, OutgoingPorts},
         SiblingSubgraph,
     },
-    HugrView, IncomingPort, OutgoingPort,
+    IncomingPort, OutgoingPort,
 };
 use itertools::Itertools;
 use thiserror::Error;
@@ -21,6 +21,7 @@ use crate::{CommitId, PatchNode, PersistentHugr, PersistentWire, Resolver, Walke
 ///
 /// Obtain a valid [`SiblingSubgraph`] for a specific [`PersistentHugr`] by
 /// calling [`PinnedSubgraph::to_sibling_subgraph`].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PinnedSubgraph {
     /// The nodes of the induced subgraph.
     nodes: BTreeSet<PatchNode>,

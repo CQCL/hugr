@@ -737,14 +737,18 @@ mod tests {
             dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
         };
         let commit = walker
-            .try_create_commit(vec![wire], empty_hugr, |node, port| {
-                assert_eq!(port.index(), 0);
-                assert!([not0, not2].contains(&node));
-                match port.direction() {
-                    Direction::Incoming => OutgoingPort::from(0).into(),
-                    Direction::Outgoing => IncomingPort::from(0).into(),
-                }
-            })
+            .try_create_commit(
+                PinnedSubgraph::try_from_pinned(std::iter::empty(), [wire], &walker).unwrap(),
+                empty_hugr,
+                |node, port| {
+                    assert_eq!(port.index(), 0);
+                    assert!([not0, not2].contains(&node));
+                    match port.direction() {
+                        Direction::Incoming => OutgoingPort::from(0).into(),
+                        Direction::Outgoing => IncomingPort::from(0).into(),
+                    }
+                },
+            )
             .unwrap();
 
         let mut new_state_space = hugr.as_state_space().to_owned();
