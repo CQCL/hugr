@@ -6,15 +6,17 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    IncomingPort, OutgoingPort, PortIndex,
     hugr::HugrMut,
-    ops::{DFG, FuncDefn, Input, OpTrait, OpType, Output, dataflow::IOTrait, handle::DfgID},
+    ops::{
+        dataflow::IOTrait, handle::DataflowParentID, FuncDefn, Input, OpTrait, OpType, Output, DFG,
+    },
     types::{NoRV, Signature, TypeBase},
+    IncomingPort, OutgoingPort, PortIndex,
 };
 
 use super::RootChecked;
 
-impl<H: HugrMut> RootChecked<H, DfgID<H::Node>> {
+impl<H: HugrMut> RootChecked<H, DataflowParentID<H::Node>> {
     /// Get the input and output nodes of the DFG at the entrypoint node.
     pub fn get_io(&self) -> [H::Node; 2] {
         self.hugr()
@@ -268,11 +270,11 @@ mod test {
 
     use super::*;
     use crate::builder::{
-        DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, endo_sig,
+        endo_sig, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
     };
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::hugr::views::root_checked::RootChecked;
-    use crate::ops::handle::{DfgID, NodeHandle};
+    use crate::ops::handle::NodeHandle;
     use crate::ops::{NamedOp, OpParent};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension::cx_gate;
@@ -291,7 +293,7 @@ mod test {
         let mut hugr = new_empty_dfg(sig);
 
         // Wrap in RootChecked
-        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
 
         // Test mapping inputs: [0,1] -> [1,0]
         let input_map = vec![1, 0];
@@ -337,7 +339,7 @@ mod test {
         let mut hugr = new_empty_dfg(sig);
 
         // Wrap in RootChecked
-        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
 
         // Test mapping outputs: [0] -> [0,0] (duplicating the output)
         let input_map = vec![0];
@@ -377,7 +379,7 @@ mod test {
             .unwrap();
 
         // Wrap in RootChecked
-        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
 
         // Test mapping inputs: [0,1] -> [1,0] (swapping inputs)
         let input_map = vec![1, 0];
@@ -437,7 +439,7 @@ mod test {
             .unwrap();
 
         // Wrap in RootChecked
-        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
 
         // Test cycling outputs: [0,1,2] -> [1,2,0]
         let input_map = vec![1, 2, 0];
@@ -527,7 +529,7 @@ mod test {
         hugr.set_entrypoint(dfg_roots[2]);
 
         // Test successful signature update in "foo"
-        let mut dfg_view = RootChecked::<&mut Hugr, DfgID>::try_new(&mut hugr).unwrap();
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
 
         // Swap the outputs: [0,1] -> [1,0]
         let input_map = vec![0, 1];

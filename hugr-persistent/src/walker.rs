@@ -58,12 +58,11 @@
 use std::{borrow::Cow, collections::BTreeSet};
 
 use hugr_core::hugr::patch::simple_replace::IncludeReplacementNodes;
+use hugr_core::ops::handle::DataflowParentID;
 use itertools::Itertools;
 use thiserror::Error;
 
-use hugr_core::{
-    hugr::views::RootCheckable, ops::handle::DfgID, Direction, Hugr, HugrView, Port, PortIndex,
-};
+use hugr_core::{hugr::views::RootCheckable, Direction, Hugr, HugrView, Port, PortIndex};
 
 use crate::{Commit, PersistentReplacement, PinnedSubgraph};
 
@@ -282,7 +281,7 @@ impl<'a, R: Resolver> Walker<'a, R> {
     pub fn try_create_commit(
         &self,
         subgraph: impl Into<PinnedSubgraph>,
-        repl: impl RootCheckable<Hugr, DfgID>,
+        repl: impl RootCheckable<Hugr, DataflowParentID>,
         map_boundary: impl Fn(PatchNode, Port) -> Port,
     ) -> Result<Commit, InvalidCommit> {
         let pinned_subgraph = subgraph.into();
