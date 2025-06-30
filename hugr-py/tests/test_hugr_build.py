@@ -5,7 +5,7 @@ import pytest
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
-from hugr.build.dfg import Dfg, _ancestral_sibling
+from hugr.build.dfg import Dfg, Function, _ancestral_sibling
 from hugr.build.function import Module
 from hugr.hugr import Hugr
 from hugr.hugr.node_port import Node, _SubPort
@@ -404,3 +404,23 @@ def test_option() -> None:
     dfg.set_outputs(b)
 
     validate(dfg.hugr)
+
+
+def test_html_labels(snapshot) -> None:
+    """Ensures that HTML-like labels can be processed correctly by both the builder and
+    the renderer.
+    """
+    f = Function(
+        "<jupyter-notebook>",
+        [tys.Bool],
+    )
+    f.metadata["label"] = "<b>Bold Label</b>"
+    f.metadata["<other-label>"] = "<i>Italic Label</i>"
+
+    f.hugr[f.hugr.module_root].metadata["name"] = "<i>Module Root</i>"
+
+    b = f.inputs()[0]
+    f.add_op(ops.Some(tys.Bool), b)
+    f.set_outputs(b)
+
+    validate(f.hugr, snap=snapshot)
