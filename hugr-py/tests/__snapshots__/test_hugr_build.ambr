@@ -1111,7 +1111,7 @@
 # ---
 # name: test_html_labels
   '''
-  digraph {
+  digraph "&lt;i&gt;Module Root&lt;/i&gt;" {
   	bgcolor=white margin=0 nodesep=0.15 rankdir="" ranksep=0.1
   	subgraph cluster0 {
   		subgraph cluster1 {
@@ -1215,7 +1215,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Module</B></FONT></TD></TR>
+                  COLOR="black"><B>Module</B><BR/><BR/>name: &lt;i&gt;Module Root&lt;/i&gt;</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>

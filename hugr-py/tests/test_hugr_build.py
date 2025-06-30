@@ -417,6 +417,8 @@ def test_html_labels(snapshot) -> None:
     f.metadata["label"] = "<b>Bold Label</b>"
     f.metadata["<other-label>"] = "<i>Italic Label</i>"
 
+    f.hugr[f.hugr.module_root].metadata["name"] = "<i>Module Root</i>"
+
     b = f.inputs()[0]
     f.add_op(ops.Some(tys.Bool), b)
     f.set_outputs(b)
