@@ -28,7 +28,8 @@ pub struct TypeRowBase<ROWVARS: MaybeRV> {
 /// Row of single types i.e. of known length, for node inputs/outputs
 pub type TypeRow = TypeRowBase<NoRV>;
 
-/// Row of types and/or row variables, the number of actual types is thus unknown
+/// Row of types and/or row variables, the number of actual types is thus
+/// unknown
 pub type TypeRowRV = TypeRowBase<RowVariable>;
 
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeRowBase<RV1>> for TypeRowBase<RV2> {
@@ -223,7 +224,7 @@ impl TryFrom<Term> for TypeRow {
 
     fn try_from(value: TypeArg) -> Result<Self, Self::Error> {
         match value {
-            TypeArg::Tuple(elems) => elems
+            TypeArg::List(elems) => elems
                 .into_iter()
                 .map(|ta| ta.as_runtime())
                 .collect::<Option<Vec<_>>>()
@@ -242,7 +243,7 @@ impl TryFrom<Term> for TypeRowRV {
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         match value {
-            TypeArg::Tuple(elems) => elems
+            TypeArg::List(elems) => elems
                 .into_iter()
                 .map(TypeRV::try_from)
                 .collect::<Result<Vec<_>, _>>()
@@ -260,13 +261,13 @@ impl TryFrom<Term> for TypeRowRV {
 
 impl From<TypeRow> for Term {
     fn from(value: TypeRow) -> Self {
-        Term::Tuple(value.into_owned().into_iter().map_into().collect())
+        Term::List(value.into_owned().into_iter().map_into().collect())
     }
 }
 
 impl From<TypeRowRV> for Term {
     fn from(value: TypeRowRV) -> Self {
-        Term::Tuple(value.into_owned().into_iter().map_into().collect())
+        Term::List(value.into_owned().into_iter().map_into().collect())
     }
 }
 
@@ -330,15 +331,15 @@ mod test {
 
     #[test]
     fn test_try_from_term_to_typerow() {
-        // Test successful conversion with Tuple
+        // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
         let type_args = types.iter().map(|t| TypeArg::Runtime(t.clone())).collect();
-        let term = TypeArg::Tuple(type_args);
+        let term = TypeArg::List(type_args);
         let result = TypeRow::try_from(term);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), TypeRow::from(types));
 
-        // Test failure with non-tuple
+        // Test failure with non-list
         let term = TypeArg::Runtime(Type::UNIT);
         let result = TypeRow::try_from(term);
         assert!(result.is_err());
@@ -346,10 +347,10 @@ mod test {
 
     #[test]
     fn test_try_from_term_to_typerowrv() {
-        // Test successful conversion with Tuple
+        // Test successful conversion with List
         let types = [TypeRV::from(Type::UNIT), TypeRV::from(bool_t())];
         let type_args = types.iter().map(|t| t.clone().into()).collect();
-        let term = TypeArg::Tuple(type_args);
+        let term = TypeArg::List(type_args);
         let result = TypeRowRV::try_from(term);
         assert!(result.is_ok());
 
@@ -366,10 +367,10 @@ mod test {
         let term = Term::from(type_row);
 
         match term {
-            Term::Tuple(elems) => {
+            Term::List(elems) => {
                 assert_eq!(elems.len(), 2);
             }
-            _ => panic!("Expected Term::Tuple"),
+            _ => panic!("Expected Term::List"),
         }
     }
 
@@ -380,10 +381,10 @@ mod test {
         let term = Term::from(type_row_rv);
 
         match term {
-            TypeArg::Tuple(elems) => {
+            TypeArg::List(elems) => {
                 assert_eq!(elems.len(), 2);
             }
-            _ => panic!("Expected Term::Tuple"),
+            _ => panic!("Expected Term::List"),
         }
     }
 }

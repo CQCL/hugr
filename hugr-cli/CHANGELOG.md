@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.1...hugr-cli-v0.20.2) - 2025-06-25
+
+### New Features
+
+- *(cli)* convert sub-command for converting envelope formats ([#2331](https://github.com/CQCL/hugr/pull/2331))
+
 ## [0.20.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.0...hugr-cli-v0.20.1) - 2025-06-03
 
 ### New Features

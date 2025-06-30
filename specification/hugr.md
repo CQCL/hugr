@@ -771,11 +771,11 @@ existing metadata, given the node ID.
 engine)?
 
 Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
-Use of this prefix by external tooling may cause issues. 
+Use of this prefix by external tooling may cause issues.
 
 #### Generator Metadata
 Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
-purposes. 
+purposes.
 
 The key `core.generator` when used on the module root node is
 used to specify the tooling used to generate the module.

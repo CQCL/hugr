@@ -445,3 +445,23 @@ def test_toposort_error(simple_fn: Function) -> None:
         ValueError, match="Graph contains a cycle. No topological ordering exists."
     ):
         list(simple_fn.hugr.sort_region_nodes(func_node))
+
+
+def test_html_labels(snapshot) -> None:
+    """Ensures that HTML-like labels can be processed correctly by both the builder and
+    the renderer.
+    """
+    f = Function(
+        "<jupyter-notebook>",
+        [tys.Bool],
+    )
+    f.metadata["label"] = "<b>Bold Label</b>"
+    f.metadata["<other-label>"] = "<i>Italic Label</i>"
+
+    f.hugr[f.hugr.module_root].metadata["name"] = "<i>Module Root</i>"
+
+    b = f.inputs()[0]
+    f.add_op(ops.Some(tys.Bool), b)
+    f.set_outputs(b)
+
+    validate(f.hugr, snap=snapshot)

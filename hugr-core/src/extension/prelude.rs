@@ -39,7 +39,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
 lazy_static! {
     /// Prelude extension, containing common types and operations.
     pub static ref PRELUDE: Arc<Extension> = {
@@ -52,6 +52,7 @@ lazy_static! {
             // would try to access the `PRELUDE` lazy static recursively,
             // causing a deadlock.
             let string_type: Type = string_custom_type(extension_ref).into();
+            let usize_type: Type = usize_custom_t(extension_ref).into();
             let error_type: CustomType = error_custom_type(extension_ref);
 
             prelude
@@ -74,7 +75,7 @@ lazy_static! {
             prelude.add_op(
                     PRINT_OP_ID,
                     "Print the string to standard output".to_string(),
-                    Signature::new(vec![string_type], type_row![]),
+                    Signature::new(vec![string_type.clone()], type_row![]),
                     extension_ref,
                 )
                 .unwrap();
@@ -93,6 +94,14 @@ lazy_static! {
                     vec![],
                     "Simple opaque error type.".into(),
                     TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            prelude
+                .add_op(
+                    MAKE_ERROR_OP_ID,
+                    "Create an error value".to_string(),
+                    Signature::new(vec![usize_type, string_type], vec![error_type.clone().into()]),
                     extension_ref,
                 )
                 .unwrap();
@@ -171,6 +180,11 @@ pub fn usize_t() -> Type {
 pub fn bool_t() -> Type {
     Type::new_unit_sum(2)
 }
+
+/// Name of the prelude `MakeError` operation.
+///
+/// This operation can be used to dynamically create error values.
+pub const MAKE_ERROR_OP_ID: OpName = OpName::new_inline("MakeError");
 
 /// Name of the prelude panic operation.
 ///
@@ -1006,6 +1020,8 @@ mod test {
         type_row,
     };
 
+    use crate::hugr::views::HugrView;
+
     #[test]
     fn test_make_tuple() {
         let op = MakeTuple::new(type_row![Type::UNIT]);
@@ -1124,6 +1140,26 @@ mod test {
         b.add_dataflow_op(op, [err]).unwrap();
 
         b.finish_hugr_with_outputs([]).unwrap();
+    }
+
+    #[test]
+    /// test the prelude make error op with the panic op.
+    fn test_make_error() {
+        let err_op = PRELUDE
+            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+            .unwrap();
+        let panic_op = PRELUDE
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .unwrap();
+
+        let mut b =
+            DFGBuilder::new(Signature::new(vec![usize_t(), string_type()], type_row![])).unwrap();
+        let [signal, message] = b.input_wires_arr();
+        let err_value = b.add_dataflow_op(err_op, [signal, message]).unwrap();
+        b.add_dataflow_op(panic_op, err_value.outputs()).unwrap();
+
+        let h = b.finish_hugr_with_outputs([]).unwrap();
+        h.validate().unwrap();
     }
 
     #[test]
