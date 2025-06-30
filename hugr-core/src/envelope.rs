@@ -293,6 +293,13 @@ pub enum EnvelopeError {
         #[from]
         source: hugr_model::v0::ast::ResolveError,
     },
+    /// Error reading a list of extensions from the envelope.
+    #[error(transparent)]
+    ExtensionLoad {
+        /// The source error.
+        #[from]
+        source: crate::extension::ExtensionRegistryLoadError,
+    },
 }
 
 /// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
@@ -339,11 +346,8 @@ fn decode_model(
 
     let mut extension_registry = extension_registry.clone();
     if format == EnvelopeFormat::ModelWithExtensions {
-        let extra_extensions: Vec<Extension> =
-            serde_json::from_reader::<_, Vec<Extension>>(stream)?;
-        for ext in extra_extensions {
-            extension_registry.register_updated(ext);
-        }
+        let extra_extensions = ExtensionRegistry::load_json(stream, &extension_registry)?;
+        extension_registry.extend(extra_extensions);
     }
 
     Ok(import_package(&model_package, &extension_registry)?)
