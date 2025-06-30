@@ -1,14 +1,5 @@
-//! Fixed-length array type and operations extension.
-
-mod array_clone;
-mod array_conversion;
-mod array_discard;
-mod array_kind;
-mod array_op;
-mod array_repeat;
-mod array_scan;
-mod array_value;
-pub mod op_builder;
+//! A version of the standard fixed-length array extension that includes unsafe
+//! operations that may panic.
 
 use std::sync::Arc;
 
@@ -17,109 +8,110 @@ use lazy_static::lazy_static;
 
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::simple_op::{HasConcrete, MakeOpDef, MakeRegisteredOp};
+use crate::extension::simple_op::{HasConcrete, MakeOpDef};
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
-use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
 
-pub use array_clone::{ARRAY_CLONE_OP_ID, GenericArrayClone, GenericArrayCloneDef};
-pub use array_conversion::{Direction, FROM, GenericArrayConvert, GenericArrayConvertDef, INTO};
-pub use array_discard::{ARRAY_DISCARD_OP_ID, GenericArrayDiscard, GenericArrayDiscardDef};
-pub use array_kind::ArrayKind;
-pub use array_op::{GenericArrayOp, GenericArrayOpDef};
-pub use array_repeat::{ARRAY_REPEAT_OP_ID, GenericArrayRepeat, GenericArrayRepeatDef};
-pub use array_scan::{ARRAY_SCAN_OP_ID, GenericArrayScan, GenericArrayScanDef};
-pub use array_value::GenericArrayValue;
+use super::array::op_builder::GenericArrayOpBuilder;
+use super::array::{
+    Array, ArrayKind, FROM, GenericArrayClone, GenericArrayCloneDef, GenericArrayConvert,
+    GenericArrayConvertDef, GenericArrayDiscard, GenericArrayDiscardDef, GenericArrayOp,
+    GenericArrayOpDef, GenericArrayRepeat, GenericArrayRepeatDef, GenericArrayScan,
+    GenericArrayScanDef, GenericArrayValue, INTO,
+};
 
-use op_builder::GenericArrayOpBuilder;
-
-/// Reported unique name of the array type.
-pub const ARRAY_TYPENAME: TypeName = TypeName::new_inline("array");
-/// Reported unique name of the array value.
-pub const ARRAY_VALUENAME: TypeName = TypeName::new_inline("array");
+/// Reported unique name of the panic array type.
+pub const PANIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("panic_array");
+/// Reported unique name of the panic array value.
+pub const PANIC_ARRAY_VALUENAME: TypeName = TypeName::new_inline("panic_array");
 /// Reported unique name of the extension
-pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.array");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.panic_array");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
-/// A linear, fixed-length collection of values.
+/// A linear, unsafe, fixed-length collection of values.
 ///
-/// Arrays are linear, even if their elements are copyable.
+/// Panic arrays are linear, even if their elements are copyable.
 #[derive(Clone, Copy, Debug, derive_more::Display, Eq, PartialEq, Default)]
-pub struct Array;
+pub struct PanicArray;
 
-impl ArrayKind for Array {
+impl ArrayKind for PanicArray {
     const EXTENSION_ID: ExtensionId = EXTENSION_ID;
-    const TYPE_NAME: TypeName = ARRAY_TYPENAME;
-    const VALUE_NAME: ValueName = ARRAY_VALUENAME;
+    const TYPE_NAME: TypeName = PANIC_ARRAY_TYPENAME;
+    const VALUE_NAME: ValueName = PANIC_ARRAY_VALUENAME;
 
     fn extension() -> &'static Arc<Extension> {
         &EXTENSION
     }
 
     fn type_def() -> &'static TypeDef {
-        EXTENSION.get_type(&ARRAY_TYPENAME).unwrap()
+        EXTENSION.get_type(&PANIC_ARRAY_TYPENAME).unwrap()
     }
 }
 
-/// Array operation definitions.
-pub type ArrayOpDef = GenericArrayOpDef<Array>;
-/// Array clone operation definition.
-pub type ArrayCloneDef = GenericArrayCloneDef<Array>;
-/// Array discard operation definition.
-pub type ArrayDiscardDef = GenericArrayDiscardDef<Array>;
-/// Array repeat operation definition.
-pub type ArrayRepeatDef = GenericArrayRepeatDef<Array>;
-/// Array scan operation definition.
-pub type ArrayScanDef = GenericArrayScanDef<Array>;
+/// Panic array operation definitions.
+pub type PArrayOpDef = GenericArrayOpDef<PanicArray>;
+/// Panic array clone operation definition.
+pub type PArrayCloneDef = GenericArrayCloneDef<PanicArray>;
+/// Panic array discard operation definition.
+pub type PArrayDiscardDef = GenericArrayDiscardDef<PanicArray>;
+/// Panic array repeat operation definition.
+pub type PArrayRepeatDef = GenericArrayRepeatDef<PanicArray>;
+/// Panic array scan operation definition.
+pub type PArrayScanDef = GenericArrayScanDef<PanicArray>;
+/// Panic array to default array conversion operation definition.
+pub type PArrayToArrayDef = GenericArrayConvertDef<PanicArray, INTO, Array>;
+/// Panic array from default array conversion operation definition.
+pub type PArrayFromArrayDef = GenericArrayConvertDef<PanicArray, FROM, Array>;
 
-/// Array operations.
-pub type ArrayOp = GenericArrayOp<Array>;
+/// Panic array operations.
+pub type PArrayOp = GenericArrayOp<PanicArray>;
 /// The array clone operation.
-pub type ArrayClone = GenericArrayClone<Array>;
+pub type PArrayClone = GenericArrayClone<PanicArray>;
 /// The array discard operation.
-pub type ArrayDiscard = GenericArrayDiscard<Array>;
+pub type PArrayDiscard = GenericArrayDiscard<PanicArray>;
 /// The array repeat operation.
-pub type ArrayRepeat = GenericArrayRepeat<Array>;
+pub type PArrayRepeat = GenericArrayRepeat<PanicArray>;
 /// The array scan operation.
-pub type ArrayScan = GenericArrayScan<Array>;
+pub type PArrayScan = GenericArrayScan<PanicArray>;
+/// The panic array to default array conversion operation.
+pub type PArrayToArray = GenericArrayConvert<PanicArray, INTO, Array>;
+/// The panic array from default array conversion operation.
+pub type PArrayFromArray = GenericArrayConvert<PanicArray, FROM, Array>;
 
-/// An array extension value.
-pub type ArrayValue = GenericArrayValue<Array>;
+/// A panic array extension value.
+pub type PArrayValue = GenericArrayValue<PanicArray>;
 
 lazy_static! {
-    /// Extension for array operations.
+    /// Extension for panic array operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
-                    ARRAY_TYPENAME,
+                    PANIC_ARRAY_TYPENAME,
                     vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
-                    "Fixed-length array".into(),
-                    // Default array is linear, even if the elements are copyable
+                    "Fixed-length panic array".into(),
+                    // Panic array is linear, even if the elements are copyable.
                     TypeDefBound::any(),
                     extension_ref,
                 )
                 .unwrap();
 
-            ArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            ArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+            PArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+            PArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
         })
     };
 }
 
-impl ArrayValue {
-    /// Name of the constructor for creating constant arrays.
-    pub(crate) const CTR_NAME: &'static str = "collections.array.const";
-}
-
-#[typetag::serde(name = "ArrayValue")]
-impl CustomConst for ArrayValue {
+#[typetag::serde(name = "PArrayValue")]
+impl CustomConst for PArrayValue {
     delegate! {
         to self {
             fn name(&self) -> ValueName;
@@ -137,44 +129,34 @@ impl CustomConst for ArrayValue {
     }
 }
 
-/// Gets the [`TypeDef`] for arrays. Note that instantiations are more easily
-/// created via [`array_type`] and [`array_type_parametric`]
+/// Gets the [`TypeDef`] for panic arrays. Note that instantiations are more easily
+/// created via [`panic_array_type`] and [`panic_array_type_parametric`]
 #[must_use]
-pub fn array_type_def() -> &'static TypeDef {
-    Array::type_def()
+pub fn panic_array_type_def() -> &'static TypeDef {
+    PanicArray::type_def()
 }
 
-/// Instantiate a new array type given a size argument and element type.
+/// Instantiate a new panic array type given a size argument and element type.
 ///
-/// This method is equivalent to [`array_type_parametric`], but uses concrete
+/// This method is equivalent to [`panic_array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
 #[must_use]
-pub fn array_type(size: u64, element_ty: Type) -> Type {
-    Array::ty(size, element_ty)
+pub fn panic_array_type(size: u64, element_ty: Type) -> Type {
+    PanicArray::ty(size, element_ty)
 }
 
-/// Instantiate a new array type given the size and element type parameters.
+/// Instantiate a new panic array type given the size and element type parameters.
 ///
-/// This is a generic version of [`array_type`].
-pub fn array_type_parametric(
+/// This is a generic version of [`panic_array_type`].
+pub fn panic_array_type_parametric(
     size: impl Into<TypeArg>,
     element_ty: impl Into<TypeArg>,
 ) -> Result<Type, SignatureError> {
-    Array::ty_parametric(size, element_ty)
+    PanicArray::ty_parametric(size, element_ty)
 }
 
-/// Name of the operation in the prelude for creating new arrays.
-pub const NEW_ARRAY_OP_ID: OpName = OpName::new_inline("new_array");
-
-/// Initialize a new array op of element type `element_ty` of length `size`
-#[must_use]
-pub fn new_array_op(element_ty: Type, size: u64) -> ExtensionOp {
-    let op = ArrayOpDef::new_array.to_concrete(element_ty, size);
-    op.to_extension_op().unwrap()
-}
-
-/// Trait for building array operations in a dataflow graph.
-pub trait ArrayOpBuilder: GenericArrayOpBuilder {
+/// Trait for building panic array operations in a dataflow graph.
+pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// Adds a new array operation to the dataflow graph and return the wire
     /// representing the new array.
     ///
@@ -190,12 +172,12 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the new array.
-    fn add_new_array(
+    fn add_new_panic_array(
         &mut self,
         elem_ty: Type,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.add_new_generic_array::<Array>(elem_ty, values)
+        self.add_new_generic_array::<PanicArray>(elem_ty, values)
     }
     /// Adds an array unpack operation to the dataflow graph.
     ///
@@ -214,13 +196,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// A vector of wires representing the individual elements from the array.
-    fn add_array_unpack(
+    fn add_panic_array_unpack(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Vec<Wire>, BuildError> {
-        self.add_generic_array_unpack::<Array>(elem_ty, size, input)
+        self.add_generic_array_unpack::<PanicArray>(elem_ty, size, input)
     }
     /// Adds an array clone operation to the dataflow graph and return the wires
     /// representing the original and cloned array.
@@ -238,13 +220,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wires representing the original and cloned array.
-    fn add_array_clone(
+    fn add_panic_array_clone(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        self.add_generic_array_clone::<Array>(elem_ty, size, input)
+        self.add_generic_array_clone::<PanicArray>(elem_ty, size, input)
     }
 
     /// Adds an array discard operation to the dataflow graph.
@@ -258,13 +240,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// If building the operation fails.
-    fn add_array_discard(
+    fn add_panic_array_discard(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<(), BuildError> {
-        self.add_generic_array_discard::<Array>(elem_ty, size, input)
+        self.add_generic_array_discard::<PanicArray>(elem_ty, size, input)
     }
 
     /// Adds an array get operation to the dataflow graph.
@@ -284,14 +266,14 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     ///
     /// * The wire representing the value at the specified index in the array
     /// * The wire representing the array
-    fn add_array_get(
+    fn add_panic_array_get(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        self.add_generic_array_get::<Array>(elem_ty, size, input, index)
+        self.add_generic_array_get::<PanicArray>(elem_ty, size, input, index)
     }
 
     /// Adds an array set operation to the dataflow graph.
@@ -313,7 +295,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the updated array after the set operation.
-    fn add_array_set(
+    fn add_panic_array_set(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -321,7 +303,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_set::<Array>(elem_ty, size, input, index, value)
+        self.add_generic_array_set::<PanicArray>(elem_ty, size, input, index, value)
     }
 
     /// Adds an array swap operation to the dataflow graph.
@@ -343,7 +325,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the updated array after the swap operation.
-    fn add_array_swap(
+    fn add_panic_array_swap(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -351,7 +333,8 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
         index1: Wire,
         index2: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<Array>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+        let op =
+            GenericArrayOpDef::<PanicArray>::swap.instantiate(&[size.into(), elem_ty.into()])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();
@@ -375,13 +358,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_array_pop_left(
+    fn add_panic_array_pop_left(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_pop_left::<Array>(elem_ty, size, input)
+        self.add_generic_array_pop_left::<PanicArray>(elem_ty, size, input)
     }
 
     /// Adds an array pop-right operation to the dataflow graph.
@@ -401,13 +384,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_array_pop_right(
+    fn add_panic_array_pop_right(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_pop_right::<Array>(elem_ty, size, input)
+        self.add_generic_array_pop_right::<PanicArray>(elem_ty, size, input)
     }
 
     /// Adds an operation to discard an empty array from the dataflow graph.
@@ -420,32 +403,13 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_array_discard_empty(&mut self, elem_ty: Type, input: Wire) -> Result<(), BuildError> {
+    fn add_panic_array_discard_empty(
+        &mut self,
+        elem_ty: Type,
+        input: Wire,
+    ) -> Result<(), BuildError> {
         self.add_generic_array_discard_empty::<Array>(elem_ty, input)
     }
 }
 
-impl<D: Dataflow> ArrayOpBuilder for D {}
-
-#[cfg(test)]
-mod test {
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig};
-    use crate::extension::prelude::qb_t;
-
-    use super::{array_type, new_array_op};
-
-    #[test]
-    /// Test building a HUGR involving a `new_array` operation.
-    fn test_new_array() {
-        let mut b =
-            DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], array_type(2, qb_t()))).unwrap();
-
-        let [q1, q2] = b.input_wires_arr();
-
-        let op = new_array_op(qb_t(), 2);
-
-        let out = b.add_dataflow_op(op, [q1, q2]).unwrap();
-
-        b.finish_hugr_with_outputs(out.outputs()).unwrap();
-    }
-}
+impl<D: Dataflow> PArrayOpBuilder for D {}
