@@ -291,7 +291,7 @@ class DotRenderer:
         label = ""
         match kind:
             case ValueKind(ty):
-                label = str(ty)
+                label = html.escape(str(ty))
                 color = self.config.palette.edge
             case OrderKind():
                 color = self.config.palette.dark
