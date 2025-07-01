@@ -28,12 +28,12 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
-    resolve_op_types_extensions,
+    resolve_op_extensions, resolve_op_types_extensions, ExtensionResolutionError,
+    WeakExtensionRegistry,
 };
-use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
+use crate::extension::{ExtensionRegistry, ExtensionSet, EMPTY_REG};
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
-pub use crate::ops::{DEFAULT_OPTYPE, OpType};
+pub use crate::ops::{OpType, DEFAULT_OPTYPE};
 use crate::package::Package;
 use crate::{Direction, Node};
 
@@ -98,6 +98,10 @@ impl Hugr {
         make_module_hugr(Module::new().into(), 0, 0).unwrap()
     }
 
+    pub fn dummy() -> Self {
+        Self::new()
+    }
+
     /// Create a new Hugr, with a given entrypoint operation.
     ///
     /// If the optype is [`OpType::Module`], the HUGR module root will match the
@@ -115,7 +119,8 @@ impl Hugr {
         Self::with_capacity(entrypoint_op, 0, 0)
     }
 
-    /// Create a new Hugr, with a given entrypoint operation and preallocated capacity.
+    /// Create a new Hugr, with a given entrypoint operation and preallocated
+    /// capacity.
     ///
     /// If the optype is [`OpType::Module`], the HUGR module root will match the
     /// entrypoint node. Otherwise, the entrypoint will be a child of the a
@@ -220,8 +225,8 @@ impl Hugr {
     ///
     /// The Envelope will not include any extension definition, and will require
     /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load_str`]).
-    /// Use [`Hugr::store_str_with_exts`] to include additional extensions in the
-    /// Envelope.
+    /// Use [`Hugr::store_str_with_exts`] to include additional extensions in
+    /// the Envelope.
     pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
         self.store_str_with_exts(config, &EMPTY_REG)
     }
@@ -268,8 +273,8 @@ impl Hugr {
     /// # Parameters
     ///
     /// - `extensions`: The extension set considered when resolving opaque
-    ///   operations and types. The original Hugr's internal extension
-    ///   registry is ignored and replaced with the newly computed one.
+    ///   operations and types. The original Hugr's internal extension registry
+    ///   is ignored and replaced with the newly computed one.
     ///
     /// # Errors
     ///
@@ -350,13 +355,14 @@ impl Hugr {
         })
     }
 
-    /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
-    /// traversal of the hierarchy.
+    /// Compact the nodes indices of the hugr to be contiguous, and order them
+    /// as a breadth-first traversal of the hierarchy.
     ///
-    /// The rekey function is called for each moved node with the old and new indices.
+    /// The rekey function is called for each moved node with the old and new
+    /// indices.
     ///
-    /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
-    /// preserve the indices.
+    /// After this operation, a serialization and deserialization of the Hugr is
+    /// guaranteed to preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
         // Generate the ordered list of nodes
         let ordered = {
@@ -380,7 +386,8 @@ impl Hugr {
             }
 
             // Find the element's current location. If it originally came from an earlier
-            // position then it has been swapped somewhere else, so follow the permutation chain.
+            // position then it has been swapped somewhere else, so follow the permutation
+            // chain.
             while position > source.index() {
                 source = ordered[source.index()];
             }
@@ -551,8 +558,8 @@ pub(crate) mod test {
     use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
     use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::extension::prelude::bool_t;
-    use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
+    use crate::ops::OpaqueOp;
     use crate::test_file;
     use crate::types::Signature;
     use cool_asserts::assert_matches;
