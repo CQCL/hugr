@@ -1,10 +1,10 @@
 {
   "version": "0.1.1",
-  "name": "collections.panic_array",
+  "name": "collections.borrow_arr",
   "types": {
-    "panic_array": {
-      "extension": "collections.panic_array",
-      "name": "panic_array",
+    "borrow_array": {
+      "extension": "collections.borrow_arr",
+      "name": "borrow_array",
       "params": [
         {
           "tp": "BoundedNat",
@@ -15,7 +15,7 @@
           "b": "A"
         }
       ],
-      "description": "Fixed-length panic array",
+      "description": "Fixed-length borrow array",
       "bound": {
         "b": "Explicit",
         "bound": "A"
@@ -23,8 +23,88 @@
     }
   },
   "operations": {
+    "borrow": {
+      "extension": "collections.borrow_arr",
+      "name": "borrow",
+      "description": "Take an element from a borrow array (panicking if it was already taken before)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "clone": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "clone",
       "description": "Clones an array with copyable elements",
       "signature": {
@@ -42,8 +122,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -68,8 +148,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -92,8 +172,8 @@
             },
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -120,7 +200,7 @@
       "binary": false
     },
     "discard": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "discard",
       "description": "Discards an array with copyable elements",
       "signature": {
@@ -138,8 +218,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -167,7 +247,7 @@
       "binary": false
     },
     "discard_empty": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "discard_empty",
       "description": "Discard an empty array",
       "signature": {
@@ -181,8 +261,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "BoundedNat",
@@ -206,9 +286,9 @@
       "binary": false
     },
     "from_array": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "from_array",
-      "description": "Turns `array` into `panic_array`",
+      "description": "Turns `array` into `borrow_array`",
       "signature": {
         "params": [
           {
@@ -250,8 +330,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -278,7 +358,7 @@
       "binary": false
     },
     "get": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "get",
       "description": "Get an element from an array",
       "signature": {
@@ -296,8 +376,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -339,8 +419,8 @@
             },
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -367,30 +447,89 @@
       "binary": false
     },
     "new_array": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "new_array",
       "description": "Create a new array from elements",
       "signature": null,
       "binary": true
     },
     "pop_left": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "pop_left",
       "description": "Pop an element from the left of an array",
       "signature": null,
       "binary": true
     },
     "pop_right": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "pop_right",
       "description": "Pop an element from the right of an array",
       "signature": null,
       "binary": true
     },
-    "put": {
-      "extension": "collections.panic_array",
-      "name": "put",
-      "description": "Put an element into a panic array (panicking if there is an element already)",
+    "repeat": {
+      "extension": "collections.borrow_arr",
+      "name": "repeat",
+      "description": "Creates a new array whose elements are initialised by calling the given function n times",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                }
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "return": {
+      "extension": "collections.borrow_arr",
+      "name": "return",
+      "description": "Put an element into a borrow array (panicking if there is an element already)",
       "signature": {
         "params": [
           {
@@ -406,8 +545,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -440,67 +579,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "repeat": {
-      "extension": "collections.panic_array",
-      "name": "repeat",
-      "description": "Creates a new array whose elements are initialised by calling the given function n times",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "G",
-              "input": [],
-              "output": [
-                {
-                  "t": "V",
-                  "i": 1,
-                  "b": "A"
-                }
-              ]
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -527,7 +607,7 @@
       "binary": false
     },
     "scan": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "scan",
       "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
       "signature": {
@@ -556,8 +636,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -614,8 +694,8 @@
           "output": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -647,7 +727,7 @@
       "binary": false
     },
     "set": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "set",
       "description": "Set an element in an array",
       "signature": {
@@ -665,8 +745,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -709,8 +789,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.panic_array",
-                    "id": "panic_array",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -740,8 +820,8 @@
                   },
                   {
                     "t": "Opaque",
-                    "extension": "collections.panic_array",
-                    "id": "panic_array",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -771,7 +851,7 @@
       "binary": false
     },
     "swap": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "swap",
       "description": "Swap two elements in an array",
       "signature": {
@@ -789,8 +869,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -826,8 +906,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.panic_array",
-                    "id": "panic_array",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -852,8 +932,8 @@
                 [
                   {
                     "t": "Opaque",
-                    "extension": "collections.panic_array",
-                    "id": "panic_array",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
                     "args": [
                       {
                         "tya": "Variable",
@@ -882,90 +962,10 @@
       },
       "binary": false
     },
-    "take": {
-      "extension": "collections.panic_array",
-      "name": "take",
-      "description": "Take an element from a panic array (panicking if it was already taken before)",
-      "signature": {
-        "params": [
-          {
-            "tp": "BoundedNat",
-            "bound": null
-          },
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            },
-            {
-              "t": "I"
-            }
-          ],
-          "output": [
-            {
-              "t": "V",
-              "i": 1,
-              "b": "A"
-            },
-            {
-              "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
-              "args": [
-                {
-                  "tya": "Variable",
-                  "idx": 0,
-                  "cached_decl": {
-                    "tp": "BoundedNat",
-                    "bound": null
-                  }
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 1,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
     "to_array": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "to_array",
-      "description": "Turns `panic_array` into `array`",
+      "description": "Turns `borrow_array` into `array`",
       "signature": {
         "params": [
           {
@@ -981,8 +981,8 @@
           "input": [
             {
               "t": "Opaque",
-              "extension": "collections.panic_array",
-              "id": "panic_array",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
               "args": [
                 {
                   "tya": "Variable",
@@ -1035,7 +1035,7 @@
       "binary": false
     },
     "unpack": {
-      "extension": "collections.panic_array",
+      "extension": "collections.borrow_arr",
       "name": "unpack",
       "description": "Unpack an array into its elements",
       "signature": null,

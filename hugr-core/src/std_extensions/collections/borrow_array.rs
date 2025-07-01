@@ -1,5 +1,5 @@
 //! A version of the standard fixed-length array extension that includes unsafe
-//! operations that may panic.
+//! operations for borrowing and returning that may panic.
 
 use std::sync::{self, Arc};
 
@@ -38,12 +38,12 @@ use super::array::{
     GenericArrayScanDef, GenericArrayValue, INTO,
 };
 
-/// Reported unique name of the panic array type.
-pub const PANIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("panic_array");
-/// Reported unique name of the panic array value.
-pub const PANIC_ARRAY_VALUENAME: TypeName = TypeName::new_inline("panic_array");
+/// Reported unique name of the borrow array type.
+pub const BORROW_ARRAY_TYPENAME: TypeName = TypeName::new_inline("borrow_array");
+/// Reported unique name of the borrow array value.
+pub const BORROW_ARRAY_VALUENAME: TypeName = TypeName::new_inline("borrow_array");
 /// Reported unique name of the extension
-pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.panic_array");
+pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.borrow_arr");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
@@ -51,54 +51,54 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 ///
 /// Panic arrays are linear, even if their elements are copyable.
 #[derive(Clone, Copy, Debug, derive_more::Display, Eq, PartialEq, Default)]
-pub struct PanicArray;
+pub struct BorrowArray;
 
-impl ArrayKind for PanicArray {
+impl ArrayKind for BorrowArray {
     const EXTENSION_ID: ExtensionId = EXTENSION_ID;
-    const TYPE_NAME: TypeName = PANIC_ARRAY_TYPENAME;
-    const VALUE_NAME: ValueName = PANIC_ARRAY_VALUENAME;
+    const TYPE_NAME: TypeName = BORROW_ARRAY_TYPENAME;
+    const VALUE_NAME: ValueName = BORROW_ARRAY_VALUENAME;
 
     fn extension() -> &'static Arc<Extension> {
         &EXTENSION
     }
 
     fn type_def() -> &'static TypeDef {
-        EXTENSION.get_type(&PANIC_ARRAY_TYPENAME).unwrap()
+        EXTENSION.get_type(&BORROW_ARRAY_TYPENAME).unwrap()
     }
 }
 
 /// Panic array operation definitions.
-pub type PArrayOpDef = GenericArrayOpDef<PanicArray>;
+pub type BArrayOpDef = GenericArrayOpDef<BorrowArray>;
 /// Panic array clone operation definition.
-pub type PArrayCloneDef = GenericArrayCloneDef<PanicArray>;
+pub type BArrayCloneDef = GenericArrayCloneDef<BorrowArray>;
 /// Panic array discard operation definition.
-pub type PArrayDiscardDef = GenericArrayDiscardDef<PanicArray>;
+pub type BArrayDiscardDef = GenericArrayDiscardDef<BorrowArray>;
 /// Panic array repeat operation definition.
-pub type PArrayRepeatDef = GenericArrayRepeatDef<PanicArray>;
+pub type BArrayRepeatDef = GenericArrayRepeatDef<BorrowArray>;
 /// Panic array scan operation definition.
-pub type PArrayScanDef = GenericArrayScanDef<PanicArray>;
+pub type BArrayScanDef = GenericArrayScanDef<BorrowArray>;
 /// Panic array to default array conversion operation definition.
-pub type PArrayToArrayDef = GenericArrayConvertDef<PanicArray, INTO, Array>;
+pub type BArrayToArrayDef = GenericArrayConvertDef<BorrowArray, INTO, Array>;
 /// Panic array from default array conversion operation definition.
-pub type PArrayFromArrayDef = GenericArrayConvertDef<PanicArray, FROM, Array>;
+pub type BArrayFromArrayDef = GenericArrayConvertDef<BorrowArray, FROM, Array>;
 
 /// Panic array operations.
-pub type PArrayOp = GenericArrayOp<PanicArray>;
+pub type BArrayOp = GenericArrayOp<BorrowArray>;
 /// The array clone operation.
-pub type PArrayClone = GenericArrayClone<PanicArray>;
+pub type BArrayClone = GenericArrayClone<BorrowArray>;
 /// The array discard operation.
-pub type PArrayDiscard = GenericArrayDiscard<PanicArray>;
+pub type BArrayDiscard = GenericArrayDiscard<BorrowArray>;
 /// The array repeat operation.
-pub type PArrayRepeat = GenericArrayRepeat<PanicArray>;
+pub type BArrayRepeat = GenericArrayRepeat<BorrowArray>;
 /// The array scan operation.
-pub type PArrayScan = GenericArrayScan<PanicArray>;
-/// The panic array to default array conversion operation.
-pub type PArrayToArray = GenericArrayConvert<PanicArray, INTO, Array>;
-/// The panic array from default array conversion operation.
-pub type PArrayFromArray = GenericArrayConvert<PanicArray, FROM, Array>;
+pub type BArrayScan = GenericArrayScan<BorrowArray>;
+/// The borrow array to default array conversion operation.
+pub type BArrayToArray = GenericArrayConvert<BorrowArray, INTO, Array>;
+/// The borrow array from default array conversion operation.
+pub type BArrayFromArray = GenericArrayConvert<BorrowArray, FROM, Array>;
 
-/// A panic array extension value.
-pub type PArrayValue = GenericArrayValue<PanicArray>;
+/// A borrow array extension value.
+pub type BArrayValue = GenericArrayValue<BorrowArray>;
 
 #[derive(
     Clone,
@@ -113,18 +113,19 @@ pub type PArrayValue = GenericArrayValue<PanicArray>;
 )]
 #[allow(non_camel_case_types, missing_docs)]
 #[non_exhaustive]
-pub enum PArrayUnsafeOpDef {
-    /// `take<size, elem_ty>: panic_array<size, elem_ty>, index -> elem_ty, panic_array<size, elem_ty>`
-    take,
-    /// `put<size, elem_ty>: panic_array<size, elem_ty>, index, elem_ty -> panic_array<size, elem_ty>`
-    put,
+pub enum BArrayUnsafeOpDef {
+    /// `borrow<size, elem_ty>: borrow_array<size, elem_ty>, index -> elem_ty, borrow_array<size, elem_ty>`
+    borrow,
+    /// `return<size, elem_ty>: borrow_array<size, elem_ty>, index, elem_ty -> borrow_array<size, elem_ty>`
+    #[strum(serialize = "return")]
+    r#return,
 }
 
-impl PArrayUnsafeOpDef {
-    /// Instantiate a new unsafe panic array operation with the given element type and array size.
+impl BArrayUnsafeOpDef {
+    /// Instantiate a new unsafe borrow array operation with the given element type and array size.
     #[must_use]
-    pub fn to_concrete(self, elem_ty: Type, size: u64) -> PArrayUnsafeOp {
-        PArrayUnsafeOp {
+    pub fn to_concrete(self, elem_ty: Type, size: u64) -> BArrayUnsafeOp {
+        BArrayUnsafeOp {
             def: self,
             elem_ty,
             size,
@@ -144,11 +145,11 @@ impl PArrayUnsafeOpDef {
         let usize_t: Type = usize_t();
 
         match self {
-            Self::take => PolyFuncTypeRV::new(
+            Self::borrow => PolyFuncTypeRV::new(
                 params,
                 FuncValueType::new(vec![array_ty.clone(), usize_t], vec![elem_ty_var, array_ty]),
             ),
-            Self::put => PolyFuncTypeRV::new(
+            Self::r#return => PolyFuncTypeRV::new(
                 params,
                 FuncValueType::new(
                     vec![array_ty.clone(), usize_t, elem_ty_var.clone()],
@@ -160,7 +161,7 @@ impl PArrayUnsafeOpDef {
     }
 }
 
-impl MakeOpDef for PArrayUnsafeOpDef {
+impl MakeOpDef for BArrayUnsafeOpDef {
     fn opdef_id(&self) -> OpName {
         <&'static str>::from(self).into()
     }
@@ -174,7 +175,7 @@ impl MakeOpDef for PArrayUnsafeOpDef {
 
     fn init_signature(&self, extension_ref: &sync::Weak<Extension>) -> SignatureFunc {
         self.signature_from_def(
-            EXTENSION.get_type(&PANIC_ARRAY_TYPENAME).unwrap(),
+            EXTENSION.get_type(&BORROW_ARRAY_TYPENAME).unwrap(),
             extension_ref,
         )
     }
@@ -189,11 +190,11 @@ impl MakeOpDef for PArrayUnsafeOpDef {
 
     fn description(&self) -> String {
         match self {
-            Self::take => {
-                "Take an element from a panic array (panicking if it was already taken before)"
+            Self::borrow => {
+                "Take an element from a borrow array (panicking if it was already taken before)"
             }
-            Self::put => {
-                "Put an element into a panic array (panicking if there is an element already)"
+            Self::r#return => {
+                "Put an element into a borrow array (panicking if there is an element already)"
             }
         }
         .into()
@@ -206,7 +207,7 @@ impl MakeOpDef for PArrayUnsafeOpDef {
         extension_ref: &sync::Weak<Extension>,
     ) -> Result<(), crate::extension::ExtensionBuildError> {
         let sig = self.signature_from_def(
-            extension.get_type(&PANIC_ARRAY_TYPENAME).unwrap(),
+            extension.get_type(&BORROW_ARRAY_TYPENAME).unwrap(),
             extension_ref,
         );
         let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
@@ -219,16 +220,16 @@ impl MakeOpDef for PArrayUnsafeOpDef {
 
 #[derive(Clone, Debug, PartialEq)]
 /// Concrete array operation.
-pub struct PArrayUnsafeOp {
+pub struct BArrayUnsafeOp {
     /// The operation definition.
-    pub def: PArrayUnsafeOpDef,
+    pub def: BArrayUnsafeOpDef,
     /// The element type of the array.
     pub elem_ty: Type,
     /// The size of the array.
     pub size: u64,
 }
 
-impl MakeExtensionOp for PArrayUnsafeOp {
+impl MakeExtensionOp for BArrayUnsafeOp {
     fn op_id(&self) -> OpName {
         self.def.opdef_id()
     }
@@ -237,7 +238,7 @@ impl MakeExtensionOp for PArrayUnsafeOp {
     where
         Self: Sized,
     {
-        let def = PArrayUnsafeOpDef::from_def(ext_op.def())?;
+        let def = BArrayUnsafeOpDef::from_def(ext_op.def())?;
         def.instantiate(ext_op.args())
     }
 
@@ -246,12 +247,12 @@ impl MakeExtensionOp for PArrayUnsafeOp {
     }
 }
 
-impl HasDef for PArrayUnsafeOp {
-    type Def = PArrayUnsafeOpDef;
+impl HasDef for BArrayUnsafeOp {
+    type Def = BArrayUnsafeOpDef;
 }
 
-impl HasConcrete for PArrayUnsafeOpDef {
-    type Concrete = PArrayUnsafeOp;
+impl HasConcrete for BArrayUnsafeOpDef {
+    type Concrete = BArrayUnsafeOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
@@ -261,7 +262,7 @@ impl HasConcrete for PArrayUnsafeOpDef {
     }
 }
 
-impl MakeRegisteredOp for PArrayUnsafeOp {
+impl MakeRegisteredOp for BArrayUnsafeOp {
     fn extension_id(&self) -> ExtensionId {
         EXTENSION_ID.clone()
     }
@@ -272,34 +273,34 @@ impl MakeRegisteredOp for PArrayUnsafeOp {
 }
 
 lazy_static! {
-    /// Extension for panic array operations.
+    /// Extension for borrow array operations.
     pub static ref EXTENSION: Arc<Extension> = {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
-                    PANIC_ARRAY_TYPENAME,
+                    BORROW_ARRAY_TYPENAME,
                     vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
-                    "Fixed-length panic array".into(),
+                    "Fixed-length borrow array".into(),
                     // Panic array is linear, even if the elements are copyable.
                     TypeDefBound::any(),
                     extension_ref,
                 )
                 .unwrap();
 
-            PArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            PArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
-            PArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
-            PArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            PArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
-            PArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
-            PArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+            BArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+            BArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
 
-            PArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
+            BArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
 }
 
-#[typetag::serde(name = "PArrayValue")]
-impl CustomConst for PArrayValue {
+#[typetag::serde(name = "BArrayValue")]
+impl CustomConst for BArrayValue {
     delegate! {
         to self {
             fn name(&self) -> ValueName;
@@ -317,34 +318,34 @@ impl CustomConst for PArrayValue {
     }
 }
 
-/// Gets the [`TypeDef`] for panic arrays. Note that instantiations are more easily
-/// created via [`panic_array_type`] and [`panic_array_type_parametric`]
+/// Gets the [`TypeDef`] for borrow arrays. Note that instantiations are more easily
+/// created via [`borrow_array_type`] and [`borrow_array_type_parametric`]
 #[must_use]
-pub fn panic_array_type_def() -> &'static TypeDef {
-    PanicArray::type_def()
+pub fn borrow_array_type_def() -> &'static TypeDef {
+    BorrowArray::type_def()
 }
 
-/// Instantiate a new panic array type given a size argument and element type.
+/// Instantiate a new borrow array type given a size argument and element type.
 ///
-/// This method is equivalent to [`panic_array_type_parametric`], but uses concrete
+/// This method is equivalent to [`borrow_array_type_parametric`], but uses concrete
 /// arguments types to ensure no errors are possible.
 #[must_use]
-pub fn panic_array_type(size: u64, element_ty: Type) -> Type {
-    PanicArray::ty(size, element_ty)
+pub fn borrow_array_type(size: u64, element_ty: Type) -> Type {
+    BorrowArray::ty(size, element_ty)
 }
 
-/// Instantiate a new panic array type given the size and element type parameters.
+/// Instantiate a new borrow array type given the size and element type parameters.
 ///
-/// This is a generic version of [`panic_array_type`].
-pub fn panic_array_type_parametric(
+/// This is a generic version of [`borrow_array_type`].
+pub fn borrow_array_type_parametric(
     size: impl Into<TypeArg>,
     element_ty: impl Into<TypeArg>,
 ) -> Result<Type, SignatureError> {
-    PanicArray::ty_parametric(size, element_ty)
+    BorrowArray::ty_parametric(size, element_ty)
 }
 
-/// Trait for building panic array operations in a dataflow graph.
-pub trait PArrayOpBuilder: GenericArrayOpBuilder {
+/// Trait for building borrow array operations in a dataflow graph.
+pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// Adds a new array operation to the dataflow graph and return the wire
     /// representing the new array.
     ///
@@ -360,12 +361,12 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the new array.
-    fn add_new_panic_array(
+    fn add_new_borrow_array(
         &mut self,
         elem_ty: Type,
         values: impl IntoIterator<Item = Wire>,
     ) -> Result<Wire, BuildError> {
-        self.add_new_generic_array::<PanicArray>(elem_ty, values)
+        self.add_new_generic_array::<BorrowArray>(elem_ty, values)
     }
     /// Adds an array unpack operation to the dataflow graph.
     ///
@@ -384,13 +385,13 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// A vector of wires representing the individual elements from the array.
-    fn add_panic_array_unpack(
+    fn add_borrow_array_unpack(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Vec<Wire>, BuildError> {
-        self.add_generic_array_unpack::<PanicArray>(elem_ty, size, input)
+        self.add_generic_array_unpack::<BorrowArray>(elem_ty, size, input)
     }
     /// Adds an array clone operation to the dataflow graph and return the wires
     /// representing the original and cloned array.
@@ -408,13 +409,13 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wires representing the original and cloned array.
-    fn add_panic_array_clone(
+    fn add_borrow_array_clone(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        self.add_generic_array_clone::<PanicArray>(elem_ty, size, input)
+        self.add_generic_array_clone::<BorrowArray>(elem_ty, size, input)
     }
 
     /// Adds an array discard operation to the dataflow graph.
@@ -428,13 +429,13 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// If building the operation fails.
-    fn add_panic_array_discard(
+    fn add_borrow_array_discard(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<(), BuildError> {
-        self.add_generic_array_discard::<PanicArray>(elem_ty, size, input)
+        self.add_generic_array_discard::<BorrowArray>(elem_ty, size, input)
     }
 
     /// Adds an array get operation to the dataflow graph.
@@ -454,14 +455,14 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     ///
     /// * The wire representing the value at the specified index in the array
     /// * The wire representing the array
-    fn add_panic_array_get(
+    fn add_borrow_array_get(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        self.add_generic_array_get::<PanicArray>(elem_ty, size, input, index)
+        self.add_generic_array_get::<BorrowArray>(elem_ty, size, input, index)
     }
 
     /// Adds an array set operation to the dataflow graph.
@@ -483,7 +484,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the updated array after the set operation.
-    fn add_panic_array_set(
+    fn add_borrow_array_set(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -491,7 +492,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_set::<PanicArray>(elem_ty, size, input, index, value)
+        self.add_generic_array_set::<BorrowArray>(elem_ty, size, input, index, value)
     }
 
     /// Adds an array swap operation to the dataflow graph.
@@ -513,7 +514,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the updated array after the swap operation.
-    fn add_panic_array_swap(
+    fn add_borrow_array_swap(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -522,7 +523,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         index2: Wire,
     ) -> Result<Wire, BuildError> {
         let op =
-            GenericArrayOpDef::<PanicArray>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+            GenericArrayOpDef::<BorrowArray>::swap.instantiate(&[size.into(), elem_ty.into()])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();
@@ -546,13 +547,13 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_panic_array_pop_left(
+    fn add_borrow_array_pop_left(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_pop_left::<PanicArray>(elem_ty, size, input)
+        self.add_generic_array_pop_left::<BorrowArray>(elem_ty, size, input)
     }
 
     /// Adds an array pop-right operation to the dataflow graph.
@@ -572,13 +573,13 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// The wire representing the Option<elemty, array<SIZE-1, elemty>>
-    fn add_panic_array_pop_right(
+    fn add_borrow_array_pop_right(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        self.add_generic_array_pop_right::<PanicArray>(elem_ty, size, input)
+        self.add_generic_array_pop_right::<BorrowArray>(elem_ty, size, input)
     }
 
     /// Adds an operation to discard an empty array from the dataflow graph.
@@ -591,7 +592,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_panic_array_discard_empty(
+    fn add_borrow_array_discard_empty(
         &mut self,
         elem_ty: Type,
         input: Wire,
@@ -599,7 +600,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         self.add_generic_array_discard_empty::<Array>(elem_ty, input)
     }
 
-    /// Adds a panic array take operation to the dataflow graph.
+    /// Adds a borrow array borrow operation to the dataflow graph.
     ///
     /// # Arguments
     ///
@@ -611,21 +612,21 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_panic_array_take(
+    fn add_borrow_array_borrow(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::borrow.instantiate(&[size.into(), elem_ty.into()])?;
         let [out, arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();
         Ok((out, arr))
     }
 
-    /// Adds a panic array put operation to the dataflow graph.
+    /// Adds a borrow array put operation to the dataflow graph.
     ///
     /// # Arguments
     ///
@@ -638,7 +639,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_panic_array_put(
+    fn add_borrow_array_return(
         &mut self,
         elem_ty: Type,
         size: u64,
@@ -646,7 +647,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = PArrayUnsafeOpDef::put.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::r#return.instantiate(&[size.into(), elem_ty.into()])?;
         let [arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index, value])?
             .outputs_arr();
@@ -654,14 +655,14 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     }
 }
 
-impl<D: Dataflow> PArrayOpBuilder for D {}
+impl<D: Dataflow> BArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr as _},
         extension::prelude::{ConstUsize, qb_t},
-        std_extensions::collections::panic_array::{PArrayOpBuilder, panic_array_type},
+        std_extensions::collections::borrow_array::{BArrayOpBuilder, borrow_array_type},
         types::Signature,
     };
 
@@ -669,17 +670,17 @@ mod test {
     fn all_unsafe_ops() {
         let size = 22;
         let elem_ty = qb_t();
-        let arr_ty = panic_array_type(size, elem_ty.clone());
+        let arr_ty = borrow_array_type(size, elem_ty.clone());
         let _ = {
             let mut builder = DFGBuilder::new(Signature::new_endo(vec![arr_ty.clone()])).unwrap();
             let idx1 = builder.add_load_value(ConstUsize::new(11));
             let idx2 = builder.add_load_value(ConstUsize::new(11));
             let [arr] = builder.input_wires_arr();
             let (el, arr_with_take) = builder
-                .add_panic_array_take(elem_ty.clone(), size, arr, idx1)
+                .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx1)
                 .unwrap();
             let arr_with_put = builder
-                .add_panic_array_put(elem_ty, size, arr_with_take, idx2, el)
+                .add_borrow_array_return(elem_ty, size, arr_with_take, idx2, el)
                 .unwrap();
             builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
         };
