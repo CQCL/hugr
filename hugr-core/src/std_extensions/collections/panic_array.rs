@@ -130,26 +130,14 @@ impl PArrayUnsafeOpDef {
             size,
         }
     }
-}
 
-impl MakeOpDef for PArrayUnsafeOpDef {
-    fn opdef_id(&self) -> OpName {
-        <&'static str>::from(self).into()
-    }
-
-    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
-    where
-        Self: Sized,
-    {
-        try_from_name(op_def.name(), op_def.extension_id())
-    }
-
-    fn init_signature(&self, _extension_ref: &sync::Weak<Extension>) -> SignatureFunc {
+    fn signature_from_def(&self, def: &TypeDef, _: &sync::Weak<Extension>) -> SignatureFunc {
         let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
-        let array_ty =
-            PanicArray::instantiate_ty(PanicArray::type_def(), size_var, elem_ty_var.clone())
-                .expect("Panic array instantiation failed");
+        let array_ty: Type = def
+            .instantiate(vec![size_var, elem_ty_var.clone().into()])
+            .unwrap()
+            .into();
 
         let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
 
@@ -170,6 +158,26 @@ impl MakeOpDef for PArrayUnsafeOpDef {
         }
         .into()
     }
+}
+
+impl MakeOpDef for PArrayUnsafeOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        try_from_name(op_def.name(), op_def.extension_id())
+    }
+
+    fn init_signature(&self, extension_ref: &sync::Weak<Extension>) -> SignatureFunc {
+        self.signature_from_def(
+            EXTENSION.get_type(&PANIC_ARRAY_TYPENAME).unwrap(),
+            extension_ref,
+        )
+    }
 
     fn extension_ref(&self) -> sync::Weak<Extension> {
         Arc::downgrade(&EXTENSION)
@@ -189,6 +197,23 @@ impl MakeOpDef for PArrayUnsafeOpDef {
             }
         }
         .into()
+    }
+
+    // This method is re-defined here to avoid recursive loops initializing the extension.
+    fn add_to_extension(
+        &self,
+        extension: &mut Extension,
+        extension_ref: &sync::Weak<Extension>,
+    ) -> Result<(), crate::extension::ExtensionBuildError> {
+        let sig = self.signature_from_def(
+            extension.get_type(&PANIC_ARRAY_TYPENAME).unwrap(),
+            extension_ref,
+        );
+        let def = extension.add_op(self.opdef_id(), self.description(), sig, extension_ref)?;
+
+        self.post_opdef(def);
+
+        Ok(())
     }
 }
 
@@ -621,7 +646,7 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = PArrayUnsafeOpDef::put.instantiate(&[size.into(), elem_ty.into()])?;
         let [arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index, value])?
             .outputs_arr();
@@ -633,14 +658,14 @@ impl<D: Dataflow> PArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
-    /*     use crate::{
+    use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr as _},
         extension::prelude::{ConstUsize, qb_t},
         std_extensions::collections::panic_array::{PArrayOpBuilder, panic_array_type},
         types::Signature,
     };
 
-     #[test]
+    #[test]
     fn all_unsafe_ops() {
         let size = 22;
         let elem_ty = qb_t();
@@ -658,5 +683,5 @@ mod test {
                 .unwrap();
             builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
         };
-    } */
+    }
 }
