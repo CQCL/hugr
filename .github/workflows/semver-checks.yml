@@ -1,6 +1,6 @@
 name: Rust Semver Checks
 on:
-  pull_request_target:
+  pull_request:
     branches:
       - '**'
 
@@ -42,7 +42,7 @@ jobs:
   rs-semver-checks:
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@2a2f5ca8e000030636dc1511f6c935c1492204c3
     with:
       apt-dependencies: llvm-14
     secrets:
