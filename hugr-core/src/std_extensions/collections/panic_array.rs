@@ -1,19 +1,34 @@
 //! A version of the standard fixed-length array extension that includes unsafe
 //! operations that may panic.
 
-use std::sync::Arc;
+use std::sync::{self, Arc};
 
 use delegate::delegate;
 use lazy_static::lazy_static;
 
-use crate::builder::{BuildError, Dataflow};
-use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::simple_op::{HasConcrete, MakeOpDef};
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{CustomCheckFailure, Type, TypeBound, TypeName};
+use crate::types::{CustomCheckFailure, Term, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
+use crate::{
+    builder::{BuildError, Dataflow},
+    extension::SignatureFunc,
+};
+use crate::{
+    extension::simple_op::{HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp},
+    ops::ExtensionOp,
+};
+use crate::{
+    extension::{
+        OpDef,
+        prelude::usize_t,
+        resolution::{ExtensionResolutionError, WeakExtensionRegistry},
+        simple_op::{OpLoadError, try_from_name},
+    },
+    ops::OpName,
+    types::{FuncValueType, PolyFuncTypeRV},
+};
 
 use super::array::op_builder::GenericArrayOpBuilder;
 use super::array::{
@@ -84,6 +99,151 @@ pub type PArrayFromArray = GenericArrayConvert<PanicArray, FROM, Array>;
 
 /// A panic array extension value.
 pub type PArrayValue = GenericArrayValue<PanicArray>;
+
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    strum::EnumIter,
+    strum::IntoStaticStr,
+    strum::EnumString,
+)]
+#[allow(non_camel_case_types, missing_docs)]
+#[non_exhaustive]
+pub enum PArrayUnsafeOpDef {
+    /// `take<size, elem_ty>: panic_array<size, elem_ty>, index -> elem_ty, panic_array<size, elem_ty>`
+    take,
+    /// `put<size, elem_ty>: panic_array<size, elem_ty>, index, elem_ty -> panic_array<size, elem_ty>`
+    put,
+}
+
+impl PArrayUnsafeOpDef {
+    /// Instantiate a new unsafe panic array operation with the given element type and array size.
+    #[must_use]
+    pub fn to_concrete(self, elem_ty: Type, size: u64) -> PArrayUnsafeOp {
+        PArrayUnsafeOp {
+            def: self,
+            elem_ty,
+            size,
+        }
+    }
+}
+
+impl MakeOpDef for PArrayUnsafeOpDef {
+    fn opdef_id(&self) -> OpName {
+        <&'static str>::from(self).into()
+    }
+
+    fn from_def(op_def: &OpDef) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        try_from_name(op_def.name(), op_def.extension_id())
+    }
+
+    fn init_signature(&self, _extension_ref: &sync::Weak<Extension>) -> SignatureFunc {
+        let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
+        let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
+        let array_ty = panic_array_type_parametric(size_var, elem_ty_var.clone())
+            .expect("Panic array instantiation failed");
+
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+
+        let usize_t: Type = usize_t();
+
+        match self {
+            Self::take => PolyFuncTypeRV::new(
+                params,
+                FuncValueType::new(vec![array_ty.clone(), usize_t], vec![elem_ty_var, array_ty]),
+            ),
+            Self::put => PolyFuncTypeRV::new(
+                params,
+                FuncValueType::new(
+                    vec![array_ty.clone(), usize_t, elem_ty_var.clone()],
+                    vec![array_ty],
+                ),
+            ),
+        }
+        .into()
+    }
+
+    fn extension_ref(&self) -> sync::Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+
+    fn extension(&self) -> ExtensionId {
+        EXTENSION_ID.clone()
+    }
+
+    fn description(&self) -> String {
+        match self {
+            Self::take => {
+                "Take an element from a panic array (panicking if it was already taken before)"
+            }
+            Self::put => {
+                "Put an element into a panic array (panicking if there is an element already)"
+            }
+        }
+        .into()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+/// Concrete array operation.
+pub struct PArrayUnsafeOp {
+    /// The operation definition.
+    pub def: PArrayUnsafeOpDef,
+    /// The element type of the array.
+    pub elem_ty: Type,
+    /// The size of the array.
+    pub size: u64,
+}
+
+impl MakeExtensionOp for PArrayUnsafeOp {
+    fn op_id(&self) -> OpName {
+        self.def.opdef_id()
+    }
+
+    fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
+    where
+        Self: Sized,
+    {
+        let def = PArrayUnsafeOpDef::from_def(ext_op.def())?;
+        def.instantiate(ext_op.args())
+    }
+
+    fn type_args(&self) -> Vec<TypeArg> {
+        vec![self.size.into(), self.elem_ty.clone().into()]
+    }
+}
+
+impl HasDef for PArrayUnsafeOp {
+    type Def = PArrayUnsafeOpDef;
+}
+
+impl HasConcrete for PArrayUnsafeOpDef {
+    type Concrete = PArrayUnsafeOp;
+
+    fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
+        match type_args {
+            [Term::BoundedNat(n), Term::Runtime(ty)] => Ok(self.to_concrete(ty.clone(), *n)),
+            _ => Err(SignatureError::InvalidTypeArgs.into()),
+        }
+    }
+}
+
+impl MakeRegisteredOp for PArrayUnsafeOp {
+    fn extension_id(&self) -> ExtensionId {
+        EXTENSION_ID.clone()
+    }
+
+    fn extension_ref(&self) -> sync::Weak<Extension> {
+        Arc::downgrade(&EXTENSION)
+    }
+}
 
 lazy_static! {
     /// Extension for panic array operations.
@@ -409,6 +569,58 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         input: Wire,
     ) -> Result<(), BuildError> {
         self.add_generic_array_discard_empty::<Array>(elem_ty, input)
+    }
+
+    /// Adds a panic array take operation to the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to get.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    fn add_panic_array_take(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
+        let [out, arr] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
+        Ok((out, arr))
+    }
+
+    /// Adds a panic array put operation to the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to set.
+    /// * `value` - The wire representing the value to set at the specified index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    fn add_panic_array_put(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index: Wire,
+        value: Wire,
+    ) -> Result<Wire, BuildError> {
+        let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
+        let [arr] = self
+            .add_dataflow_op(op, vec![input, index, value])?
+            .outputs_arr();
+        Ok(arr)
     }
 }
 
