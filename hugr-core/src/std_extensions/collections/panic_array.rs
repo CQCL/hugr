@@ -147,8 +147,9 @@ impl MakeOpDef for PArrayUnsafeOpDef {
     fn init_signature(&self, _extension_ref: &sync::Weak<Extension>) -> SignatureFunc {
         let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
-        let array_ty = panic_array_type_parametric(size_var, elem_ty_var.clone())
-            .expect("Panic array instantiation failed");
+        let array_ty =
+            PanicArray::instantiate_ty(PanicArray::type_def(), size_var, elem_ty_var.clone())
+                .expect("Panic array instantiation failed");
 
         let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
 
@@ -266,6 +267,8 @@ lazy_static! {
             PArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
             PArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
             PArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+
+            PArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
         })
     };
 }
@@ -591,7 +594,9 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
         let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
-        let [out, arr] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
+        let [out, arr] = self
+            .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
+            .outputs_arr();
         Ok((out, arr))
     }
 
@@ -618,10 +623,40 @@ pub trait PArrayOpBuilder: GenericArrayOpBuilder {
     ) -> Result<Wire, BuildError> {
         let op = PArrayUnsafeOpDef::take.instantiate(&[size.into(), elem_ty.into()])?;
         let [arr] = self
-            .add_dataflow_op(op, vec![input, index, value])?
+            .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index, value])?
             .outputs_arr();
         Ok(arr)
     }
 }
 
 impl<D: Dataflow> PArrayOpBuilder for D {}
+
+#[cfg(test)]
+mod test {
+    /*     use crate::{
+        builder::{DFGBuilder, Dataflow, DataflowHugr as _},
+        extension::prelude::{ConstUsize, qb_t},
+        std_extensions::collections::panic_array::{PArrayOpBuilder, panic_array_type},
+        types::Signature,
+    };
+
+     #[test]
+    fn all_unsafe_ops() {
+        let size = 22;
+        let elem_ty = qb_t();
+        let arr_ty = panic_array_type(size, elem_ty.clone());
+        let _ = {
+            let mut builder = DFGBuilder::new(Signature::new_endo(vec![arr_ty.clone()])).unwrap();
+            let idx1 = builder.add_load_value(ConstUsize::new(11));
+            let idx2 = builder.add_load_value(ConstUsize::new(11));
+            let [arr] = builder.input_wires_arr();
+            let (el, arr_with_take) = builder
+                .add_panic_array_take(elem_ty.clone(), size, arr, idx1)
+                .unwrap();
+            let arr_with_put = builder
+                .add_panic_array_put(elem_ty, size, arr_with_take, idx2, el)
+                .unwrap();
+            builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
+        };
+    } */
+}
