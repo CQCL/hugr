@@ -608,7 +608,7 @@ impl<'a> Context<'a> {
             self.import_node(*child, node)?;
         }
 
-        self.create_order_edges(region)?;
+        self.create_order_edges(region, input, output)?;
 
         for meta_item in region_data.meta {
             self.import_node_metadata(node, *meta_item)?;
@@ -620,9 +620,15 @@ impl<'a> Context<'a> {
     }
 
     /// Create order edges between nodes of a dataflow region based on order hint metadata.
+    /// Also creates order edges from the input and to the output node.
     ///
     /// This method assumes that the nodes for the children of the region have already been imported.
-    fn create_order_edges(&mut self, region_id: table::RegionId) -> Result<(), ImportError> {
+    fn create_order_edges(
+        &mut self,
+        region_id: table::RegionId,
+        input: Node,
+        output: Node,
+    ) -> Result<(), ImportError> {
         let region_data = self.get_region(region_id)?;
         debug_assert_eq!(region_data.kind, model::RegionKind::DataFlow);
 
@@ -683,6 +689,34 @@ impl<'a> Context<'a> {
                 .ok_or(OrderHintError::NoOrderPort(*b))?;
 
             self.hugr.connect(a_node, a_port, b_node, b_port);
+        }
+
+        // Insert order edges from the input
+        let input_order_port = self
+            .hugr
+            .get_optype(input)
+            .other_output_port()
+            .expect("Input node must have an order output");
+
+        let output_order_port = self
+            .hugr
+            .get_optype(output)
+            .other_input_port()
+            .expect("Output node must have an order output");
+
+        for node in region_data.children {
+            let node = self.nodes[node];
+            let optype = self.hugr.get_optype(node);
+            let node_order_input = optype.other_input_port();
+            let node_order_output = optype.other_output_port();
+
+            if let Some(port) = node_order_input {
+                self.hugr.connect(input, input_order_port, node, port);
+            }
+
+            if let Some(port) = node_order_output {
+                self.hugr.connect(node, port, output, output_order_port);
+            }
         }
 
         Ok(())
