@@ -28,7 +28,7 @@ macro_rules! impl_dataflow_parent_methods {
                     .expect("valid DFG graph")
             }
 
-            /// Rewire the inputs and outputs of the DFG to modify its signature.
+            /// Rewire the inputs and outputs of the nested DFG to modify its signature.
             ///
             /// Reorder the outgoing resp. incoming wires at the input resp. output
             /// node of the DFG to modify the signature of the DFG HUGR. This will

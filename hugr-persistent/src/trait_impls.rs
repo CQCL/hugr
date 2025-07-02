@@ -175,11 +175,11 @@ impl<R> HugrView for PersistentHugr<R> {
         } else {
             match port.as_directed() {
                 Either::Left(incoming) => {
-                    let (out_node, out_port) = self.get_single_outgoing_port(node, incoming);
+                    let (out_node, out_port) = self.single_outgoing_port(node, incoming);
                     ret_ports.push((out_node, out_port.into()))
                 }
                 Either::Right(outgoing) => ret_ports.extend(
-                    self.get_all_incoming_ports(node, outgoing)
+                    self.all_incoming_ports(node, outgoing)
                         .map(|(node, port)| (node, port.into())),
                 ),
             }
