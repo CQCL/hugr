@@ -244,12 +244,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> from hugr.std.logic import Not
             >>> dfg = TrackedDfg(tys.Bool)
             >>> [b] = dfg.track_inputs()
-            >>> for _ in range(8):
+            >>> for _ in range(6):
             ...     _= dfg.add(Not(b));
             >>> dfg.set_tracked_outputs()
             >>> nodes = list(dfg.hugr)
-            >>> list(dfg.hugr.sorted_region_nodes(nodes[1]))
-            [Node(2), Node(4), Node(3)]
+            >>> list(dfg.hugr.sorted_region_nodes(nodes[4]))
+            [Node(5), Node(7), Node(8), Node(9), Node(10), Node(11), Node(12), Node(6)]
         """
         # A dict to keep track of how many times we see a node.
         # Store the Nodes with the input degrees as values.
