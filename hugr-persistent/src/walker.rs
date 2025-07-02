@@ -60,7 +60,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
 };
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use thiserror::Error;
 
 use hugr_core::{
@@ -203,10 +203,14 @@ impl<'a, R: Resolver> Walker<'a, R> {
     /// walkers, which together cover the same space of possible HUGRs, each
     /// having a different additional node pinned.
     ///
-    /// Return an iterator over all possible [`Walker`]s that can be created by
-    /// pinning exactly one additional node (or one additonal commit with an
-    /// empty wire) connected to `wire`. Each returned [`Walker`] represents
-    /// a different alternative Hugr in the exploration space.
+    /// If the wire is not complete yet, return an iterator over all possible
+    /// [`Walker`]s that can be created by pinning exactly one additional
+    /// node (or one additonal commit with an empty wire) connected to
+    /// `wire`. Each returned [`Walker`] represents a different alternative
+    /// Hugr in the exploration space.
+    ///
+    /// If the wire is already complete, return an iterator containing one
+    /// walker: the current walker unchanged.
     ///
     /// Optionally, the expansion can be restricted to only ports with the given
     /// direction (incoming or outgoing).
@@ -223,6 +227,10 @@ impl<'a, R: Resolver> Walker<'a, R> {
     ) -> impl Iterator<Item = Walker<'a, R>> + 'b {
         let dir = dir.into();
 
+        if self.is_complete(wire, dir) {
+            return Either::Left(std::iter::once(self.clone()));
+        }
+
         // Find unpinned ports on the wire (satisfying the direction constraint)
         let unpinned_ports = self.wire_unpinned_ports(wire, dir);
 
@@ -233,7 +241,7 @@ impl<'a, R: Resolver> Walker<'a, R> {
             .map(|(n, _, commits)| (n, commits))
             .unique();
 
-        pinnable_nodes.filter_map(|(pinnable_node, new_commits)| {
+        let new_walkers = pinnable_nodes.filter_map(|(pinnable_node, new_commits)| {
             let contains_new_commit = || {
                 new_commits
                     .iter()
@@ -268,7 +276,9 @@ impl<'a, R: Resolver> Walker<'a, R> {
             };
             new_walker.try_pin_node(pinnable_node).ok()?;
             Some(new_walker)
-        })
+        });
+
+        Either::Right(new_walkers)
     }
 
     /// Create a new commit from a set of complete pinned wires and a
@@ -436,6 +446,28 @@ impl<R: Clone> Walker<'_, R> {
     }
 }
 
+#[cfg(test)]
+impl<R: Resolver> Walker<'_, R> {
+    // Check walker equality by comparing pointers to the state space and
+    // other fields. Only for testing purposes.
+    fn ptr_eq(&self, other: &Self) -> bool {
+        self.state_space.as_ref() as *const CommitStateSpace<R>
+            == other.state_space.as_ref() as *const CommitStateSpace<R>
+            && self.pinned_nodes == other.pinned_nodes
+            && BTreeSet::from_iter(self.selected_commits.all_commit_ids())
+                == BTreeSet::from_iter(other.selected_commits.all_commit_ids())
+    }
+
+    /// Check if the Walker cannot be expanded further, i.e. expanding it
+    /// returns the same Walker.
+    fn no_more_expansion(&self, wire: &PersistentWire, dir: impl Into<Option<Direction>>) -> bool {
+        let Some([new_walker]) = self.expand(wire, dir).collect_array() else {
+            return false;
+        };
+        new_walker.ptr_eq(self)
+    }
+}
+
 impl<R> CommitStateSpace<R> {
     /// Given a node and port, return all child commits of the current `node`
     /// that delete `node` but keep at least one port linked to `(node, port)`.
@@ -546,7 +578,8 @@ mod tests {
         let in0 = walker.get_wire(base_and_node, IncomingPort::from(0));
 
         // a single incoming port (already pinned) => no more expansion
-        assert!(walker.expand(&in0, Direction::Incoming).next().is_none());
+        assert!(walker.no_more_expansion(&in0, Direction::Incoming));
+
         // commit 2 cannot be applied, because AND is pinned
         // => only base commit, or commit1
         let out_walkers = walker.expand(&in0, Direction::Outgoing).collect_vec();
@@ -555,7 +588,7 @@ mod tests {
             // new wire is complete (and thus cannot be expanded)
             let in0 = new_walker.get_wire(base_and_node, IncomingPort::from(0));
             assert!(new_walker.is_complete(&in0, None));
-            assert!(new_walker.expand(&in0, None).next().is_none());
+            assert!(new_walker.no_more_expansion(&in0, None));
 
             // all nodes on wire are pinned
             let (not_node, _) = in0.single_outgoing_port(new_walker.as_hugr_view()).unwrap();
@@ -612,9 +645,8 @@ mod tests {
         assert!(walker.is_pinned(not4_node));
 
         let not4_out = walker.get_wire(not4_node, OutgoingPort::from(0));
-        let expanded_out = walker.expand(&not4_out, Direction::Outgoing).collect_vec();
         // a single outgoing port (already pinned) => no more expansion
-        assert!(expanded_out.is_empty());
+        assert!(walker.no_more_expansion(&not4_out, Direction::Outgoing));
 
         // Three options:
         // - AND gate from base
@@ -639,7 +671,7 @@ mod tests {
             // new wire is complete (and thus cannot be expanded)
             let not4_out = new_walker.get_wire(not4_node, OutgoingPort::from(0));
             assert!(new_walker.is_complete(&not4_out, None));
-            assert!(new_walker.expand(&not4_out, None).next().is_none());
+            assert!(new_walker.no_more_expansion(&not4_out, None));
 
             // all nodes on wire are pinned
             let (next_node, _) = not4_out
