@@ -228,12 +228,14 @@ mod test {
         let fm = fm.finish_with_outputs(f_inp)?;
 
         let mut me = hb.define_function("ment", Signature::new_endo(usize_t()))?;
-        let mc = me.call(fm.handle(), &[], me.input_wires())?;
-        let me = me.finish_with_outputs(mc.outputs())?;
+        let mut dfg = me.dfg_builder(Signature::new_endo(usize_t()), me.input_wires())?;
+        let mc = dfg.call(fm.handle(), &[], dfg.input_wires())?;
+        let dfg = dfg.finish_with_outputs(mc.outputs()).unwrap();
+        me.finish_with_outputs(dfg.outputs())?;
 
         let mut hugr = hb.finish_hugr()?;
         if use_hugr_entrypoint {
-            hugr.set_entrypoint(me.node());
+            hugr.set_entrypoint(dfg.node());
         }
 
         let avail_funcs = hugr
