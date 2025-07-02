@@ -285,7 +285,7 @@ mod test {
     use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
-    use hugr_core::{Hugr, HugrView, Node};
+    use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
     use crate::{monomorphize, remove_dead_funcs2};
@@ -352,7 +352,11 @@ mod test {
         };
         {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new(usize_t(), outs),
+                Visibility::Public,
+            )?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -400,7 +404,7 @@ mod test {
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
         for n in expected_mangled_names {
-            assert!(funcs.remove(&n).is_some());
+            assert!(funcs.remove(&n).is_some(), "Did not find {n}");
         }
         assert_eq!(funcs.keys().collect_vec(), vec![&"main"]);
         Ok(())
