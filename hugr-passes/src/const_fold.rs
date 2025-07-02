@@ -28,11 +28,14 @@ use crate::{
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
+///
+/// Note that inputs to some nodes should be provided by [ConstantFoldPass::with_inputs];
+/// none are assumed by default.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
-    ///   - a `FuncDefn` child of the root, if the root is a module; or
-    ///   - the entrypoint, if the entrypoint is not a Module
+    ///   - a `FuncDefn` child of the module-root
+    ///   - the entrypoint
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
@@ -40,9 +43,8 @@ pub struct ConstantFoldPass {
 #[non_exhaustive]
 /// Errors produced by [`ConstantFoldPass`].
 pub enum ConstFoldError {
-    /// Error raised when a Node is specified as an entry-point but
-    /// is neither a dataflow parent, nor a [CFG](OpType::CFG), nor
-    /// a [Conditional](OpType::Conditional).
+    /// Error raised when inputs are provided for a Node that is neither a dataflow
+    /// parent, nor a [CFG](OpType::CFG), nor a [Conditional](OpType::Conditional).
     #[error("{node} has OpType {op} which cannot be an entry-point")]
     InvalidEntryPoint {
         /// The node which was specified as an entry-point
@@ -50,7 +52,7 @@ pub enum ConstFoldError {
         /// The `OpType` of the node
         op: OpType,
     },
-    /// The chosen entrypoint is not in the hugr.
+    /// Inputs were provided for a node that is not in the hugr.
     #[error("Entry-point {node} is not part of the Hugr")]
     MissingEntryPoint {
         /// The missing node
@@ -71,15 +73,16 @@ impl ConstantFoldPass {
     }
 
     /// Specifies a number of external inputs to an entry point of the Hugr.
-    /// In normal use, for Module-rooted Hugrs, `node` is a `FuncDefn` child of the root;
-    /// or for non-Module-rooted Hugrs, `node` is the root of the Hugr. (This is not
+    /// In normal use, for Module-rooted Hugrs, `node` is a `FuncDefn` (child of the root);
+    /// for non-Module-rooted Hugrs, `node` is the [HugrView::entrypoint]. (This is not
     /// enforced, but it must be a container and not a module itself.)
     ///
     /// Multiple calls for the same entry-point combine their values, with later
     /// values on the same in-port replacing earlier ones.
     ///
-    /// Note that if `inputs` is empty, this still marks the node as an entry-point, i.e.
-    /// we must preserve nodes required to compute its result.
+    /// Note that providing empty `inputs` indicates that we must preserve nodes required
+    /// to compute the result of `node` for all possible inputs; by default there is no
+    /// such requirement.
     pub fn with_inputs(
         mut self,
         node: Node,
@@ -101,8 +104,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     ///
     /// # Errors
     ///
-    /// [`ConstFoldError::InvalidEntryPoint`] if an entry-point added by [`Self::with_inputs`]
-    /// was of an invalid [`OpType`]
+    /// [ConstFoldError] if inputs were provided via [`Self::with_inputs`] for an invalid node.
     fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
@@ -217,7 +219,7 @@ pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 pub fn fold_constants(h: &mut (impl HugrMut<Node = Node> + 'static), policy: IncludeExports) {
     let mut funcs = Vec::new();
-    if h.get_optype(h.entrypoint()).is_func_defn() {
+    if !h.entrypoint_optype().is_module() {
         funcs.push(h.entrypoint());
     }
     if policy.for_hugr(&h) {

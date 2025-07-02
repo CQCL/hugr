@@ -133,6 +133,9 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// Note that for a [`Module`]-rooted Hugr with no `entry_points` provided, this will remove
 /// all functions from the module.
 ///
+/// Note that, unlike [`DeadCodeElimPass`], this can remove functions *outside* the
+/// [HugrView::entrypoint].
+///
 /// # Errors
 /// * If any node in `entry_points` is not a [`FuncDefn`]
 ///
@@ -140,6 +143,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
+/// [`DeadCodeElimPass`]: super::DeadCodeElimPass
 #[deprecated( // TODO When removing, rename remove_dead_funcs2 over this
     note = "Does not account for visibility; use remove_dead_funcs2 or manually configure RemoveDeadFuncsPass"
 )]
@@ -165,9 +169,6 @@ pub fn remove_dead_funcs(
 ///
 /// Note that, unlike [`DeadCodeElimPass`], this can remove functions *outside* the
 /// [HugrView::entrypoint].
-///
-/// # Errors
-/// * If any node in `entry_points` is not a [`FuncDefn`]
 ///
 /// [`Call`]: hugr_core::ops::OpType::Call
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn

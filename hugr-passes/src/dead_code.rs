@@ -142,10 +142,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                     | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
                     | OpType::Output(_) => true,
                     // FuncDefns (as children of Module) only if public and including exports
-                    // (or by static edges from Call/LoadFunction, in predecessor check below)
+                    // (will be included if static predecessors of Call/LoadFunction below,
+                    // regardless of Visibility or self.include_exports)
                     OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public && self.include_exports.for_hugr(h),
                     OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public && self.include_exports.for_hugr(h),
-                    // No Const
+                    // No Const, unless reached along static edges
                     _ => false
                 };
                 if must_keep || self.must_preserve(h, &mut must_preserve, ch) {
