@@ -226,6 +226,65 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         return self.items()
 
+    def sorted_region_nodes(self, parent: Node) -> Iterator[Node]:
+        """Iterator over a topological ordering of all the hugr nodes.
+
+        Note that the sort is performed within a hugr region and non-local
+        edges are ignored.
+
+        Args:
+            parent: The parent node of the region to sort.
+
+        Raises:
+            ValueError: If the region contains a cycle.
+
+        Examples:
+            >>> from hugr.build.tracked_dfg import TrackedDfg
+            >>> from hugr.std.logic import Not
+            >>> dfg = TrackedDfg(tys.Bool)
+            >>> [b] = dfg.track_inputs()
+            >>> for _ in range(6):
+            ...     _= dfg.add(Not(b));
+            >>> dfg.set_tracked_outputs()
+            >>> nodes = list(dfg.hugr)
+            >>> list(dfg.hugr.sorted_region_nodes(nodes[4]))
+            [Node(5), Node(7), Node(8), Node(9), Node(10), Node(11), Node(12), Node(6)]
+        """
+        # A dict to keep track of how many times we see a node.
+        # Store the Nodes with the input degrees as values.
+        # Implementation uses Kahn's algorithm
+        # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
+        visit_dict: dict[Node, int] = {}
+        queue: Queue[Node] = Queue()
+        for node in self.children(parent):
+            incoming = 0
+            for n in self.input_neighbours(node):
+                same_region = self[n].parent == parent
+                # Only update the degree of the node if edge is within the same region.
+                # We do not count non-local edges.
+                if same_region:
+                    incoming += 1
+            if incoming:
+                visit_dict[node] = incoming
+            # If a Node has no dependencies, add it to the queue.
+            else:
+                queue.put(node)
+
+        while not queue.empty():
+            new_node = queue.get()
+            yield new_node
+
+            for neigh in self.output_neighbours(new_node):
+                visit_dict[neigh] -= 1
+                if visit_dict[neigh] == 0:
+                    del visit_dict[neigh]
+                    queue.put(neigh)
+
+        # If our dict is non-empty here then our graph contains a cycle
+        if visit_dict:
+            err = "Graph contains a cycle. No topological ordering exists."
+            raise ValueError(err)
+
     def links(self) -> Iterator[tuple[OutPort, InPort]]:
         """Iterator over all the links in the HUGR.
 
