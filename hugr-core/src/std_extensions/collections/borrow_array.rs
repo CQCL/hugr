@@ -8,6 +8,7 @@ use lazy_static::lazy_static;
 
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
+use crate::type_row;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{CustomCheckFailure, Term, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
@@ -49,7 +50,7 @@ pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// A linear, unsafe, fixed-length collection of values.
 ///
-/// Panic arrays are linear, even if their elements are copyable.
+/// Borrow arrays are linear, even if their elements are copyable.
 #[derive(Clone, Copy, Debug, derive_more::Display, Eq, PartialEq, Default)]
 pub struct BorrowArray;
 
@@ -67,30 +68,30 @@ impl ArrayKind for BorrowArray {
     }
 }
 
-/// Panic array operation definitions.
+/// Borrow array operation definitions.
 pub type BArrayOpDef = GenericArrayOpDef<BorrowArray>;
-/// Panic array clone operation definition.
+/// Borrow array clone operation definition.
 pub type BArrayCloneDef = GenericArrayCloneDef<BorrowArray>;
-/// Panic array discard operation definition.
+/// Borrow array discard operation definition.
 pub type BArrayDiscardDef = GenericArrayDiscardDef<BorrowArray>;
-/// Panic array repeat operation definition.
+/// Borrow array repeat operation definition.
 pub type BArrayRepeatDef = GenericArrayRepeatDef<BorrowArray>;
-/// Panic array scan operation definition.
+/// Borrow array scan operation definition.
 pub type BArrayScanDef = GenericArrayScanDef<BorrowArray>;
-/// Panic array to default array conversion operation definition.
+/// Borrow array to default array conversion operation definition.
 pub type BArrayToArrayDef = GenericArrayConvertDef<BorrowArray, INTO, Array>;
-/// Panic array from default array conversion operation definition.
+/// Borrow array from default array conversion operation definition.
 pub type BArrayFromArrayDef = GenericArrayConvertDef<BorrowArray, FROM, Array>;
 
-/// Panic array operations.
+/// Borrow array operations.
 pub type BArrayOp = GenericArrayOp<BorrowArray>;
-/// The array clone operation.
+/// The borrow array clone operation.
 pub type BArrayClone = GenericArrayClone<BorrowArray>;
-/// The array discard operation.
+/// The borrow array discard operation.
 pub type BArrayDiscard = GenericArrayDiscard<BorrowArray>;
-/// The array repeat operation.
+/// The borrow array repeat operation.
 pub type BArrayRepeat = GenericArrayRepeat<BorrowArray>;
-/// The array scan operation.
+/// The borrow array scan operation.
 pub type BArrayScan = GenericArrayScan<BorrowArray>;
 /// The borrow array to default array conversion operation.
 pub type BArrayToArray = GenericArrayConvert<BorrowArray, INTO, Array>;
@@ -119,6 +120,8 @@ pub enum BArrayUnsafeOpDef {
     /// `return<size, elem_ty>: borrow_array<size, elem_ty>, index, elem_ty -> borrow_array<size, elem_ty>`
     #[strum(serialize = "return")]
     r#return,
+    /// `return<size, elem_ty>: borrow_array<size, elem_ty> -> ()`
+    discard_empty_borrowed,
 }
 
 impl BArrayUnsafeOpDef {
@@ -156,6 +159,9 @@ impl BArrayUnsafeOpDef {
                     vec![array_ty],
                 ),
             ),
+            Self::discard_empty_borrowed => {
+                PolyFuncTypeRV::new(params, FuncValueType::new(vec![array_ty], type_row![]))
+            }
         }
         .into()
     }
@@ -195,6 +201,9 @@ impl MakeOpDef for BArrayUnsafeOpDef {
             }
             Self::r#return => {
                 "Put an element into a borrow array (panicking if there is an element already)"
+            }
+            Self::discard_empty_borrowed => {
+                "Discard an array where all elements have been borrowed"
             }
         }
         .into()
@@ -280,7 +289,7 @@ lazy_static! {
                     BORROW_ARRAY_TYPENAME,
                     vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
                     "Fixed-length borrow array".into(),
-                    // Panic array is linear, even if the elements are copyable.
+                    // Borrow array is linear, even if the elements are copyable.
                     TypeDefBound::any(),
                     extension_ref,
                 )
@@ -653,21 +662,59 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
             .outputs_arr();
         Ok(arr)
     }
+
+    /// Adds an operation to discard a borrow array where all elements have been borrowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    fn add_discard_empty_borrowed(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+    ) -> Result<(), BuildError> {
+        let op = BArrayUnsafeOpDef::discard_empty_borrowed
+            .instantiate(&[size.into(), elem_ty.into()])?;
+        self.add_dataflow_op(op.to_extension_op().unwrap(), vec![input])?;
+        Ok(())
+    }
 }
 
 impl<D: Dataflow> BArrayOpBuilder for D {}
 
 #[cfg(test)]
 mod test {
+    use strum::IntoEnumIterator;
+
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr as _},
         extension::prelude::{ConstUsize, qb_t},
-        std_extensions::collections::borrow_array::{BArrayOpBuilder, borrow_array_type},
+        ops::OpType,
+        std_extensions::collections::borrow_array::{
+            BArrayOpBuilder, BArrayUnsafeOp, BArrayUnsafeOpDef, borrow_array_type,
+        },
         types::Signature,
     };
 
     #[test]
-    fn all_unsafe_ops() {
+    fn test_borrow_array_unsafe_ops() {
+        for def in BArrayUnsafeOpDef::iter() {
+            let op = def.to_concrete(qb_t(), 2);
+            let optype: OpType = op.clone().into();
+            let new_op: BArrayUnsafeOp = optype.cast().unwrap();
+            assert_eq!(new_op, op);
+        }
+    }
+
+    #[test]
+    fn test_borrow_and_return() {
         let size = 22;
         let elem_ty = qb_t();
         let arr_ty = borrow_array_type(size, elem_ty.clone());
@@ -683,6 +730,26 @@ mod test {
                 .add_borrow_array_return(elem_ty, size, arr_with_take, idx2, el)
                 .unwrap();
             builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
+        };
+    }
+
+    #[test]
+    fn test_discard_empty_borrowed() {
+        let size = 1;
+        let elem_ty = qb_t();
+        let arr_ty = borrow_array_type(size, elem_ty.clone());
+        let _ = {
+            let mut builder =
+                DFGBuilder::new(Signature::new(vec![arr_ty.clone()], vec![qb_t()])).unwrap();
+            let idx = builder.add_load_value(ConstUsize::new(0));
+            let [arr] = builder.input_wires_arr();
+            let (el, arr_with_borrowed) = builder
+                .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
+                .unwrap();
+            builder
+                .add_discard_empty_borrowed(elem_ty, size, arr_with_borrowed)
+                .unwrap();
+            builder.finish_hugr_with_outputs([el]).unwrap()
         };
     }
 }

@@ -146,6 +146,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::ConstF64;
 
     use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
 
     use super::*;
@@ -153,6 +154,7 @@ mod test {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_array_value<AK: ArrayKind>(#[case] _kind: AK) {
         let array_value = GenericArrayValue::<AK>::new(usize_t(), vec![ConstUsize::new(3).into()]);
         array_value.validate().unwrap();

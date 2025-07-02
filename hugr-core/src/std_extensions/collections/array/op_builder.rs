@@ -1,6 +1,7 @@
 //! Builder trait for array operations in the dataflow graph.
 
 use crate::std_extensions::collections::array::GenericArrayOpDef;
+use crate::std_extensions::collections::borrow_array::BorrowArray;
 use crate::std_extensions::collections::value_array::ValueArray;
 use crate::{
     Wire,
@@ -390,6 +391,11 @@ pub fn build_all_value_array_ops<B: Dataflow>(builder: B) -> B {
     build_all_array_ops_generic::<B, ValueArray>(builder)
 }
 
+/// Helper function to build a Hugr that contains all basic array operations.
+pub fn build_all_borrow_array_ops<B: Dataflow>(builder: B) -> B {
+    build_all_array_ops_generic::<B, BorrowArray>(builder)
+}
+
 /// Testing utilities to generate Hugrs that contain array operations.
 #[cfg(test)]
 mod test {
@@ -410,5 +416,12 @@ mod test {
         let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
         let builder = DFGBuilder::new(sig).unwrap();
         build_all_value_array_ops(builder).finish_hugr().unwrap();
+    }
+
+    #[test]
+    fn all_borrow_array_ops() {
+        let sig = Signature::new_endo(Type::EMPTY_TYPEROW);
+        let builder = DFGBuilder::new(sig).unwrap();
+        build_all_borrow_array_ops(builder).finish_hugr().unwrap();
     }
 }
