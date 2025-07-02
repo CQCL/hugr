@@ -177,6 +177,9 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
 
 /// Serialize a Hugr and check that it is valid against the schema.
 ///
+/// NOTE: The schema definition is currently broken, so this check always succeeds.
+/// See <https://github.com/CQCL/hugr/issues/2401>
+///
 /// # Panics
 ///
 /// Panics if the serialization fails or if the schema validation fails.
