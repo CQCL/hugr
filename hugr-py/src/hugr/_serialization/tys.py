@@ -207,12 +207,28 @@ class ListArg(BaseTypeArg):
         return tys.ListArg(elems=deser_it(self.elems))
 
 
+class ListConcatArg(BaseTypeArg):
+    tya: Literal["ListConcat"] = "ListConcat"
+    lists: list[TypeArg]
+
+    def deserialize(self) -> tys.ListConcatArg:
+        return tys.ListConcatArg(lists=deser_it(self.lists))
+
+
 class TupleArg(BaseTypeArg):
     tya: Literal["Tuple"] = "Tuple"
     elems: list[TypeArg]
 
     def deserialize(self) -> tys.TupleArg:
         return tys.TupleArg(elems=deser_it(self.elems))
+
+
+class TupleConcatArg(BaseTypeArg):
+    tya: Literal["TupleConcat"] = "TupleConcat"
+    tuples: list[TypeArg]
+
+    def deserialize(self) -> tys.TupleConcatArg:
+        return tys.TupleConcatArg(tuples=deser_it(self.tuples))
 
 
 class VariableArg(BaseTypeArg):

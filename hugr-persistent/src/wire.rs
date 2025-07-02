@@ -237,8 +237,6 @@ impl<R: Resolver> Walker<'_, R> {
     }
 }
 
-/// Get all ports connected to a wire in a persistent HUGR.
-
 /// Implementation of the (shared) body of [`PersistentWire::all_ports`] and
 /// [`PersistentWire::into_all_ports`].
 fn all_ports_impl<R>(

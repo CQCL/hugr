@@ -388,3 +388,18 @@ fn try_alloc_slice<T, E>(
     }
     Ok(vec.into_bump_slice())
 }
+
+#[cfg(test)]
+mod test {
+    use crate::v0::ast;
+    use bumpalo::Bump;
+    use std::str::FromStr as _;
+
+    #[test]
+    fn vars_in_root_scope() {
+        let text = "(hugr 0) (mod) (meta ?x)";
+        let ast = ast::Package::from_str(text).unwrap();
+        let bump = Bump::new();
+        assert!(ast.resolve(&bump).is_err());
+    }
+}

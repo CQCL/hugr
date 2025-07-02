@@ -271,7 +271,7 @@ pub(crate) mod test {
         for decl in [
             Term::new_list_type(Term::max_nat_type()),
             Term::StringType,
-            Term::TupleType(vec![TypeBound::Any.into(), Term::max_nat_type()]),
+            Term::new_tuple_type([TypeBound::Any.into(), Term::max_nat_type()]),
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
