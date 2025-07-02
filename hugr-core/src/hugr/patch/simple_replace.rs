@@ -127,15 +127,15 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     ///
     /// The returned port will be in `replacement`, unless the wire in the
     /// replacement is empty and `return_invalid` is
-    /// [`IncludeReplacementNodes::Valid`] (the default), in which case it
-    /// will be another `host` port. If [`IncludeReplacementNodes::All`] is
+    /// [`BoundaryMode::SnapToHost`] (the default), in which case it
+    /// will be another `host` port. If [`BoundaryMode::IncludeIO`] is
     /// passed, the returned port will always be in `replacement` even if it
     /// is invalid (i.e. it is an IO node in the replacement).
     pub fn linked_replacement_output(
         &self,
         port: impl Into<HostPort<HostNode, IncomingPort>>,
         host: &impl HugrView<Node = HostNode>,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> Option<BoundaryPort<HostNode, OutgoingPort>> {
         let HostPort(node, port) = port.into();
         let pos = self
@@ -155,7 +155,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         &self,
         pos: usize,
         host: &impl HugrView<Node = HostNode>,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> BoundaryPort<HostNode, OutgoingPort> {
         debug_assert!(pos < self.subgraph().signature(host).output_count());
 
@@ -166,7 +166,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             .single_linked_output(repl_out, pos)
             .expect("valid dfg wire");
 
-        if out_node != repl_inp || return_invalid == IncludeReplacementNodes::All {
+        if out_node != repl_inp || return_invalid == BoundaryMode::IncludeIO {
             BoundaryPort::Replacement(out_node, out_port)
         } else {
             let (in_node, in_port) = *self.subgraph.incoming_ports()[out_port.index()]
@@ -214,8 +214,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     ///
     /// The returned ports will be in `replacement`, unless the wires in the
     /// replacement are empty and `return_invalid` is
-    /// [`IncludeReplacementNodes::Valid`] (the default), in which case they
-    /// will be other `host` ports. If [`IncludeReplacementNodes::All`] is
+    /// [`BoundaryMode::SnapToHost`] (the default), in which case they
+    /// will be other `host` ports. If [`BoundaryMode::IncludeIO`] is
     /// passed, the returned ports will always be in
     /// `replacement` even if they are invalid (i.e. they are an IO node in
     /// the replacement).
@@ -223,7 +223,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         &'a self,
         port: impl Into<HostPort<HostNode, OutgoingPort>>,
         host: &'a impl HugrView<Node = HostNode>,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = BoundaryPort<HostNode, IncomingPort>> + 'a {
         let HostPort(node, port) = port.into();
         let positions = self
@@ -245,7 +245,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         &self,
         pos: usize,
         host: &impl HugrView<Node = HostNode>,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = BoundaryPort<HostNode, IncomingPort>> {
         debug_assert!(pos < self.subgraph().signature(host).input_count());
 
@@ -253,7 +253,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         self.replacement
             .linked_inputs(repl_inp, pos)
             .flat_map(move |(in_node, in_port)| {
-                if in_node != repl_out || return_invalid == IncludeReplacementNodes::All {
+                if in_node != repl_out || return_invalid == BoundaryMode::IncludeIO {
                     Either::Left(std::iter::once(BoundaryPort::Replacement(in_node, in_port)))
                 } else {
                     let (out_node, out_port) = self.subgraph.outgoing_ports()[in_port.index()];
@@ -327,12 +327,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         subgraph_outgoing_ports
             .enumerate()
             .flat_map(|(pos, subg_np)| {
-                self.linked_replacement_inputs_by_position(
-                    pos,
-                    host,
-                    IncludeReplacementNodes::Valid,
-                )
-                .filter_map(move |np| Some((np.as_replacement()?, subg_np)))
+                self.linked_replacement_inputs_by_position(pos, host, BoundaryMode::SnapToHost)
+                    .filter_map(move |np| Some((np.as_replacement()?, subg_np)))
             })
             .map(|((repl_node, repl_port), (subgraph_node, subgraph_port))| {
                 (
@@ -374,11 +370,7 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             .enumerate()
             .filter_map(|(pos, subg_all)| {
                 let np = self
-                    .linked_replacement_output_by_position(
-                        pos,
-                        host,
-                        IncludeReplacementNodes::Valid,
-                    )
+                    .linked_replacement_output_by_position(pos, host, BoundaryMode::SnapToHost)
                     .as_replacement()?;
                 Some((np, subg_all))
             })
@@ -425,12 +417,8 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
             .enumerate()
             .filter_map(|(pos, subg_all)| {
                 Some((
-                    self.linked_replacement_output_by_position(
-                        pos,
-                        host,
-                        IncludeReplacementNodes::Valid,
-                    )
-                    .as_host()?,
+                    self.linked_replacement_output_by_position(pos, host, BoundaryMode::SnapToHost)
+                        .as_host()?,
                     subg_all,
                 ))
             })
@@ -567,15 +555,19 @@ impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
 /// In [`SimpleReplacement`], some nodes in the replacement may not be valid
 /// after the replacement is applied.
 ///
-/// This enum allows to filter out such nodes.
+/// This enum allows specifying whether these invalid nodes on the boundary
+/// should be returned or should be resolved to valid nodes in the host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[non_exhaustive]
-pub enum IncludeReplacementNodes {
+pub enum BoundaryMode {
     /// Only consider nodes that are valid after the replacement is applied.
+    ///
+    /// This means that nodes in hosts may be returned in places where nodes in
+    /// the replacement would be typically expected.
     #[default]
-    Valid,
-    /// Include all nodes, including potentially invalid ones.
-    All,
+    SnapToHost,
+    /// Include all nodes, including potentially invalid ones (inputs and
+    /// outputs of replacements).
+    IncludeIO,
 }
 
 /// Result of applying a [`SimpleReplacement`].
@@ -690,7 +682,7 @@ pub(in crate::hugr::patch) mod test {
         ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{bool_t, qb_t};
-    use crate::hugr::patch::simple_replace::{IncludeReplacementNodes, Outcome};
+    use crate::hugr::patch::simple_replace::{BoundaryMode, Outcome};
     use crate::hugr::patch::{BoundaryPort, HostPort, PatchVerification, ReplacementPort};
     use crate::hugr::views::{HugrView, SiblingSubgraph};
     use crate::hugr::{Hugr, HugrMut, Patch};
@@ -1186,7 +1178,7 @@ pub(in crate::hugr::patch) mod test {
             .linked_replacement_inputs(
                 (inp, OutgoingPort::from(0)),
                 &hugr,
-                IncludeReplacementNodes::Valid,
+                BoundaryMode::SnapToHost,
             )
             .collect();
 
@@ -1203,7 +1195,7 @@ pub(in crate::hugr::patch) mod test {
                 repl.linked_replacement_output(
                     (out, IncomingPort::from(i)),
                     &hugr,
-                    IncludeReplacementNodes::Valid,
+                    BoundaryMode::SnapToHost,
                 )
                 .unwrap()
             })
@@ -1240,7 +1232,7 @@ pub(in crate::hugr::patch) mod test {
             .linked_replacement_inputs(
                 (inp, OutgoingPort::from(0)),
                 &hugr,
-                IncludeReplacementNodes::Valid,
+                BoundaryMode::SnapToHost,
             )
             .collect();
 
@@ -1256,7 +1248,7 @@ pub(in crate::hugr::patch) mod test {
                 repl.linked_replacement_output(
                     (out, IncomingPort::from(i)),
                     &hugr,
-                    IncludeReplacementNodes::Valid,
+                    BoundaryMode::SnapToHost,
                 )
                 .unwrap()
             })
@@ -1298,7 +1290,7 @@ pub(in crate::hugr::patch) mod test {
             .linked_replacement_inputs(
                 (inp, OutgoingPort::from(0)),
                 &hugr,
-                IncludeReplacementNodes::Valid,
+                BoundaryMode::SnapToHost,
             )
             .collect();
 
@@ -1318,7 +1310,7 @@ pub(in crate::hugr::patch) mod test {
                 repl.linked_replacement_output(
                     (out, IncomingPort::from(i)),
                     &hugr,
-                    IncludeReplacementNodes::Valid,
+                    BoundaryMode::SnapToHost,
                 )
                 .unwrap()
             })

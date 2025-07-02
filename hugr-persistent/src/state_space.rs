@@ -11,7 +11,7 @@ use hugr_core::{
         internal::HugrInternals,
         patch::{
             BoundaryPort,
-            simple_replace::{IncludeReplacementNodes, InvalidReplacement},
+            simple_replace::{BoundaryMode, InvalidReplacement},
         },
         views::{InvalidSignature, sibling_subgraph::InvalidSubgraph},
     },
@@ -253,6 +253,12 @@ impl<R> CommitStateSpace<R> {
         self.graph.get_node(commit_id).into()
     }
 
+    /// Check whether `commit_id` exists and return it.
+    pub fn try_get_commit(&self, commit_id: CommitId) -> Option<&Commit> {
+        self.contains_id(commit_id)
+            .then(|| self.graph.get_node(commit_id).into())
+    }
+
     /// Get an iterator over all commit IDs in the state space.
     pub fn all_commit_ids(&self) -> impl Iterator<Item = CommitId> + Clone + '_ {
         let vec = self.graph.all_node_ids().collect_vec();
@@ -330,8 +336,10 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
-    /// The returned ports will be in the `child` commit unless the child commit
-    /// is empty, in which case they will be in one of the parents of `child`.
+    /// The returned ports will be ports on successors of the input node in the
+    /// `child` commit, unless (node, port) is connected to an empty wire in
+    /// `child` (i.e. a wire from input node to output node), in which case
+    /// they will be in one of the parents of `child`.
     ///
     /// `child` should be a child commit of the owner of `node`.
     ///
@@ -344,7 +352,7 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: OutgoingPort,
         child: CommitId,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
         assert!(
             self.is_boundary_edge(node, port, child),
@@ -364,8 +372,10 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
-    /// The returned port will be in the `child` commit unless the child commit
-    /// is empty, in which case it will be in one of the parents of `child`.
+    /// The returned port will be ports on predecessors of the output node in
+    /// the `child` commit, unless (node, port) is connected to an empty wire
+    /// in `child` (i.e. a wire from input node to output node), in which
+    /// case it will be in one of the parents of `child`.
     ///
     /// `child` should be a child commit of the owner of `node` (or `None` will
     /// be returned).
@@ -378,7 +388,7 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: IncomingPort,
         child: CommitId,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
         let repl = self.replacement(child)?;
@@ -400,7 +410,7 @@ impl<R> CommitStateSpace<R> {
         node: PatchNode,
         port: impl Into<Port>,
         child: CommitId,
-        return_invalid: IncludeReplacementNodes,
+        return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
         match port.into().as_directed() {
             Either::Left(incoming) => Either::Left(

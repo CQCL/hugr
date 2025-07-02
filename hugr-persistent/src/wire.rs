@@ -2,9 +2,9 @@ use std::collections::{BTreeSet, VecDeque};
 
 use hugr_core::{
     Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire,
-    hugr::patch::simple_replace::IncludeReplacementNodes,
+    hugr::patch::simple_replace::BoundaryMode,
 };
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 use crate::{CommitId, PatchNode, PersistentHugr, Resolver, Walker};
 
@@ -51,6 +51,12 @@ impl CommitWire {
 
     fn commit_id(&self) -> CommitId {
         self.0.node().0
+    }
+
+    delegate::delegate! {
+        to self.0 {
+            fn node(&self) -> PatchNode;
+        }
     }
 }
 
@@ -120,7 +126,7 @@ impl PersistentWire {
                                     opp_node,
                                     opp_port,
                                     deleted_by,
-                                    IncludeReplacementNodes::All,
+                                    BoundaryMode::IncludeIO,
                                 )
                             {
                                 debug_assert_eq!(child_node.owner(), deleted_by);

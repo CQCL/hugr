@@ -66,7 +66,7 @@ use thiserror::Error;
 use hugr_core::{
     Direction, Hugr, HugrView, Port, PortIndex,
     hugr::{
-        patch::simple_replace::IncludeReplacementNodes,
+        patch::simple_replace::BoundaryMode,
         views::{RootCheckable, SiblingSubgraph},
     },
     ops::handle::DfgID,
@@ -303,11 +303,12 @@ impl<'a, R: Resolver> Walker<'a, R> {
             wire_ports_incoming.extend(w.all_incoming_ports(self.as_hugr_view()));
             wire_ports_outgoing.extend(w.single_outgoing_port(self.as_hugr_view()));
             for id in w.owners() {
-                if self.state_space.contains_id(id) {
-                    additional_parents.insert(id, self.state_space.get_commit(id).clone());
-                } else {
-                    return Err(InvalidCommit::UnknownParent(id));
-                }
+                let commit = self
+                    .state_space
+                    .try_get_commit(id)
+                    .ok_or(InvalidCommit::UnknownParent(id))?
+                    .clone();
+                additional_parents.insert(id, commit);
             }
         }
 
@@ -421,7 +422,7 @@ impl<R: Clone> Walker<'_, R> {
                     opp_node,
                     opp_port,
                     child_id,
-                    IncludeReplacementNodes::Valid,
+                    BoundaryMode::SnapToHost,
                 ) {
                     let mut empty_commits = empty_commits.clone();
                     if node.0 != child_id {
@@ -836,7 +837,5 @@ mod tests {
                 BTreeSet::from_iter([base_commit, empty_commit])
             ])
         );
-
-        panic!("explicit")
     }
 }

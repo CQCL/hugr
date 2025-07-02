@@ -618,14 +618,13 @@ fn get_parent_commits<R>(
     replacement: &PersistentReplacement,
     graph: &CommitStateSpace<R>,
 ) -> Result<Vec<Commit>, InvalidCommit> {
-    let parent_ids = replacement.invalidation_set().map(|n| n.0).unique();
+    let parent_ids = replacement.invalidation_set().map(|n| n.owner()).unique();
     parent_ids
         .map(|id| {
-            if graph.contains_id(id) {
-                Ok(graph.get_commit(id).clone())
-            } else {
-                Err(InvalidCommit::UnknownParent(id))
-            }
+            graph
+                .try_get_commit(id)
+                .cloned()
+                .ok_or(InvalidCommit::UnknownParent(id))
         })
         .collect()
 }
