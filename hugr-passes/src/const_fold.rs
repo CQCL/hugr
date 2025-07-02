@@ -29,8 +29,8 @@ use crate::{
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 ///
-/// Note that inputs to some nodes should be provided by [ConstantFoldPass::with_inputs];
-/// none are assumed by default.
+/// Note that by default we assume that only the entrypoint is reachable and
+/// only if it is not the module root; see [Self::with_inputs].
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
@@ -80,9 +80,9 @@ impl ConstantFoldPass {
     /// Multiple calls for the same entry-point combine their values, with later
     /// values on the same in-port replacing earlier ones.
     ///
-    /// Note that providing empty `inputs` indicates that we must preserve nodes required
-    /// to compute the result of `node` for all possible inputs; by default there is no
-    /// such requirement.
+    /// Note that providing empty `inputs` indicates that we must preserve the ability
+    /// to compute the result of `node` for all possible inputs. The default is to
+    /// preserve the ability to compute the result of any non-module entrypoint, only.
     pub fn with_inputs(
         mut self,
         node: Node,
@@ -194,6 +194,7 @@ const NO_INPUTS: [(IncomingPort, Value); 0] = [];
 
 /// Exhaustively apply constant folding to a HUGR.
 /// If the Hugr's entrypoint is its [`Module`], assumes all [`FuncDefn`] children are reachable.
+/// Otherwise, assume that the [HugrView::entrypoint] is itself reachable.
 ///
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`Module`]: hugr_core::ops::OpType::Module
