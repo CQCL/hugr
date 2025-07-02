@@ -237,7 +237,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             parent: The parent node of the region to sort.
 
         Raises:
-            ValueError: If the hugr contains a cycle.
+            ValueError: If the region contains a cycle.
 
         Examples:
             >>> from hugr.build.tracked_dfg import TrackedDfg
