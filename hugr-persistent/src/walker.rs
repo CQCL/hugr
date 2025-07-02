@@ -451,8 +451,7 @@ impl<R: Resolver> Walker<'_, R> {
     // Check walker equality by comparing pointers to the state space and
     // other fields. Only for testing purposes.
     fn ptr_eq(&self, other: &Self) -> bool {
-        self.state_space.as_ref() as *const CommitStateSpace<R>
-            == other.state_space.as_ref() as *const CommitStateSpace<R>
+        std::ptr::eq(self.state_space.as_ref(), other.state_space.as_ref())
             && self.pinned_nodes == other.pinned_nodes
             && BTreeSet::from_iter(self.selected_commits.all_commit_ids())
                 == BTreeSet::from_iter(other.selected_commits.all_commit_ids())
