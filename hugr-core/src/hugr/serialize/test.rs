@@ -225,6 +225,12 @@ fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
     assert_eq!(before, after);
 }
 
+#[test]
+fn not_a_hugr() {
+    let val = serde_json::Value::from("Hello, world!");
+    NamedSchema::check_schemas(&val, get_testing_schemas(true));
+}
+
 /// Generate an optype for a node with a matching amount of inputs and outputs.
 fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
     let inputs = g.num_inputs(node);
