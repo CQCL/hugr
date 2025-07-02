@@ -454,6 +454,8 @@ impl<R> PersistentHugr<R> {
             pub fn base_commit(&self) -> &Commit;
             /// Get the commit with ID `commit_id`.
             pub fn get_commit(&self, commit_id: CommitId) -> &Commit;
+            /// Check whether `commit_id` exists and return it.
+            pub fn try_get_commit(&self, commit_id: CommitId) -> Option<&Commit>;
             /// Get an iterator over all nodes inserted by `commit_id`.
             ///
             /// All nodes will be PatchNodes with commit ID `commit_id`.
