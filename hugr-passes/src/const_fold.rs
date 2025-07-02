@@ -30,7 +30,8 @@ use crate::{
 /// A configuration for the Constant Folding pass.
 ///
 /// Note that by default we assume that only the entrypoint is reachable and
-/// only if it is not the module root; see [Self::with_inputs].
+/// only if it is not the module root; see [Self::with_inputs]. Mutation
+/// occurs anywhere beneath the entrypoint.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
     /// Each outer key Node must be either:
@@ -81,8 +82,17 @@ impl ConstantFoldPass {
     /// values on the same in-port replacing earlier ones.
     ///
     /// Note that providing empty `inputs` indicates that we must preserve the ability
-    /// to compute the result of `node` for all possible inputs. The default is to
-    /// preserve the ability to compute the result of any non-module entrypoint, only.
+    /// to compute the result of `node` for all possible inputs.
+    /// * If the entrypoint is the module-root, this method should be called for every
+    /// [FuncDefn] that is externally callable
+    /// * Otherwise, i.e. if the entrypoint is not the module-root,
+    ///    * The default is to assume the entrypoint is callable with any inputs;
+    ///    * If `node` is the entrypoint, this method allows to restrict the possible inputs
+    ///    * If `node` is beneath the entrypoint, this merely degrades the analysis. (We
+    ///      will mutate only beneath the entrypoint, but using results of analysing the
+    ///      whole Hugr wrt. the specified/any inputs too).
+    /// 
+    /// [FuncDefn]: hugr_core::ops::FuncDefn
     pub fn with_inputs(
         mut self,
         node: Node,
