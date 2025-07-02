@@ -126,88 +126,21 @@ fn read_operation<'a>(
         Which::Dfg(()) => table::Operation::Dfg,
         Which::Cfg(()) => table::Operation::Cfg,
         Which::Block(()) => table::Operation::Block,
-        Which::FuncDefn(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints,
-                signature,
-            });
-            table::Operation::DefineFunc(symbol)
-        }
-        Which::FuncDecl(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints,
-                signature,
-            });
-            table::Operation::DeclareFunc(symbol)
-        }
+        Which::FuncDefn(reader) => table::Operation::DefineFunc(read_symbol(bump, reader?, None)?),
+        Which::FuncDecl(reader) => table::Operation::DeclareFunc(read_symbol(bump, reader?, None)?),
         Which::AliasDefn(reader) => {
             let symbol = reader.get_symbol()?;
             let value = table::TermId(reader.get_value());
-            let name = bump.alloc_str(symbol.get_name()?.to_str()?);
-            let params = read_list!(bump, symbol.get_params()?, read_param);
-            let signature = table::TermId(symbol.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints: &[],
-                signature,
-            });
-            table::Operation::DefineAlias(symbol, value)
+            table::Operation::DefineAlias(read_symbol(bump, symbol, Some(&[]))?, value)
         }
         Which::AliasDecl(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints: &[],
-                signature,
-            });
-            table::Operation::DeclareAlias(symbol)
+            table::Operation::DeclareAlias(read_symbol(bump, reader?, Some(&[]))?)
         }
         Which::ConstructorDecl(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints,
-                signature,
-            });
-            table::Operation::DeclareConstructor(symbol)
+            table::Operation::DeclareConstructor(read_symbol(bump, reader?, None)?)
         }
         Which::OperationDecl(reader) => {
-            let reader = reader?;
-            let name = bump.alloc_str(reader.get_name()?.to_str()?);
-            let params = read_list!(bump, reader.get_params()?, read_param);
-            let constraints = read_scalar_list!(bump, reader, get_constraints, table::TermId);
-            let signature = table::TermId(reader.get_signature());
-            let symbol = bump.alloc(table::Symbol {
-                name,
-                params,
-                constraints,
-                signature,
-            });
-            table::Operation::DeclareOperation(symbol)
+            table::Operation::DeclareOperation(read_symbol(bump, reader?, None)?)
         }
         Which::Custom(operation) => table::Operation::Custom(table::TermId(operation)),
         Which::TailLoop(()) => table::Operation::TailLoop,
@@ -255,6 +188,34 @@ fn read_region_scope(reader: hugr_capnp::region_scope::Reader) -> ReadResult<tab
     let links = reader.get_links();
     let ports = reader.get_ports();
     Ok(table::RegionScope { links, ports })
+}
+
+/// (Only) if `constraints` are None, then they are read from the `reader`
+fn read_symbol<'a>(
+    bump: &'a Bump,
+    reader: hugr_capnp::symbol::Reader,
+    constraints: Option<&'a [table::TermId]>,
+) -> ReadResult<&'a mut table::Symbol<'a>> {
+    let name = bump.alloc_str(reader.get_name()?.to_str()?);
+    let visibility = match reader.get_visibility() {
+        Ok(hugr_capnp::Visibility::Private) => model::Visibility::Private,
+        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public,
+        Err(_) => model::Visibility::default(),
+    };
+    let visibility = bump.alloc(visibility);
+    let params = read_list!(bump, reader.get_params()?, read_param);
+    let constraints = match constraints {
+        Some(cs) => cs,
+        None => read_scalar_list!(bump, reader, get_constraints, table::TermId),
+    };
+    let signature = table::TermId(reader.get_signature());
+    Ok(bump.alloc(table::Symbol {
+        visibility,
+        name,
+        params,
+        constraints,
+        signature,
+    }))
 }
 
 fn read_term<'a>(bump: &'a Bump, reader: hugr_capnp::term::Reader) -> ReadResult<table::Term<'a>> {

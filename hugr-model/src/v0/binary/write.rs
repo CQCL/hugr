@@ -110,6 +110,10 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &tabl
 
 fn write_symbol(mut builder: hugr_capnp::symbol::Builder, symbol: &table::Symbol) {
     builder.set_name(symbol.name);
+    builder.set_visibility(match symbol.visibility {
+        model::Visibility::Private => hugr_capnp::Visibility::Private,
+        model::Visibility::Public => hugr_capnp::Visibility::Public,
+    });
     write_list!(builder, init_params, write_param, symbol.params);
     let _ = builder.set_constraints(table::TermId::unwrap_slice(symbol.constraints));
     builder.set_signature(symbol.signature.0);
