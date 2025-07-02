@@ -9,7 +9,7 @@ use hugr_core::{
     hugr::{self, internal::HugrInternals, patch::BoundaryPort},
     ops::OpType,
 };
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
@@ -42,7 +42,8 @@ mod hidden {
     /// other commits apply), or a [`PersistentReplacement`]
     ///
     /// This is a "unnamable" type: we do not expose this struct publicly in our
-    /// API, but we can still use it in public trait bounds (see [`Resolver`](crate::resolver::Resolver)).
+    /// API, but we can still use it in public trait bounds (see
+    /// [`Resolver`](crate::resolver::Resolver)).
     #[derive(Debug, Clone, From)]
     pub enum CommitData {
         Base(Hugr),
@@ -307,10 +308,12 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
+    /// `child` should be a child commit of the owner of `node`.
+    ///
     /// ## Panics
     ///
-    /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
-    /// a valid commit ID.
+    /// Panics if `(node, port)` is not a boundary edge, if `child` is not
+    /// a valid commit ID or if it is the base commit.
     pub(crate) fn linked_child_inputs(
         &self,
         node: PatchNode,
@@ -335,6 +338,9 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
+    /// `child` should be a child commit of the owner of `node` (or `None` will
+    /// be returned).
+    ///
     /// ## Panics
     ///
     /// Panics if `child` is not a valid commit ID.
@@ -345,12 +351,37 @@ impl<R> CommitStateSpace<R> {
         child: CommitId,
     ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
-        let repl = self.replacement(child).expect("valid child commit");
+        let repl = self.replacement(child)?;
         match repl.linked_replacement_output((node, port), &parent_hugrs)? {
             BoundaryPort::Host(patch_node, port) => (patch_node, port),
             BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
         }
         .into()
+    }
+
+    /// Get the boundary ports linked to `(node, port)` in `child`.
+    ///
+    /// `child` should be a child commit of the owner of `node`.
+    ///
+    /// See [`Self::linked_child_inputs`] and [`Self::linked_child_output`] for
+    /// more details.
+    pub(crate) fn linked_child_ports(
+        &self,
+        node: PatchNode,
+        port: impl Into<Port>,
+        child: CommitId,
+    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
+        match port.into().as_directed() {
+            Either::Left(incoming) => Either::Left(
+                self.linked_child_output(node, incoming, child)
+                    .into_iter()
+                    .map(|(node, port)| (node, port.into())),
+            ),
+            Either::Right(outgoing) => Either::Right(
+                self.linked_child_inputs(node, outgoing, child)
+                    .map(|(node, port)| (node, port.into())),
+            ),
+        }
     }
 
     /// Get the single output boundary port linked to `(node, port)` in a
@@ -397,6 +428,33 @@ impl<R> CommitStateSpace<R> {
             .map_into()
             .collect_vec()
             .into_iter()
+    }
+
+    /// Get the ports linked to `(node, port)` in a parent of the commit of
+    /// `node`.
+    ///
+    /// See [`Self::linked_parent_input`] and [`Self::linked_parent_outputs`]
+    /// for more details.
+    ///
+    /// ## Panics
+    ///
+    /// Panics if `(node, port)` is not connected to an IO node in the commit
+    /// of `node`, or if the node is not valid.
+    pub fn linked_parent_ports(
+        &self,
+        node: PatchNode,
+        port: impl Into<Port>,
+    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
+        match port.into().as_directed() {
+            Either::Left(incoming) => {
+                let (node, port) = self.linked_parent_input(node, incoming);
+                Either::Left(std::iter::once((node, port.into())))
+            }
+            Either::Right(outgoing) => Either::Right(
+                self.linked_parent_outputs(node, outgoing)
+                    .map(|(node, port)| (node, port.into())),
+            ),
+        }
     }
 
     /// Get the replacement for `commit_id`.
