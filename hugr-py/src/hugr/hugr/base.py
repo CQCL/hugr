@@ -240,7 +240,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             ValueError: If the hugr contains a cycle.
 
         Examples:
-            >>> dfg = TrackedDfg(tys.Bool)
+            >>> dfg = Dfg(tys.Bool)
             >>> [b] = dfg.track_inputs()
             >>> for _ in range(8):
             ...     dfg.add(Not(b))
