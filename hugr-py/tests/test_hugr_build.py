@@ -428,7 +428,7 @@ def test_toposort(simple_fn: Function) -> None:
     nodes = list(simple_fn.hugr)
     func_node = nodes[1]
 
-    sorted_nodes = list(simple_fn.hugr.sort_region_nodes(func_node))
+    sorted_nodes = list(simple_fn.hugr.sorted_region_nodes(func_node))
     assert set(sorted_nodes) == set(simple_fn.hugr.children(simple_fn))
     assert sorted_nodes[0] == simple_fn.input_node
     assert sorted_nodes[-1] == simple_fn.output_node
@@ -444,7 +444,7 @@ def test_toposort_error(simple_fn: Function) -> None:
     with pytest.raises(
         ValueError, match="Graph contains a cycle. No topological ordering exists."
     ):
-        list(simple_fn.hugr.sort_region_nodes(func_node))
+        list(simple_fn.hugr.sorted_region_nodes(func_node))
 
 
 def test_html_labels(snapshot) -> None:

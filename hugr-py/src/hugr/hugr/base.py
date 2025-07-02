@@ -227,7 +227,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         return self.items()
 
-    def sort_region_nodes(self, parent: Node) -> Iterator[Node]:
+    def sorted_region_nodes(self, parent: Node) -> Iterator[Node]:
         """Iterator over a topological ordering of all the hugr nodes.
 
         Note that the sort is performed within a hugr region and non-local
@@ -240,12 +240,16 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             ValueError: If the hugr contains a cycle.
 
         Examples:
-            >>> dfg = Dfg(tys.Bool)
+            >>> from hugr.build.tracked_dfg import TrackedDfg
+            >>> from hugr.std.logic import Not
+            >>> dfg = TrackedDfg(tys.Bool)
             >>> [b] = dfg.track_inputs()
             >>> for _ in range(8):
-            ...     dfg.add(Not(b))
+            ...     _= dfg.add(Not(b));
             >>> dfg.set_tracked_outputs()
-            >>> dfg.hugr.sort_region_nodes()
+            >>> nodes = list(dfg.hugr)
+            >>> list(dfg.hugr.sorted_region_nodes(nodes[1]))
+            [Node(2), Node(4), Node(3)]
         """
         # A dict to keep track of how many times we see a node.
         # Store the Nodes with the input degrees as values.
