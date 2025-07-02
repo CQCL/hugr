@@ -2054,5 +2054,6 @@
             "type": "object"
         }
     },
-    "title": "HUGR schema"
+    "title": "HUGR schema",
+    "$ref": "#/$defs/TestingHugr"
 }
