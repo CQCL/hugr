@@ -308,10 +308,12 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
+    /// `child` should be a child commit of the owner of `node`.
+    ///
     /// ## Panics
     ///
-    /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
-    /// a valid commit ID.
+    /// Panics if `(node, port)` is not a boundary edge, if `child` is not
+    /// a valid commit ID or if it is the base commit.
     pub(crate) fn linked_child_inputs(
         &self,
         node: PatchNode,
@@ -336,6 +338,9 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
+    /// `child` should be a child commit of the owner of `node` (or `None` will
+    /// be returned).
+    ///
     /// ## Panics
     ///
     /// Panics if `child` is not a valid commit ID.
@@ -346,7 +351,7 @@ impl<R> CommitStateSpace<R> {
         child: CommitId,
     ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
-        let repl = self.replacement(child).expect("valid child commit");
+        let repl = self.replacement(child)?;
         match repl.linked_replacement_output((node, port), &parent_hugrs)? {
             BoundaryPort::Host(patch_node, port) => (patch_node, port),
             BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
@@ -355,6 +360,8 @@ impl<R> CommitStateSpace<R> {
     }
 
     /// Get the boundary ports linked to `(node, port)` in `child`.
+    ///
+    /// `child` should be a child commit of the owner of `node`.
     ///
     /// See [`Self::linked_child_inputs`] and [`Self::linked_child_output`] for
     /// more details.

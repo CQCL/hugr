@@ -489,6 +489,7 @@ impl<R> PersistentHugr<R> {
             .unique()
     }
 
+    /// Get the child commit that deletes `node`.
     pub(crate) fn find_deleting_commit(
         &self,
         node @ PatchNode(commit_id, _): PatchNode,
@@ -498,6 +499,12 @@ impl<R> PersistentHugr<R> {
             let child = self.get_commit(child_id);
             child.deleted_nodes().contains(&node)
         })
+    }
+
+    /// Convert a node ID specific to a commit HUGR into a patch node in the
+    /// [`PersistentHugr`].
+    pub(crate) fn to_persistent_node(&self, node: Node, commit_id: CommitId) -> PatchNode {
+        PatchNode(commit_id, node)
     }
 
     /// Check if a patch node is in the PersistentHugr, that is, it belongs to
