@@ -120,8 +120,10 @@ pub enum BArrayUnsafeOpDef {
     /// `return<size, elem_ty>: borrow_array<size, elem_ty>, index, elem_ty -> borrow_array<size, elem_ty>`
     #[strum(serialize = "return")]
     r#return,
-    /// `return<size, elem_ty>: borrow_array<size, elem_ty> -> ()`
+    /// `discard_empty_borrowed<size, elem_ty>: borrow_array<size, elem_ty> -> ()`
     discard_empty_borrowed,
+    /// `new_empty_borrowed<size, elem_ty>: () -> borrow_array<size, elem_ty>`
+    new_empty_borrowed,
 }
 
 impl BArrayUnsafeOpDef {
@@ -161,6 +163,9 @@ impl BArrayUnsafeOpDef {
             ),
             Self::discard_empty_borrowed => {
                 PolyFuncTypeRV::new(params, FuncValueType::new(vec![array_ty], type_row![]))
+            }
+            Self::new_empty_borrowed => {
+                PolyFuncTypeRV::new(params, FuncValueType::new(type_row![], vec![array_ty]))
             }
         }
         .into()
@@ -203,8 +208,9 @@ impl MakeOpDef for BArrayUnsafeOpDef {
                 "Put an element into a borrow array (panicking if there is an element already)"
             }
             Self::discard_empty_borrowed => {
-                "Discard an array where all elements have been borrowed"
+                "Discard a borrow array where all elements have been borrowed"
             }
+            Self::new_empty_borrowed => "Create a new borrow array that contains no elements",
         }
         .into()
     }
@@ -685,6 +691,25 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         self.add_dataflow_op(op.to_extension_op().unwrap(), vec![input])?;
         Ok(())
     }
+
+    /// Adds an operation to create a new empty borrowed array in the dataflow graph.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    fn add_new_empty_borrowed(&mut self, elem_ty: Type, size: u64) -> Result<Wire, BuildError> {
+        let op =
+            BArrayUnsafeOpDef::new_empty_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+        let [arr] = self
+            .add_dataflow_op(op.to_extension_op().unwrap(), vec![])?
+            .outputs_arr();
+        Ok(arr)
+    }
 }
 
 impl<D: Dataflow> BArrayOpBuilder for D {}
@@ -695,7 +720,7 @@ mod test {
 
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr as _},
-        extension::prelude::{ConstUsize, qb_t},
+        extension::prelude::{ConstUsize, qb_t, usize_t},
         ops::OpType,
         std_extensions::collections::borrow_array::{
             BArrayOpBuilder, BArrayUnsafeOp, BArrayUnsafeOpDef, borrow_array_type,
@@ -750,6 +775,26 @@ mod test {
                 .add_discard_empty_borrowed(elem_ty, size, arr_with_borrowed)
                 .unwrap();
             builder.finish_hugr_with_outputs([el]).unwrap()
+        };
+    }
+
+    #[test]
+    fn test_new_empty_borrowed() {
+        let size = 5;
+        let elem_ty = usize_t();
+        let arr_ty = borrow_array_type(size, elem_ty.clone());
+        let _ = {
+            let mut builder =
+                DFGBuilder::new(Signature::new(vec![], vec![arr_ty.clone()])).unwrap();
+            let arr = builder
+                .add_new_empty_borrowed(elem_ty.clone(), size)
+                .unwrap();
+            let idx = builder.add_load_value(ConstUsize::new(3));
+            let val = builder.add_load_value(ConstUsize::new(202));
+            let arr_with_put = builder
+                .add_borrow_array_return(elem_ty, size, arr, idx, val)
+                .unwrap();
+            builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
         };
     }
 }
