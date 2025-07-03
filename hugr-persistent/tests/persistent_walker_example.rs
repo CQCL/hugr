@@ -12,7 +12,7 @@ use hugr_core::{
     types::EdgeKind,
 };
 
-use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, Walker};
+use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, PinnedSubgraph, Walker};
 
 /// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 4;
@@ -247,12 +247,16 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
                 .map(|[out_port, _]| walker.get_wire(out_node, out_port));
 
             // Create the commit
-            walker.try_create_commit(wires, empty_2qb_hugr(add_swap), |_, port| {
-                // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
-                // HUGR
-                let dir = port.direction();
-                Port::new(dir.reverse(), port.index())
-            })
+            walker.try_create_commit(
+                PinnedSubgraph::try_from_wires(wires, walker).unwrap(),
+                empty_2qb_hugr(add_swap),
+                |_, port| {
+                    // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
+                    // HUGR
+                    let dir = port.direction();
+                    Port::new(dir.reverse(), port.index())
+                },
+            )
         }
         1 => {
             // out_node and in_node share just one qubit
@@ -265,40 +269,48 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
             let shared_qb_out = out_port.index();
             let shared_qb_in = in_port.index();
 
-            walker.try_create_commit([wire], repl_hugr, |node, port| {
-                // map the incoming/outgoing ports of the subgraph to the replacement as
-                // follows:
-                //  - the first qubit is the one that is shared between the two CZ gates
-                //  - the second qubit only touches the first CZ (out_node)
-                //  - the third qubit only touches the second CZ (in_node)
-                match (port.as_directed(), node == out_node) {
-                    (Either::Left(incoming), true) if incoming.index() == shared_qb_out => {
-                        // out_node on the shared qubit -> port 0
-                        OutgoingPort::from(0).into()
+            walker.try_create_commit(
+                PinnedSubgraph::try_from_wires([wire], walker).unwrap(),
+                repl_hugr,
+                |node, port| {
+                    // map the incoming/outgoing ports of the subgraph to the replacement as
+                    // follows:
+                    //  - the first qubit is the one that is shared between the two CZ gates
+                    //  - the second qubit only touches the first CZ (out_node)
+                    //  - the third qubit only touches the second CZ (in_node)
+                    match (port.as_directed(), node == out_node) {
+                        (Either::Left(incoming), true) if incoming.index() == shared_qb_out => {
+                            // out_node on the shared qubit -> port 0
+                            OutgoingPort::from(0).into()
+                        }
+                        (Either::Left(incoming), true) if incoming.index() == 1 - shared_qb_out => {
+                            // out_node on the not shared qubit -> port 1
+                            OutgoingPort::from(1).into()
+                        }
+                        (Either::Left(incoming), false) if incoming.index() == 1 - shared_qb_in => {
+                            // in_node on the not shared qubit -> port 2
+                            OutgoingPort::from(2).into()
+                        }
+                        (Either::Right(outgoing), false) if outgoing.index() == shared_qb_in => {
+                            // in_node on the shared qubit -> port 0
+                            IncomingPort::from(0).into()
+                        }
+                        (Either::Right(outgoing), true)
+                            if outgoing.index() == 1 - shared_qb_out =>
+                        {
+                            // out_node on the not shared qubit -> port 1
+                            IncomingPort::from(1).into()
+                        }
+                        (Either::Right(outgoing), false)
+                            if outgoing.index() == 1 - shared_qb_in =>
+                        {
+                            // in_node on the not shared qubit -> port 2
+                            IncomingPort::from(2).into()
+                        }
+                        _ => panic!("unexpected boundary port"),
                     }
-                    (Either::Left(incoming), true) if incoming.index() == 1 - shared_qb_out => {
-                        // out_node on the not shared qubit -> port 1
-                        OutgoingPort::from(1).into()
-                    }
-                    (Either::Left(incoming), false) if incoming.index() == 1 - shared_qb_in => {
-                        // in_node on the not shared qubit -> port 2
-                        OutgoingPort::from(2).into()
-                    }
-                    (Either::Right(outgoing), false) if outgoing.index() == shared_qb_in => {
-                        // in_node on the shared qubit -> port 0
-                        IncomingPort::from(0).into()
-                    }
-                    (Either::Right(outgoing), true) if outgoing.index() == 1 - shared_qb_out => {
-                        // out_node on the not shared qubit -> port 1
-                        IncomingPort::from(1).into()
-                    }
-                    (Either::Right(outgoing), false) if outgoing.index() == 1 - shared_qb_in => {
-                        // in_node on the not shared qubit -> port 2
-                        IncomingPort::from(2).into()
-                    }
-                    _ => panic!("unexpected boundary port"),
-                }
-            })
+                },
+            )
         }
         _ => unreachable!(),
     }
