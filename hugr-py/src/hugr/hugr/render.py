@@ -103,7 +103,7 @@ class DotRenderer:
             "bgcolor": self.config.palette.background,
         }
         if name := hugr[hugr.module_root].metadata.get("name", None):
-            name = html.escape(name)
+            name = html.escape(str(name))
         else:
             name = ""
 
@@ -218,7 +218,7 @@ class DotRenderer:
         meta = hugr[node].metadata
         if len(meta) > 0:
             data = "<BR/><BR/>" + "<BR/>".join(
-                html.escape(key) + ": " + html.escape(value)
+                html.escape(key) + ": " + html.escape(str(value))
                 for key, value in meta.items()
             )
         else:
