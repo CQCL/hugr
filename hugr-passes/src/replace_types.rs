@@ -1,5 +1,4 @@
 #![allow(clippy::type_complexity)]
-#![warn(missing_docs)]
 //! Replace types with other types across the Hugr. See [`ReplaceTypes`] and [Linearizer].
 //!
 use std::borrow::Cow;

@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! Data structure for call graphs of a Hugr
 use std::collections::HashMap;
 
