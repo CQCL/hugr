@@ -1,0 +1,1139 @@
+{
+  "version": "0.1.1",
+  "name": "collections.borrow_arr",
+  "types": {
+    "borrow_array": {
+      "extension": "collections.borrow_arr",
+      "name": "borrow_array",
+      "params": [
+        {
+          "tp": "BoundedNat",
+          "bound": null
+        },
+        {
+          "tp": "Type",
+          "b": "A"
+        }
+      ],
+      "description": "Fixed-length borrow array",
+      "bound": {
+        "b": "Explicit",
+        "bound": "A"
+      }
+    }
+  },
+  "operations": {
+    "borrow": {
+      "extension": "collections.borrow_arr",
+      "name": "borrow",
+      "description": "Take an element from a borrow array (panicking if it was already taken before)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "clone": {
+      "extension": "collections.borrow_arr",
+      "name": "clone",
+      "description": "Clones an array with copyable elements",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "discard": {
+      "extension": "collections.borrow_arr",
+      "name": "discard",
+      "description": "Discards an array with copyable elements",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "discard_all_borrowed": {
+      "extension": "collections.borrow_arr",
+      "name": "discard_all_borrowed",
+      "description": "Discard a borrow array where all elements have been borrowed",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "discard_empty": {
+      "extension": "collections.borrow_arr",
+      "name": "discard_empty",
+      "description": "Discard an empty array",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "from_array": {
+      "extension": "collections.borrow_arr",
+      "name": "from_array",
+      "description": "Turns `array` into `borrow_array`",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "get": {
+      "extension": "collections.borrow_arr",
+      "name": "get",
+      "description": "Get an element from an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                ]
+              ]
+            },
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "new_all_borrowed": {
+      "extension": "collections.borrow_arr",
+      "name": "new_all_borrowed",
+      "description": "Create a new borrow array that contains no elements",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "new_array": {
+      "extension": "collections.borrow_arr",
+      "name": "new_array",
+      "description": "Create a new array from elements",
+      "signature": null,
+      "binary": true
+    },
+    "pop_left": {
+      "extension": "collections.borrow_arr",
+      "name": "pop_left",
+      "description": "Pop an element from the left of an array",
+      "signature": null,
+      "binary": true
+    },
+    "pop_right": {
+      "extension": "collections.borrow_arr",
+      "name": "pop_right",
+      "description": "Pop an element from the right of an array",
+      "signature": null,
+      "binary": true
+    },
+    "repeat": {
+      "extension": "collections.borrow_arr",
+      "name": "repeat",
+      "description": "Creates a new array whose elements are initialised by calling the given function n times",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "G",
+              "input": [],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                }
+              ]
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "return": {
+      "extension": "collections.borrow_arr",
+      "name": "return",
+      "description": "Put an element into a borrow array (panicking if there is an element already)",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "scan": {
+      "extension": "collections.borrow_arr",
+      "name": "scan",
+      "description": "A combination of map and foldl. Applies a function to each element of the array with an accumulator that is passed through from start to finish. Returns the resulting array and the final state of the accumulator.",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 1,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 2,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 3,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 2,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "R",
+              "i": 3,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "set": {
+      "extension": "collections.borrow_arr",
+      "name": "set",
+      "description": "Set an element in an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  },
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ],
+                [
+                  {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  },
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "swap": {
+      "extension": "collections.borrow_arr",
+      "name": "swap",
+      "description": "Swap two elements in an array",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ],
+                [
+                  {
+                    "t": "Opaque",
+                    "extension": "collections.borrow_arr",
+                    "id": "borrow_array",
+                    "args": [
+                      {
+                        "tya": "Variable",
+                        "idx": 0,
+                        "cached_decl": {
+                          "tp": "BoundedNat",
+                          "bound": null
+                        }
+                      },
+                      {
+                        "tya": "Type",
+                        "ty": {
+                          "t": "V",
+                          "i": 1,
+                          "b": "A"
+                        }
+                      }
+                    ],
+                    "bound": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "to_array": {
+      "extension": "collections.borrow_arr",
+      "name": "to_array",
+      "description": "Turns `borrow_array` into `array`",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.array",
+              "id": "array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "unpack": {
+      "extension": "collections.borrow_arr",
+      "name": "unpack",
+      "description": "Unpack an array into its elements",
+      "signature": null,
+      "binary": true
+    }
+  }
+}

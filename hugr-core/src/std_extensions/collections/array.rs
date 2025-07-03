@@ -223,7 +223,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
         self.add_generic_array_unpack::<Array>(elem_ty, size, input)
     }
     /// Adds an array clone operation to the dataflow graph and return the wires
-    /// representing the originala and cloned array.
+    /// representing the original and cloned array.
     ///
     /// # Arguments
     ///
