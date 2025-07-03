@@ -411,6 +411,7 @@ def test_html_labels(snapshot) -> None:
     )
     f.metadata["label"] = "<b>Bold Label</b>"
     f.metadata["<other-label>"] = "<i>Italic Label</i>"
+    f.metadata["meta_can_be_anything"] = [42, "string", 3.14, True]
 
     f.hugr[f.hugr.module_root].metadata["name"] = "<i>Module Root</i>"
 
