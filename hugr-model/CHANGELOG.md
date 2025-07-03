@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.2...hugr-model-v0.21.0) - 2025-07-03
+
+### Bug Fixes
+
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+- [**breaking**] Fix panic in model resolver when variable is used outside of symbol. ([#2362](https://github.com/CQCL/hugr/pull/2362))
+
+### New Features
+
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- better errors using metadata from generator ([#2368](https://github.com/CQCL/hugr/pull/2368))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.1...hugr-model-v0.20.2) - 2025-06-25
 
 ### New Features
