@@ -60,24 +60,19 @@ impl PinnedSubgraph {
     /// Nodes that are not isolated, i.e. are attached to at least one wire in
     /// `wires` will be added implicitly to the graph and do not need to be
     /// explicitly listed in `nodes`.
-    pub fn try_from_pinned<R, Wires, Nodes>(
-        nodes: impl IntoIterator<IntoIter = Nodes>,
-        wires: impl IntoIterator<IntoIter = Wires>,
+    pub fn try_from_pinned<R: Resolver>(
+        nodes: impl IntoIterator<Item = PatchNode>,
+        wires: impl IntoIterator<Item = PersistentWire>,
         walker: &Walker<R>,
-    ) -> Result<Self, InvalidPinnedSubgraph>
-    where
-        R: Resolver,
-        Wires: Iterator<Item = PersistentWire> + Clone,
-        Nodes: Iterator<Item = PatchNode> + Clone,
-    {
+    ) -> Result<Self, InvalidPinnedSubgraph> {
         let mut selected_commits = BTreeSet::new();
         let host = walker.as_hugr_view();
-        let wires = wires.into_iter();
-        let nodes = nodes.into_iter();
+        let wires = wires.into_iter().collect_vec();
+        let nodes = nodes.into_iter().collect_vec();
 
-        for w in wires.clone() {
-            if !walker.is_complete(&w, None) {
-                return Err(InvalidPinnedSubgraph::IncompleteWire(w));
+        for w in wires.iter() {
+            if !walker.is_complete(w, None) {
+                return Err(InvalidPinnedSubgraph::IncompleteWire(w.clone()));
             }
             for id in w.owners() {
                 if host.contains_id(id) {
@@ -88,7 +83,7 @@ impl PinnedSubgraph {
             }
         }
 
-        if let Some(unpinned) = nodes.clone().find(|&n| !walker.is_pinned(n)) {
+        if let Some(&unpinned) = nodes.iter().find(|&&n| !walker.is_pinned(n)) {
             return Err(InvalidPinnedSubgraph::UnpinnedNode(unpinned));
         }
 
@@ -103,14 +98,10 @@ impl PinnedSubgraph {
     }
 
     /// Create a new subgraph from a set of complete wires in `walker`.
-    pub fn try_from_wires<R, Wires>(
-        wires: impl IntoIterator<IntoIter = Wires>,
+    pub fn try_from_wires<R: Resolver>(
+        wires: impl IntoIterator<Item = PersistentWire>,
         walker: &Walker<R>,
-    ) -> Result<Self, InvalidPinnedSubgraph>
-    where
-        R: Resolver,
-        Wires: Iterator<Item = PersistentWire> + Clone,
-    {
+    ) -> Result<Self, InvalidPinnedSubgraph> {
         Self::try_from_pinned(std::iter::empty(), wires, walker)
     }
 
