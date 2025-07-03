@@ -5,11 +5,11 @@ use std::collections::{BTreeSet, VecDeque};
 use itertools::{Either, Itertools};
 
 use hugr_core::{
-    builder::{endo_sig, DFGBuilder, Dataflow, DataflowHugr},
+    Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
+    builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
     extension::prelude::qb_t,
     ops::OpType,
     types::EdgeKind,
-    Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
 };
 
 use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, PinnedSubgraph, Walker};
@@ -23,10 +23,10 @@ use walker_example_extension::cz_gate;
 mod walker_example_extension {
     use std::sync::Arc;
 
+    use hugr_core::Extension;
     use hugr_core::extension::ExtensionId;
     use hugr_core::ops::{ExtensionOp, OpName};
     use hugr_core::types::{FuncValueType, PolyFuncTypeRV};
-    use hugr_core::Extension;
 
     use lazy_static::lazy_static;
     use semver::Version;
