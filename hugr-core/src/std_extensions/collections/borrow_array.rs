@@ -120,10 +120,10 @@ pub enum BArrayUnsafeOpDef {
     /// `return<size, elem_ty>: borrow_array<size, elem_ty>, index, elem_ty -> borrow_array<size, elem_ty>`
     #[strum(serialize = "return")]
     r#return,
-    /// `discard_empty_borrowed<size, elem_ty>: borrow_array<size, elem_ty> -> ()`
-    discard_empty_borrowed,
-    /// `new_empty_borrowed<size, elem_ty>: () -> borrow_array<size, elem_ty>`
-    new_empty_borrowed,
+    /// `discard_all_borrowed<size, elem_ty>: borrow_array<size, elem_ty> -> ()`
+    discard_all_borrowed,
+    /// `new_all_borrowed<size, elem_ty>: () -> borrow_array<size, elem_ty>`
+    new_all_borrowed,
 }
 
 impl BArrayUnsafeOpDef {
@@ -161,10 +161,10 @@ impl BArrayUnsafeOpDef {
                     vec![array_ty],
                 ),
             ),
-            Self::discard_empty_borrowed => {
+            Self::discard_all_borrowed => {
                 PolyFuncTypeRV::new(params, FuncValueType::new(vec![array_ty], type_row![]))
             }
-            Self::new_empty_borrowed => {
+            Self::new_all_borrowed => {
                 PolyFuncTypeRV::new(params, FuncValueType::new(type_row![], vec![array_ty]))
             }
         }
@@ -207,10 +207,10 @@ impl MakeOpDef for BArrayUnsafeOpDef {
             Self::r#return => {
                 "Put an element into a borrow array (panicking if there is an element already)"
             }
-            Self::discard_empty_borrowed => {
+            Self::discard_all_borrowed => {
                 "Discard a borrow array where all elements have been borrowed"
             }
-            Self::new_empty_borrowed => "Create a new borrow array that contains no elements",
+            Self::new_all_borrowed => "Create a new borrow array that contains no elements",
         }
         .into()
     }
@@ -680,14 +680,14 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_discard_empty_borrowed(
+    fn add_discard_all_borrowed(
         &mut self,
         elem_ty: Type,
         size: u64,
         input: Wire,
     ) -> Result<(), BuildError> {
-        let op = BArrayUnsafeOpDef::discard_empty_borrowed
-            .instantiate(&[size.into(), elem_ty.into()])?;
+        let op =
+            BArrayUnsafeOpDef::discard_all_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
         self.add_dataflow_op(op.to_extension_op().unwrap(), vec![input])?;
         Ok(())
     }
@@ -702,9 +702,8 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
-    fn add_new_empty_borrowed(&mut self, elem_ty: Type, size: u64) -> Result<Wire, BuildError> {
-        let op =
-            BArrayUnsafeOpDef::new_empty_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+    fn add_new_all_borrowed(&mut self, elem_ty: Type, size: u64) -> Result<Wire, BuildError> {
+        let op = BArrayUnsafeOpDef::new_all_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
         let [arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![])?
             .outputs_arr();
@@ -759,7 +758,7 @@ mod test {
     }
 
     #[test]
-    fn test_discard_empty_borrowed() {
+    fn test_discard_all_borrowed() {
         let size = 1;
         let elem_ty = qb_t();
         let arr_ty = borrow_array_type(size, elem_ty.clone());
@@ -772,23 +771,21 @@ mod test {
                 .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
                 .unwrap();
             builder
-                .add_discard_empty_borrowed(elem_ty, size, arr_with_borrowed)
+                .add_discard_all_borrowed(elem_ty, size, arr_with_borrowed)
                 .unwrap();
             builder.finish_hugr_with_outputs([el]).unwrap()
         };
     }
 
     #[test]
-    fn test_new_empty_borrowed() {
+    fn test_new_all_borrowed() {
         let size = 5;
         let elem_ty = usize_t();
         let arr_ty = borrow_array_type(size, elem_ty.clone());
         let _ = {
             let mut builder =
                 DFGBuilder::new(Signature::new(vec![], vec![arr_ty.clone()])).unwrap();
-            let arr = builder
-                .add_new_empty_borrowed(elem_ty.clone(), size)
-                .unwrap();
+            let arr = builder.add_new_all_borrowed(elem_ty.clone(), size).unwrap();
             let idx = builder.add_load_value(ConstUsize::new(3));
             let val = builder.add_load_value(ConstUsize::new(202));
             let arr_with_put = builder

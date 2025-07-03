@@ -246,48 +246,9 @@
       },
       "binary": false
     },
-    "discard_empty": {
+    "discard_all_borrowed": {
       "extension": "collections.borrow_arr",
-      "name": "discard_empty",
-      "description": "Discard an empty array",
-      "signature": {
-        "params": [
-          {
-            "tp": "Type",
-            "b": "A"
-          }
-        ],
-        "body": {
-          "input": [
-            {
-              "t": "Opaque",
-              "extension": "collections.borrow_arr",
-              "id": "borrow_array",
-              "args": [
-                {
-                  "tya": "BoundedNat",
-                  "n": 0
-                },
-                {
-                  "tya": "Type",
-                  "ty": {
-                    "t": "V",
-                    "i": 0,
-                    "b": "A"
-                  }
-                }
-              ],
-              "bound": "A"
-            }
-          ],
-          "output": []
-        }
-      },
-      "binary": false
-    },
-    "discard_empty_borrowed": {
-      "extension": "collections.borrow_arr",
-      "name": "discard_empty_borrowed",
+      "name": "discard_all_borrowed",
       "description": "Discard a borrow array where all elements have been borrowed",
       "signature": {
         "params": [
@@ -320,6 +281,45 @@
                   "ty": {
                     "t": "V",
                     "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "discard_empty": {
+      "extension": "collections.borrow_arr",
+      "name": "discard_empty",
+      "description": "Discard an empty array",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "BoundedNat",
+                  "n": 0
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
                     "b": "A"
                   }
                 }
@@ -493,16 +493,9 @@
       },
       "binary": false
     },
-    "new_array": {
+    "new_all_borrowed": {
       "extension": "collections.borrow_arr",
-      "name": "new_array",
-      "description": "Create a new array from elements",
-      "signature": null,
-      "binary": true
-    },
-    "new_empty_borrowed": {
-      "extension": "collections.borrow_arr",
-      "name": "new_empty_borrowed",
+      "name": "new_all_borrowed",
       "description": "Create a new borrow array that contains no elements",
       "signature": {
         "params": [
@@ -546,6 +539,13 @@
         }
       },
       "binary": false
+    },
+    "new_array": {
+      "extension": "collections.borrow_arr",
+      "name": "new_array",
+      "description": "Create a new array from elements",
+      "signature": null,
+      "binary": true
     },
     "pop_left": {
       "extension": "collections.borrow_arr",
