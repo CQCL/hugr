@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - release/*
 
 permissions:
   contents: write
@@ -21,3 +22,4 @@ jobs:
             # Using a personal access token so releases created by this workflow can trigger the deployment workflow
             token: ${{ secrets.HUGRBOT_PAT }}
             config-file: release-please-config.json
+            target-branch: ${{ github.ref_name }}
