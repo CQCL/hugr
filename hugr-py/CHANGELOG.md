@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.3...hugr-py-v0.12.4) (2025-07-03)
+
+
+### Bug Fixes
+
+* stringify metadata before escaping in renderer ([#2405](https://github.com/CQCL/hugr/issues/2405)) ([1f01e97](https://github.com/CQCL/hugr/commit/1f01e97696afe02b46eedb2c6e3e2f2369a4ac7b))
+
 ## [0.12.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.2...hugr-py-v0.12.3) (2025-07-03)
 
 
