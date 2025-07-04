@@ -226,9 +226,60 @@ fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
 }
 
 #[test]
-fn not_a_hugr() {
-    let val = serde_json::Value::from("Hello, world!");
+fn extra_and_missing_fields() {
+    // First, some "known good" JSON
+    let mut val = serde_json::json!({
+        "op_def":null,
+        "optype":{
+            "name":"polyfunc1",
+            "op":"FuncDefn",
+            "parent":0,
+            "signature":{
+                "body":{
+                    "input":[],
+                    "output":[]
+                },
+                "params":[
+                    {"bound":null,"tp":"BoundedNat"}
+                ]
+            }
+        },
+        "poly_func_type":null,
+        "sum_type":null,
+        "typ":null,
+        "value":null,
+        "version":"live"
+    });
     NamedSchema::check_schemas(&val, get_testing_schemas(true));
+
+    // Now try adding an extra field
+    let serde_json::Value::Object(fields) = &mut val else {
+        panic!()
+    };
+    let Some(serde_json::Value::Object(optype_fields)) = fields.get_mut("optype") else {
+        panic!()
+    };
+    optype_fields.insert(
+        "extra_field".to_string(),
+        serde_json::Value::String("not in schema".to_string()),
+    );
+    TESTING_SCHEMA_STRICT
+        .schema
+        .iter_errors(&val)
+        .next()
+        .unwrap();
+    assert!(TESTING_SCHEMA.schema.iter_errors(&val).next().is_none());
+
+    // And removing one
+    let serde_json::Value::Object(fields) = &mut val else {
+        panic!()
+    };
+    let Some(serde_json::Value::Object(optype_fields)) = fields.get_mut("optype") else {
+        panic!()
+    };
+    optype_fields.remove("name").unwrap();
+
+    TESTING_SCHEMA.schema.iter_errors(&val).next().unwrap();
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
