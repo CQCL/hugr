@@ -230,10 +230,8 @@ fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
     assert_eq!(before, after);
 }
 
-#[test]
-fn extra_and_missing_fields() {
-    // First, some "known good" JSON
-    let mut val = serde_json::json!({
+fn test_schema_val() -> serde_json::Value {
+    serde_json::json!({
         "op_def":null,
         "optype":{
             "name":"polyfunc1",
@@ -254,37 +252,51 @@ fn extra_and_missing_fields() {
         "typ":null,
         "value":null,
         "version":"live"
-    });
-    NamedSchema::check_schemas(&val, get_testing_schemas(true)).unwrap();
+    })
+}
+
+fn schema_val() -> serde_json::Value {
+    serde_json::json!({"nodes": [], "edges": [], "version": "live"})
+}
+
+#[rstest]
+#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val())]
+#[case(&SCHEMA, &SCHEMA_STRICT, schema_val())]
+fn extra_and_missing_fields(
+    #[case] lax_schema: &'static NamedSchema,
+    #[case] strict_schema: &'static NamedSchema,
+    #[case] mut val: serde_json::Value,
+) {
+    // First, some "known good" JSON
+    NamedSchema::check_schemas(&val, [lax_schema, strict_schema]).unwrap();
 
     // Now try adding an extra field
     let serde_json::Value::Object(fields) = &mut val else {
         panic!()
     };
-    let Some(serde_json::Value::Object(optype_fields)) = fields.get_mut("optype") else {
-        panic!()
-    };
-    optype_fields.insert(
+    fields.insert(
         "extra_field".to_string(),
         serde_json::Value::String("not in schema".to_string()),
     );
-    TESTING_SCHEMA_STRICT
-        .schema
-        .iter_errors(&val)
-        .next()
-        .unwrap();
-    assert!(TESTING_SCHEMA.schema.iter_errors(&val).next().is_none());
+    strict_schema.check(&val).unwrap_err();
+    lax_schema.check(&val).unwrap();
 
     // And removing one
     let serde_json::Value::Object(fields) = &mut val else {
         panic!()
     };
-    let Some(serde_json::Value::Object(optype_fields)) = fields.get_mut("optype") else {
-        panic!()
+    // This will only work for the two fixtures above
+    match fields.get_mut("optype") {
+        Some(mut optype) => {
+            let serde_json::Value::Object(optype_fields) = &mut optype else {
+                panic!()
+            };
+            optype_fields.remove("name").unwrap()
+        }
+        None => fields.remove("nodes").unwrap(),
     };
-    optype_fields.remove("name").unwrap();
 
-    TESTING_SCHEMA.schema.iter_errors(&val).next().unwrap();
+    lax_schema.check(&val).unwrap_err();
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
