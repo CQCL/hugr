@@ -1977,5 +1977,15 @@
         }
     },
     "title": "HUGR schema",
-    "$ref": "#/$defs/SerialHugr"
+    "oneOf": [
+        {
+            "$ref": "#/$defs/SerialHugr"
+        },
+        {
+            "$ref": "#/$defs/Extension"
+        },
+        {
+            "$ref": "#/$defs/Package"
+        }
+    ]
 }

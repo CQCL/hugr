@@ -2055,5 +2055,15 @@
         }
     },
     "title": "HUGR schema",
-    "$ref": "#/$defs/TestingHugr"
+    "oneOf": [
+        {
+            "$ref": "#/$defs/TestingHugr"
+        },
+        {
+            "$ref": "#/$defs/Extension"
+        },
+        {
+            "$ref": "#/$defs/Package"
+        }
+    ]
 }
