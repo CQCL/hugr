@@ -218,6 +218,23 @@ class TupleParam(TypeParam):
         return model.Apply("core.tuple", [item_types])
 
 
+@dataclass(frozen=True)
+class ConstParam(TypeParam):
+    """Type parameter which requires a constant value."""
+
+    ty: Type
+
+    def _to_serial(self) -> stys.ConstParam:
+        return stys.ConstParam(ty=self.ty._to_serial_root())
+
+    def __str__(self) -> str:
+        return f"Const({self.ty!s})"
+
+    def to_model(self) -> model.Term:
+        ty = cast(model.Term, self.ty.to_model())
+        return model.Apply("core.const", [ty])
+
+
 # ------------------------------------------
 # --------------- TypeArg ------------------
 # ------------------------------------------

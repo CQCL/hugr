@@ -345,6 +345,25 @@
             "title": "Const",
             "type": "object"
         },
+        "ConstParam": {
+            "additionalProperties": true,
+            "properties": {
+                "tp": {
+                    "const": "Const",
+                    "default": "Const",
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "ty": {
+                    "$ref": "#/$defs/Type"
+                }
+            },
+            "required": [
+                "ty"
+            ],
+            "title": "ConstParam",
+            "type": "object"
+        },
         "CustomConst": {
             "additionalProperties": true,
             "properties": {
@@ -1865,6 +1884,7 @@
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
                     "Bytes": "#/$defs/BytesParam",
+                    "Const": "#/$defs/ConstParam",
                     "Float": "#/$defs/FloatParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
@@ -1894,6 +1914,9 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
+                },
+                {
+                    "$ref": "#/$defs/ConstParam"
                 }
             ],
             "required": [

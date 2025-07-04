@@ -139,6 +139,9 @@ pub enum Term {
     /// - see [`Term::new_var_use`]
     #[display("{_0}")]
     Variable(TermVar),
+
+    /// The type of constants for a runtime type.
+    Const(Box<Type>),
 }
 
 impl Term {
@@ -167,6 +170,11 @@ impl Term {
     /// Creates a new [`Term::TupleType`] given the type of its elements.
     pub fn new_tuple_type(item_types: impl Into<Term>) -> Self {
         Self::TupleType(Box::new(item_types.into()))
+    }
+
+    /// Creates a new [`Term::Const`] from a runtime type.
+    pub fn new_const(ty: impl Into<Type>) -> Self {
+        Self::Const(Box::new(ty.into()))
     }
 
     /// Checks if this term is a supertype of another.
@@ -369,6 +377,7 @@ impl Term {
             Term::ListType(item_type) => item_type.validate(var_decls),
             Term::TupleType(item_types) => item_types.validate(var_decls),
             Term::StaticType => Ok(()),
+            Term::Const(ty) => ty.validate(var_decls),
         }
     }
 
@@ -432,6 +441,7 @@ impl Term {
             Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
             Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
             Term::StaticType => self.clone(),
+            Term::Const(ty) => Term::new_const(ty.substitute1(t)),
         }
     }
 
@@ -593,6 +603,7 @@ impl Transformable for Term {
             Term::StaticType => Ok(false),
             TypeArg::ListConcat(lists) => lists.transform(tr),
             TypeArg::TupleConcat(tuples) => tuples.transform(tr),
+            Term::Const(ty) => ty.transform(tr),
         }
     }
 }
@@ -685,6 +696,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::ListType { .. }, Term::StaticType) => Ok(()),
         (Term::TupleType(_), Term::StaticType) => Ok(()),
         (Term::RuntimeType(_), Term::StaticType) => Ok(()),
+        (Term::Const(_), Term::StaticType) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
             term: Box::new(term.clone()),

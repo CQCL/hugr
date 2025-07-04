@@ -1325,8 +1325,11 @@ impl<'a> Context<'a> {
                 return Ok(Term::StaticType);
             }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CONST)? {
-                return Err(error_unsupported!("`{}`", model::CORE_CONST));
+            if let Some([ty]) = self.match_symbol(term_id, model::CORE_CONST)? {
+                let ty = self
+                    .import_type(ty)
+                    .map_err(|err| error_context!(err, "type of a constant"))?;
+                return Ok(TypeParam::new_const(ty));
             }
 
             if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {

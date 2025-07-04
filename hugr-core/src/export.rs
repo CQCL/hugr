@@ -1021,6 +1021,10 @@ impl<'a> Context<'a> {
             }
             Term::Variable(v) => self.export_type_arg_var(v),
             Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
+            Term::Const(ty) => {
+                let ty = self.export_type(ty);
+                self.make_term_apply(model::CORE_CONST, &[ty])
+            }
         }
     }
 
