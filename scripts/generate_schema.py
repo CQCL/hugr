@@ -38,6 +38,7 @@ def write_schema(
     _, top_level_schema = models_json_schema(
         [(s, "validation") for s in schemas], title="HUGR schema"
     )
+    top_level_schema["$ref"] = f"#/$defs/{schema.__name__}"
     with path.open("w") as f:
         json.dump(top_level_schema, f, indent=4)
 
