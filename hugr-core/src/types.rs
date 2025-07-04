@@ -1166,8 +1166,6 @@ pub(super) mod proptest_utils {
     }
 
     pub fn any_serde_type_param(depth: RecursionDepth) -> impl Strategy<Value = Term> {
-        any_with::<Term>(depth).prop_filter("Term was not a TypeParam", |term| {
-            matches!(TermSer::from(term.clone()), TermSer::TypeParam(_))
-        })
+        any_with::<Term>(depth).prop_filter("Term was not a TypeParam", term_is_serde_type_param)
     }
 }
