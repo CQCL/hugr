@@ -187,7 +187,7 @@ impl From<TermSer> for Term {
 #[serde(untagged)]
 pub(super) enum ArrayOrTermSer {
     Array(Vec<Term>),
-    Term(Box<Term>),
+    Term(Box<Term>), // ALAN Not clear what Term can go in here that JSON-serializes correctly?
 }
 
 impl From<ArrayOrTermSer> for Term {
