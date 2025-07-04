@@ -1110,6 +1110,7 @@ pub(crate) mod test {
 
 #[cfg(test)]
 pub(super) mod proptest_utils {
+    use proptest::collection::vec;
     use proptest::prelude::{Strategy, any_with};
 
     use super::serialize::{TermSer, TypeArgSer, TypeParamSer};
@@ -1163,6 +1164,10 @@ pub(super) mod proptest_utils {
 
     pub fn any_serde_type_arg(depth: RecursionDepth) -> impl Strategy<Value = Term> {
         any_with::<Term>(depth).prop_filter("Term was not a TypeArg", term_is_serde_type_arg)
+    }
+
+    pub fn any_serde_type_arg_vec() -> impl Strategy<Value = Vec<Term>> {
+        vec(any_serde_type_arg(RecursionDepth::default()), 1..3)
     }
 
     pub fn any_serde_type_param(depth: RecursionDepth) -> impl Strategy<Value = Term> {
