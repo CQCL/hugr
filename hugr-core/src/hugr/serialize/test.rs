@@ -62,26 +62,29 @@ impl NamedSchema {
         Self { name, schema }
     }
 
-    pub fn check(&self, val: &serde_json::Value) {
+    pub fn check(&self, val: &serde_json::Value) -> Result<(), String> {
         let mut errors = self.schema.iter_errors(val).peekable();
-        if errors.peek().is_some() {
-            // errors don't necessarily implement Debug
-            eprintln!("Schema failed to validate: {}", self.name);
-            for error in errors {
-                eprintln!("Validation error: {error}");
-                eprintln!("Instance path: {}", error.instance_path);
-            }
-            panic!("Serialization test failed.");
+        if errors.peek().is_none() {
+            return Ok(());
         }
+
+        // errors don't necessarily implement Debug
+        let mut strs = vec![format!("Schema failed to validate: {}", self.name)];
+        strs.extend(errors.flat_map(|error| {
+            [
+                format!("Validation error: {error}"),
+                format!("Instance path: {}", error.instance_path),
+            ]
+        }));
+        strs.push("Serialization test failed.".to_string());
+        Err(strs.join("\n"))
     }
 
     pub fn check_schemas(
         val: &serde_json::Value,
         schemas: impl IntoIterator<Item = &'static Self>,
-    ) {
-        for schema in schemas {
-            schema.check(val);
-        }
+    ) -> Result<(), String> {
+        schemas.into_iter().try_for_each(|schema| schema.check(val))
     }
 }
 
@@ -161,7 +164,7 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
     val: serde_json::Value,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> T {
-    NamedSchema::check_schemas(&val, schemas);
+    NamedSchema::check_schemas(&val, schemas).unwrap();
     serde_json::from_value(val).unwrap()
 }
 
@@ -171,8 +174,10 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> TDeser {
     let val = serde_json::to_value(g).unwrap();
-    NamedSchema::check_schemas(&val, schemas);
-    serde_json::from_value(val).unwrap()
+    match NamedSchema::check_schemas(&val, schemas) {
+        Ok(()) => serde_json::from_value(val).unwrap(),
+        Err(msg) => panic!("ser_roundtrip_check_schema failed with {msg}, input was {val}"),
+    }
 }
 
 /// Serialize a Hugr and check that it is valid against the schema.
@@ -187,7 +192,7 @@ pub(crate) fn check_hugr_serialization_schema(hugr: &Hugr) {
     let schemas = get_schemas(true);
     let hugr_ser = HugrSer(hugr);
     let val = serde_json::to_value(hugr_ser).unwrap();
-    NamedSchema::check_schemas(&val, schemas);
+    NamedSchema::check_schemas(&val, schemas).unwrap();
 }
 
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
@@ -250,7 +255,7 @@ fn extra_and_missing_fields() {
         "value":null,
         "version":"live"
     });
-    NamedSchema::check_schemas(&val, get_testing_schemas(true));
+    NamedSchema::check_schemas(&val, get_testing_schemas(true)).unwrap();
 
     // Now try adding an extra field
     let serde_json::Value::Object(fields) = &mut val else {
@@ -601,7 +606,7 @@ fn std_extensions_valid() {
     let std_reg = crate::std_extensions::std_reg();
     for ext in std_reg {
         let val = serde_json::to_value(ext).unwrap();
-        NamedSchema::check_schemas(&val, get_schemas(true));
+        NamedSchema::check_schemas(&val, get_schemas(true)).unwrap();
         // check deserialises correctly, can't check equality because of custom binaries.
         let deser: crate::extension::Extension = serde_json::from_value(val.clone()).unwrap();
         assert_eq!(serde_json::to_value(deser).unwrap(), val);
