@@ -125,6 +125,14 @@ class TupleParam(BaseTypeParam):
         return tys.TupleParam(params=deser_it(self.params))
 
 
+class ConstParam(BaseTypeParam):
+    tp: Literal["Const"] = "Const"
+    ty: Type
+
+    def deserialize(self) -> tys.ConstParam:
+        return tys.ConstParam(ty=self.ty.deserialize())
+
+
 class TypeParam(RootModel):
     """A type parameter."""
 
@@ -135,7 +143,8 @@ class TypeParam(RootModel):
         | FloatParam
         | BytesParam
         | ListParam
-        | TupleParam,
+        | TupleParam
+        | ConstParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
