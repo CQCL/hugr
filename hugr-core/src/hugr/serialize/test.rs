@@ -510,6 +510,14 @@ fn serialize_types_roundtrip() {
 #[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
 #[case(Type::new_function(Signature::new_endo(vec![qb_t(),bool_t(),usize_t()])))]
+// ALAN This case fails:
+#[case(Type::new_extension(crate::types::CustomType::new(
+    "foo",
+    [TypeParam::new_tuple_type(TypeParam::StringType)], // Ok if we pass []
+    crate::hugr::IdentList::new_unchecked("bar"),
+    TypeBound::Copyable,
+    &std::sync::Weak::default()
+)))]
 fn roundtrip_type(#[case] typ: Type) {
     check_testing_roundtrip(typ);
 }

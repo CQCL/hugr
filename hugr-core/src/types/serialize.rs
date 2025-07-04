@@ -193,6 +193,7 @@ pub(super) enum ArrayOrTermSer {
 impl From<ArrayOrTermSer> for Term {
     fn from(value: ArrayOrTermSer) -> Self {
         match value {
+            // ALAN is this right, given ArrayOrTermSer is used inside TypeParamSer::Tuple only?
             ArrayOrTermSer::Array(terms) => Term::new_list(terms),
             ArrayOrTermSer::Term(term) => *term,
         }
