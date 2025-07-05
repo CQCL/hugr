@@ -7,6 +7,7 @@ use itertools::Itertools;
 use crate::extension::SignatureError;
 #[cfg(test)]
 use {
+    super::proptest_utils::any_serde_type_param,
     crate::proptest::RecursionDepth,
     ::proptest::{collection::vec, prelude::*},
     proptest_derive::Arbitrary,
@@ -31,7 +32,7 @@ pub struct PolyFuncTypeBase<RV: MaybeRV> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [`TypeArg`]s before the function can be called. This
     /// defines the indices used by variables inside the body.
-    #[cfg_attr(test, proptest(strategy = "vec(any_with::<TypeParam>(params), 0..3)"))]
+    #[cfg_attr(test, proptest(strategy = "vec(any_serde_type_param(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [`Self::params`]
     #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<RV>>(params)"))]

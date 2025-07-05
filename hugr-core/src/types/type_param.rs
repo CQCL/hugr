@@ -261,7 +261,7 @@ impl<const N: usize> From<[Term; N]> for Term {
 #[display("#{idx}")]
 pub struct TermVar {
     idx: usize,
-    cached_decl: Box<Term>,
+    pub(in crate::types) cached_decl: Box<Term>,
 }
 
 impl Term {
@@ -1046,13 +1046,13 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{Term, Type, TypeBound};
+        use crate::types::{Term, Type, TypeBound, proptest_utils::any_serde_type_param};
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                (any::<usize>(), any_with::<Term>(depth))
+                (any::<usize>(), any_serde_type_param(depth))
                     .prop_map(|(idx, cached_decl)| Self {
                         idx,
                         cached_decl: Box::new(cached_decl),

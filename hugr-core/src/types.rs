@@ -1107,3 +1107,79 @@ pub(crate) mod test {
         }
     }
 }
+
+#[cfg(test)]
+pub(super) mod proptest_utils {
+    use proptest::collection::vec;
+    use proptest::prelude::{Strategy, any_with};
+
+    use super::serialize::{TermSer, TypeArgSer, TypeParamSer};
+    use super::type_param::Term;
+
+    use crate::proptest::RecursionDepth;
+    use crate::types::serialize::ArrayOrTermSer;
+
+    fn term_is_serde_type_arg(t: &Term) -> bool {
+        let TermSer::TypeArg(arg) = TermSer::from(t.clone()) else {
+            return false;
+        };
+        match arg {
+            TypeArgSer::List { elems: terms }
+            | TypeArgSer::ListConcat { lists: terms }
+            | TypeArgSer::Tuple { elems: terms }
+            | TypeArgSer::TupleConcat { tuples: terms } => terms.iter().all(term_is_serde_type_arg),
+            TypeArgSer::Variable { v } => term_is_serde_type_param(&v.cached_decl),
+            TypeArgSer::Type { ty } => {
+                if let Some(cty) = ty.as_extension() {
+                    cty.args().iter().all(term_is_serde_type_arg)
+                } else {
+                    true
+                }
+            } // Do we need to inspect inside function types? sum types?
+            TypeArgSer::BoundedNat { .. }
+            | TypeArgSer::String { .. }
+            | TypeArgSer::Bytes { .. }
+            | TypeArgSer::Float { .. } => true,
+        }
+    }
+
+    fn term_is_serde_type_param(t: &Term) -> bool {
+        let TermSer::TypeParam(parm) = TermSer::from(t.clone()) else {
+            return false;
+        };
+        match parm {
+            TypeParamSer::Type { .. }
+            | TypeParamSer::BoundedNat { .. }
+            | TypeParamSer::String
+            | TypeParamSer::Bytes
+            | TypeParamSer::Float
+            | TypeParamSer::StaticType => true,
+            TypeParamSer::List { param } => term_is_serde_type_param(&param),
+            TypeParamSer::Tuple { params } => {
+                let terms = match &params {
+                    ArrayOrTermSer::Term(b) => match &**b {
+                        Term::List(_) => panic!("Should be an ArrayOrTermSer::Array"),
+                        // ALAN I think this may be the only legal Term here?
+                        // But impl Arbitrary for Term never creates such, so we won't actually see it.
+                        Term::ListConcat(terms) => terms,
+                        _ => return false,
+                    },
+                    ArrayOrTermSer::Array(terms) => terms,
+                };
+                terms.iter().all(term_is_serde_type_param)
+            }
+        }
+    }
+
+    pub fn any_serde_type_arg(depth: RecursionDepth) -> impl Strategy<Value = Term> {
+        any_with::<Term>(depth).prop_filter("Term was not a TypeArg", term_is_serde_type_arg)
+    }
+
+    pub fn any_serde_type_arg_vec() -> impl Strategy<Value = Vec<Term>> {
+        vec(any_serde_type_arg(RecursionDepth::default()), 1..3)
+    }
+
+    pub fn any_serde_type_param(depth: RecursionDepth) -> impl Strategy<Value = Term> {
+        any_with::<Term>(depth).prop_filter("Term was not a TypeParam", term_is_serde_type_param)
+    }
+}

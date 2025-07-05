@@ -7,7 +7,8 @@ use thiserror::Error;
 #[cfg(test)]
 use {
     crate::extension::test::SimpleOpDef, crate::proptest::any_nonempty_smolstr,
-    ::proptest::prelude::*, ::proptest_derive::Arbitrary,
+    crate::types::proptest_utils::any_serde_type_arg_vec, ::proptest::prelude::*,
+    ::proptest_derive::Arbitrary,
 };
 
 use crate::core::HugrNode;
@@ -35,6 +36,7 @@ pub struct ExtensionOp {
         proptest(strategy = "any::<SimpleOpDef>().prop_map(|x| Arc::new(x.into()))")
     )]
     def: Arc<OpDef>,
+    #[cfg_attr(test, proptest(strategy = "any_serde_type_arg_vec()"))]
     args: Vec<TypeArg>,
     signature: Signature, // Cache
 }
@@ -235,6 +237,7 @@ pub struct OpaqueOp {
     extension: ExtensionId,
     #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     name: OpName,
+    #[cfg_attr(test, proptest(strategy = "any_serde_type_arg_vec()"))]
     args: Vec<TypeArg>,
     // note that the `signature` field might not include `extension`. Thus this must
     // remain private, and should be accessed through
