@@ -1155,10 +1155,19 @@ pub(super) mod proptest_utils {
             | TypeParamSer::Float
             | TypeParamSer::StaticType => true,
             TypeParamSer::List { param } => term_is_serde_type_param(&param),
-            TypeParamSer::Tuple { params } => match params {
-                ArrayOrTermSer::Term(_) => false,
-                ArrayOrTermSer::Array(terms) => terms.iter().all(term_is_serde_type_param),
-            },
+            TypeParamSer::Tuple { params } => {
+                let terms = match &params {
+                    ArrayOrTermSer::Term(b) => match &**b {
+                        Term::List(_) => panic!("Should be an ArrayOrTermSer::Array"),
+                        // ALAN I think this may be the only legal Term here?
+                        // But impl Arbitrary for Term never creates such, so we won't actually see it.
+                        Term::ListConcat(terms) => terms,
+                        _ => return false,
+                    },
+                    ArrayOrTermSer::Array(terms) => terms,
+                };
+                terms.iter().all(term_is_serde_type_param)
+            }
         }
     }
 
