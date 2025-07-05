@@ -260,43 +260,45 @@ fn schema_val() -> serde_json::Value {
 }
 
 #[rstest]
-#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val())]
-#[case(&SCHEMA, &SCHEMA_STRICT, schema_val())]
-fn extra_and_missing_fields(
+#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val(), ["optype"])]
+#[case(&SCHEMA, &SCHEMA_STRICT, schema_val(), [])]
+fn extra_and_missing_fields<const L: usize>(
     #[case] lax_schema: &'static NamedSchema,
     #[case] strict_schema: &'static NamedSchema,
     #[case] mut val: serde_json::Value,
+    #[case] target_loc: [&'static str; L],
 ) {
+    use serde_json::Value;
+    fn get_fields(
+        val: &mut Value,
+        mut path: impl Iterator<Item = &'static str>,
+    ) -> &mut serde_json::Map<String, Value> {
+        let Value::Object(fields) = val else { panic!() };
+        match path.next() {
+            Some(n) => get_fields(fields.get_mut(n).unwrap(), path),
+            None => fields,
+        }
+    }
     // First, some "known good" JSON
     NamedSchema::check_schemas(&val, [lax_schema, strict_schema]).unwrap();
 
     // Now try adding an extra field
-    let serde_json::Value::Object(fields) = &mut val else {
-        panic!()
-    };
+    let fields = get_fields(&mut val, target_loc.iter().copied());
     fields.insert(
         "extra_field".to_string(),
-        serde_json::Value::String("not in schema".to_string()),
+        Value::String("not in schema".to_string()),
     );
     strict_schema.check(&val).unwrap_err();
     lax_schema.check(&val).unwrap();
 
     // And removing one
-    let serde_json::Value::Object(fields) = &mut val else {
-        panic!()
-    };
-    // This will only work for the two fixtures above
-    match fields.get_mut("optype") {
-        Some(mut optype) => {
-            let serde_json::Value::Object(optype_fields) = &mut optype else {
-                panic!()
-            };
-            optype_fields.remove("name").unwrap()
-        }
-        None => fields.remove("nodes").unwrap(),
-    };
+    let fields = get_fields(&mut val, target_loc.iter().copied());
+    fields.remove("extra_field").unwrap();
+    let key = fields.keys().next().unwrap().clone();
+    fields.remove(&key).unwrap();
 
     lax_schema.check(&val).unwrap_err();
+    strict_schema.check(&val).unwrap_err();
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
