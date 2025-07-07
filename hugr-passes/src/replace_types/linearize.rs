@@ -404,7 +404,7 @@ mod test {
             arg_values: &[TypeArg],
             _def: &'o OpDef,
         ) -> Result<PolyFuncTypeRV, SignatureError> {
-            let [TypeArg::BoundedNat { n }] = arg_values else {
+            let [TypeArg::BoundedNat(n)] = arg_values else {
                 panic!()
             };
             let outs = vec![self.0.clone(); *n as usize];
@@ -412,7 +412,7 @@ mod test {
         }
 
         fn static_params(&self) -> &[TypeParam] {
-            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+            const JUST_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
             JUST_NAT
         }
     }

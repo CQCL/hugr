@@ -1,5 +1,4 @@
 #![allow(clippy::type_complexity)]
-#![warn(missing_docs)]
 //! Replace types with other types across the Hugr. See [`ReplaceTypes`] and [Linearizer].
 //!
 use std::borrow::Cow;
@@ -641,7 +640,7 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Type { ty }] = args else {
+        let [TypeArg::Runtime(ty)] = args else {
             panic!("Expected just elem type")
         };
         ty

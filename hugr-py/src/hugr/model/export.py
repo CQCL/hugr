@@ -39,6 +39,7 @@ class ModelExport:
         self.hugr = hugr
         self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
         self.link_names: dict[InPort | OutPort, str] = {}
+        self.link_next = 0
 
         # TODO: Store the hugr entrypoint
 
@@ -52,28 +53,22 @@ class ModelExport:
         if root in self.link_names:
             return self.link_names[root]
         else:
-            index = str(len(self.link_names))
+            index = str(self.link_next)
+            self.link_next += 1
             self.link_names[root] = index
             return index
 
-    def export_node(self, node: Node) -> model.Node | None:
+    def export_node(
+        self, node: Node, virtual_input_links: Sequence[str] = []
+    ) -> model.Node | None:
         """Export the node with the given node id."""
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
-        outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
-        meta = []
+        inputs = [*inputs, *virtual_input_links]
 
-        # Export JSON metadata
-        for meta_name, meta_value in node_data.metadata.items():
-            # TODO: Is this the correct way to convert the metadata as JSON?
-            meta_json = json.dumps(meta_value)
-            meta.append(
-                model.Apply(
-                    "compat.meta_json",
-                    [model.Literal(meta_name), model.Literal(meta_json)],
-                )
-            )
+        outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
+        meta = self.export_json_meta(node)
 
         # Add an order hint key to the node if necessary
         if _needs_order_key(self.hugr, node):
@@ -213,7 +208,8 @@ class ModelExport:
                 )
 
             case LoadFunc() as op:
-                signature = op.instantiation.to_model()
+                signature = op.outer_signature().to_model()
+                instantiation = op.instantiation.to_model()
                 func_args = cast(
                     list[model.Term], [type.to_model() for type in op.type_args]
                 )
@@ -227,10 +223,10 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", [signature, func])
+                        model.Apply("core.load_const", [instantiation, func])
                     ),
                     signature=signature,
-                    inputs=inputs,
+                    inputs=[],
                     outputs=outputs,
                     meta=meta,
                 )
@@ -307,31 +303,21 @@ class ModelExport:
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
-                input_types = [
-                    model.Apply(
-                        "core.ctrl",
-                        [model.List([type.to_model() for type in op.inputs])],
-                    )
-                ]
+                input_types = [model.List([type.to_model() for type in op.inputs])]
 
                 other_output_types = [type.to_model() for type in op.other_outputs]
                 output_types = [
-                    model.Apply(
-                        "core.ctrl",
+                    model.List(
                         [
-                            model.List(
-                                [
-                                    *[type.to_model() for type in row],
-                                    *other_output_types,
-                                ]
-                            )
-                        ],
+                            *[type.to_model() for type in row],
+                            *other_output_types,
+                        ]
                     )
                     for row in op.sum_ty.variant_rows
                 ]
 
                 signature = model.Apply(
-                    "core.fn",
+                    "core.ctrl",
                     [model.List(input_types), model.List(output_types)],
                 )
 
@@ -373,9 +359,27 @@ class ModelExport:
                 error = f"Unknown operation: {op}"
                 raise ValueError(error)
 
+    def export_json_meta(self, node: Node) -> list[model.Term]:
+        """Export the metadata of the node via the JSON compatibility constructor."""
+        node_data = self.hugr[node]
+        meta: list[model.Term] = []
+
+        for meta_name, meta_value in node_data.metadata.items():
+            # TODO: Is this the correct way to convert the metadata as JSON?
+            meta_json = json.dumps(meta_value)
+            meta.append(
+                model.Apply(
+                    "compat.meta_json",
+                    [model.Literal(meta_name), model.Literal(meta_json)],
+                )
+            )
+
+        return meta
+
     def export_region_module(self, node: Node) -> model.Region:
         """Export a module node as a module region."""
         node_data = self.hugr[node]
+        meta = self.export_json_meta(node)
         children = []
 
         for child in node_data.children:
@@ -384,7 +388,7 @@ class ModelExport:
             if child_node is not None:
                 children.append(child_node)
 
-        return model.Region(kind=model.RegionKind.MODULE, children=children)
+        return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
     def export_region_dfg(self, node: Node) -> model.Region:
         """Export the children of a node as a dataflow region."""
@@ -439,6 +443,7 @@ class ModelExport:
             children=children,
             sources=sources,
             targets=targets,
+            meta=meta,
         )
 
     def export_region_cfg(self, node: Node) -> model.Region:
@@ -468,9 +473,14 @@ class ModelExport:
                         source_types = model.List(
                             [type.to_model() for type in op.inputs]
                         )
-                        source = self.link_name(OutPort(child, 0))
+                        source = str(self.link_next)
+                        self.link_next += 1
 
-                    child_node = self.export_node(child)
+                        child_node = self.export_node(
+                            child, virtual_input_links=[source]
+                        )
+                    else:
+                        child_node = self.export_node(child)
 
                     if child_node is not None:
                         children.append(child_node)
@@ -482,7 +492,13 @@ class ModelExport:
             error = f"CFG {node} has no entry block."
             raise ValueError(error)
 
-        signature = model.Apply("core.fn", [source_types, target_types])
+        signature = model.Apply(
+            "core.ctrl",
+            [
+                model.List([source_types]),
+                model.List([target_types]),
+            ],
+        )
 
         return model.Region(
             kind=model.RegionKind.CONTROL_FLOW,
@@ -539,7 +555,7 @@ class ModelExport:
             case _:
                 return None
 
-        return _mangle_name(node, name)
+        return _mangle_name(func_node, name)
 
     def find_const_input(self, node: Node) -> model.Term | None:
         """Find and export the constant that a node is connected to, if any."""

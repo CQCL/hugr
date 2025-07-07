@@ -1,7 +1,9 @@
+//! Serialized format for [`CommitStateSpace`]
+
 use relrc::serialization::SerializedHistoryGraph;
 
 use super::*;
-use crate::hugr::patch::simple_replace::serial::SerialSimpleReplacement;
+use hugr_core::hugr::patch::simple_replace::serial::SerialSimpleReplacement;
 
 /// Serialized format for [`PersistentReplacement`]
 pub type SerialPersistentReplacement<H> = SerialSimpleReplacement<H, PatchNode>;
@@ -51,28 +53,28 @@ impl<H: Into<Hugr>> From<SerialCommitData<H>> for CommitData {
 
 /// Serialized format for commit state space
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct SerialCommitStateSpace<H> {
+pub struct SerialCommitStateSpace<H, R> {
     /// The serialized history graph containing commit data
-    pub graph: SerializedHistoryGraph<SerialCommitData<H>, (), PointerEqResolver>,
+    pub graph: SerializedHistoryGraph<SerialCommitData<H>, (), R>,
     /// The base commit ID
     pub base_commit: CommitId,
 }
 
-impl CommitStateSpace {
+impl<R: Resolver> CommitStateSpace<R> {
     /// Create a new [`CommitStateSpace`] from its serialized format
-    pub fn from_serial<H: Into<Hugr> + Clone>(value: SerialCommitStateSpace<H>) -> Self {
+    pub fn from_serial<H: Into<Hugr>>(value: SerialCommitStateSpace<H, R>) -> Self {
         let SerialCommitStateSpace { graph, base_commit } = value;
 
         // Deserialize the SerializedHistoryGraph into a HistoryGraph with CommitData
         let graph = graph.map_nodes(|n| CommitData::from_serial(n));
-        let graph = HistoryGraph::try_from_serialized(graph, PointerEqResolver)
+        let graph = HistoryGraph::try_from_serialized(graph, R::default())
             .expect("failed to deserialize history graph");
 
         Self { graph, base_commit }
     }
 
     /// Convert a [`CommitStateSpace`] into its serialized format
-    pub fn into_serial<H: From<Hugr>>(self) -> SerialCommitStateSpace<H> {
+    pub fn into_serial<H: From<Hugr>>(self) -> SerialCommitStateSpace<H, R> {
         let Self { graph, base_commit } = self;
         let graph = graph.to_serialized();
         let graph = graph.map_nodes(|n| n.into_serial());
@@ -80,10 +82,7 @@ impl CommitStateSpace {
     }
 
     /// Create a serialized format from a reference to [`CommitStateSpace`]
-    pub fn to_serial<H>(&self) -> SerialCommitStateSpace<H>
-    where
-        H: From<Hugr>,
-    {
+    pub fn to_serial<H: From<Hugr>>(&self) -> SerialCommitStateSpace<H, R> {
         let Self { graph, base_commit } = self;
         let graph = graph.to_serialized();
         let graph = graph.map_nodes(|n| n.into_serial());
@@ -94,51 +93,46 @@ impl CommitStateSpace {
     }
 }
 
-impl<H: From<Hugr>> From<CommitStateSpace> for SerialCommitStateSpace<H> {
-    fn from(value: CommitStateSpace) -> Self {
+impl<H: From<Hugr>, R: Resolver> From<CommitStateSpace<R>> for SerialCommitStateSpace<H, R> {
+    fn from(value: CommitStateSpace<R>) -> Self {
         value.into_serial()
     }
 }
 
-impl<H: Clone + Into<Hugr>> From<SerialCommitStateSpace<H>> for CommitStateSpace {
-    fn from(value: SerialCommitStateSpace<H>) -> Self {
+impl<H: Into<Hugr>, R: Resolver> From<SerialCommitStateSpace<H, R>> for CommitStateSpace<R> {
+    fn from(value: SerialCommitStateSpace<H, R>) -> Self {
         CommitStateSpace::from_serial(value)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use derive_more::derive::Into;
     use rstest::rstest;
-    use serde_with::serde_as;
 
     use super::*;
     use crate::{
-        envelope::serde_with::AsStringEnvelope, hugr::persistent::tests::test_state_space,
+        SerdeHashResolver,
+        tests::{WrappedHugr, test_state_space},
     };
-
-    #[serde_as]
-    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
-    struct WrappedHugr {
-        #[serde_as(as = "AsStringEnvelope")]
-        pub hugr: Hugr,
-    }
 
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
     #[rstest]
-    fn test_serialize_state_space(test_state_space: (CommitStateSpace, [CommitId; 4])) {
+    fn test_serialize_state_space(
+        test_state_space: (
+            CommitStateSpace<SerdeHashResolver<WrappedHugr>>,
+            [CommitId; 4],
+        ),
+    ) {
         let (state_space, _) = test_state_space;
         let serialized = state_space.to_serial::<WrappedHugr>();
 
-        let deser = CommitStateSpace::from_serial(serialized);
-        let _serialized_2 = deser.to_serial::<WrappedHugr>();
+        let deser = CommitStateSpace::from_serial(serialized.clone());
+        let serialized_2 = deser.to_serial::<WrappedHugr>();
 
-        // TODO: add this once PointerEqResolver is replaced by a deterministic resolver
-        // insta::assert_snapshot!(serde_json::to_string_pretty(&serialized).unwrap());
-        // see https://github.com/CQCL/hugr/issues/2299
-        // assert_eq!(
-        //     serde_json::to_string(&serialized),
-        //     serde_json::to_string(&serialized_2)
-        // );
+        insta::assert_snapshot!(serde_json::to_string_pretty(&serialized).unwrap());
+        assert_eq!(
+            serde_json::to_string(&serialized).unwrap(),
+            serde_json::to_string(&serialized_2).unwrap()
+        );
     }
 }

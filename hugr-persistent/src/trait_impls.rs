@@ -37,7 +37,7 @@ impl Patch<PersistentHugr> for PersistentReplacement {
     }
 }
 
-impl HugrInternals for PersistentHugr {
+impl<R> HugrInternals for PersistentHugr<R> {
     type RegionPortgraph<'p>
         = portgraph::MultiPortGraph
     where
@@ -71,7 +71,7 @@ impl HugrInternals for PersistentHugr {
 // the whole extracted HUGR in memory. We are currently prioritizing correctness
 // and clarity over performance and will optimise some of these operations in
 // the future as bottlenecks are encountered. (see #2248)
-impl HugrView for PersistentHugr {
+impl<R> HugrView for PersistentHugr<R> {
     fn entrypoint(&self) -> Self::Node {
         // The entrypoint remains unchanged throughout the patch history, and is
         // found in the base hugr.
@@ -175,11 +175,11 @@ impl HugrView for PersistentHugr {
         } else {
             match port.as_directed() {
                 Either::Left(incoming) => {
-                    let (out_node, out_port) = self.get_single_outgoing_port(node, incoming);
+                    let (out_node, out_port) = self.single_outgoing_port(node, incoming);
                     ret_ports.push((out_node, out_port.into()))
                 }
                 Either::Right(outgoing) => ret_ports.extend(
-                    self.get_all_incoming_ports(node, outgoing)
+                    self.all_incoming_ports(node, outgoing)
                         .map(|(node, port)| (node, port.into())),
                 ),
             }
@@ -256,7 +256,7 @@ impl HugrView for PersistentHugr {
                 // replace node labels with patch node IDs
                 let node_labels_map: HashMap<_, _> = node_map
                     .into_iter()
-                    .map(|(k, v)| (v, format!("{:?}", k)))
+                    .map(|(k, v)| (v, format!("{k:?}")))
                     .collect();
                 NodeLabel::Custom(node_labels_map)
             }

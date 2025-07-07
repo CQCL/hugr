@@ -175,6 +175,21 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
     serde_json::from_value(val).unwrap()
 }
 
+/// Serialize a Hugr and check that it is valid against the schema.
+///
+/// NOTE: The schema definition is currently broken, so this check always succeeds.
+/// See <https://github.com/CQCL/hugr/issues/2401>
+///
+/// # Panics
+///
+/// Panics if the serialization fails or if the schema validation fails.
+pub(crate) fn check_hugr_serialization_schema(hugr: &Hugr) {
+    let schemas = get_schemas(true);
+    let hugr_ser = HugrSer(hugr);
+    let val = serde_json::to_value(hugr_ser).unwrap();
+    NamedSchema::check_schemas(&val, schemas);
+}
+
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
 ///
 /// If `check_schema` is true, checks the serialized json against the in-tree schema.
@@ -458,13 +473,13 @@ fn roundtrip_value(#[case] value: Value) {
 
 fn polyfunctype1() -> PolyFuncType {
     let function_type = Signature::new_endo(type_row![]);
-    PolyFuncType::new([TypeParam::max_nat()], function_type)
+    PolyFuncType::new([TypeParam::max_nat_type()], function_type)
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-    let params = [TypeBound::Any, TypeBound::Copyable].map(TypeParam::new_list);
+    let params = [TypeBound::Any, TypeBound::Copyable].map(TypeParam::new_list_type);
     let inputs = vec![
         TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
         tv0,
@@ -479,12 +494,12 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::String], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], Signature::new_endo(type_row![])))]
-#[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_list_type(TypeBound::Any)], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
-    [TypeParam::new_list(TypeBound::Any)],
+    [TypeParam::new_list_type(TypeBound::Any)],
     Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
@@ -492,12 +507,12 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_list_type(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Any.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
-    [TypeParam::new_list(TypeBound::Any)],
+    [TypeParam::new_list_type(TypeBound::Any)],
     FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
@@ -514,7 +529,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}]).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat(1)]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {

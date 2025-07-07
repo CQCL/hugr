@@ -1,29 +1,41 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-add.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
 (mod)
 
+(import core.meta.description)
+
+(import core.nat)
+
 (import core.fn)
 
-(import arithmetic.int.iadd)
-
 (import arithmetic.int.types.int)
+
+(declare-operation
+  arithmetic.int.iadd
+  (param ?0 core.nat)
+  (core.fn
+    [(arithmetic.int.types.int ?0) (arithmetic.int.types.int ?0)]
+    [(arithmetic.int.types.int ?0)])
+  (meta
+    (core.meta.description
+      "addition modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
   example.add
   (core.fn
-    [arithmetic.int.types.int arithmetic.int.types.int]
-    [arithmetic.int.types.int])
+    [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+    [(arithmetic.int.types.int 6)])
   (dfg [%0 %1] [%2]
     (signature
       (core.fn
-        [arithmetic.int.types.int arithmetic.int.types.int]
-        [arithmetic.int.types.int]))
-    (arithmetic.int.iadd [%0 %1] [%2]
+        [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+        [(arithmetic.int.types.int 6)]))
+    ((arithmetic.int.iadd 6) [%0 %1] [%2]
       (signature
         (core.fn
-          [arithmetic.int.types.int arithmetic.int.types.int]
-          [arithmetic.int.types.int])))))
+          [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+          [(arithmetic.int.types.int 6)])))))

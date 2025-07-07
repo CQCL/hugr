@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from hugr.ops import ComWire
 
-QUANTUM_EXT = ext.Extension("pytest.quantum,", ext.Version(0, 1, 0))
+QUANTUM_EXT = ext.Extension("pytest.quantum", ext.Version(0, 1, 0))
 QUANTUM_EXT.add_op_def(
     ext.OpDef(
         name="H",
@@ -156,6 +156,7 @@ def validate(
         return
 
     # Roundtrip checks
+    # 1. just roundtrip with Python
     if isinstance(h, Hugr):
         starting_json = h.to_str()
         h2 = Hugr.from_str(starting_json)
@@ -174,14 +175,24 @@ def validate(
         roundtrip_encoded = loaded.to_str(EnvelopeConfig.TEXT)
         assert encoded == roundtrip_encoded
 
+    # 2. roundtrip through the CLI
 
-def _run_hugr_cmd(serial: bytes, cmd: list[str]):
+    # TODO once model loading is supported in Python
+    # try every combo of input and output formats
+    cmd = [*_base_command(), "convert", "-", "--text"]
+
+    serial = h.to_bytes(EnvelopeConfig.BINARY)
+    out = _run_hugr_cmd(serial, cmd)
+    loaded = Package.from_bytes(out.stdout)
+
+
+def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
     """Run a HUGR command.
 
     The `serial` argument is the serialized HUGR to pass to the command via stdin.
     """
     try:
-        subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
+        return subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e

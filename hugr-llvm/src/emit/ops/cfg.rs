@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use anyhow::{Result, anyhow};
 use hugr_core::{
@@ -21,7 +21,7 @@ use crate::{
 use super::emit_dataflow_parent;
 
 pub struct CfgEmitter<'c, 'hugr, H> {
-    bbs: HashMap<FatNode<'hugr, OpType, H>, (BasicBlock<'c>, RowMailBox<'c>)>,
+    bbs: BTreeMap<FatNode<'hugr, OpType, H>, (BasicBlock<'c>, RowMailBox<'c>)>,
     inputs: Option<Vec<BasicValueEnum<'c>>>,
     outputs: Option<RowPromise<'c>>,
     node: FatNode<'hugr, CFG, H>,
@@ -47,7 +47,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> CfgEmitter<'c, 'hugr, H> {
         // to crate the other blocks immediately before it. This is just for
         // nice block ordering.
         let exit_block = context.new_basic_block("", None);
-        let mut bbs = HashMap::new();
+        let mut bbs = BTreeMap::new();
         for child in node.children() {
             if child.is_exit_block() {
                 let output_row = {

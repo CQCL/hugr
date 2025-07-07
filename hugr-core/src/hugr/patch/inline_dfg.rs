@@ -4,7 +4,7 @@
 
 use super::{PatchHugrMut, PatchVerification};
 use crate::ops::handle::{DfgID, NodeHandle};
-use crate::{IncomingPort, Node, OutgoingPort, PortIndex};
+use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 /// Structure identifying an `InlineDFG` rewrite from the spec
 pub struct InlineDFG(pub DfgID);
@@ -43,7 +43,10 @@ impl PatchVerification for InlineDFG {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         [self.0.node()].into_iter()
     }
 }

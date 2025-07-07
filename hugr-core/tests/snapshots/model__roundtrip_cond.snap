@@ -1,10 +1,14 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
 (mod)
+
+(import core.meta.description)
+
+(import core.nat)
 
 (import core.fn)
 
@@ -12,31 +16,41 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond
 
 (import arithmetic.int.types.int)
 
-(import arithmetic.int.ineg)
+(declare-operation
+  arithmetic.int.ineg
+  (param ?0 core.nat)
+  (core.fn [(arithmetic.int.types.int ?0)] [(arithmetic.int.types.int ?0)])
+  (meta
+    (core.meta.description
+      "negation modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
   example.cond
   (core.fn
-    [(core.adt [[] []]) arithmetic.int.types.int]
-    [arithmetic.int.types.int])
+    [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+    [(arithmetic.int.types.int 6)])
   (dfg [%0 %1] [%2]
     (signature
       (core.fn
-        [(core.adt [[] []]) arithmetic.int.types.int]
-        [arithmetic.int.types.int]))
+        [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+        [(arithmetic.int.types.int 6)]))
     (cond [%0 %1] [%2]
       (signature
         (core.fn
-          [(core.adt [[] []]) arithmetic.int.types.int]
-          [arithmetic.int.types.int]))
+          [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+          [(arithmetic.int.types.int 6)]))
       (dfg [%3] [%3]
         (signature
-          (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))
+          (core.fn
+            [(arithmetic.int.types.int 6)]
+            [(arithmetic.int.types.int 6)])))
       (dfg [%4] [%5]
         (signature
-          (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
-        (arithmetic.int.ineg [%4] [%5]
+          (core.fn
+            [(arithmetic.int.types.int 6)]
+            [(arithmetic.int.types.int 6)]))
+        ((arithmetic.int.ineg 6) [%4] [%5]
           (signature
             (core.fn
-              [arithmetic.int.types.int]
-              [arithmetic.int.types.int])))))))
+              [(arithmetic.int.types.int 6)]
+              [(arithmetic.int.types.int 6)])))))))

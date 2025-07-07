@@ -308,7 +308,10 @@ impl<T: MakeRegisteredOp> From<T> for OpType {
 mod test {
     use std::sync::Arc;
 
-    use crate::{const_extension_ids, type_row, types::Signature};
+    use crate::{
+        const_extension_ids, type_row,
+        types::{Signature, Term},
+    };
 
     use super::*;
     use lazy_static::lazy_static;
@@ -393,7 +396,7 @@ mod test {
 
         assert_eq!(o.instantiate(&[]), Ok(o.clone()));
         assert_eq!(
-            o.instantiate(&[TypeArg::BoundedNat { n: 1 }]),
+            o.instantiate(&[Term::from(1u64)]),
             Err(OpLoadError::InvalidArgs(SignatureError::InvalidTypeArgs))
         );
     }
