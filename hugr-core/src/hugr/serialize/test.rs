@@ -236,6 +236,7 @@ fn test_schema_val() -> serde_json::Value {
         "optype":{
             "name":"polyfunc1",
             "op":"FuncDefn",
+            "visibility": "Public",
             "parent":0,
             "signature":{
                 "body":{
