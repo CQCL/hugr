@@ -4,14 +4,12 @@ use derive_more::derive::{From, Into};
 use hugr_core::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
-    envelope::serde_with::AsStringEnvelope,
     extension::prelude::bool_t,
     hugr::{Hugr, HugrView, patch::Patch, views::SiblingSubgraph},
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
 use rstest::*;
-use serde_with::serde_as;
 
 use crate::{Commit, CommitStateSpace, PatchNode, Resolver, state_space::CommitId};
 
