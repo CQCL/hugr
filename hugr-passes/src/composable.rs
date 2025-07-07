@@ -9,11 +9,16 @@ use itertools::Either;
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [`ValidatingPass`]
 pub trait ComposablePass<H: HugrMut>: Sized {
+    /// Error thrown by this pass.
     type Error: Error;
+    /// Result returned by this pass.
     type Result; // Would like to default to () but currently unstable
 
+    /// Run the pass on the given HUGR.
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error>;
 
+    /// Apply a function to the error type of this pass, returning a new
+    /// [`ComposablePass`] that has the same result type.
     fn map_err<E2: Error>(
         self,
         f: impl Fn(Self::Error) -> E2,
@@ -52,7 +57,9 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 /// Trait for combining the error types from two different passes
 /// into a single error.
 pub trait ErrorCombiner<A, B>: Error {
+    /// Create a combined error from the first pass's error.
     fn from_first(a: A) -> Self;
+    /// Create a combined error from the second pass's error.
     fn from_second(b: B) -> Self;
 }
 
@@ -113,18 +120,25 @@ pub enum ValidatePassError<N, E>
 where
     N: HugrNode + 'static,
 {
+    /// Validation failed on the initial HUGR.
     #[error("Failed to validate input HUGR: {err}\n{pretty_hugr}")]
     Input {
+        /// The validation error that occurred.
         #[source]
         err: ValidationError<N>,
+        /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
+    /// Validation failed on the final HUGR.
     #[error("Failed to validate output HUGR: {err}\n{pretty_hugr}")]
     Output {
+        /// The validation error that occurred.
         #[source]
         err: ValidationError<N>,
+        /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
+    /// An error from the underlying pass.
     #[error(transparent)]
     Underlying(#[from] E),
 }
@@ -134,6 +148,7 @@ where
 pub struct ValidatingPass<P, H>(P, PhantomData<H>);
 
 impl<P: ComposablePass<H>, H: HugrMut> ValidatingPass<P, H> {
+    /// Return a new [`ValidatingPass`] that wraps the given underlying pass.
     pub fn new(underlying: P) -> Self {
         Self(underlying, PhantomData)
     }

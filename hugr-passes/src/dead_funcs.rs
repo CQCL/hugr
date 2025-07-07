@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! Pass for removing statically-unreachable functions from a Hugr
 
 use std::collections::HashSet;
