@@ -339,6 +339,7 @@ mod tests {
     use crate::extension::prelude::usize_t;
     use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
@@ -351,6 +352,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_array_ops<AK: ArrayKind>(#[case] _kind: AK) {
         for def in GenericArrayOpDef::<AK>::iter() {
             let ty = if def == GenericArrayOpDef::get {
@@ -373,6 +375,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     /// Test building a HUGR involving a new_array operation.
     fn test_new_array<AK: ArrayKind>(#[case] _kind: AK) {
         let mut b = DFGBuilder::new(inout_sig(vec![qb_t(), qb_t()], AK::ty(2, qb_t()))).unwrap();
@@ -389,6 +392,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     /// Test building a HUGR involving an unpack operation.
     fn test_unpack<AK: ArrayKind>(#[case] _kind: AK) {
         let mut b = DFGBuilder::new(inout_sig(AK::ty(2, qb_t()), vec![qb_t(), qb_t()])).unwrap();
@@ -405,6 +409,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_get<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
@@ -430,6 +435,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_set<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
@@ -452,6 +458,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_swap<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
@@ -473,6 +480,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_pops<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();
@@ -505,6 +513,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_discard_empty<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 0;
         let element_ty = bool_t();
@@ -523,6 +532,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     /// Initialize an array operation where the element type is not from the prelude.
     fn test_non_prelude_op<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;

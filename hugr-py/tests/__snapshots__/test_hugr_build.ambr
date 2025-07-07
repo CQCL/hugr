@@ -1198,7 +1198,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B><b>[FuncDefn(&lt;jupyter-notebook&gt;)]</b></B><BR/><BR/>label: &lt;b&gt;Bold Label&lt;/b&gt;<BR/>&lt;other-label&gt;: &lt;i&gt;Italic Label&lt;/i&gt;</FONT></TD></TR>
+                  COLOR="black"><B><b>[FuncDefn(&lt;jupyter-notebook&gt;)]</b></B><BR/><BR/>label: &lt;b&gt;Bold Label&lt;/b&gt;<BR/>&lt;other-label&gt;: &lt;i&gt;Italic Label&lt;/i&gt;<BR/>meta_can_be_anything: [42, &#x27;string&#x27;, 3.14, True]</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>

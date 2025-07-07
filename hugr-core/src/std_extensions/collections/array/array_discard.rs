@@ -178,6 +178,7 @@ mod tests {
 
     use crate::extension::prelude::bool_t;
     use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},
@@ -187,6 +188,7 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
+    #[case(BorrowArray)]
     fn test_discard_def<AK: ArrayKind>(#[case] _kind: AK) {
         let op = GenericArrayDiscard::<AK>::new(bool_t(), 2).unwrap();
         let optype: OpType = op.clone().into();
@@ -198,6 +200,7 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
+    #[case(BorrowArray)]
     fn test_discard<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();

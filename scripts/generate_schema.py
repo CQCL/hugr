@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 from pydantic import ConfigDict
-from pydantic.json_schema import models_json_schema
+from pydantic.json_schema import DEFAULT_REF_TEMPLATE, models_json_schema
 
 from hugr._serialization.extension import Extension, Package
 from hugr._serialization.serial_hugr import SerialHugr
@@ -38,6 +38,9 @@ def write_schema(
     _, top_level_schema = models_json_schema(
         [(s, "validation") for s in schemas], title="HUGR schema"
     )
+    top_level_schema["oneOf"] = [
+        {"$ref": DEFAULT_REF_TEMPLATE.format(model=s.__name__)} for s in schemas
+    ]
     with path.open("w") as f:
         json.dump(top_level_schema, f, indent=4)
 

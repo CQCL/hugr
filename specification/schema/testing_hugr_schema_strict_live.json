@@ -2072,5 +2072,16 @@
             "type": "object"
         }
     },
-    "title": "HUGR schema"
+    "title": "HUGR schema",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/TestingHugr"
+        },
+        {
+            "$ref": "#/$defs/Extension"
+        },
+        {
+            "$ref": "#/$defs/Package"
+        }
+    ]
 }

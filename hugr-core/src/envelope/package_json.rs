@@ -56,6 +56,20 @@ pub(super) fn to_json_writer<'h>(
         modules: hugrs.into_iter().map(HugrSer).collect(),
         extensions: extensions.iter().map(std::convert::AsRef::as_ref).collect(),
     };
+
+    // Validate the hugr serializations against the schema.
+    //
+    // NOTE: The schema definition is currently broken, so this check always succeeds.
+    // See <https://github.com/CQCL/hugr/issues/2401>
+    #[cfg(all(test, not(miri)))]
+    if std::env::var("HUGR_TEST_SCHEMA").is_ok_and(|x| !x.is_empty()) {
+        use crate::hugr::serialize::test::check_hugr_serialization_schema;
+
+        for hugr in &pkg_ser.modules {
+            check_hugr_serialization_schema(hugr.0);
+        }
+    }
+
     serde_json::to_writer(writer, &pkg_ser)?;
     Ok(())
 }

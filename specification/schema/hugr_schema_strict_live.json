@@ -1994,5 +1994,16 @@
             "type": "object"
         }
     },
-    "title": "HUGR schema"
+    "title": "HUGR schema",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/SerialHugr"
+        },
+        {
+            "$ref": "#/$defs/Extension"
+        },
+        {
+            "$ref": "#/$defs/Package"
+        }
+    ]
 }
