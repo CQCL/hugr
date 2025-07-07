@@ -1156,17 +1156,19 @@ pub(super) mod proptest_utils {
             | TypeParamSer::StaticType => true,
             TypeParamSer::List { param } => term_is_serde_type_param(&param),
             TypeParamSer::Tuple { params } => {
-                let terms = match &params {
+                match &params {
+                    ArrayOrTermSer::Array(terms) => terms.iter().all(term_is_serde_type_param),
                     ArrayOrTermSer::Term(b) => match &**b {
-                        Term::List(_) => panic!("Should be an ArrayOrTermSer::Array"),
-                        // ALAN I think this may be the only legal Term here?
-                        // But impl Arbitrary for Term never creates such, so we won't actually see it.
-                        Term::ListConcat(terms) => terms,
-                        _ => return false,
+                        Term::List(_) => panic!("Should be represented as ArrayOrTermSer::Array"),
+                        // This does not fit our current JSON schema, nor is it produced by our
+                        // `impl Arbitrary`, but might be well-typed:
+                        Term::ListConcat(_) => todo!("Update schema"),
+                        Term::Variable(_) => false, // Potentially well-typed, but not JSONable
+                        // The others do not fit the JSON schema, and are not well-typed, but can
+                        // be produced by our `impl Arbitrary`, so we must filter out
+                        _ => false,
                     },
-                    ArrayOrTermSer::Array(terms) => terms,
-                };
-                terms.iter().all(term_is_serde_type_param)
+                }
             }
         }
     }
