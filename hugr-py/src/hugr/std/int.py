@@ -52,16 +52,39 @@ def _int_tv(index: int) -> tys.ExtType:
 INT_T = int_t(5)
 
 
+def _to_unsigned(val: int, bits: int) -> int:
+    """Convert a signed integer to its unsigned representation
+    in twos-complement form.
+
+    Positive integers are unchanged, while negative integers
+    are converted by adding 2^bits to the value.
+
+    Raises ValueError if the value is out of range for the given bit width
+    (valid range is [-2^(bits-1), 2^(bits-1)-1]).
+    """
+    half_max = 1 << (bits - 1)
+    min_val = -half_max
+    max_val = half_max - 1
+    if val < min_val or val > max_val:
+        msg = f"Value {val} out of range for {bits}-bit signed integer."
+        raise ValueError(msg)  #
+
+    if val < 0:
+        return (1 << bits) + val
+    return val
+
+
 @dataclass
 class IntVal(val.ExtensionValue):
-    """Custom value for an integer."""
+    """Custom value for a signed integer."""
 
     v: int
     width: int = field(default=5)
 
     def to_value(self) -> val.Extension:
         name = "ConstInt"
-        payload = {"log_width": self.width, "value": self.v}
+        unsigned = _to_unsigned(self.v, 1 << self.width)
+        payload = {"log_width": self.width, "value": unsigned}
         return val.Extension(
             name,
             typ=int_t(self.width),
@@ -72,8 +95,9 @@ class IntVal(val.ExtensionValue):
         return f"{self.v}"
 
     def to_model(self) -> model.Term:
+        unsigned = _to_unsigned(self.v, 1 << self.width)
         return model.Apply(
-            "arithmetic.int.const", [model.Literal(self.width), model.Literal(self.v)]
+            "arithmetic.int.const", [model.Literal(self.width), model.Literal(unsigned)]
         )
 
 
