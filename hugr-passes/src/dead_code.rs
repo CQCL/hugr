@@ -1,7 +1,7 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{HugrView, Visibility, hugr::hugrmut::HugrMut, ops::OpType};
+use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
 use std::{
@@ -9,19 +9,17 @@ use std::{
     sync::Arc,
 };
 
-use crate::{ComposablePass, IncludeExports};
+use crate::ComposablePass;
 
-/// Configuration for Dead Code Elimination pass, i.e. which removes nodes
-/// beneath the [HugrView::entrypoint] that compute only unneeded values.
+/// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
 pub struct DeadCodeElimPass<H: HugrView> {
     /// Nodes that are definitely needed - e.g. `FuncDefns`, but could be anything.
-    /// [HugrView::entrypoint] is assumed to be needed even if not mentioned here.
+    /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<H::Node>,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
-    include_exports: IncludeExports,
 }
 
 impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
@@ -29,7 +27,6 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
-            include_exports: IncludeExports::default(),
         }
     }
 }
@@ -42,13 +39,11 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
         #[derive(Debug)]
         struct DCEDebug<'a, N> {
             entry_points: &'a Vec<N>,
-            include_exports: IncludeExports,
         }
 
         Debug::fmt(
             &DCEDebug {
                 entry_points: &self.entry_points,
-                include_exports: self.include_exports,
             },
             f,
         )
@@ -74,12 +69,12 @@ pub enum PreserveNode {
 
 impl PreserveNode {
     /// A conservative default for a given node. Just examines the node's [`OpType`]:
-    /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn` for
-    ///   termination, but would also need to check for cycles in the `CallGraph`.)
+    /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn`, but would
+    ///   also need to check for cycles in the [`CallGraph`](super::call_graph::CallGraph).)
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
-    /// * Assumes all `TailLoops` must be preserved. (One could use some analysis, e.g.
-    ///   dataflow, to allow removal of `TailLoops` with a bounded number of iterations.)
+    /// * Assumes all `TailLoops` must be preserved. (One could, for example, use dataflow
+    ///   analysis to allow removal of `TailLoops` that never [Continue](hugr_core::ops::TailLoop::CONTINUE_TAG).)
     pub fn default_for<H: HugrView>(h: &H, n: H::Node) -> PreserveNode {
         match h.get_optype(n) {
             OpType::CFG(_) | OpType::TailLoop(_) | OpType::Call(_) => PreserveNode::MustKeep,
@@ -96,30 +91,13 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         self
     }
 
-    /// Mark some nodes as reachable, i.e. so we cannot eliminate any code used to
-    /// evaluate their results. The [`HugrView::entrypoint`] is assumed to be reachable;
-    /// if that is the [`HugrView::module_root`], then any public [FuncDefn] and
-    /// [FuncDecl]s are also considered reachable by default,
-    /// but this can be change by [`Self::include_module_exports`].
-    ///
-    /// [FuncDecl]: OpType::FuncDecl
-    /// [FuncDefn]: OpType::FuncDefn
+    /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
+    /// used to evaluate these nodes.
+    /// [`HugrView::entrypoint`] is assumed to be an entry point;
+    /// for Module roots the client will want to mark some of the `FuncDefn` children
+    /// as entry points too.
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
-        self
-    }
-
-    /// Sets whether the exported [FuncDefn](OpType::FuncDefn)s and
-    /// [FuncDecl](OpType::FuncDecl)s are considered reachable.
-    ///
-    /// Note that for non-module-entry Hugrs this has no effect, since we only remove
-    /// code beneath the entrypoint: this cannot be affected by other module children.
-    ///
-    /// So, for module-rooted-Hugrs: [IncludeExports::OnlyIfEntrypointIsModuleRoot] is
-    /// equivalent to [IncludeExports::Always]; and [IncludeExports::Never] will remove
-    /// all children, unless some are explicity added by [Self::with_entry_points].
-    pub fn include_module_exports(mut self, include: IncludeExports) -> Self {
-        self.include_exports = include;
         self
     }
 
@@ -133,23 +111,19 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                 continue;
             }
             for ch in h.children(n) {
-                let must_keep = match h.get_optype(ch) {
+                if self.must_preserve(h, &mut must_preserve, ch)
+                    || matches!(
+                        h.get_optype(ch),
                         OpType::Case(_) // Include all Cases in Conditionals
                     | OpType::DataflowBlock(_) // and all Basic Blocks in CFGs
                     | OpType::ExitBlock(_)
                     | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
                     | OpType::AliasDefn(_)
                     | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
-                    | OpType::Output(_) => true,
-                    // FuncDefns (as children of Module) only if public and including exports
-                    // (will be included if static predecessors of Call/LoadFunction below,
-                    // regardless of Visibility or self.include_exports)
-                    OpType::FuncDefn(fd) => fd.visibility() == &Visibility::Public && self.include_exports.for_hugr(h),
-                    OpType::FuncDecl(fd) => fd.visibility() == &Visibility::Public && self.include_exports.for_hugr(h),
-                    // No Const, unless reached along static edges
-                    _ => false
-                };
-                if must_keep || self.must_preserve(h, &mut must_preserve, ch) {
+                    | OpType::Output(_) // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges
+                                                                // (from Call/LoadConst/LoadFunction):
+                    )
+                {
                     q.push_back(ch);
                 }
             }
@@ -167,6 +141,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
+        #[allow(deprecated)]
         let res = match self.preserve_callback.as_ref()(h, n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,
@@ -199,56 +174,17 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::builder::{
-        CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
-    };
+    use hugr_core::Hugr;
+    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
     use hugr_core::extension::prelude::{ConstUsize, usize_t};
-    use hugr_core::ops::{OpTag, OpTrait, Value, handle::NodeHandle};
-    use hugr_core::{Hugr, HugrView, type_row, types::Signature};
+    use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
+    use hugr_core::types::Signature;
+    use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
-    use rstest::rstest;
 
-    use crate::{ComposablePass, IncludeExports};
+    use crate::ComposablePass;
 
     use super::{DeadCodeElimPass, PreserveNode};
-
-    #[rstest]
-    #[case(false, IncludeExports::Never, true)]
-    #[case(false, IncludeExports::OnlyIfEntrypointIsModuleRoot, false)]
-    #[case(false, IncludeExports::Always, false)]
-    #[case(true, IncludeExports::Never, true)]
-    #[case(true, IncludeExports::OnlyIfEntrypointIsModuleRoot, false)]
-    #[case(true, IncludeExports::Always, false)]
-    fn test_module_exports(
-        #[case] include_dfn: bool,
-        #[case] module_exports: IncludeExports,
-        #[case] decl_removed: bool,
-    ) {
-        let mut mb = ModuleBuilder::new();
-        let dfn = mb
-            .define_function("foo", Signature::new_endo(usize_t()))
-            .unwrap();
-        let ins = dfn.input_wires();
-        let dfn = dfn.finish_with_outputs(ins).unwrap();
-        let dcl = mb
-            .declare("bar", Signature::new_endo(usize_t()).into())
-            .unwrap();
-        let mut h = mb.finish_hugr().unwrap();
-        let mut dce = DeadCodeElimPass::<Hugr>::default().include_module_exports(module_exports);
-        if include_dfn {
-            dce = dce.with_entry_points([dfn.node()]);
-        }
-        dce.run(&mut h).unwrap();
-        let defn_retained = include_dfn;
-        let decl_retained = !decl_removed;
-        let children = h.children(h.module_root()).collect_vec();
-        assert_eq!(defn_retained, children.iter().contains(&dfn.node()));
-        assert_eq!(decl_retained, children.iter().contains(&dcl.node()));
-        assert_eq!(
-            children.len(),
-            (defn_retained as usize) + (decl_retained as usize)
-        );
-    }
 
     #[test]
     fn test_cfg_callback() {

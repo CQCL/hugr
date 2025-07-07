@@ -116,7 +116,7 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
         } else {
             let ep = self.0.entrypoint();
             let mut p = in_values.into_iter().peekable();
-            // We must provide some inputs to the entrypoint so that they are Top rather than Bottom.
+            // We must provide some inputs to the root so that they are Top rather than Bottom.
             // (However, this test will fail for DataflowBlock or Case roots, i.e. if no
             // inputs have been provided they will still see Bottom. We could store the "input"
             // values for even these nodes in self.1 and then convert to actual Wire values

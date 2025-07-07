@@ -29,14 +29,10 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
+use crate::ComposablePass as _;
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
-use crate::{ComposablePass as _, IncludeExports};
 
-use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, fold_constants};
-
-fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
-    fold_constants(h, IncludeExports::Always);
-}
+use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass};
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]
