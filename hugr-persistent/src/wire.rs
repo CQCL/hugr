@@ -15,9 +15,8 @@ pub struct PersistentWire {
 
 /// A wire within a commit HUGR of a [`PersistentHugr`].
 ///
-/// This is a `Wire` valid in a commit HUGR of a [`PersistentHugr`], along with
-/// the ID of the commit that contains the wire; this is equivalent to storing a
-/// wire of type `Wire<PatchNode>`.
+/// Also stores the ID of the commit that contains the wire;
+/// equivalent to (indeed contains) a `Wire<PatchNode>`.
 ///
 /// Note that it does not correspond to a valid wire in a [`PersistentHugr`]
 /// (see [`PersistentWire`]): some of its connected ports may be on deleted or
