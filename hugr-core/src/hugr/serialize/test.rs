@@ -260,13 +260,13 @@ fn schema_val() -> serde_json::Value {
 }
 
 #[rstest]
-#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val(), ["optype"])]
-#[case(&SCHEMA, &SCHEMA_STRICT, schema_val(), [])]
-fn extra_and_missing_fields<const L: usize>(
+#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val(), Some("optype"))]
+#[case(&SCHEMA, &SCHEMA_STRICT, schema_val(), None)]
+fn wrong_fields(
     #[case] lax_schema: &'static NamedSchema,
     #[case] strict_schema: &'static NamedSchema,
     #[case] mut val: serde_json::Value,
-    #[case] target_loc: [&'static str; L],
+    #[case] target_loc: impl IntoIterator<Item = &'static str> + Clone,
 ) {
     use serde_json::Value;
     fn get_fields(
@@ -283,7 +283,7 @@ fn extra_and_missing_fields<const L: usize>(
     NamedSchema::check_schemas(&val, [lax_schema, strict_schema]).unwrap();
 
     // Now try adding an extra field
-    let fields = get_fields(&mut val, target_loc.iter().copied());
+    let fields = get_fields(&mut val, target_loc.clone().into_iter());
     fields.insert(
         "extra_field".to_string(),
         Value::String("not in schema".to_string()),
@@ -292,7 +292,7 @@ fn extra_and_missing_fields<const L: usize>(
     lax_schema.check(&val).unwrap();
 
     // And removing one
-    let fields = get_fields(&mut val, target_loc.iter().copied());
+    let fields = get_fields(&mut val, target_loc.into_iter());
     fields.remove("extra_field").unwrap();
     let key = fields.keys().next().unwrap().clone();
     fields.remove(&key).unwrap();

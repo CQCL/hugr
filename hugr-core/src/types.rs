@@ -1160,12 +1160,13 @@ pub(super) mod proptest_utils {
                     ArrayOrTermSer::Array(terms) => terms.iter().all(term_is_serde_type_param),
                     ArrayOrTermSer::Term(b) => match &**b {
                         Term::List(_) => panic!("Should be represented as ArrayOrTermSer::Array"),
-                        // This does not fit our current JSON schema, nor is it produced by our
-                        // `impl Arbitrary`, but might be well-typed:
+                        // This might be well-typed, but does not fit the (TODO: update) JSON schema
+                        Term::Variable(_) => false,
+                        // Similarly, but not produced by our `impl Arbitrary`:
                         Term::ListConcat(_) => todo!("Update schema"),
-                        Term::Variable(_) => false, // Potentially well-typed, but not JSONable
-                        // The others do not fit the JSON schema, and are not well-typed, but can
-                        // be produced by our `impl Arbitrary`, so we must filter out
+
+                        // The others do not fit the JSON schema, and are not well-typed,
+                        // but can be produced by our impl of Arbitrary, so we must filter out:
                         _ => false,
                     },
                 }
