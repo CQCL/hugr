@@ -938,12 +938,12 @@ impl<'a> Context<'a> {
         node_data: &'a table::Node<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
+        let visibility = symbol.visibility.clone().ok_or(ImportErrorInner::Invalid(
+            "No visibility for FuncDefn".to_string(),
+        ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDefn(FuncDefn::new_vis(
-                symbol.name,
-                signature,
-                symbol.visibility.clone().into(),
-            ));
+            let optype =
+                OpType::FuncDefn(FuncDefn::new_vis(symbol.name, signature, visibility.into()));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -967,12 +967,12 @@ impl<'a> Context<'a> {
         symbol: &'a table::Symbol<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
+        let visibility = symbol.visibility.clone().ok_or(ImportErrorInner::Invalid(
+            "No visibility for FuncDecl".to_string(),
+        ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new_vis(
-                symbol.name,
-                signature,
-                symbol.visibility.clone().into(),
-            ));
+            let optype =
+                OpType::FuncDecl(FuncDecl::new_vis(symbol.name, signature, visibility.into()));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })

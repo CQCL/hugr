@@ -370,8 +370,9 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
 
 fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
     match symbol.visibility {
-        Visibility::Private => (),
-        Visibility::Public => printer.text("pub"),
+        None => (),
+        Some(Visibility::Private) => printer.text("priv"),
+        Some(Visibility::Public) => printer.text("pub"),
     }
 
     print_symbol_name(printer, &symbol.name);
