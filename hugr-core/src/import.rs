@@ -654,7 +654,7 @@ impl<'a> Context<'a> {
 
                 // Check that the node has order ports.
                 // NOTE: This assumes that a node has an input order port iff it has an output one.
-                if !child_optype.other_output_port().is_some() {
+                if child_optype.other_output_port().is_none() {
                     return Err(OrderHintError::NoOrderPort(*child_id).into());
                 }
 

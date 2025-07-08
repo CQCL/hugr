@@ -633,7 +633,7 @@ impl<'a> Context<'a> {
                     sources = self.make_ports(child, Direction::Outgoing, input.types.len());
                     input_types = Some(&input.types);
 
-                    if has_order_edges(&self.hugr, child) {
+                    if has_order_edges(self.hugr, child) {
                         let key = self.make_term(model::Literal::Nat(child.index() as u64).into());
                         meta.push(self.make_term_apply(model::ORDER_HINT_INPUT_KEY, &[key]));
                     }
@@ -642,7 +642,7 @@ impl<'a> Context<'a> {
                     targets = self.make_ports(child, Direction::Incoming, output.types.len());
                     output_types = Some(&output.types);
 
-                    if has_order_edges(&self.hugr, child) {
+                    if has_order_edges(self.hugr, child) {
                         let key = self.make_term(model::Literal::Nat(child.index() as u64).into());
                         meta.push(self.make_term_apply(model::ORDER_HINT_OUTPUT_KEY, &[key]));
                     }
@@ -1106,7 +1106,7 @@ impl<'a> Context<'a> {
     }
 
     fn export_node_order_metadata(&mut self, node: Node, meta: &mut Vec<table::TermId>) {
-        if has_order_edges(&self.hugr, node) {
+        if has_order_edges(self.hugr, node) {
             let key = self.make_term(model::Literal::Nat(node.index() as u64).into());
             meta.push(self.make_term_apply(model::ORDER_HINT_KEY, &[key]));
         }
