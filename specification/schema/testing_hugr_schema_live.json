@@ -678,6 +678,7 @@
                     "$ref": "#/$defs/PolyFuncType"
                 },
                 "visibility": {
+                    "default": "Public",
                     "enum": [
                         "Public",
                         "Private"
@@ -689,8 +690,7 @@
             "required": [
                 "parent",
                 "name",
-                "signature",
-                "visibility"
+                "signature"
             ],
             "title": "FuncDecl",
             "type": "object"
@@ -717,6 +717,7 @@
                     "$ref": "#/$defs/PolyFuncType"
                 },
                 "visibility": {
+                    "default": "Private",
                     "enum": [
                         "Public",
                         "Private"
@@ -728,8 +729,7 @@
             "required": [
                 "parent",
                 "name",
-                "signature",
-                "visibility"
+                "signature"
             ],
             "title": "FuncDefn",
             "type": "object"
