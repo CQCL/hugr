@@ -30,3 +30,15 @@ def test_envelope():
     encoded = package.to_str(EnvelopeConfig.TEXT)
     decoded = Package.from_str(encoded)
     assert decoded == package
+
+
+def test_legacy_funcdefn():
+    from pathlib import Path
+
+    p = Path(__file__).parents[2] / "resources" / "test" / "hugr-no-visibility.hugr"
+    with open(p, "rb") as f:
+        pkg_bytes = f.read()
+    decoded = Package.from_bytes(pkg_bytes)
+    h = decoded.modules[0]
+    assert isinstance(h[1].op, ops.FuncDecl) and h[1].op.visibility == "Public"
+    assert isinstance(h[1].op, ops.FuncDefn) and h[1].op.visibility == "Private"
