@@ -123,6 +123,7 @@ struct Param {
 }
 
 enum Visibility {
-    private @0;
-    public @1;
+    unspecified @0;
+    private @1;
+    public @2;
 }
