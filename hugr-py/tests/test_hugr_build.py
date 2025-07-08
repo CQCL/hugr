@@ -233,8 +233,8 @@ def test_poly_function(direct_call: bool) -> None:
     f_id = mod.declare_function(
         "id",
         tys.PolyFuncType(
-            [tys.TypeTypeParam(tys.TypeBound.Any)],
-            tys.FunctionType.endo([tys.Variable(0, tys.TypeBound.Any)]),
+            [tys.TypeTypeParam(tys.TypeBound.Linear)],
+            tys.FunctionType.endo([tys.Variable(0, tys.TypeBound.Linear)]),
         ),
     )
 
