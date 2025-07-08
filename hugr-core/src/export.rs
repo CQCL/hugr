@@ -627,40 +627,46 @@ impl<'a> Context<'a> {
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
 
-        let mut output_node = None;
-
         for child in children {
             match self.hugr.get_optype(child) {
                 OpType::Input(input) => {
                     sources = self.make_ports(child, Direction::Outgoing, input.types.len());
                     input_types = Some(&input.types);
+
+                    if has_order_edges(&self.hugr, child) {
+                        let key = self.make_term(model::Literal::Nat(child.index() as u64).into());
+                        meta.push(self.make_term_apply(model::ORDER_HINT_INPUT_KEY, &[key]));
+                    }
                 }
                 OpType::Output(output) => {
                     targets = self.make_ports(child, Direction::Incoming, output.types.len());
                     output_types = Some(&output.types);
-                    output_node = Some(child);
-                }
-                child_optype => {
-                    if let Some(child_id) = self.export_node_shallow(child) {
-                        region_children.push(child_id);
 
-                        // Record all order edges that originate from this node in metadata.
-                        let successors = child_optype
-                            .other_output_port()
-                            .into_iter()
-                            .flat_map(|port| self.hugr.linked_inputs(child, port))
-                            .map(|(successor, _)| successor)
-                            .filter(|successor| Some(*successor) != output_node);
-
-                        for successor in successors {
-                            let a =
-                                self.make_term(model::Literal::Nat(child.index() as u64).into());
-                            let b = self
-                                .make_term(model::Literal::Nat(successor.index() as u64).into());
-                            meta.push(self.make_term_apply(model::ORDER_HINT_ORDER, &[a, b]));
-                        }
+                    if has_order_edges(&self.hugr, child) {
+                        let key = self.make_term(model::Literal::Nat(child.index() as u64).into());
+                        meta.push(self.make_term_apply(model::ORDER_HINT_OUTPUT_KEY, &[key]));
                     }
                 }
+                _ => {
+                    if let Some(child_id) = self.export_node_shallow(child) {
+                        region_children.push(child_id);
+                    }
+                }
+            }
+
+            // Record all order edges that originate from this node in metadata.
+            let successors = self
+                .hugr
+                .get_optype(child)
+                .other_output_port()
+                .into_iter()
+                .flat_map(|port| self.hugr.linked_inputs(child, port))
+                .map(|(successor, _)| successor);
+
+            for successor in successors {
+                let a = self.make_term(model::Literal::Nat(child.index() as u64).into());
+                let b = self.make_term(model::Literal::Nat(successor.index() as u64).into());
+                meta.push(self.make_term_apply(model::ORDER_HINT_ORDER, &[a, b]));
             }
         }
 
@@ -1100,21 +1106,7 @@ impl<'a> Context<'a> {
     }
 
     fn export_node_order_metadata(&mut self, node: Node, meta: &mut Vec<table::TermId>) {
-        fn is_relevant_node(hugr: &Hugr, node: Node) -> bool {
-            let optype = hugr.get_optype(node);
-            !optype.is_input() && !optype.is_output()
-        }
-
-        let optype = self.hugr.get_optype(node);
-
-        let has_order_edges = Direction::BOTH
-            .iter()
-            .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
-            .filter_map(|dir| optype.other_port(*dir))
-            .flat_map(|port| self.hugr.linked_ports(node, port))
-            .any(|(other, _)| is_relevant_node(self.hugr, other));
-
-        if has_order_edges {
+        if has_order_edges(&self.hugr, node) {
             let key = self.make_term(model::Literal::Nat(node.index() as u64).into());
             meta.push(self.make_term_apply(model::ORDER_HINT_KEY, &[key]));
         }
@@ -1227,6 +1219,18 @@ impl Links {
         let group = self.groups[&(node, port)];
         self.scope.use_link(group)
     }
+}
+
+/// Returns `true` if a node has any incident order edges.
+fn has_order_edges(hugr: &Hugr, node: Node) -> bool {
+    let optype = hugr.get_optype(node);
+    Direction::BOTH
+        .iter()
+        .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
+        .filter_map(|dir| optype.other_port(*dir))
+        .flat_map(|port| hugr.linked_ports(node, port))
+        .next()
+        .is_some()
 }
 
 #[cfg(test)]
