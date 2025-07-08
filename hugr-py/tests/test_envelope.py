@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from hugr import ops, tys
 from hugr.build.function import Module
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
@@ -37,8 +39,11 @@ def test_envelope():
 
 def test_legacy_funcdefn():
     p = Path(__file__).parents[2] / "resources" / "test" / "hugr-no-visibility.hugr"
-    with p.open("rb") as f:
-        pkg_bytes = f.read()
+    try:
+        with p.open("rb") as f:
+            pkg_bytes = f.read()
+    except FileNotFoundError:
+        pytest.skip("Missing test file")
     decoded = Package.from_bytes(pkg_bytes)
     h = decoded.modules[0]
     op1 = h[Node(1)].op
