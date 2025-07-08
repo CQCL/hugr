@@ -51,7 +51,11 @@ impl<H: HugrView, V: AbstractValue> Machine<H, V> {
     /// or [Conditional](hugr_core::ops::Conditional)).
     /// Any inputs not given values by `in_values`, are set to [`PartialValue::Top`].
     /// Multiple calls for the same `parent` will `join` values for corresponding ports.
-    #[expect(clippy::result_large_err)]
+    #[expect(
+        clippy::result_large_err,
+        reason = "Not called recursively and not a performance bottleneck"
+    )]
+    #[inline]
     pub fn prepopulate_inputs(
         &mut self,
         parent: H::Node,
