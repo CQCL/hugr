@@ -33,8 +33,12 @@ use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file,
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-    let def_op: OpType =
-        FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
+    let def_op: OpType = FuncDefn::new_vis(
+        "main",
+        Signature::new(bool_t(), vec![bool_t(); copies]),
+        Visibility::Public,
+    )
+    .into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
