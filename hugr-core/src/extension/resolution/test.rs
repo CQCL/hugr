@@ -333,7 +333,7 @@ fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
 #[rstest]
 fn resolve_call() {
     let dummy_fn_sig = PolyFuncType::new(
-        vec![TypeParam::RuntimeType(TypeBound::Any)],
+        vec![TypeParam::RuntimeType(TypeBound::Linear)],
         Signature::new(vec![], vec![bool_t()]),
     );
 

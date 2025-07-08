@@ -548,8 +548,8 @@ mod test {
                     .define_function(
                         "foo",
                         PolyFuncType::new(
-                            [TypeBound::Any.into()],
-                            Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+                            [TypeBound::Linear.into()],
+                            Signature::new_endo(Type::new_var_use(0, TypeBound::Linear)),
                         ),
                     )
                     .unwrap();

@@ -131,9 +131,11 @@ pub enum TypeBound {
     #[serde(rename = "C", alias = "E")] // alias to read in legacy Eq variants
     Copyable,
     /// No bound on the type.
+    ///
+    /// It cannot be copied nor discarded.
     #[serde(rename = "A")]
     #[default]
-    Any,
+    Linear,
 }
 
 impl TypeBound {
@@ -152,16 +154,16 @@ impl TypeBound {
     /// Report if this bound contains another.
     #[must_use]
     pub const fn contains(&self, other: TypeBound) -> bool {
-        use TypeBound::{Any, Copyable};
-        matches!((self, other), (Any, _) | (_, Copyable))
+        use TypeBound::{Copyable, Linear};
+        matches!((self, other), (Linear, _) | (_, Copyable))
     }
 }
 
 /// Calculate the least upper bound for an iterator of bounds
 pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
     tags.fold_while(TypeBound::Copyable, |acc, new| {
-        if acc == TypeBound::Any || new == TypeBound::Any {
-            Done(TypeBound::Any)
+        if acc == TypeBound::Linear || new == TypeBound::Linear {
+            Done(TypeBound::Linear)
         } else {
             Continue(acc.union(new))
         }
@@ -777,7 +779,7 @@ impl<'a> Substitution<'a> {
 
 /// A transformation that can be applied to a [Type] or [`TypeArg`].
 /// More general in some ways than a Substitution: can fail with a
-/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Any`],
+/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Linear`],
 /// and applies to arbitrary extension types rather than type variables.
 pub trait TypeTransformer {
     /// Error returned when a [`CustomType`] cannot be transformed, or a type
@@ -930,7 +932,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             TypeRV::UNIT.into(),
-            vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
+            vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());

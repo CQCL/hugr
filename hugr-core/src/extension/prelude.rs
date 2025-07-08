@@ -110,10 +110,10 @@ lazy_static! {
                     PANIC_OP_ID,
                     "Panic with input error".to_string(),
                     PolyFuncTypeRV::new(
-                        [TypeParam::new_list_type(TypeBound::Any), TypeParam::new_list_type(TypeBound::Any)],
+                        [TypeParam::new_list_type(TypeBound::Linear), TypeParam::new_list_type(TypeBound::Linear)],
                         FuncValueType::new(
-                            vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Any)],
-                            vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                            vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                            vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
                         ),
                     ),
                     extension_ref,
@@ -124,10 +124,10 @@ lazy_static! {
                 EXIT_OP_ID,
                 "Exit with input error".to_string(),
                 PolyFuncTypeRV::new(
-                    [TypeParam::new_list_type(TypeBound::Any), TypeParam::new_list_type(TypeBound::Any)],
+                    [TypeParam::new_list_type(TypeBound::Linear), TypeParam::new_list_type(TypeBound::Linear)],
                     FuncValueType::new(
-                        vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Any)],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Any)],
+                        vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
                     ),
                 ),
                 extension_ref,
@@ -160,7 +160,7 @@ pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
         TypeName::new_inline("qubit"),
         vec![],
         PRELUDE_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         extension_ref,
     )
 }
@@ -626,10 +626,10 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = TypeRV::new_row_var_use(0, TypeBound::Any);
+        let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
 
-        let param = TypeParam::new_list_type(TypeBound::Any);
+        let param = TypeParam::new_list_type(TypeBound::Linear);
         match self {
             TupleOpDef::MakeTuple => {
                 PolyFuncTypeRV::new([param], FuncValueType::new(rv, tuple_type))
@@ -800,8 +800,8 @@ impl MakeOpDef for NoopDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let tv = Type::new_var_use(0, TypeBound::Any);
-        PolyFuncType::new([TypeBound::Any.into()], Signature::new_endo(tv)).into()
+        let tv = Type::new_var_use(0, TypeBound::Linear);
+        PolyFuncType::new([TypeBound::Linear.into()], Signature::new_endo(tv)).into()
     }
 
     fn description(&self) -> String {
@@ -912,8 +912,8 @@ impl MakeOpDef for BarrierDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::new_list_type(TypeBound::Any)],
-            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any)),
+            vec![TypeParam::new_list_type(TypeBound::Linear)],
+            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear)),
         )
         .into()
     }

@@ -320,7 +320,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     ));
     let mut hugr = identity_hugr_with_type(valid.clone()).0;
@@ -332,7 +332,7 @@ fn invalid_types() {
         "MyContainer",
         vec![valid.clone().into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
@@ -354,7 +354,7 @@ fn invalid_types() {
         validate_to_sig_error(bad_bound.clone()),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Any
+            expected: TypeBound::Linear
         }
     );
 
@@ -363,14 +363,14 @@ fn invalid_types() {
         "MyContainer",
         vec![Type::new_extension(bad_bound).into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(nested),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Any
+            expected: TypeBound::Linear
         }
     );
 
@@ -378,7 +378,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into(), 3u64.into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
@@ -393,8 +393,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            [TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -403,8 +403,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+            [TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Linear)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -413,7 +413,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
+            [TypeBound::Linear.into()],
             Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
@@ -486,10 +486,10 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list_type(TypeBound::Any);
+    let rowp = TypeParam::new_list_type(TypeBound::Linear);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
-        let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
+        let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
+        let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
         let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
@@ -498,7 +498,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
+        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
@@ -548,13 +548,13 @@ fn list1ty(t: TypeRV) -> Term {
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list_type(TypeBound::Any)],
+            [TypeParam::new_list_type(TypeBound::Linear)],
             Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;
@@ -582,8 +582,8 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let id = m.declare(
         "id",
         PolyFuncType::new(
-            vec![TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            vec![TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
         ),
     )?;
     let sig = Signature::new(

@@ -656,7 +656,7 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
@@ -702,13 +702,13 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
                 let [TypeArg::BoundedNat(n)] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
                 let n = *n as usize;
                 let tvs: Vec<Type> = (0..n)
-                    .map(|_| Type::new_var_use(0, TypeBound::Any))
+                    .map(|_| Type::new_var_use(0, TypeBound::Linear))
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.clone()],
@@ -752,9 +752,9 @@ pub(super) mod test {
 
             // quick sanity check that we are validating the args - note changed bound:
             assert_eq!(
-                def.validate_args(&args, &[TypeBound::Any.into()]),
+                def.validate_args(&args, &[TypeBound::Linear.into()]),
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    actual: TypeBound::Any.into(),
+                    actual: TypeBound::Linear.into(),
                     cached: TypeBound::Copyable.into()
                 })
             );
@@ -791,8 +791,8 @@ pub(super) mod test {
                 "SimpleOp".into(),
                 String::new(),
                 PolyFuncTypeRV::new(
-                    vec![TypeBound::Any.into()],
-                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                    vec![TypeBound::Linear.into()],
+                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
                 ),
                 extension_ref,
             )?;
@@ -807,7 +807,7 @@ pub(super) mod test {
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
                     TermTypeError::TypeMismatch {
-                        type_: TypeBound::Any.into(),
+                        type_: TypeBound::Linear.into(),
                         term: arg,
                     }
                 ))

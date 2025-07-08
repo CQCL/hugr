@@ -100,7 +100,7 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
                 bound: TypeBound::Copyable,
             },
             TypeDefBoundDeclaration::Any => Self::Explicit {
-                bound: TypeBound::Any,
+                bound: TypeBound::Linear,
             },
         }
     }

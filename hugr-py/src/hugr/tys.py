@@ -68,7 +68,7 @@ class Type(Protocol):
             >>> Tuple(Bool, Bool).type_bound()
             <TypeBound.Copyable: 'C'>
             >>> Tuple(Qubit, Bool).type_bound()
-            <TypeBound.Any: 'A'>
+            <TypeBound.Linear: 'A'>
         """
         ...  # pragma: no cover
 
@@ -820,7 +820,7 @@ class Opaque(Type):
 @dataclass
 class _QubitDef(Type):
     def type_bound(self) -> TypeBound:
-        return TypeBound.Any
+        return TypeBound.Linear
 
     def _to_serial(self) -> stys.Qubit:
         return stys.Qubit()
