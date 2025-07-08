@@ -187,7 +187,7 @@ impl From<TermSer> for Term {
 #[serde(untagged)]
 pub(super) enum ArrayOrTermSer {
     Array(Vec<Term>),
-    Term(Box<Term>),
+    Term(Box<Term>), // TODO JSON Schema does not really support this yet
 }
 
 impl From<ArrayOrTermSer> for Term {
