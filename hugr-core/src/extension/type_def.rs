@@ -272,8 +272,8 @@ mod test {
             def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
                 TermTypeError::TypeMismatch {
-                    term: qb_t().into(),
-                    type_: TypeBound::Copyable.into()
+                    term: Box::new(qb_t().into()),
+                    type_: Box::new(TypeBound::Copyable.into())
                 }
             ))
         );

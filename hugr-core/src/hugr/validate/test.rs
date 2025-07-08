@@ -237,7 +237,7 @@ fn test_local_const() {
         Err(ValidationError::UnconnectedPort {
             node: and,
             port: IncomingPort::from(1).into(),
-            port_kind: EdgeKind::Value(bool_t())
+            port_kind: Box::new(EdgeKind::Value(bool_t()))
         })
     );
     let const_op: ops::Const = ops::Value::from_bool(true).into();
@@ -338,8 +338,8 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: TypeBound::Copyable.into(),
-            term: valid.into()
+            type_: Box::new(TypeBound::Copyable.into()),
+            term: Box::new(valid.into())
         })
     );
 
@@ -439,11 +439,12 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
     assert_matches!(
         hugr.unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::InvalidParentOp {
-            child_optype: OpType::FuncDefn(_),
+            child_optype,
             allowed_children: OpTag::DataflowChild,
-            parent_optype: OpType::FuncDefn(_),
+            parent_optype,
             child, parent
-        }) => {assert_eq!(child, inner);
+        }) if matches!(*child_optype, OpType::FuncDefn(_)) && matches!(*parent_optype, OpType::FuncDefn(_)) => {
+            assert_eq!(child, inner);
             assert_eq!(parent, outer_node);
         }
     );
@@ -730,7 +731,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
         Err(ValidationError::TooManyConnections {
             node: middle.node(),
             port: Port::new(Direction::Outgoing, 0),
-            port_kind: EdgeKind::ControlFlow
+            port_kind: Box::new(EdgeKind::ControlFlow)
         })
     );
     Ok(())

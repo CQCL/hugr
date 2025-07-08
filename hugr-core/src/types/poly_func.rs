@@ -233,16 +233,16 @@ pub(crate) mod test {
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
                 TermTypeError::TypeMismatch {
-                    type_: type_params[0].clone(),
-                    term: usize_t().into(),
+                    type_: Box::new(type_params[0].clone()),
+                    term: Box::new(usize_t().into()),
                 }
             ))
         );
 
         // (Try to) make a schema with the args in the wrong order
         let arg_err = SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: type_params[0].clone(),
-            term: ty_var.clone(),
+            type_: Box::new(type_params[0].clone()),
+            term: Box::new(ty_var.clone()),
         });
         assert_eq!(
             array_type_parametric(ty_var.clone(), size_var.clone()),
@@ -278,8 +278,8 @@ pub(crate) mod test {
             assert_eq!(
                 invalid_ts.err(),
                 Some(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: TypeBound::Copyable.into(),
-                    actual: decl
+                    cached: Box::new(TypeBound::Copyable.into()),
+                    actual: Box::new(decl)
                 })
             );
         }
@@ -338,8 +338,8 @@ pub(crate) mod test {
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
                     TermTypeError::TypeMismatch {
-                        type_: bound.clone(),
-                        term: TypeArg::new_var_use(0, decl.clone())
+                        type_: Box::new(bound.clone()),
+                        term: Box::new(TypeArg::new_var_use(0, decl.clone()))
                     }
                 ))
             );
@@ -388,8 +388,8 @@ pub(crate) mod test {
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
-            assert_eq!(actual, decl);
-            assert_eq!(cached, TypeParam::new_list_type(TypeBound::Copyable));
+            assert_eq!(*actual, decl);
+            assert_eq!(*cached, TypeParam::new_list_type(TypeBound::Copyable));
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -398,8 +398,8 @@ pub(crate) mod test {
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
-            assert_eq!(actual, decl);
-            assert_eq!(cached, TP_ANY);
+            assert_eq!(*actual, decl);
+            assert_eq!(*cached, TP_ANY);
         });
     }
 

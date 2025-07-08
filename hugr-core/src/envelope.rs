@@ -97,7 +97,7 @@ fn gen_str(generator: &Option<String>) -> String {
 #[derive(Error, Debug)]
 #[error("{inner}{}", gen_str(&self.generator))]
 pub struct WithGenerator<E: std::fmt::Display> {
-    inner: E,
+    inner: Box<E>,
     /// The name of the generator that produced the envelope, if any.
     generator: Option<String>,
 }
@@ -105,7 +105,7 @@ pub struct WithGenerator<E: std::fmt::Display> {
 impl<E: std::fmt::Display> WithGenerator<E> {
     fn new(err: E, modules: &[impl HugrView]) -> Self {
         Self {
-            inner: err,
+            inner: Box::new(err),
             generator: get_generator(modules),
         }
     }

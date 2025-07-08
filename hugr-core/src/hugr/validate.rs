@@ -118,7 +118,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if num_ports != op_type.port_count(dir) {
                 return Err(ValidationError::WrongNumberOfPorts {
                     node,
-                    optype: op_type.clone(),
+                    optype: Box::new(op_type.clone()),
                     actual: num_ports,
                     expected: op_type.port_count(dir),
                     dir,
@@ -136,9 +136,9 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if !allowed_children.is_superset(op_type.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
-                    child_optype: op_type.clone(),
+                    child_optype: Box::new(op_type.clone()),
                     parent,
-                    parent_optype: parent_optype.clone(),
+                    parent_optype: Box::new(parent_optype.clone()),
                     allowed_children,
                 });
             }
@@ -150,7 +150,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if validity_flags.allowed_children == OpTag::None {
                 return Err(ValidationError::EntrypointNotContainer {
                     node,
-                    optype: op_type.clone(),
+                    optype: Box::new(op_type.clone()),
                 });
             }
         }
@@ -199,7 +199,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port,
-                port_kind,
+                port_kind: Box::new(port_kind),
             });
         }
 
@@ -209,7 +209,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
-                    port_kind,
+                    port_kind: Box::new(port_kind),
                 });
             }
             return Ok(());
@@ -229,7 +229,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
-                    port_kind,
+                    port_kind: Box::new(port_kind),
                 });
             }
 
@@ -243,10 +243,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::IncompatiblePorts {
                     from: node,
                     from_port: port,
-                    from_kind: port_kind,
+                    from_kind: Box::new(port_kind),
                     to: other_node,
                     to_port: other_offset,
-                    to_kind: other_kind,
+                    to_kind: Box::new(other_kind),
                 });
             }
 
@@ -285,7 +285,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
-                    optype: op_type.clone(),
+                    optype: Box::new(op_type.clone()),
                 });
             }
 
@@ -295,8 +295,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if !flags.allowed_first_child.is_superset(first_child.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
-                    parent_optype: op_type.clone(),
-                    optype: first_child.clone(),
+                    parent_optype: Box::new(op_type.clone()),
+                    optype: Box::new(first_child.clone()),
                     expected: flags.allowed_first_child,
                     position: "first",
                 });
@@ -309,8 +309,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 if !flags.allowed_second_child.is_superset(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
                         parent: node,
-                        parent_optype: op_type.clone(),
-                        optype: second_child.clone(),
+                        parent_optype: Box::new(op_type.clone()),
+                        optype: Box::new(second_child.clone()),
                         expected: flags.allowed_second_child,
                         position: "second",
                     });
@@ -321,7 +321,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
-                    parent_optype: op_type.clone(),
+                    parent_optype: Box::new(op_type.clone()),
                     source,
                 });
             }
@@ -348,7 +348,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                             if let Err(source) = edge_check(edge_data) {
                                 return Err(ValidationError::InvalidEdges {
                                     parent: node,
-                                    parent_optype: op_type.clone(),
+                                    parent_optype: Box::new(op_type.clone()),
                                     source,
                                 });
                             }
@@ -363,7 +363,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         } else if flags.requires_children {
             return Err(ValidationError::ContainerWithoutChildren {
                 node,
-                optype: op_type.clone(),
+                optype: Box::new(op_type.clone()),
             });
         }
 
@@ -394,7 +394,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {
                 node: parent,
-                optype: op_type.clone(),
+                optype: Box::new(op_type.clone()),
             });
         }
 
@@ -432,7 +432,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 from_offset,
                 to,
                 to_offset,
-                ty: edge_kind,
+                ty: Box::new(edge_kind),
             });
         }
 
@@ -471,7 +471,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                         from_offset,
                         to,
                         to_offset,
-                        ancestor_parent_op: ancestor_parent_op.clone(),
+                        ancestor_parent_op: Box::new(ancestor_parent_op.clone()),
                     });
                 }
 
@@ -600,7 +600,7 @@ pub enum ValidationError<N: HugrNode> {
     )]
     WrongNumberOfPorts {
         node: N,
-        optype: OpType,
+        optype: Box<OpType>,
         actual: usize,
         expected: usize,
         dir: Direction,
@@ -610,14 +610,14 @@ pub enum ValidationError<N: HugrNode> {
     UnconnectedPort {
         node: N,
         port: Port,
-        port_kind: EdgeKind,
+        port_kind: Box<EdgeKind>,
     },
     /// A linear port is connected to more than one thing.
     #[error("{node} has a port {port} of type {port_kind} with more than one connection.")]
     TooManyConnections {
         node: N,
         port: Port,
-        port_kind: EdgeKind,
+        port_kind: Box<EdgeKind>,
     },
     /// Connected ports have different types, or non-unifiable types.
     #[error(
@@ -626,10 +626,10 @@ pub enum ValidationError<N: HugrNode> {
     IncompatiblePorts {
         from: N,
         from_port: Port,
-        from_kind: EdgeKind,
+        from_kind: Box<EdgeKind>,
         to: N,
         to_port: Port,
-        to_kind: EdgeKind,
+        to_kind: Box<EdgeKind>,
     },
     /// The non-root node has no parent.
     #[error("{node} has no parent.")]
@@ -638,9 +638,9 @@ pub enum ValidationError<N: HugrNode> {
     #[error("The operation {parent_optype} cannot contain a {child_optype} as a child. Allowed children: {}. In {child} with parent {parent}.", allowed_children.description())]
     InvalidParentOp {
         child: N,
-        child_optype: OpType,
+        child_optype: Box<OpType>,
         parent: N,
-        parent_optype: OpType,
+        parent_optype: Box<OpType>,
         allowed_children: OpTag,
     },
     /// Invalid first/second child.
@@ -649,8 +649,8 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidInitialChild {
         parent: N,
-        parent_optype: OpType,
-        optype: OpType,
+        parent_optype: Box<OpType>,
+        optype: Box<OpType>,
         expected: OpTag,
         position: &'static str,
     },
@@ -661,7 +661,7 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidChildren {
         parent: N,
-        parent_optype: OpType,
+        parent_optype: Box<OpType>,
         source: ChildrenValidationError<N>,
     },
     /// The children graph has invalid edges.
@@ -674,20 +674,20 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidEdges {
         parent: N,
-        parent_optype: OpType,
+        parent_optype: Box<OpType>,
         source: EdgeValidationError<N>,
     },
     /// The node operation is not a container, but has children.
     #[error("{node} with optype {optype} is not a container, but has children.")]
-    NonContainerWithChildren { node: N, optype: OpType },
+    NonContainerWithChildren { node: N, optype: Box<OpType> },
     /// The node must have children, but has none.
     #[error("{node} with optype {optype} must have children, but has none.")]
-    ContainerWithoutChildren { node: N, optype: OpType },
+    ContainerWithoutChildren { node: N, optype: Box<OpType> },
     /// The children of a node do not form a DAG.
     #[error(
         "The children of an operation {optype} must form a DAG. Loops are not allowed. In {node}."
     )]
-    NotADag { node: N, optype: OpType },
+    NotADag { node: N, optype: Box<OpType> },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError<N>),
@@ -719,7 +719,7 @@ pub enum ValidationError<N: HugrNode> {
     ConstTypeError(#[from] ConstTypeError),
     /// The HUGR entrypoint must be a region container.
     #[error("The HUGR entrypoint ({node}) must be a region container, but '{}' does not accept children.", optype.name())]
-    EntrypointNotContainer { node: N, optype: OpType },
+    EntrypointNotContainer { node: N, optype: Box<OpType> },
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -736,7 +736,7 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         from_offset: Port,
         to: N,
         to_offset: Port,
-        ty: EdgeKind,
+        ty: Box<EdgeKind>,
     },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error(
@@ -747,7 +747,7 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         from_offset: Port,
         to: N,
         to_offset: Port,
-        ancestor_parent_op: OpType,
+        ancestor_parent_op: Box<OpType>,
     },
     /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
     #[error(
