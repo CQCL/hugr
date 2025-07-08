@@ -1,6 +1,9 @@
-from hugr import tys
+from pathlib import Path
+
+from hugr import ops, tys
 from hugr.build.function import Module
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
+from hugr.hugr.node_port import Node
 from hugr.package import Package
 
 
@@ -33,12 +36,14 @@ def test_envelope():
 
 
 def test_legacy_funcdefn():
-    from pathlib import Path
-
     p = Path(__file__).parents[2] / "resources" / "test" / "hugr-no-visibility.hugr"
-    with open(p, "rb") as f:
+    with p.open("rb") as f:
         pkg_bytes = f.read()
     decoded = Package.from_bytes(pkg_bytes)
     h = decoded.modules[0]
-    assert isinstance(h[1].op, ops.FuncDecl) and h[1].op.visibility == "Public"
-    assert isinstance(h[1].op, ops.FuncDefn) and h[1].op.visibility == "Private"
+    op1 = h[Node(1)].op
+    assert isinstance(op1, ops.FuncDecl)
+    assert op1.visibility == "Public"
+    op2 = h[Node(2)].op
+    assert isinstance(op2, ops.FuncDefn)
+    assert op2.visibility == "Private"

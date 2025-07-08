@@ -76,7 +76,7 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
-    visibility: Visibility
+    visibility: Visibility = Field(default="Private")
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
@@ -95,7 +95,7 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
-    visibility: Visibility
+    visibility: Visibility = Field(default="Public")
 
     def deserialize(self) -> ops.FuncDecl:
         return ops.FuncDecl(
