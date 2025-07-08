@@ -34,7 +34,7 @@ impl TypeDefBound {
     #[must_use]
     pub fn any() -> Self {
         TypeDefBound::Explicit {
-            bound: TypeBound::Any,
+            bound: TypeBound::Linear,
         }
     }
 
@@ -142,7 +142,7 @@ impl TypeDef {
                 let args: Vec<_> = args.iter().collect();
                 if indices.is_empty() {
                     // Assume most general case
-                    return TypeBound::Any;
+                    return TypeBound::Linear;
                 }
                 least_upper_bound(indices.iter().map(|i| {
                     let ta = args.get(*i);

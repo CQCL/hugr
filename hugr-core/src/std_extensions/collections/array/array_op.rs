@@ -72,9 +72,9 @@ impl<AK: ArrayKind> SignatureFromArgs for GenericArrayOpDef<AK> {
         let [TypeArg::BoundedNat(n)] = *arg_values else {
             return Err(SignatureError::InvalidTypeArgs);
         };
-        let elem_ty_var = Type::new_var_use(0, TypeBound::Any);
+        let elem_ty_var = Type::new_var_use(0, TypeBound::Linear);
         let array_ty = AK::ty(n, elem_ty_var.clone());
-        let params = vec![TypeBound::Any.into()];
+        let params = vec![TypeBound::Linear.into()];
         let poly_func_ty = match self {
             GenericArrayOpDef::new_array => PolyFuncTypeRV::new(
                 params,
@@ -140,10 +140,10 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
             (*self).into()
         } else {
             let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-            let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
+            let elem_ty_var = Type::new_var_use(1, TypeBound::Linear);
             let array_ty = AK::instantiate_ty(array_def, size_var.clone(), elem_ty_var.clone())
                 .expect("Array type instantiation failed");
-            let standard_params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+            let standard_params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
 
             // We can assume that the prelude has ben loaded at this point,
             // since it doesn't depend on the array extension.
@@ -184,9 +184,9 @@ impl<AK: ArrayKind> GenericArrayOpDef<AK> {
                     )
                 }
                 discard_empty => PolyFuncTypeRV::new(
-                    vec![TypeBound::Any.into()],
+                    vec![TypeBound::Linear.into()],
                     FuncValueType::new(
-                        AK::instantiate_ty(array_def, 0, Type::new_var_use(0, TypeBound::Any))
+                        AK::instantiate_ty(array_def, 0, Type::new_var_use(0, TypeBound::Linear))
                             .expect("Array type instantiation failed"),
                         type_row![],
                     ),

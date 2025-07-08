@@ -15,7 +15,7 @@ use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
 /// results in types of such outports changing from [Copyable] to linear (i.e.
-/// [`hugr_core::types::TypeBound::Any`]).
+/// [`hugr_core::types::TypeBound::Linear`]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
 /// function polymorphic over a [Copyable] becomes called with a

@@ -167,7 +167,7 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -181,7 +181,7 @@ impl ListOp {
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
         use ListOp::{get, insert, length, pop, push, set};
-        let e = Type::new_var_use(0, TypeBound::Any);
+        let e = Type::new_var_use(0, TypeBound::Linear);
         let l = self.list_type(list_type_def, 0);
         match self {
             pop => self

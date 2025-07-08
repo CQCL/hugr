@@ -70,7 +70,7 @@ pub type TypeParam = Term;
 pub enum Term {
     /// The type of runtime types.
     #[display("Type{}", match _0 {
-        TypeBound::Any => String::new(),
+        TypeBound::Linear => String::new(),
         _ => format!("[{_0}]")
     })]
     RuntimeType(TypeBound),
@@ -896,7 +896,7 @@ mod test {
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &seq_param).unwrap_err();
-        check_seq(&[usize_t()], &TypeBound::Any.into()).unwrap_err();
+        check_seq(&[usize_t()], &TypeBound::Linear.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
@@ -905,17 +905,17 @@ mod test {
         check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap();
         check_seq(
             &[
-                rowvar(1, TypeBound::Any),
+                rowvar(1, TypeBound::Linear),
                 usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
-            &TypeParam::new_list_type(TypeBound::Any),
+            &TypeParam::new_list_type(TypeBound::Linear),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
         check_seq(
             &[
-                rowvar(1, TypeBound::Any),
+                rowvar(1, TypeBound::Linear),
                 usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
@@ -957,8 +957,8 @@ mod test {
         )
         .unwrap_err(); // Wrong way around
         let two_types = TypeParam::new_tuple_type(Term::new_list([
-            TypeBound::Any.into(),
-            TypeBound::Any.into(),
+            TypeBound::Linear.into(),
+            TypeBound::Linear.into(),
         ]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
@@ -973,7 +973,7 @@ mod test {
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
-        let outer_param = Term::new_list_type(TypeBound::Any);
+        let outer_param = Term::new_list_type(TypeBound::Linear);
         let outer_arg = Term::new_list([
             TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
             usize_t().into(),
@@ -992,7 +992,7 @@ mod test {
 
     #[test]
     fn subst_list_list() {
-        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Any));
+        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Linear));
         let row_var_decl = Term::new_list_type(TypeBound::Copyable);
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
@@ -1013,7 +1013,7 @@ mod test {
             Err(TermTypeError::TypeMismatch {
                 term: usize_t().into(),
                 // The error reports the type expected for each element of the list:
-                type_: TypeParam::new_list_type(TypeBound::Any)
+                type_: TypeParam::new_list_type(TypeBound::Linear)
             })
         );
 

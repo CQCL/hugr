@@ -220,7 +220,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
+                module_builder.add_alias_declare("qubit_state", TypeBound::Linear)?;
 
             let f_build = module_builder.define_function(
                 "main",

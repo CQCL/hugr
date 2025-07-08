@@ -96,7 +96,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                     ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
+                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
                     "Fixed-length array".into(),
                     // Default array is linear, even if the elements are copyable
                     TypeDefBound::any(),

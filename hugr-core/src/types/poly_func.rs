@@ -192,10 +192,10 @@ pub(crate) mod test {
     #[test]
     fn test_opaque() -> Result<(), SignatureError> {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
-        let tyvar = TypeArg::new_var_use(0, TypeBound::Any.into());
+        let tyvar = TypeArg::new_var_use(0, TypeBound::Linear.into());
         let list_of_var = Type::new_extension(list_def.instantiate([tyvar.clone()])?);
         let list_len = PolyFuncTypeBase::new_validated(
-            [TypeBound::Any.into()],
+            [TypeBound::Linear.into()],
             Signature::new(vec![list_of_var], vec![usize_t()]),
         )?;
 
@@ -216,8 +216,8 @@ pub(crate) mod test {
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
         let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let ty_var = TypeArg::new_var_use(1, TypeBound::Any.into());
-        let type_params = [TypeParam::max_nat_type(), TypeBound::Any.into()];
+        let ty_var = TypeArg::new_var_use(1, TypeBound::Linear.into());
+        let type_params = [TypeParam::max_nat_type(), TypeBound::Linear.into()];
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
@@ -252,7 +252,7 @@ pub(crate) mod test {
             "array",
             [ty_var, size_var],
             array::EXTENSION_ID,
-            TypeBound::Any,
+            TypeBound::Linear,
             &Arc::downgrade(&array::EXTENSION),
         ));
         let bad_ts =
@@ -271,7 +271,7 @@ pub(crate) mod test {
         for decl in [
             Term::new_list_type(Term::max_nat_type()),
             Term::StringType,
-            Term::new_tuple_type([TypeBound::Any.into(), Term::max_nat_type()]),
+            Term::new_tuple_type([TypeBound::Linear.into(), Term::max_nat_type()]),
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
@@ -324,7 +324,7 @@ pub(crate) mod test {
                     TYPE_NAME,
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
-                    TypeBound::Any,
+                    TypeBound::Linear,
                     &Arc::downgrade(&ext),
                 ))),
             )
@@ -351,13 +351,13 @@ pub(crate) mod test {
         decl_accepts_rejects_var(
             TypeBound::Copyable.into(),
             &[TypeBound::Copyable.into()],
-            &[TypeBound::Any.into()],
+            &[TypeBound::Linear.into()],
         )?;
 
         decl_accepts_rejects_var(
             Term::new_list_type(TypeBound::Copyable),
             &[Term::new_list_type(TypeBound::Copyable)],
-            &[Term::new_list_type(TypeBound::Any)],
+            &[Term::new_list_type(TypeBound::Linear)],
         )?;
 
         decl_accepts_rejects_var(
@@ -373,7 +373,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+    const TP_ANY: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
@@ -393,7 +393,7 @@ pub(crate) mod test {
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -404,7 +404,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables() {
-        let rty = TypeRV::new_row_var_use(0, TypeBound::Any);
+        let rty = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(

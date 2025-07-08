@@ -654,7 +654,7 @@ mod test {
                 let pv_of_var = ext
                     .add_type(
                         PACKED_VEC.into(),
-                        vec![TypeBound::Any.into()],
+                        vec![TypeBound::Linear.into()],
                         String::new(),
                         TypeDefBound::from_params(vec![0]),
                         w,
@@ -669,7 +669,7 @@ mod test {
                         vec![TypeBound::Copyable.into()],
                         Signature::new(
                             vec![pv_of_var.into(), i64_t()],
-                            Type::new_var_use(0, TypeBound::Any),
+                            Type::new_var_use(0, TypeBound::Linear),
                         ),
                     ),
                     w,
@@ -747,9 +747,9 @@ mod test {
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Any));
+        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Linear));
         let fb = mb
-            .define_function("id", PolyFuncType::new([TypeBound::Any.into()], sig))
+            .define_function("id", PolyFuncType::new([TypeBound::Linear.into()], sig))
             .unwrap();
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
@@ -966,8 +966,8 @@ mod test {
             IdentList::new_unchecked("NoBoundsCheck"),
             Version::new(0, 0, 0),
             |e, w| {
-                let params = vec![TypeBound::Any.into()];
-                let tv = Type::new_var_use(0, TypeBound::Any);
+                let params = vec![TypeBound::Linear.into()];
+                let tv = Type::new_var_use(0, TypeBound::Linear);
                 let list_of_var = list_type(tv.clone());
                 e.add_op(
                     READ.into(),
