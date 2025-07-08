@@ -437,7 +437,7 @@ pub(crate) mod test {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
             })
-            if typ == qb_t()
+            if *typ == qb_t()
         );
     }
 

@@ -285,8 +285,8 @@ impl Call {
             Ok(())
         } else {
             Err(SignatureError::CallIncorrectlyAppliesType {
-                cached: self.instantiation.clone(),
-                expected: other.instantiation.clone(),
+                cached: Box::new(self.instantiation.clone()),
+                expected: Box::new(other.instantiation.clone()),
             })
         }
     }
@@ -476,8 +476,8 @@ impl LoadFunction {
             Ok(())
         } else {
             Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
-                cached: self.instantiation.clone(),
-                expected: other.instantiation.clone(),
+                cached: Box::new(self.instantiation.clone()),
+                expected: Box::new(other.instantiation.clone()),
             })
         }
     }

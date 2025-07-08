@@ -258,7 +258,7 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
     #[error("Replacement op for {0} could not be added because {1}")]
-    AddTemplateError(Node, BuildError),
+    AddTemplateError(Node, Box<BuildError>),
 }
 
 impl ReplaceTypes {
@@ -452,7 +452,7 @@ impl ReplaceTypes {
                 if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement
                         .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                     true
                 } else {
                     let def = ext_op.def_arc();
@@ -465,7 +465,7 @@ impl ReplaceTypes {
                     {
                         replacement
                             .replace(hugr, n)
-                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                         true
                     } else {
                         if ch {

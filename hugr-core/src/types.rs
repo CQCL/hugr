@@ -841,8 +841,8 @@ pub(crate) fn check_typevar_decl(
                 Ok(())
             } else {
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: cached_decl.clone(),
-                    actual: actual.clone(),
+                    cached: Box::new(cached_decl.clone()),
+                    actual: Box::new(actual.clone()),
                 })
             }
         }
@@ -1029,8 +1029,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                type_: TypeBound::Copyable.into(),
-                term: qb_t().into()
+                type_: Box::new(TypeBound::Copyable.into()),
+                term: Box::new(qb_t().into())
             }))
         );
 
@@ -1041,8 +1041,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                type_: TypeBound::Copyable.into(),
-                term: mk_opt(qb_t()).into()
+                type_: Box::new(TypeBound::Copyable.into()),
+                term: Box::new(mk_opt(qb_t()).into())
             }))
         );
 

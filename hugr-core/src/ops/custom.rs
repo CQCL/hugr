@@ -356,8 +356,8 @@ pub enum OpaqueOpError<N: HugrNode> {
         node: N,
         extension: ExtensionId,
         op: OpName,
-        stored: Signature,
-        computed: Signature,
+        stored: Box<Signature>,
+        computed: Box<Signature>,
     },
     /// An error in computing the signature of the `ExtensionOp`
     #[error("Error in signature of operation '{name}' in {node}: {cause}")]

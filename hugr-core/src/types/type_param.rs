@@ -687,8 +687,8 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::RuntimeType(_), Term::StaticType) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
-            term: term.clone(),
-            type_: type_.clone(),
+            term: Box::new(term.clone()),
+            type_: Box::new(type_.clone()),
         }),
     }
 }
@@ -713,7 +713,7 @@ pub enum TermTypeError {
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
     #[error("Term {term} does not fit declared type {type_}")]
-    TypeMismatch { term: Term, type_: Term },
+    TypeMismatch { term: Box<Term>, type_: Box<Term> },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -730,7 +730,7 @@ pub enum TermTypeError {
     OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of type argument")]
-    InvalidValue(TypeArg),
+    InvalidValue(Box<TypeArg>),
 }
 
 /// Part of a sequence.
@@ -1011,9 +1011,9 @@ mod test {
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
-                term: usize_t().into(),
+                term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
-                type_: TypeParam::new_list_type(TypeBound::Linear)
+                type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
             })
         );
 
