@@ -1155,7 +1155,8 @@ pub(super) mod proptest_utils {
             | TypeParamSer::String
             | TypeParamSer::Bytes
             | TypeParamSer::Float
-            | TypeParamSer::StaticType => true,
+            | TypeParamSer::StaticType
+            | TypeParamSer::Const { .. } => true,
             TypeParamSer::List { param } => term_is_serde_type_param(&param),
             TypeParamSer::Tuple { params } => {
                 match &params {
