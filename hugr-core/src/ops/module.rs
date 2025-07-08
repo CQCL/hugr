@@ -56,8 +56,7 @@ pub struct FuncDefn {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
-    #[serde(default = "priv_vis")]
-    /// Is the function public? (Can it be linked against and called externally?)
+    #[serde(default = "priv_vis")] // sadly serde does not pick this up from the schema
     visibility: Visibility,
 }
 
@@ -150,6 +149,7 @@ pub struct FuncDecl {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
+    // (again) sadly serde does not pick this up from the schema
     #[serde(default = "pub_vis")] // Note opposite of FuncDefn
     visibility: Visibility,
 }
