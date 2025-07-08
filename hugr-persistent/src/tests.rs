@@ -4,7 +4,6 @@ use derive_more::derive::{From, Into};
 use hugr_core::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig},
-    envelope::serde_with::AsStringEnvelope,
     extension::prelude::bool_t,
     hugr::{Hugr, HugrView, patch::Patch, views::SiblingSubgraph},
     ops::handle::NodeHandle,
@@ -12,7 +11,6 @@ use hugr_core::{
 };
 use itertools::Itertools;
 use rstest::*;
-use serde_with::serde_as;
 
 use crate::{
     Commit, CommitStateSpace, PatchNode, PersistentHugr, PersistentReplacement, Resolver,
@@ -528,9 +526,47 @@ fn test_try_add_commit(test_state_space: (CommitStateSpace, [CommitId; 4])) {
 }
 
 /// A Hugr that serialises with no extensions
-#[serde_as]
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
 pub(crate) struct WrappedHugr {
-    #[serde_as(as = "AsStringEnvelope")]
+    #[serde(with = "serial")]
     pub hugr: Hugr,
+}
+
+mod serial {
+    use hugr_core::envelope::EnvelopeConfig;
+    use hugr_core::std_extensions::STD_REG;
+    use serde::Deserialize;
+
+    use super::*;
+
+    pub(crate) fn serialize<S>(hugr: &Hugr, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut str = hugr
+            .store_str_with_exts(EnvelopeConfig::text(), &STD_REG)
+            .map_err(serde::ser::Error::custom)?;
+        // TODO: replace this with a proper hugr hash (see https://github.com/CQCL/hugr/issues/2091)
+        remove_encoder_version(&mut str);
+        serializer.serialize_str(&str)
+    }
+
+    fn remove_encoder_version(str: &mut String) {
+        // Remove encoder version information for consistent test output
+        let encoder_pattern = r#""encoder":"hugr-rs v"#;
+        if let Some(start) = str.find(encoder_pattern) {
+            if let Some(end) = str[start..].find(r#"","#) {
+                let end = start + end + 2; // +2 for the `",` part
+                str.replace_range(start..end, "");
+            }
+        }
+    }
+
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let str = String::deserialize(deserializer)?;
+        Hugr::load_str(str, Some(&STD_REG)).map_err(serde::de::Error::custom)
+    }
 }

@@ -243,6 +243,7 @@ mod tests {
 
     use crate::extension::prelude::usize_t;
     use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::{bool_t, qb_t},
@@ -255,6 +256,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_scan_def<AK: ArrayKind>(#[case] _kind: AK) {
         let op = GenericArrayScan::<AK>::new(bool_t(), qb_t(), vec![usize_t()], 2);
         let optype: OpType = op.clone().into();
@@ -265,6 +267,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_scan_map<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let src_ty = qb_t();
@@ -290,6 +293,7 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
+    #[case(BorrowArray)]
     fn test_scan_accs<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let src_ty = qb_t();

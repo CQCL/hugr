@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! Constant-folding pass.
 //! An (example) use of the [dataflow analysis framework](super::dataflow).
 

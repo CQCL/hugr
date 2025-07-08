@@ -10,10 +10,11 @@ from hugr.build.function import Module
 from hugr.hugr import Hugr
 from hugr.hugr.node_port import Node, _SubPort
 from hugr.ops import NoConcreteFunc
+from hugr.package import Package
 from hugr.std.int import INT_T, DivMod, IntVal
 from hugr.std.logic import Not
 
-from .conftest import validate
+from .conftest import QUANTUM_EXT, H, validate
 
 
 def test_stable_indices():
@@ -406,6 +407,46 @@ def test_option() -> None:
     validate(dfg.hugr)
 
 
+# a helper for the toposort tests
+@pytest.fixture
+def simple_fn() -> Function:
+    f = Function("prepare_qubit", [tys.Bool, tys.Qubit])
+    [b, q] = f.inputs()
+
+    h = f.add_op(H, q)
+    q = h.out(0)
+
+    nnot = f.add_op(Not, b)
+
+    f.set_outputs(q, nnot, b)
+    validate(Package([f.hugr], [QUANTUM_EXT]))
+    return f
+
+
+# https://github.com/CQCL/hugr/issues/2350
+def test_toposort(simple_fn: Function) -> None:
+    nodes = list(simple_fn.hugr)
+    func_node = nodes[1]
+
+    sorted_nodes = list(simple_fn.hugr.sorted_region_nodes(func_node))
+    assert set(sorted_nodes) == set(simple_fn.hugr.children(simple_fn))
+    assert sorted_nodes[0] == simple_fn.input_node
+    assert sorted_nodes[-1] == simple_fn.output_node
+
+
+def test_toposort_error(simple_fn: Function) -> None:
+    # Test that we get an error if we toposort an invalid hugr containing a cycle
+    nodes = list(simple_fn.hugr)
+    func_node = nodes[1]
+
+    # Add a loop, invalidating the HUGR
+    simple_fn.hugr.add_link(nodes[4].out_port(), nodes[4].inp(0))
+    with pytest.raises(
+        ValueError, match="Graph contains a cycle. No topological ordering exists."
+    ):
+        list(simple_fn.hugr.sorted_region_nodes(func_node))
+
+
 def test_html_labels(snapshot) -> None:
     """Ensures that HTML-like labels can be processed correctly by both the builder and
     the renderer.
@@ -416,6 +457,7 @@ def test_html_labels(snapshot) -> None:
     )
     f.metadata["label"] = "<b>Bold Label</b>"
     f.metadata["<other-label>"] = "<i>Italic Label</i>"
+    f.metadata["meta_can_be_anything"] = [42, "string", 3.14, True]
 
     f.hugr[f.hugr.module_root].metadata["name"] = "<i>Module Root</i>"
 

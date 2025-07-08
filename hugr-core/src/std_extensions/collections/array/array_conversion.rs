@@ -246,12 +246,14 @@ mod tests {
     use crate::extension::prelude::bool_t;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::collections::array::Array;
+    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
 
     use super::*;
 
     #[rstest]
     #[case(ValueArray, Array)]
+    #[case(BorrowArray, Array)]
     fn test_convert_from_def<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -264,6 +266,7 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
+    #[case(BorrowArray, Array)]
     fn test_convert_into_def<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -276,6 +279,7 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
+    #[case(BorrowArray, Array)]
     fn test_convert_from<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -296,6 +300,7 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
+    #[case(BorrowArray, Array)]
     fn test_convert_into<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
