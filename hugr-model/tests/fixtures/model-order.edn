@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func main
+(define-func pub main
   (core.fn
     [(arithmetic.int.types.int 6)
       (arithmetic.int.types.int 6)
