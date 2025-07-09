@@ -114,7 +114,7 @@ impl Default for LinearizeArrayPass {
                 )))
             },
         );
-        pass.linearizer()
+        pass.linearizer_mut()
             .register_callback(array_type_def(), copy_discard_array);
         Self(pass)
     }
@@ -139,7 +139,7 @@ impl LinearizeArrayPass {
     /// Allows to configure how to clone and discard arrays that are nested
     /// inside opaque extension values.
     pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
-        self.0.linearizer()
+        self.0.linearizer_mut()
     }
 }
 

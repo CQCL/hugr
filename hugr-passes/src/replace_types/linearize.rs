@@ -455,7 +455,7 @@ mod test {
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
-            .linearizer()
+            .linearizer_mut()
             .register_simple(
                 lin_custom_t,
                 NodeTemplate::SingleOp(copy_op.into()),
@@ -577,7 +577,7 @@ mod test {
         let opdef = e.get_op("copy").unwrap();
         let opdef2 = opdef.clone();
         lowerer
-            .linearizer()
+            .linearizer_mut()
             .register_callback(lin_t_def, move |args, num_outs, _| {
                 assert!(args.is_empty());
                 Ok(NodeTemplate::SingleOp(
@@ -639,7 +639,7 @@ mod test {
         let mut replacer = ReplaceTypes::default();
         replacer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
 
-        let bad_copy = replacer.linearizer().register_simple(
+        let bad_copy = replacer.linearizer_mut().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
@@ -654,7 +654,7 @@ mod test {
             })
         );
 
-        let bad_discard = replacer.linearizer().register_simple(
+        let bad_discard = replacer.linearizer_mut().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy2.into()),
             NodeTemplate::SingleOp(copy3.clone()),
@@ -671,7 +671,7 @@ mod test {
 
         // Try parametrized instead, but this version always returns 3 outports
         replacer
-            .linearizer()
+            .linearizer_mut()
             .register_callback(ext.get_type(LIN_T).unwrap(), move |_args, _, _| {
                 Ok(NodeTemplate::SingleOp(copy3.clone()))
             });
@@ -699,7 +699,7 @@ mod test {
         let (e, mut lowerer) = ext_lowerer();
 
         lowerer
-            .linearizer()
+            .linearizer_mut()
             .register_callback(value_array_type_def(), linearize_value_array);
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let opt_lin_ty = Type::from(option_type(lin_t.clone()));
@@ -817,7 +817,7 @@ mod test {
 
         let mut lower_discard_to_call = ReplaceTypes::default();
         lower_discard_to_call
-            .linearizer()
+            .linearizer_mut()
             .register_simple(
                 lin_ct.clone(),
                 NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused

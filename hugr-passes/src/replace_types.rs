@@ -326,6 +326,12 @@ impl ReplaceTypes {
         self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
+    /// Deprecated + Renamed to [Self::linearizer_mut]
+    #[deprecated(note = "Use linearizer_mut")]
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+        self.linearizer_mut()
+    }
+
     /// Allows to configure how to deal with types/wires that were [Copyable]
     /// but have become linear as a result of type-changing. Specifically,
     /// the [Linearizer] is used whenever lowering produces an outport which both
@@ -335,7 +341,7 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+    pub fn linearizer_mut(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
     }
 
