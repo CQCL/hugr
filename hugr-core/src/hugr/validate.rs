@@ -1,6 +1,7 @@
 //! HUGR invariant checks.
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::iter;
 
 use itertools::Itertools;
@@ -19,7 +20,7 @@ use crate::ops::validate::{
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
-use crate::{Direction, Port};
+use crate::{Direction, Port, Visibility};
 
 use super::internal::PortgraphNodeMap;
 use super::views::HugrView;
@@ -59,6 +60,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.entrypoint(), &[])?;
 
+        self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
         // serialization round-trips. We verify the schema of the serialization
         // format only when an environment variable is set. This allows
@@ -77,6 +79,44 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::text());
         }
 
+        Ok(())
+    }
+
+    fn validate_linkage(&self) -> Result<(), ValidationError<H::Node>> {
+        // Map from func_name, for visible funcs only, to *tuple of*
+        //    Node with that func_name,
+        //    Signature,
+        //    bool - true for FuncDefn
+        let mut node_sig_defn = HashMap::new();
+
+        for c in self.hugr.children(self.hugr.module_root()) {
+            let (func_name, sig, is_defn) = match self.hugr.get_optype(c) {
+                OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
+                    (fd.func_name(), fd.signature(), false)
+                }
+                OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
+                    (fd.func_name(), fd.signature(), true)
+                }
+                _ => continue,
+            };
+            match node_sig_defn.entry(func_name) {
+                Entry::Vacant(ve) => {
+                    ve.insert((c, sig, is_defn));
+                }
+                Entry::Occupied(oe) => {
+                    // Allow two decls of the same sig (aliasing - we are allowing some laziness here).
+                    // Reject if at least one Defn - either two conflicting impls,
+                    //                               or Decl+Defn which should have been linked
+                    let (prev_c, prev_sig, prev_defn) = oe.get();
+                    if prev_sig != &sig || is_defn || *prev_defn {
+                        return Err(ValidationError::DuplicateExport {
+                            link_name: func_name.clone(),
+                            children: [*prev_c, c],
+                        });
+                    };
+                }
+            }
+        }
         Ok(())
     }
 
@@ -663,6 +703,16 @@ pub enum ValidationError<N: HugrNode> {
         parent: N,
         parent_optype: Box<OpType>,
         source: ChildrenValidationError<N>,
+    },
+    /// Multiple, incompatible, nodes with [Visibility::Public] use the same `func_name`
+    /// in a [Module](super::Module). (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with
+    /// the same signature are allowed)
+    #[error("FuncDefn/Decl {} is exported under same name {link_name} as earlier node {}", children[0], children[1])]
+    DuplicateExport {
+        /// The `func_name` of a public `FuncDecl` or `FuncDefn`
+        link_name: String,
+        /// Two nodes using that name
+        children: [N; 2],
     },
     /// The children graph has invalid edges.
     #[error(

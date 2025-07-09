@@ -9,12 +9,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::types::{EdgeKind, PolyFuncType, Signature};
-use crate::types::{Type, TypeBound};
+use crate::Visibility;
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeBound};
 
-use super::StaticTag;
 use super::dataflow::DataflowParent;
-use super::{OpTag, OpTrait, impl_op_name};
+use super::{OpTag, OpTrait, StaticTag, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -57,14 +56,31 @@ pub struct FuncDefn {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
+    #[serde(default = "priv_vis")] // sadly serde does not pick this up from the schema
+    visibility: Visibility,
+}
+
+fn priv_vis() -> Visibility {
+    Visibility::Private
 }
 
 impl FuncDefn {
-    /// Create a new instance with the given name and signature
+    /// Create a new, [Visibility::Private], instance with the given name and signature.
+    /// See also [Self::new_vis].
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_vis(name, signature, Visibility::Private)
+    }
+
+    /// Create a new instance with the specified name and visibility
+    pub fn new_vis(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        visibility: Visibility,
+    ) -> Self {
         Self {
             name: name.into(),
             signature: signature.into(),
+            visibility,
         }
     }
 
@@ -86,6 +102,16 @@ impl FuncDefn {
     /// Allows mutating the signature of the function
     pub fn signature_mut(&mut self) -> &mut PolyFuncType {
         &mut self.signature
+    }
+
+    /// The visibility of the function, e.g. for linking
+    pub fn visibility(&self) -> &Visibility {
+        &self.visibility
+    }
+
+    /// Allows changing [Self::visibility]
+    pub fn visibility_mut(&mut self) -> &mut Visibility {
+        &mut self.visibility
     }
 }
 
@@ -123,14 +149,32 @@ pub struct FuncDecl {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_string()"))]
     name: String,
     signature: PolyFuncType,
+    // (again) sadly serde does not pick this up from the schema
+    #[serde(default = "pub_vis")] // Note opposite of FuncDefn
+    visibility: Visibility,
+}
+
+fn pub_vis() -> Visibility {
+    Visibility::Public
 }
 
 impl FuncDecl {
-    /// Create a new instance with the given name and signature
+    /// Create a new [Visibility::Public] instance with the given name and signature.
+    /// See also [Self::new_vis]
     pub fn new(name: impl Into<String>, signature: impl Into<PolyFuncType>) -> Self {
+        Self::new_vis(name, signature, Visibility::Public)
+    }
+
+    /// Create a new instance with the given name, signature and visibility
+    pub fn new_vis(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        visibility: Visibility,
+    ) -> Self {
         Self {
             name: name.into(),
             signature: signature.into(),
+            visibility,
         }
     }
 
@@ -139,9 +183,19 @@ impl FuncDecl {
         &self.name
     }
 
+    /// The visibility of the function, e.g. for linking
+    pub fn visibility(&self) -> &Visibility {
+        &self.visibility
+    }
+
     /// Allows mutating the name of the function (as per [Self::func_name])
     pub fn func_name_mut(&mut self) -> &mut String {
         &mut self.name
+    }
+
+    /// Allows mutating the [Self::visibility] of the function
+    pub fn visibility_mut(&mut self) -> &mut Visibility {
+        &mut self.visibility
     }
 
     /// Gets the signature of the function

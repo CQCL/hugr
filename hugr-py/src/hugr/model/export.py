@@ -29,7 +29,15 @@ from hugr.ops import (
     Tag,
     TailLoop,
 )
-from hugr.tys import ConstKind, FunctionKind, Type, TypeBound, TypeParam, TypeTypeParam
+from hugr.tys import (
+    ConstKind,
+    FunctionKind,
+    Type,
+    TypeBound,
+    TypeParam,
+    TypeTypeParam,
+    Visibility,
+)
 
 
 class ModelExport:
@@ -146,7 +154,7 @@ class ModelExport:
             case FuncDefn() as op:
                 name = _mangle_name(node, op.f_name)
                 symbol = self.export_symbol(
-                    name, op.signature.params, op.signature.body
+                    name, op.visibility, op.signature.params, op.signature.body
                 )
                 region = self.export_region_dfg(node)
 
@@ -157,17 +165,25 @@ class ModelExport:
             case FuncDecl() as op:
                 name = _mangle_name(node, op.f_name)
                 symbol = self.export_symbol(
-                    name, op.signature.params, op.signature.body
+                    name, op.visibility, op.signature.params, op.signature.body
                 )
                 return model.Node(operation=model.DeclareFunc(symbol), meta=meta)
 
             case AliasDecl() as op:
-                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
+                symbol = model.Symbol(
+                    name=op.alias,
+                    visibility="Public",
+                    signature=model.Apply("core.type"),
+                )
 
                 return model.Node(operation=model.DeclareAlias(symbol), meta=meta)
 
             case AliasDefn() as op:
-                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
+                symbol = model.Symbol(
+                    name=op.alias,
+                    visibility="Public",
+                    signature=model.Apply("core.type"),
+                )
 
                 alias_value = cast(model.Term, op.definition.to_model())
 
@@ -509,7 +525,11 @@ class ModelExport:
         )
 
     def export_symbol(
-        self, name: str, param_types: Sequence[TypeParam], body: Type
+        self,
+        name: str,
+        visibility: Visibility,
+        param_types: Sequence[TypeParam],
+        body: Type,
     ) -> model.Symbol:
         """Export a symbol."""
         constraints = []
@@ -530,6 +550,7 @@ class ModelExport:
 
         return model.Symbol(
             name=name,
+            visibility=visibility,
             params=params,
             constraints=constraints,
             signature=cast(model.Term, body.to_model()),

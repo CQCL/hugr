@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
+    from hugr.tys import Visibility
 
 
 @dataclass
@@ -1150,6 +1151,8 @@ class FuncDefn(DfParentOp):
     params: list[tys.TypeParam] = field(default_factory=list)
     _outputs: tys.TypeRow | None = field(default=None, repr=False)
     num_out: int = field(default=1, repr=False)
+    #: Visibility (for linking).
+    visibility: Visibility = "Private"
 
     @property
     def outputs(self) -> tys.TypeRow:
@@ -1176,6 +1179,7 @@ class FuncDefn(DfParentOp):
             parent=parent.idx,
             name=self.f_name,
             signature=self.signature._to_serial(),
+            visibility=self.visibility,
         )
 
     def inner_signature(self) -> tys.FunctionType:
@@ -1207,12 +1211,15 @@ class FuncDecl(Op):
     #: polymorphic function signature
     signature: tys.PolyFuncType
     num_out: int = field(default=1, repr=False)
+    #: Visibility (for linking).
+    visibility: Visibility = "Public"
 
     def _to_serial(self, parent: Node) -> sops.FuncDecl:
         return sops.FuncDecl(
             parent=parent.idx,
             name=self.f_name,
             signature=self.signature._to_serial(),
+            visibility=self.visibility,
         )
 
     def port_kind(self, port: InPort | OutPort) -> tys.Kind:

@@ -24,7 +24,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{OutgoingPort, type_row};
+use crate::{OutgoingPort, Visibility, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
@@ -236,6 +236,7 @@ fn test_schema_val() -> serde_json::Value {
         "optype":{
             "name":"polyfunc1",
             "op":"FuncDefn",
+            "visibility": "Public",
             "parent":0,
             "signature":{
                 "body":{
@@ -597,8 +598,8 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 
 #[rstest]
 #[case(ops::Module::new())]
-#[case(ops::FuncDefn::new("polyfunc1", polyfunctype1()))]
-#[case(ops::FuncDecl::new("polyfunc2", polyfunctype1()))]
+#[case(ops::FuncDefn::new_vis("polyfunc1", polyfunctype1(), Visibility::Private))]
+#[case(ops::FuncDefn::new_vis("pubfunc1", polyfunctype1(), Visibility::Public))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Linear})]
 #[case(ops::Const::new(Value::false_val()))]
