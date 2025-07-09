@@ -371,7 +371,7 @@ mod test {
         inout_sig,
     };
 
-    use hugr_core::extension::prelude::{option_type, usize_t};
+    use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
@@ -385,14 +385,14 @@ mod test {
     };
     use hugr_core::types::type_param::TypeParam;
     use hugr_core::types::{
-        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
     };
     use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
-    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
@@ -854,5 +854,58 @@ mod test {
         } else {
             panic!("Expected error");
         }
+    }
+
+    #[test]
+    fn use_in_op_callback() {
+        let (e, mut lowerer) = ext_lowerer();
+        let drop_ext = Extension::new_arc(
+            IdentList::new_unchecked("DropExt"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                e.add_op(
+                    "drop".into(),
+                    String::new(),
+                    PolyFuncTypeRV::new(
+                        [TypeBound::Linear.into()], // It won't *lower* for any type tho!
+                        Signature::new(Type::new_var_use(0, TypeBound::Linear), vec![]),
+                    ),
+                    w,
+                )
+                .unwrap();
+            },
+        );
+        let drop_op = drop_ext.get_op("drop").unwrap();
+        lowerer.replace_parametrized_op_with(drop_op, |args, rt| {
+            let [TypeArg::Runtime(ty)] = args else {
+                panic!("Expected just one type")
+            };
+            Ok(rt.get_linearizer().copy_discard_op(ty, 0).map(Some)?)
+        });
+
+        let build_hugr = |ty: Type| {
+            let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+            let [inp] = dfb.input_wires_arr();
+            let drop_op = drop_ext
+                .instantiate_extension_op("drop", [ty.into()])
+                .unwrap();
+            dfb.add_dataflow_op(drop_op, [inp]).unwrap();
+            dfb.finish_hugr().unwrap()
+        };
+        // We can drop a tuple of 2* lin_t
+        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let mut h = build_hugr(Type::new_tuple(vec![lin_t; 2]));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert_eq!(exts.clone().count(), 2);
+        assert!(exts.all(|eo| eo.qualified_id() == "TestExt.discard"));
+
+        // We cannot drop a qubit
+        let mut h = build_hugr(qb_t());
+        assert_eq!(
+            lowerer.run(&mut h).unwrap_err(),
+            ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
+        );
     }
 }
