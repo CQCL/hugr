@@ -90,7 +90,7 @@ impl ConstantFoldPass {
     ///    * If `node` is beneath the entrypoint, this merely degrades the analysis. (We
     ///      will mutate only beneath the entrypoint, but using results of analysing the
     ///      whole Hugr wrt. the specified/any inputs too).
-    /// 
+    ///
     /// [FuncDefn]: hugr_core::ops::FuncDefn
     pub fn with_inputs(
         mut self,
