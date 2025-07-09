@@ -327,9 +327,14 @@ impl ReplaceTypes {
     }
 
     /// Deprecated + Renamed to [Self::linearizer_mut]
-    #[deprecated(note = "Use linearizer_mut")]
+    #[deprecated(note = "Use linearizer_mut")] // When removed, rename get_linearizer to linearizer
     pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
         self.linearizer_mut()
+    }
+
+    /// Allows access to the [Linearizer], e.g. for building [NodeTemplate::CompoundOp]s
+    pub fn get_linearizer(&self) -> &DelegatingLinearizer {
+        &self.linearize
     }
 
     /// Allows to configure how to deal with types/wires that were [Copyable]
