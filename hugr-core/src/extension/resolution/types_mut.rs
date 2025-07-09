@@ -222,7 +222,7 @@ pub(super) fn resolve_term_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match term {
         Term::Runtime(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        Term::Const(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
+        Term::ConstType(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
         Term::List(children)
         | Term::ListConcat(children)
         | Term::Tuple(children)

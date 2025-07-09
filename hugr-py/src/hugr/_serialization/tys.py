@@ -126,7 +126,7 @@ class TupleParam(BaseTypeParam):
 
 
 class ConstParam(BaseTypeParam):
-    tp: Literal["Const"] = "Const"
+    tp: Literal["ConstType"] = "ConstType"
     ty: Type
 
     def deserialize(self) -> tys.ConstParam:
