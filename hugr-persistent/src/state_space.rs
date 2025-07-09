@@ -256,7 +256,7 @@ impl<R> CommitStateSpace<R> {
     /// Check whether `commit_id` exists and return it.
     pub fn try_get_commit(&self, commit_id: CommitId) -> Option<&Commit> {
         self.contains_id(commit_id)
-            .then(|| self.graph.get_node(commit_id).into())
+            .then(|| self.get_commit(commit_id))
     }
 
     /// Get an iterator over all commit IDs in the state space.
@@ -337,9 +337,9 @@ impl<R> CommitStateSpace<R> {
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
     /// The returned ports will be ports on successors of the input node in the
-    /// `child` commit, unless (node, port) is connected to an empty wire in
-    /// `child` (i.e. a wire from input node to output node), in which case
-    /// they will be in one of the parents of `child`.
+    /// `child` commit, unless (node, port) is connected to a passthrough wire
+    /// in `child` (i.e. a wire from input node to output node), in which
+    /// case they will be in one of the parents of `child`.
     ///
     /// `child` should be a child commit of the owner of `node`.
     ///
@@ -372,10 +372,10 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
-    /// The returned port will be ports on predecessors of the output node in
-    /// the `child` commit, unless (node, port) is connected to an empty wire
-    /// in `child` (i.e. a wire from input node to output node), in which
-    /// case it will be in one of the parents of `child`.
+    /// The returned port will be a port on a predecessor of the output node in
+    /// the `child` commit, unless (node, port) is connected to a passthrough
+    /// wire in `child` (i.e. a wire from input node to output node), in
+    /// which case it will be in one of the parents of `child`.
     ///
     /// `child` should be a child commit of the owner of `node` (or `None` will
     /// be returned).
@@ -425,8 +425,11 @@ impl<R> CommitStateSpace<R> {
         }
     }
 
-    /// Get the single output boundary port linked to `(node, port)` in a
-    /// parent of the commit of `node`.
+    /// Get the single output port linked to `(node, port)` in a parent of the
+    /// commit of `node`.
+    ///
+    /// The returned port belongs to the input boundary of the subgraph in
+    /// parent.
     ///
     /// ## Panics
     ///
@@ -450,8 +453,11 @@ impl<R> CommitStateSpace<R> {
         repl.linked_host_input((node, port), &parent_hugrs).into()
     }
 
-    /// Get the input boundary ports linked to `(node, port)` in a
-    /// parent of the commit of `node`.
+    /// Get the input ports linked to `(node, port)` in a parent of the commit
+    /// of `node`.
+    ///
+    /// The returned ports belong to the output boundary of the subgraph in
+    /// parent.
     ///
     /// ## Panics
     ///

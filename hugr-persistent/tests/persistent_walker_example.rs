@@ -271,32 +271,31 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
                 //  - the first qubit is the one that is shared between the two CZ gates
                 //  - the second qubit only touches the first CZ (out_node)
                 //  - the third qubit only touches the second CZ (in_node)
-                match (port.as_directed(), node == out_node) {
-                    (Either::Left(incoming), true) if incoming.index() == shared_qb_out => {
-                        // out_node on the shared qubit -> port 0
-                        OutgoingPort::from(0).into()
+                match port.as_directed() {
+                    Either::Left(incoming) => {
+                        let in_boundary: [(_, IncomingPort); 3] = [
+                            (out_node, shared_qb_out.into()),
+                            (out_node, (1 - shared_qb_out).into()),
+                            (in_node, (1 - shared_qb_in).into()),
+                        ];
+                        let out_index = in_boundary
+                            .iter()
+                            .position(|&(n, p)| n == node && p == incoming)
+                            .expect("invalid input port");
+                        OutgoingPort::from(out_index).into()
                     }
-                    (Either::Left(incoming), true) if incoming.index() == 1 - shared_qb_out => {
-                        // out_node on the not shared qubit -> port 1
-                        OutgoingPort::from(1).into()
+                    Either::Right(outgoing) => {
+                        let out_boundary: [(_, OutgoingPort); 3] = [
+                            (in_node, shared_qb_in.into()),
+                            (out_node, (1 - shared_qb_out).into()),
+                            (in_node, (1 - shared_qb_in).into()),
+                        ];
+                        let in_index = out_boundary
+                            .iter()
+                            .position(|&(n, p)| n == node && p == outgoing)
+                            .expect("invalid output port");
+                        IncomingPort::from(in_index).into()
                     }
-                    (Either::Left(incoming), false) if incoming.index() == 1 - shared_qb_in => {
-                        // in_node on the not shared qubit -> port 2
-                        OutgoingPort::from(2).into()
-                    }
-                    (Either::Right(outgoing), false) if outgoing.index() == shared_qb_in => {
-                        // in_node on the shared qubit -> port 0
-                        IncomingPort::from(0).into()
-                    }
-                    (Either::Right(outgoing), true) if outgoing.index() == 1 - shared_qb_out => {
-                        // out_node on the not shared qubit -> port 1
-                        IncomingPort::from(1).into()
-                    }
-                    (Either::Right(outgoing), false) if outgoing.index() == 1 - shared_qb_in => {
-                        // in_node on the not shared qubit -> port 2
-                        IncomingPort::from(2).into()
-                    }
-                    _ => panic!("unexpected boundary port"),
                 }
             })
         }
@@ -305,7 +304,7 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
     .ok()
 }
 
-#[ignore = "takes 10s (to be optimised)"]
+#[ignore = "takes 10s (todo: optimise)"]
 #[test]
 fn walker_example() {
     let state_space = build_state_space();
@@ -340,7 +339,6 @@ fn walker_example() {
     // and such that the resulting HUGR is empty
     let mut empty_hugr = None;
     for cs in empty_commits.iter().combinations(3) {
-        // for cs in empty_commits.iter().combinations(2) {
         let cs = cs.into_iter().copied();
         if let Ok(hugr) = state_space.try_extract_hugr(cs) {
             empty_hugr = Some(hugr);

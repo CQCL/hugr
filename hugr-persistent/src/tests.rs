@@ -300,15 +300,14 @@ pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [
     let (triple_not_hugr, not_nodes) = {
         let mut dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
         let [mut w] = dfg_builder.input_wires_arr();
-        let mut not_nodes = Vec::with_capacity(3);
-        for _ in 0..3 {
+        let not_nodes = [(); 3].map(|()| {
             let handle = dfg_builder.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
             [w] = handle.outputs_arr();
-            not_nodes.push(handle.node());
-        }
+            handle.node()
+        });
         (
             dfg_builder.finish_hugr_with_outputs([w]).unwrap(),
-            not_nodes.into_iter().collect_array::<3>().unwrap(),
+            not_nodes,
         )
     };
     let mut hugr = PersistentHugr::with_base(triple_not_hugr);

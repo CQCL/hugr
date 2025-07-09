@@ -344,7 +344,7 @@ impl<'a, R: Resolver> Walker<'a, R> {
             let mut repl = repl.try_into_checked().expect("replacement is not DFG");
             let new_inputs = incoming
                 .iter()
-                .flatten()
+                .flatten() // because of singleton-vec wrapping above
                 .map(|&(n, p)| {
                     map_boundary(n, p.into())
                         .as_outgoing()
@@ -450,7 +450,7 @@ impl<R: Clone> Walker<'_, R> {
 impl<R: Resolver> Walker<'_, R> {
     // Check walker equality by comparing pointers to the state space and
     // other fields. Only for testing purposes.
-    fn ptr_eq(&self, other: &Self) -> bool {
+    fn component_wise_ptr_eq(&self, other: &Self) -> bool {
         std::ptr::eq(self.state_space.as_ref(), other.state_space.as_ref())
             && self.pinned_nodes == other.pinned_nodes
             && BTreeSet::from_iter(self.selected_commits.all_commit_ids())
@@ -463,7 +463,7 @@ impl<R: Resolver> Walker<'_, R> {
         let Some([new_walker]) = self.expand(wire, dir).collect_array() else {
             return false;
         };
-        new_walker.ptr_eq(self)
+        new_walker.component_wise_ptr_eq(self)
     }
 }
 
