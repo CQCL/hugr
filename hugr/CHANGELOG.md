@@ -4,7 +4,6 @@
 
 ### Bug Fixes
 
-- update CallGraph and remove_dead_funcs for module-only FuncDefns ([#2336](https://github.com/CQCL/hugr/pull/2336))
 - DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
 - Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/pull/2324))
 - Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
@@ -20,21 +19,13 @@
 
 ### New Features
 
-- Add serial data types for SimpleReplacement and PersistentHugr ([#2300](https://github.com/CQCL/hugr/pull/2300))
 - [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
 - [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
 - [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
-- Add MermaidFormatter to replace RenderConfig ([#2275](https://github.com/CQCL/hugr/pull/2275))
 - [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
-- *(core, llvm)* add array unpack operations ([#2339](https://github.com/CQCL/hugr/pull/2339))
 - [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
 - *(persistent)* Add serialisation for CommitStateSpace ([#2344](https://github.com/CQCL/hugr/pull/2344))
-- Deprecate invalidation_set, add invalidated_nodes and SimpleReplacement::invalidation_set ([#2358](https://github.com/CQCL/hugr/pull/2358))
-- Rewrite for peeling a TailLoop ([#2290](https://github.com/CQCL/hugr/pull/2290))
-- Create Module/FunctionBuilders from existing Hugrs ([#2359](https://github.com/CQCL/hugr/pull/2359))
 - add TryFrom impls for TypeArg/TypeRow ([#2366](https://github.com/CQCL/hugr/pull/2366))
-- better errors using metadata from generator ([#2368](https://github.com/CQCL/hugr/pull/2368))
-- use `core.` prefixes for generator metadata keys ([#2371](https://github.com/CQCL/hugr/pull/2371))
 - Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
 - Open lists and tuples in `Term` ([#2360](https://github.com/CQCL/hugr/pull/2360))
 - Call `FunctionBuilder::add_{in,out}put` for any AsMut<Hugr> ([#2376](https://github.com/CQCL/hugr/pull/2376))
@@ -45,12 +36,10 @@
 - *(per)* [**breaking**] Support empty wires in commits ([#2349](https://github.com/CQCL/hugr/pull/2349))
 - [**breaking**] hugr-model use explicit Option<Visibility>, with ::Unspecified in capnp ([#2424](https://github.com/CQCL/hugr/pull/2424))
 - [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
-- *(core)* builder pattern for EnvelopeConfig ([#2330](https://github.com/CQCL/hugr/pull/2330))
 - [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
 
 ### Refactor
 
-- *(types.rs)* rm incorrect comment and unnecessary allow-unused ([#2340](https://github.com/CQCL/hugr/pull/2340))
 - [**breaking**] remove deprecated runtime extension errors ([#2369](https://github.com/CQCL/hugr/pull/2369))
 - [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
 - [**breaking**] move PersistentHugr into separate crate ([#2277](https://github.com/CQCL/hugr/pull/2277))

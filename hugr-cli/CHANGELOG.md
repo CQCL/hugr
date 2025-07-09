@@ -6,7 +6,6 @@
 ### New Features
 
 - [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
-- *(cli)* convert sub-command for converting envelope formats ([#2331](https://github.com/CQCL/hugr/pull/2331))
 
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.1...hugr-cli-v0.20.2) - 2025-06-25
 
