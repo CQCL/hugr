@@ -59,3 +59,7 @@
                          (compat.const_json arithmetic.float.types.float64 "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"))
         [] [%1]
         (signature (core.fn [] [arithmetic.float.types.float64])))))
+
+(declare-func example.const_as_param
+  (param ?c (core.const arithmetic.float.types.float64))
+  (core.fn [] [?c]))

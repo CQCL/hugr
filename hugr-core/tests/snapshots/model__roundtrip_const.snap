@@ -20,6 +20,8 @@ expression: ast
 
 (import arithmetic.int.types.int)
 
+(import core.const)
+
 (import collections.array.const)
 
 (import arithmetic.float.types.float64)
@@ -94,3 +96,8 @@ expression: ast
           "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"))
       [] [%1]
       (signature (core.fn [] [arithmetic.float.types.float64])))))
+
+(declare-func
+  example.const_as_param
+  (param ?0 (core.const arithmetic.float.types.float64))
+  (core.fn [] [?0]))
