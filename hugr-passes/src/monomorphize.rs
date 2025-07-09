@@ -140,11 +140,12 @@ fn instantiate(
         Entry::Vacant(ve) => ve,
     };
 
-    let name = mangle_name(
-        h.get_optype(poly_func).as_func_defn().unwrap().func_name(),
-        &type_args,
+    let defn = h.get_optype(poly_func).as_func_defn().unwrap();
+    let name = mangle_name(defn.func_name(), &type_args);
+    let mono_tgt = h.add_node_after(
+        poly_func,
+        FuncDefn::new_vis(name, mono_sig, defn.visibility().clone()),
     );
-    let mono_tgt = h.add_node_after(poly_func, FuncDefn::new(name, mono_sig));
     // Insert BEFORE we scan (in case of recursion), hence we cannot use Entry::or_insert
     ve.insert(mono_tgt);
     // Now make the instantiation
@@ -281,13 +282,13 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
-    use hugr_core::ops::handle::{FuncID, NodeHandle};
+    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
-    use hugr_core::{Hugr, HugrView, Node};
+    use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::{monomorphize, remove_dead_funcs2};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -349,9 +350,13 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        let mn = {
+        {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new(usize_t(), outs),
+                Visibility::Public,
+            )?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -394,12 +399,12 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [mn.node()])?;
+        remove_dead_funcs2(&mut nopoly)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
         for n in expected_mangled_names {
-            assert!(funcs.remove(&n).is_some());
+            assert!(funcs.remove(&n).is_some(), "Did not find {n}");
         }
         assert_eq!(funcs.keys().collect_vec(), vec![&"main"]);
         Ok(())
@@ -581,7 +586,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []).unwrap();
+        remove_dead_funcs2(&mut hugr).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
