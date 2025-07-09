@@ -59,10 +59,14 @@ impl TailLoop {
 
     /// Build the output `TypeRow` of the child graph of a `TailLoop` node.
     pub(crate) fn body_output_row(&self) -> TypeRow {
-        let sum_type = Type::new_sum([self.just_inputs.clone(), self.just_outputs.clone()]);
-        let mut outputs = vec![sum_type];
+        let mut outputs = vec![Type::new_sum(self.control_variants())];
         outputs.extend_from_slice(&self.rest);
         outputs.into()
+    }
+
+    /// The variants (continue / break) of the first output from the child graph
+    pub(crate) fn control_variants(&self) -> [TypeRow; 2] {
+        [self.just_inputs.clone(), self.just_outputs.clone()]
     }
 
     /// Build the input `TypeRow` of the child graph of a `TailLoop` node.
@@ -355,7 +359,7 @@ mod test {
     #[test]
     fn test_subst_dataflow_block() {
         use crate::ops::OpTrait;
-        let tv0 = Type::new_var_use(0, TypeBound::Any);
+        let tv0 = Type::new_var_use(0, TypeBound::Linear);
         let dfb = DataflowBlock {
             inputs: vec![usize_t(), tv0.clone()].into(),
             other_outputs: vec![tv0.clone()].into(),
@@ -371,16 +375,18 @@ mod test {
 
     #[test]
     fn test_subst_conditional() {
-        let tv1 = Type::new_var_use(1, TypeBound::Any);
+        let tv1 = Type::new_var_use(1, TypeBound::Linear);
         let cond = Conditional {
             sum_rows: vec![usize_t().into(), tv1.clone().into()],
-            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any))].into(),
+            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(
+                0,
+                TypeBound::Linear,
+            ))]
+            .into(),
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::Sequence {
-                elems: vec![usize_t().into(); 3],
-            },
+            TypeArg::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
             qb_t().into(),
         ]));
         let st = Type::new_sum(vec![usize_t(), qb_t()]); //both single-element variants

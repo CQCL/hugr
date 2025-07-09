@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.12.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.4...hugr-py-v0.12.5) (2025-07-08)
+
+
+### Bug Fixes
+
+* map IntValue to unsigned repr when serializing ([#2413](https://github.com/CQCL/hugr/issues/2413)) ([4ad1d4e](https://github.com/CQCL/hugr/commit/4ad1d4e010eca07207306320b3cf74396f1f8181)), closes [#2409](https://github.com/CQCL/hugr/issues/2409)
+
+## [0.12.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.3...hugr-py-v0.12.4) (2025-07-03)
+
+
+### Bug Fixes
+
+* stringify metadata before escaping in renderer ([#2405](https://github.com/CQCL/hugr/issues/2405)) ([1f01e97](https://github.com/CQCL/hugr/commit/1f01e97696afe02b46eedb2c6e3e2f2369a4ac7b))
+
+## [0.12.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.2...hugr-py-v0.12.3) (2025-07-03)
+
+
+### Features
+
+* add toposort to HUGR-py ([#2367](https://github.com/CQCL/hugr/issues/2367)) ([ba8988e](https://github.com/CQCL/hugr/commit/ba8988e87c2a3d64953838e9a1cff4989740cf05))
+* **core, llvm:** add array unpack operations ([#2339](https://github.com/CQCL/hugr/issues/2339)) ([74b25aa](https://github.com/CQCL/hugr/commit/74b25aa3a704c082f84a0c34fad2654e3392ff50)), closes [#1947](https://github.com/CQCL/hugr/issues/1947)
+* **py:** Helper methods to get the neighbours of a node ([#2370](https://github.com/CQCL/hugr/issues/2370)) ([1ed6440](https://github.com/CQCL/hugr/commit/1ed64409aaf7e8f26fb5928051245e560881a621))
+
+
+### Bug Fixes
+
+* Escape html-like labels in DotRenderer ([#2383](https://github.com/CQCL/hugr/issues/2383)) ([c7a43a6](https://github.com/CQCL/hugr/commit/c7a43a69878e1271251b570070f192ebf57aaadd))
+* Fixed invalid extension name in test. ([#2319](https://github.com/CQCL/hugr/issues/2319)) ([fbe1d9c](https://github.com/CQCL/hugr/commit/fbe1d9c061768360144f5463dcf357fb59ac736f))
+* **py:** correct ConstString JSON encoding ([#2325](https://github.com/CQCL/hugr/issues/2325)) ([325168b](https://github.com/CQCL/hugr/commit/325168b50b5e40e884127ad89d7acb5ab3a412f8))
+
 ## [0.12.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.1...hugr-py-v0.12.2) (2025-06-03)
 
 

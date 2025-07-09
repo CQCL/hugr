@@ -1,6 +1,7 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
+use crate::types::type_param::Term;
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -14,13 +15,12 @@ use crate::{
     },
     types::{
         CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeArg, TypeBase, TypeBound, TypeEnum, TypeRow,
-        type_param::{TypeArgVariable, TypeParam},
-        type_row::TypeRowBase,
+        TypeBase, TypeBound, TypeEnum, type_param::TermVar, type_row::TypeRowBase,
     },
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
+use hugr_model::v0::Visibility;
 use hugr_model::v0::{
     self as model,
     bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
@@ -231,16 +231,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Get the name of a function definition or declaration node. Returns `None` if not
-    /// one of those operations.
-    fn get_func_name(&self, func_node: Node) -> Option<&'a str> {
-        match self.hugr.get_optype(func_node) {
-            OpType::FuncDecl(func_decl) => Some(func_decl.func_name()),
-            OpType::FuncDefn(func_defn) => Some(func_defn.func_name()),
-            _ => None,
-        }
-    }
-
     fn with_local_scope<T>(&mut self, node: table::NodeId, f: impl FnOnce(&mut Self) -> T) -> T {
         let prev_local_scope = self.local_scope.replace(node);
         let prev_local_constraints = std::mem::take(&mut self.local_constraints);
@@ -339,8 +329,11 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().clone().into(),
+                    func.signature(),
+                );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
@@ -350,15 +343,21 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
-                let name = this.get_func_name(node).unwrap();
-                let symbol = this.export_poly_func_type(name, func.signature());
+                let symbol = this.export_poly_func_type(
+                    func.func_name(),
+                    func.visibility().clone().into(),
+                    func.signature(),
+                );
                 table::Operation::DeclareFunc(symbol)
             }),
 
             OpType::AliasDecl(alias) => self.with_local_scope(node_id, |this| {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -371,7 +370,10 @@ impl<'a> Context<'a> {
                 let value = this.export_type(&alias.definition);
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
+                // Visibility is not spec'd in hugr-core
+                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
+                    visibility,
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -385,7 +387,7 @@ impl<'a> Context<'a> {
                 let node = self.connected_function(node).unwrap();
                 let symbol = self.node_to_id[&node];
                 let mut args = BumpVec::new_in(self.bump);
-                args.extend(call.type_args.iter().map(|arg| self.export_type_arg(arg)));
+                args.extend(call.type_args.iter().map(|arg| self.export_term(arg, None)));
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
 
@@ -401,7 +403,7 @@ impl<'a> Context<'a> {
                 let node = self.connected_function(node).unwrap();
                 let symbol = self.node_to_id[&node];
                 let mut args = BumpVec::new_in(self.bump);
-                args.extend(load.type_args.iter().map(|arg| self.export_type_arg(arg)));
+                args.extend(load.type_args.iter().map(|arg| self.export_term(arg, None)));
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
                 let runtime_type = self.make_term(table::Term::Wildcard);
@@ -464,7 +466,7 @@ impl<'a> Context<'a> {
                 let node = self.export_opdef(op.def());
                 let params = self
                     .bump
-                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
+                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_term(arg, None)));
                 let operation = self.make_term(table::Term::Apply(node, params));
                 table::Operation::Custom(operation)
             }
@@ -473,7 +475,7 @@ impl<'a> Context<'a> {
                 let node = self.make_named_global_ref(op.extension(), op.unqualified_id());
                 let params = self
                     .bump
-                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_type_arg(arg)));
+                    .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_term(arg, None)));
                 let operation = self.make_term(table::Term::Apply(node, params));
                 table::Operation::Custom(operation)
             }
@@ -546,7 +548,8 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, poly_func_type)
+            // Visibility of OpDef's has no effect
+            this.export_poly_func_type(name, Visibility::default(), poly_func_type)
         });
 
         let meta = {
@@ -578,7 +581,6 @@ impl<'a> Context<'a> {
     pub fn export_block_signature(&mut self, block: &DataflowBlock) -> table::TermId {
         let inputs = {
             let inputs = self.export_type_row(&block.inputs);
-            let inputs = self.make_term_apply(model::CORE_CTRL, &[inputs]);
             self.make_term(table::Term::List(
                 self.bump.alloc_slice_copy(&[table::SeqPart::Item(inputs)]),
             ))
@@ -590,13 +592,12 @@ impl<'a> Context<'a> {
             let mut outputs = BumpVec::with_capacity_in(block.sum_rows.len(), self.bump);
             for sum_row in &block.sum_rows {
                 let variant = self.export_type_row_with_tail(sum_row, Some(tail));
-                let control = self.make_term_apply(model::CORE_CTRL, &[variant]);
-                outputs.push(table::SeqPart::Item(control));
+                outputs.push(table::SeqPart::Item(variant));
             }
             self.make_term(table::Term::List(outputs.into_bump_slice()))
         };
 
-        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
+        self.make_term_apply(model::CORE_CTRL, &[inputs, outputs])
     }
 
     /// Creates a data flow region from the given node's children.
@@ -740,18 +741,21 @@ impl<'a> Context<'a> {
         let signature = {
             let node_signature = self.hugr.signature(node).unwrap();
 
-            let mut wrap_ctrl = |types: &TypeRow| {
-                let types = self.export_type_row(types);
-                let types_ctrl = self.make_term_apply(model::CORE_CTRL, &[types]);
+            let inputs = {
+                let types = self.export_type_row(node_signature.input());
                 self.make_term(table::Term::List(
-                    self.bump
-                        .alloc_slice_copy(&[table::SeqPart::Item(types_ctrl)]),
+                    self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
                 ))
             };
 
-            let inputs = wrap_ctrl(node_signature.input());
-            let outputs = wrap_ctrl(node_signature.output());
-            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
+            let outputs = {
+                let types = self.export_type_row(node_signature.output());
+                self.make_term(table::Term::List(
+                    self.bump.alloc_slice_copy(&[table::SeqPart::Item(types)]),
+                ))
+            };
+
+            Some(self.make_term_apply(model::CORE_CTRL, &[inputs, outputs]))
         };
 
         let scope = match closure {
@@ -796,16 +800,17 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         name: &'a str,
+        visibility: Visibility,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
             .local_scope
             .expect("exporting poly func type outside of local scope");
-
+        let visibility = self.bump.alloc(visibility);
         for (i, param) in t.params().iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
-            let r#type = self.export_type_param(param, Some((scope, i as _)));
+            let r#type = self.export_term(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
             params.push(param);
         }
@@ -814,6 +819,7 @@ impl<'a> Context<'a> {
         let body = self.export_func_type(t.body());
 
         self.bump.alloc(table::Symbol {
+            visibility,
             name,
             params: params.into_bump_slice(),
             constraints,
@@ -853,30 +859,12 @@ impl<'a> Context<'a> {
 
         let args = self
             .bump
-            .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_type_arg(p)));
+            .alloc_slice_fill_iter(t.args().iter().map(|p| self.export_term(p, None)));
         let term = table::Term::Apply(symbol, args);
         self.make_term(term)
     }
 
-    pub fn export_type_arg(&mut self, t: &TypeArg) -> table::TermId {
-        match t {
-            TypeArg::Type { ty } => self.export_type(ty),
-            TypeArg::BoundedNat { n } => self.make_term(model::Literal::Nat(*n).into()),
-            TypeArg::String { arg } => self.make_term(model::Literal::Str(arg.into()).into()),
-            TypeArg::Sequence { elems } => {
-                // For now we assume that the sequence is meant to be a list.
-                let parts = self.bump.alloc_slice_fill_iter(
-                    elems
-                        .iter()
-                        .map(|elem| table::SeqPart::Item(self.export_type_arg(elem))),
-                );
-                self.make_term(table::Term::List(parts))
-            }
-            TypeArg::Variable { v } => self.export_type_arg_var(v),
-        }
-    }
-
-    pub fn export_type_arg_var(&mut self, var: &TypeArgVariable) -> table::TermId {
+    pub fn export_type_arg_var(&mut self, var: &TermVar) -> table::TermId {
         let node = self.local_scope.expect("local variable out of scope");
         self.make_term(table::Term::Var(table::VarId(node, var.index() as _)))
     }
@@ -942,19 +930,19 @@ impl<'a> Context<'a> {
         self.make_term(table::Term::List(parts))
     }
 
-    /// Exports a `TypeParam` to a term.
+    /// Exports a term.
     ///
-    /// The `var` argument is set when the type parameter being exported is the
+    /// The `var` argument is set when the term being exported is the
     /// type of a parameter to a polymorphic definition. In that case we can
     /// generate a `nonlinear` constraint for the type of runtime types marked as
     /// `TypeBound::Copyable`.
-    pub fn export_type_param(
+    pub fn export_term(
         &mut self,
-        t: &TypeParam,
+        t: &Term,
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
         match t {
-            TypeParam::Type { b } => {
+            Term::RuntimeType(b) => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);
@@ -963,22 +951,57 @@ impl<'a> Context<'a> {
 
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
-            // This ignores the bound on the natural for now.
-            TypeParam::BoundedNat { .. } => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
-            TypeParam::String => self.make_term_apply(model::CORE_STR_TYPE, &[]),
-            TypeParam::List { param } => {
-                let item_type = self.export_type_param(param, None);
+            Term::BoundedNatType(_) => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            Term::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            Term::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            Term::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
+            Term::ListType(item_type) => {
+                let item_type = self.export_term(item_type, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            TypeParam::Tuple { params } => {
-                let parts = self.bump.alloc_slice_fill_iter(
-                    params
-                        .iter()
-                        .map(|param| table::SeqPart::Item(self.export_type_param(param, None))),
-                );
-                let types = self.make_term(table::Term::List(parts));
-                self.make_term_apply(model::CORE_TUPLE_TYPE, &[types])
+            Term::TupleType(item_types) => {
+                let item_types = self.export_term(item_types, None);
+                self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
+            Term::Runtime(ty) => self.export_type(ty),
+            Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
+            Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
+            Term::Float(value) => self.make_term(model::Literal::Float(*value).into()),
+            Term::Bytes(value) => self.make_term(model::Literal::Bytes(value.clone()).into()),
+            Term::List(elems) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::List(parts))
+            }
+            Term::ListConcat(lists) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    lists
+                        .iter()
+                        .map(|elem| table::SeqPart::Splice(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::List(parts))
+            }
+            Term::Tuple(elems) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    elems
+                        .iter()
+                        .map(|elem| table::SeqPart::Item(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::Tuple(parts))
+            }
+            Term::TupleConcat(tuples) => {
+                let parts = self.bump.alloc_slice_fill_iter(
+                    tuples
+                        .iter()
+                        .map(|elem| table::SeqPart::Splice(self.export_term(elem, None))),
+                );
+                self.make_term(table::Term::Tuple(parts))
+            }
+            Term::Variable(v) => self.export_type_arg_var(v),
+            Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
         }
     }
 

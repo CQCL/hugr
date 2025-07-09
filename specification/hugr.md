@@ -770,6 +770,40 @@ existing metadata, given the node ID.
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
 
+Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
+Use of this prefix by external tooling may cause issues.
+
+#### Generator Metadata
+Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
+purposes.
+
+The key `core.generator` when used on the module root node is
+used to specify the tooling used to generate the module.
+The associated value must be an object/dictionary containing the fields `name`
+and `version`, each with string values. Extra fields may be used to include
+additional data about generating tooling that may be useful for debugging. Example:
+
+```json
+{
+  "core.generator": { "name": "my_compiler", "version": "1.0.0" }
+}
+```
+
+The key `core.used_extensions` when used on the module root node is
+used to specify the names and versions of all the extensions used in the module.
+Some of these may correspond to extensions packaged with the module, but they
+may also be extensions the consuming tooling has pre-loaded. They can be used by the
+tooling to check for extension version mismatches. The value associated with the key
+must be an array of objects/dictionaries containing the keys `name` and `version`, each
+with string values. Example:
+```json
+{
+  "core.used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
+}
+```
+
+
+
 **TODO** Do we allow per-port metadata (using the same mechanism?)
 
 **TODO** What about references to ports? Should we add a list of port
@@ -790,7 +824,7 @@ copied or discarded (multiple or 0 links from on output port respectively):
   allows multiple (or 0) outgoing edges from an outport; also these types can
   be sent down `Const` edges.
 
-Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `AnyType` or `Copyable`.
+Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `Linear` or `Copyable`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
@@ -824,6 +858,9 @@ such declarations may include (bind) any number of type parameters, of kinds as 
 TypeParam ::= Type(Any|Copyable)
             | BoundedUSize(u64|) -- note optional bound
             | Extensions
+            | String
+            | Bytes
+            | Float
             | List(TypeParam) -- homogeneous, any sized
             | Tuple([TypeParam]) -- heterogenous, fixed size
             | Opaque(Name, [TypeArg]) -- e.g. Opaque("Array", [5, Opaque("usize", [])])
@@ -841,22 +878,26 @@ TypeArgs appropriate for the function's TypeParams:
 ```haskell
 TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(s)
           | BoundedUSize(u64)
+          | String(String)
+          | Bytes([u8])
+          | Float(f64)
           | Extensions(Extensions) -- may contain TypeArg's of kind Extensions
-          | Sequence([TypeArg]) -- fits either a List or Tuple TypeParam
+          | List([TypeArg])
+          | Tuple([TypeArg])
           | Opaque(Value)
           | Variable -- refers to an enclosing TypeParam (binder) of any kind above
 ```
 
 For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
 means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
-or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Linear)` requires two TypeArgs,
 firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
 
 Given TypeArgs, the body of the Function node's type can be converted to a monomorphic signature by substitution,
 i.e. replacing each type variable in the body with the corresponding TypeArg. This is guaranteed to produce
 a valid type as long as the TypeArgs match the declared TypeParams, which can be checked in advance.
 
-(Note that within a polymorphic type scheme, type variables of kind `Sequence` or `Opaque` will only be usable
+(Note that within a polymorphic type scheme, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
 #### Row Variables
@@ -868,16 +909,16 @@ treatment, as follows:
   but also a single `TypeArg::Type`. (This is purely a notational convenience.)
   For example, `Type::Function(usize, unit, <exts>)` is equivalent shorthand
   for `Type::Function(#(usize), #(unit), <exts>)`.
-* When a `TypeArg::Sequence` is provided as argument for such a TypeParam, we allow
+* When a `TypeArg::List` is provided as argument for such a TypeParam, we allow
   elements to be a mixture of both types (including variables of kind
   `TypeParam::Type(_)`) and also row variables. When such variables are instantiated
-  (with other Sequences) the elements of the inner Sequence are spliced directly into
-  the outer (concatenating their elements), eliding the inner (Sequence) wrapper.
+  (with other `List`s) the elements of the inner `List` are spliced directly into
+  the outer (concatenating their elements), eliding the inner (`List`) wrapper.
 
 For example, a polymorphic FuncDefn might declare a row variable X of kind
 `TypeParam::List(TypeParam::Type(Copyable))` and have as output a (tuple) type
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
-`TypeArg::Sequence([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
+`TypeArg::List([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
 See [Declarative Format](#declarative-format) for more examples.
 

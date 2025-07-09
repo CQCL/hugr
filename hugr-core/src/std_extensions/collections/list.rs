@@ -21,7 +21,7 @@ use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
 use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::ops::{OpName, Value};
-use crate::types::{TypeName, TypeRowRV};
+use crate::types::{Term, TypeName, TypeRowRV};
 use crate::{
     Extension,
     extension::{
@@ -112,7 +112,7 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Type { ty }] = typ.args() else {
+        let [TypeArg::Runtime(ty)] = typ.args() else {
             return Err(error());
         };
 
@@ -167,7 +167,7 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -181,7 +181,7 @@ impl ListOp {
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
         use ListOp::{get, insert, length, pop, push, set};
-        let e = Type::new_var_use(0, TypeBound::Any);
+        let e = Type::new_var_use(0, TypeBound::Linear);
         let l = self.list_type(list_type_def, 0);
         match self {
             pop => self
@@ -325,9 +325,7 @@ pub fn list_type_def() -> &'static TypeDef {
 /// Get the type of a list of `elem_type` as a `CustomType`.
 #[must_use]
 pub fn list_custom_type(elem_type: Type) -> CustomType {
-    list_type_def()
-        .instantiate(vec![TypeArg::Type { ty: elem_type }])
-        .unwrap()
+    list_type_def().instantiate(vec![elem_type.into()]).unwrap()
 }
 
 /// Get the `Type` of a list of `elem_type`.
@@ -353,7 +351,7 @@ impl MakeExtensionOp for ListOpInst {
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        let [TypeArg::Type { ty }] = ext_op.args() else {
+        let [Term::Runtime(ty)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
         let name = ext_op.unqualified_id();
@@ -367,10 +365,8 @@ impl MakeExtensionOp for ListOpInst {
         })
     }
 
-    fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::Type {
-            ty: self.elem_type.clone(),
-        }]
+    fn type_args(&self) -> Vec<Term> {
+        vec![self.elem_type.clone().into()]
     }
 }
 
@@ -413,15 +409,9 @@ mod test {
     fn test_list() {
         let list_def = list_type_def();
 
-        let list_type = list_def
-            .instantiate([TypeArg::Type { ty: usize_t() }])
-            .unwrap();
+        let list_type = list_def.instantiate([usize_t().into()]).unwrap();
 
-        assert!(
-            list_def
-                .instantiate([TypeArg::BoundedNat { n: 3 }])
-                .is_err()
-        );
+        assert!(list_def.instantiate([3u64.into()]).is_err());
 
         list_def.check_custom(&list_type).unwrap();
         let list_value = ListValue(vec![ConstUsize::new(3).into()], usize_t());

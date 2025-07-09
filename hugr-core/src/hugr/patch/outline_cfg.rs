@@ -48,7 +48,7 @@ impl OutlineCfg {
         };
         let o = h.get_optype(cfg_n);
         let OpType::CFG(_) = o else {
-            return Err(OutlineCfgError::ParentNotCfg(cfg_n, o.clone()));
+            return Err(OutlineCfgError::ParentNotCfg(cfg_n, Box::new(o.clone())));
         };
         let cfg_entry = h.children(cfg_n).next().unwrap();
         let mut entry = None;
@@ -97,7 +97,10 @@ impl PatchVerification for OutlineCfg {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = Node> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         self.blocks.iter().copied()
     }
 }
@@ -212,7 +215,7 @@ pub enum OutlineCfgError {
     NotSiblings,
     /// The parent node was not a CFG node
     #[error("The parent node {0} was not a CFG but a {1}")]
-    ParentNotCfg(Node, OpType),
+    ParentNotCfg(Node, Box<OpType>),
     /// Multiple blocks had incoming edges
     #[error("Multiple blocks had predecessors outside the set - at least {0} and {1}")]
     MultipleEntryNodes(Node, Node),

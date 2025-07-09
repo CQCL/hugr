@@ -286,7 +286,7 @@ pub trait Dataflow: Container {
         let [_, out] = self.io();
         wire_up_inputs(output_wires.into_iter().collect_vec(), out, self).map_err(|error| {
             BuildError::OutputWiring {
-                container_op: self.hugr().get_optype(self.container_node()).clone(),
+                container_op: Box::new(self.hugr().get_optype(self.container_node()).clone()),
                 container_node: self.container_node(),
                 error,
             }
@@ -695,8 +695,10 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 
-    wire_up_inputs(inputs, op_node, data_builder)
-        .map_err(|error| BuildError::OperationWiring { op, error })?;
+    wire_up_inputs(inputs, op_node, data_builder).map_err(|error| BuildError::OperationWiring {
+        op: Box::new(op),
+        error,
+    })?;
 
     Ok((op_node, num_outputs))
 }
@@ -726,8 +728,10 @@ fn wire_ins_return_outs<T: Dataflow + ?Sized>(
 ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
     let op = data_builder.hugr().get_optype(node).clone();
     let num_outputs = op.value_output_count();
-    wire_up_inputs(inputs, node, data_builder)
-        .map_err(|error| BuildError::OperationWiring { op, error })?;
+    wire_up_inputs(inputs, node, data_builder).map_err(|error| BuildError::OperationWiring {
+        op: Box::new(op),
+        error,
+    })?;
     Ok((node, num_outputs).into())
 }
 
@@ -760,7 +764,7 @@ fn wire_up<T: Dataflow + ?Sized>(
                     src_offset: src_port.into(),
                     dst,
                     dst_offset: dst_port.into(),
-                    typ,
+                    typ: Box::new(typ),
                 });
             }
 
@@ -791,7 +795,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuilderWiringError::NoCopyLinear {
-                typ,
+                typ: Box::new(typ),
                 src,
                 src_offset: src_port.into(),
             });

@@ -1,22 +1,17 @@
 use std::collections::{BTreeMap, HashMap};
 
-use rstest::*;
-
-use crate::{
+use derive_more::derive::{From, Into};
+use hugr_core::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
     builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
     extension::prelude::bool_t,
-    hugr::{
-        Hugr, HugrView,
-        patch::Patch,
-        persistent::{Commit, PatchNode},
-        views::SiblingSubgraph,
-    },
+    hugr::{Hugr, HugrView, patch::Patch, views::SiblingSubgraph},
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
+use rstest::*;
 
-use super::{CommitStateSpace, state_space::CommitId};
+use crate::{Commit, CommitStateSpace, PatchNode, Resolver, state_space::CommitId};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -207,10 +202,10 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
 /// - `commit1` and `commit2` are disjoint with `commit4` (i.e. compatible),
 /// - `commit2` depends on `commit1`
 #[fixture]
-pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
+pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId; 4]) {
     let (base_hugr, [not0_node, not1_node, _and_node]) = simple_hugr();
 
-    let mut state_space = CommitStateSpace::with_base(base_hugr);
+    let mut state_space = CommitStateSpace::<R>::with_base(base_hugr);
 
     // Create first replacement (replace NOT0 with two NOT gates)
     let replacement1 = create_double_not_replacement(state_space.base_hugr(), not0_node);
@@ -218,8 +213,11 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
     // Add first commit to state space, replacing NOT0 with two NOT gates
     let commit1 = {
         let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
+        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
         // translate replacement1 to patch nodes in the base commit of the state space
-        let replacement1 = replacement1.map_host_nodes(to_patch_node);
+        let replacement1 = replacement1
+            .map_host_nodes(to_patch_node, &new_host)
+            .unwrap();
         state_space.try_add_replacement(replacement1).unwrap()
     };
 
@@ -259,7 +257,10 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
         };
 
         // translate replacement2 to patch nodes
-        let replacement2 = replacement2.map_host_nodes(to_patch_node);
+        let new_host = state_space.try_extract_hugr([commit1]).unwrap();
+        let replacement2 = replacement2
+            .map_host_nodes(to_patch_node, &new_host)
+            .unwrap();
         state_space.try_add_replacement(replacement2).unwrap()
     };
 
@@ -268,9 +269,11 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
     let commit3 = {
         let replacement3 = create_not_and_to_xor_replacement(state_space.base_hugr());
         let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
-        state_space
-            .try_add_replacement(replacement3.map_host_nodes(to_patch_node))
-            .unwrap()
+        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
+        let replacement3 = replacement3
+            .map_host_nodes(to_patch_node, &new_host)
+            .unwrap();
+        state_space.try_add_replacement(replacement3).unwrap()
     };
 
     // Create a fourth commit that is disjoint from `commit1`, replacing NOT1
@@ -278,7 +281,10 @@ pub(super) fn test_state_space() -> (CommitStateSpace, [CommitId; 4]) {
     let commit4 = {
         let replacement4 = create_double_not_replacement(state_space.base_hugr(), not1_node);
         let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
-        let replacement4 = replacement4.map_host_nodes(to_patch_node);
+        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
+        let replacement4 = replacement4
+            .map_host_nodes(to_patch_node, &new_host)
+            .unwrap();
         state_space.try_add_replacement(replacement4).unwrap()
     };
 
@@ -419,8 +425,7 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
         let result = persistent_hugr.try_add_replacement(repl4.clone());
         assert!(
             result.is_ok(),
-            "[commit1, commit2] + [commit4] are compatible. Got {:?}",
-            result
+            "[commit1, commit2] + [commit4] are compatible. Got {result:?}"
         );
         let hugr = persistent_hugr.to_hugr();
         let exp_hugr = state_space
@@ -436,8 +441,7 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
         let result = persistent_hugr.try_add_replacement(repl3.clone());
         assert!(
             result.is_err(),
-            "[commit1, commit2] + [commit3] are incompatible. Got {:?}",
-            result
+            "[commit1, commit2] + [commit3] are incompatible. Got {result:?}"
         );
     }
 }
@@ -475,5 +479,51 @@ fn test_try_add_commit(test_state_space: (CommitStateSpace, [CommitId; 4])) {
         persistent_hugr
             .try_add_commit(new_commit)
             .expect_err("commit3 is incompatible with [commit1, commit2]");
+    }
+}
+
+/// A Hugr that serialises with no extensions
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
+pub(crate) struct WrappedHugr {
+    #[serde(with = "serial")]
+    pub hugr: Hugr,
+}
+
+mod serial {
+    use hugr_core::envelope::EnvelopeConfig;
+    use hugr_core::std_extensions::STD_REG;
+    use serde::Deserialize;
+
+    use super::*;
+
+    pub(crate) fn serialize<S>(hugr: &Hugr, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut str = hugr
+            .store_str_with_exts(EnvelopeConfig::text(), &STD_REG)
+            .map_err(serde::ser::Error::custom)?;
+        // TODO: replace this with a proper hugr hash (see https://github.com/CQCL/hugr/issues/2091)
+        remove_encoder_version(&mut str);
+        serializer.serialize_str(&str)
+    }
+
+    fn remove_encoder_version(str: &mut String) {
+        // Remove encoder version information for consistent test output
+        let encoder_pattern = r#""encoder":"hugr-rs v"#;
+        if let Some(start) = str.find(encoder_pattern) {
+            if let Some(end) = str[start..].find(r#"","#) {
+                let end = start + end + 2; // +2 for the `",` part
+                str.replace_range(start..end, "");
+            }
+        }
+    }
+
+    pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let str = String::deserialize(deserializer)?;
+        Hugr::load_str(str, Some(&STD_REG)).map_err(serde::de::Error::custom)
     }
 }

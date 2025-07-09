@@ -14,7 +14,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 pub use self::petgraph::PetgraphWrapper;
-use self::render::RenderConfig;
+#[allow(deprecated)]
+use self::render::{MermaidFormatter, RenderConfig};
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
@@ -385,7 +386,9 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_string(&self) -> String;
+    fn mermaid_string(&self) -> String {
+        self.mermaid_string_with_formatter(self.mermaid_format())
+    }
 
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
@@ -394,7 +397,50 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
+    #[deprecated(note = "Use `mermaid_format` instead")]
+    #[allow(deprecated)]
     fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
+
+    /// Return the mermaid representation of the underlying hierarchical graph
+    /// according to the provided [`MermaidFormatter`] formatting options.
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    ///
+    /// ## Deprecation of [`RenderConfig`]
+    /// While the deprecated [HugrView::mermaid_string_with_config] exists, this
+    /// will by default try to convert the formatter options to a [`RenderConfig`],
+    /// but this may panic if the configuration is not supported. Users are
+    /// encouraged to provide an implementation of this method overriding the default
+    /// and no longer rely on [HugrView::mermaid_string_with_config].
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
+        #[allow(deprecated)]
+        let config = match RenderConfig::try_from(formatter) {
+            Ok(config) => config,
+            Err(e) => {
+                panic!("Unsupported format option: {e}");
+            }
+        };
+        #[allow(deprecated)]
+        self.mermaid_string_with_config(config)
+    }
+
+    /// Construct a mermaid representation of the underlying hierarchical graph.
+    ///
+    /// Options can be set on the returned [`MermaidFormatter`] struct, before
+    /// generating the String with [`MermaidFormatter::finish`].
+    ///
+    /// The hierarchy is represented using subgraphs. Edges are labelled with
+    /// their source and target ports.
+    ///
+    /// For a more detailed representation, use the [`HugrView::dot_string`]
+    /// format instead.
+    fn mermaid_format(&self) -> MermaidFormatter<Self> {
+        MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
+    }
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
@@ -629,21 +675,17 @@ impl HugrView for Hugr {
         self.graph.all_neighbours(node.into_portgraph()).map_into()
     }
 
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: Some(self.entrypoint()),
-        })
+    #[allow(deprecated)]
+    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
+        self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
 
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
         self.graph
             .mermaid_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
-            .with_edge_style(render::edge_style(self, config))
+            .with_node_style(render::node_style(self, formatter.clone()))
+            .with_edge_style(render::edge_style(self, formatter))
             .finish()
     }
 
@@ -651,16 +693,13 @@ impl HugrView for Hugr {
     where
         Self: Sized,
     {
-        let config = RenderConfig {
-            entrypoint: Some(self.entrypoint()),
-            ..RenderConfig::default()
-        };
+        let formatter = MermaidFormatter::new(self).with_entrypoint(self.entrypoint());
         self.graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(self, config, |n| n.index().to_string()))
-            .with_port_style(render::port_style(self, config))
-            .with_edge_style(render::edge_style(self, config))
+            .with_node_style(render::node_style(self, formatter.clone()))
+            .with_port_style(render::port_style(self))
+            .with_edge_style(render::edge_style(self, formatter))
             .finish()
     }
 

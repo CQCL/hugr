@@ -6,7 +6,6 @@ use crate::hugr::HugrMut;
 use crate::hugr::hugrmut::{InsertDefnError, InsertDefnMode, InsertionResult};
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 
-use super::render::RenderConfig;
 use super::{HugrView, panic_invalid_node};
 
 /// A HUGR wrapper with a modified entrypoint node.
@@ -62,14 +61,12 @@ impl<H: HugrView> HugrView for Rerooted<H> {
         self.hugr.get_optype(self.entrypoint)
     }
 
-    #[inline]
-    fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_config(RenderConfig {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: Some(self.entrypoint()),
-        })
+    fn mermaid_string_with_formatter(
+        &self,
+        formatter: crate::hugr::views::render::MermaidFormatter<Self>,
+    ) -> String {
+        self.hugr
+            .mermaid_string_with_formatter(formatter.with_hugr(&self.hugr))
     }
 
     delegate::delegate! {
@@ -105,6 +102,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+                #[allow(deprecated)]
                 fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig<Self::Node>) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
@@ -236,5 +234,13 @@ mod test {
             Some(extracted_bb)
         );
         assert!(extracted_hugr.get_optype(extracted_bb).is_dataflow_block());
+    }
+
+    #[test]
+    fn mermaid_format() {
+        let h = simple_cfg_hugr();
+        let rerooted = h.with_entrypoint(h.entrypoint());
+        let mermaid_str = rerooted.mermaid_format().finish();
+        assert_eq!(mermaid_str, h.mermaid_format().finish());
     }
 }

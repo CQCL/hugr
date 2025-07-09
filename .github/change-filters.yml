@@ -24,7 +24,11 @@ rust: &rust
   - "hugr-cli/**"
   - "hugr-core/**"
   - "hugr-passes/**"
+  - "hugr-persistent/**"
   - "specification/schema/**"
+
+std-extensions:
+  - "specification/std_extensions/**"
 
 python:
   - *rust

@@ -327,9 +327,9 @@ pub enum CustomCheckFailure {
     #[error("Expected type: {expected} but value was of type: {found}")]
     TypeMismatch {
         /// The expected custom type.
-        expected: CustomType,
+        expected: Box<CustomType>,
         /// The custom type found when checking.
-        found: Type,
+        found: Box<Type>,
     },
     /// Any other message
     #[error("{0}")]
@@ -349,11 +349,11 @@ pub enum ConstTypeError {
     )]
     NotMonomorphicFunction {
         /// The root node type of the Hugr that (claims to) define the function constant.
-        hugr_root_type: OpType,
+        hugr_root_type: Box<OpType>,
     },
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
-    ConstCheckFail(Type, Value),
+    ConstCheckFail(Box<Type>, Value),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0}")]
     CustomCheckFail(#[from] CustomCheckFailure),
@@ -362,7 +362,7 @@ pub enum ConstTypeError {
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: h.entrypoint_optype().clone(),
+        hugr_root_type: Box::new(h.entrypoint_optype().clone()),
     };
     if let Some(pf) = h.poly_func_type() {
         match pf.try_into() {
@@ -728,7 +728,7 @@ pub(crate) mod test {
                 index: 1,
                 expected,
                 found,
-            })) if expected == float64_type() && found == const_usize()
+            })) if *expected == float64_type() && *found == const_usize()
         );
     }
 
@@ -860,7 +860,7 @@ pub(crate) mod test {
         let ex_id: ExtensionId = "my_extension".try_into().unwrap();
         let typ_int = CustomType::new(
             "my_type",
-            vec![TypeArg::BoundedNat { n: 8 }],
+            vec![TypeArg::BoundedNat(8)],
             ex_id.clone(),
             TypeBound::Copyable,
             // Dummy extension reference.

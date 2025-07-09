@@ -91,6 +91,16 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
 
+/// Describes how a function or symbol should be acted upon by a linker
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Visibility {
+    /// The linker should ignore this function or symbol
+    #[default]
+    Private,
+    /// The linker should act upon this function or symbol
+    Public,
+}
+
 /// Core function types.
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
@@ -163,16 +173,12 @@ pub const CORE_BYTES_TYPE: &str = "core.bytes";
 /// - **Result:** `core.static`
 pub const CORE_FLOAT_TYPE: &str = "core.float";
 
-/// Type of a control flow edge.
+/// Type of control flow regions.
 ///
-/// - **Parameter:** `?types : (core.list core.type)`
-/// - **Result:** `core.ctrl_type`
+/// - **Parameter:** `?inputs : (core.list (core.list core.type))`
+/// - **Parameter:** `?outputs : (core.list (core.list core.type))`
+/// - **Result:** `core.type`
 pub const CORE_CTRL: &str = "core.ctrl";
-
-/// The type of the types for control flow edges.
-///
-/// - **Result:** `?type : core.static`
-pub const CORE_CTRL_TYPE: &str = "core.ctrl_type";
 
 /// The type for runtime constants.
 ///

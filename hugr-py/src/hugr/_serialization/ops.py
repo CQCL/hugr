@@ -10,6 +10,7 @@ from pydantic import ConfigDict, Field, RootModel
 from hugr.hugr.node_port import (
     NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
 )
+from hugr.tys import Visibility  # noqa: TCH001 # pydantic needs this in scope
 from hugr.utils import deser_it
 
 from . import tys as stys
@@ -75,11 +76,16 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
+    visibility: Visibility = Field(default="Private")
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
         return ops.FuncDefn(
-            self.name, inputs=poly_func.body.input, _outputs=poly_func.body.output
+            self.name,
+            params=poly_func.params,
+            inputs=poly_func.body.input,
+            _outputs=poly_func.body.output,
+            visibility=self.visibility,
         )
 
 
@@ -89,9 +95,12 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
+    visibility: Visibility = Field(default="Public")
 
     def deserialize(self) -> ops.FuncDecl:
-        return ops.FuncDecl(self.name, self.signature.deserialize())
+        return ops.FuncDecl(
+            self.name, self.signature.deserialize(), visibility=self.visibility
+        )
 
 
 class CustomConst(ConfiguredBaseModel):
@@ -123,14 +132,13 @@ class FunctionValue(BaseValue):
     """A higher-order function value."""
 
     v: Literal["Function"] = Field(default="Function", title="ValueTag")
-    hugr: Any
+    hugr: str
 
     def deserialize(self) -> val.Value:
-        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
+        return val.Function(Hugr.from_str(self.hugr))
 
 
 class TupleValue(BaseValue):

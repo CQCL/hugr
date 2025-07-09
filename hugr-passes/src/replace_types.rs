@@ -1,5 +1,4 @@
 #![allow(clippy::type_complexity)]
-#![warn(missing_docs)]
 //! Replace types with other types across the Hugr. See [`ReplaceTypes`] and [Linearizer].
 //!
 use std::borrow::Cow;
@@ -259,7 +258,7 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
     #[error("Replacement op for {0} could not be added because {1}")]
-    AddTemplateError(Node, BuildError),
+    AddTemplateError(Node, Box<BuildError>),
 }
 
 impl ReplaceTypes {
@@ -453,7 +452,7 @@ impl ReplaceTypes {
                 if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement
                         .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                     true
                 } else {
                     let def = ext_op.def_arc();
@@ -466,7 +465,7 @@ impl ReplaceTypes {
                     {
                         replacement
                             .replace(hugr, n)
-                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                         true
                     } else {
                         if ch {
@@ -641,7 +640,7 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Type { ty }] = args else {
+        let [TypeArg::Runtime(ty)] = args else {
             panic!("Expected just elem type")
         };
         ty
@@ -655,7 +654,7 @@ mod test {
                 let pv_of_var = ext
                     .add_type(
                         PACKED_VEC.into(),
-                        vec![TypeBound::Any.into()],
+                        vec![TypeBound::Linear.into()],
                         String::new(),
                         TypeDefBound::from_params(vec![0]),
                         w,
@@ -670,7 +669,7 @@ mod test {
                         vec![TypeBound::Copyable.into()],
                         Signature::new(
                             vec![pv_of_var.into(), i64_t()],
-                            Type::new_var_use(0, TypeBound::Any),
+                            Type::new_var_use(0, TypeBound::Linear),
                         ),
                     ),
                     w,
@@ -748,9 +747,9 @@ mod test {
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Any));
+        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Linear));
         let fb = mb
-            .define_function("id", PolyFuncType::new([TypeBound::Any.into()], sig))
+            .define_function("id", PolyFuncType::new([TypeBound::Linear.into()], sig))
             .unwrap();
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
@@ -967,8 +966,8 @@ mod test {
             IdentList::new_unchecked("NoBoundsCheck"),
             Version::new(0, 0, 0),
             |e, w| {
-                let params = vec![TypeBound::Any.into()];
-                let tv = Type::new_var_use(0, TypeBound::Any);
+                let params = vec![TypeBound::Linear.into()];
+                let tv = Type::new_var_use(0, TypeBound::Linear);
                 let list_of_var = list_type(tv.clone());
                 e.add_op(
                     READ.into(),

@@ -50,7 +50,7 @@ use super::root_checked::RootCheckable;
 /// The `boundary_port` and `signature` methods will panic if any are found.
 /// State order edges are also unsupported in replacements in
 /// `create_simple_replacement`.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SiblingSubgraph<N = Node> {
     /// The nodes of the induced subgraph.
     nodes: Vec<N>,
@@ -428,7 +428,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         if !OpTag::DataflowParent.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph {
                 node: rep_root,
-                op: dfg_optype.clone(),
+                op: Box::new(dfg_optype.clone()),
             });
         }
         let [rep_input, rep_output] = replacement
@@ -881,7 +881,7 @@ pub enum InvalidReplacement {
         /// The node ID of the root node.
         node: Node,
         /// The op type of the root node.
-        op: OpType,
+        op: Box<OpType>,
     },
     /// Replacement graph type mismatch.
     #[error(
@@ -890,9 +890,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: Signature,
+        expected: Box<Signature>,
         /// The actual signature.
-        actual: Option<Signature>,
+        actual: Option<Box<Signature>>,
     },
     /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]

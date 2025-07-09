@@ -17,6 +17,8 @@ use thiserror::Error;
 use super::inline_dfg::InlineDFGError;
 use super::{BoundaryPort, HostPort, PatchHugrMut, PatchVerification, ReplacementPort};
 
+pub mod serial;
+
 /// Specification of a simple replacement operation.
 ///
 /// # Type parameters
@@ -56,12 +58,12 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
                 .inner_function_type()
                 .ok_or(InvalidReplacement::InvalidDataflowGraph {
                     node: replacement.entrypoint(),
-                    op: replacement.get_optype(replacement.entrypoint()).to_owned(),
+                    op: Box::new(replacement.get_optype(replacement.entrypoint()).to_owned()),
                 })?;
         if subgraph_sig != repl_sig {
             return Err(InvalidReplacement::InvalidSignature {
-                expected: subgraph_sig,
-                actual: Some(repl_sig.into_owned()),
+                expected: Box::new(subgraph_sig),
+                actual: Some(Box::new(repl_sig.into_owned())),
             });
         }
         Ok(Self {
@@ -498,24 +500,26 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
     /// Map the host nodes in `self` according to `node_map`.
     ///
     /// `node_map` must map nodes in the current HUGR of the subgraph to
-    /// its equivalent nodes in some `new_hugr`.
+    /// its equivalent nodes in some `new_host`.
     ///
     /// This converts a replacement that acts on nodes of type `HostNode` to
-    /// a replacement that acts on `new_hugr`, with nodes of type `N`.
-    ///
-    /// This does not check convexity. It is up to the caller to ensure that
-    /// the mapped replacement obtained from this applies on a convex subgraph
-    /// of the new HUGR.
-    pub(crate) fn map_host_nodes<N: HugrNode>(
+    /// a replacement that acts on `new_host`, with nodes of type `N`.
+    pub fn map_host_nodes<N: HugrNode>(
         &self,
         node_map: impl Fn(HostNode) -> N,
-    ) -> SimpleReplacement<N> {
+        new_host: &impl HugrView<Node = N>,
+    ) -> Result<SimpleReplacement<N>, InvalidReplacement> {
         let Self {
             subgraph,
             replacement,
         } = self;
         let subgraph = subgraph.map_nodes(node_map);
-        SimpleReplacement::new_unchecked(subgraph, replacement.clone())
+        SimpleReplacement::try_new(subgraph, new_host, replacement.clone())
+    }
+
+    /// Allows to get the [Self::invalidated_nodes] without requiring a [HugrView].
+    pub fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
+        self.subgraph.nodes().iter().copied()
     }
 }
 
@@ -528,8 +532,11 @@ impl<HostNode: HugrNode> PatchVerification for SimpleReplacement<HostNode> {
     }
 
     #[inline]
-    fn invalidation_set(&self) -> impl Iterator<Item = HostNode> {
-        self.subgraph.nodes().iter().copied()
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
+        self.invalidation_set()
     }
 }
 
@@ -865,7 +872,7 @@ pub(in crate::hugr::patch) mod test {
 
         // Check invalidation set
         assert_eq!(
-            HashSet::<_>::from_iter(r.invalidation_set()),
+            HashSet::<_>::from_iter(r.invalidated_nodes(&h)),
             HashSet::<_>::from_iter([h_node_cx, h_node_h0, h_node_h1]),
         );
 

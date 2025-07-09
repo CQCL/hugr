@@ -59,7 +59,7 @@ from hugr.val import TRUE
         (FuncDecl("bar", PolyFuncType.empty()), "FuncDecl(bar)"),
         (Const(TRUE), "Const(TRUE)"),
         (Noop(), "Noop"),
-        (AliasDecl("baz", TypeBound.Any), "AliasDecl(baz)"),
+        (AliasDecl("baz", TypeBound.Linear), "AliasDecl(baz)"),
         (AliasDefn("baz", Bool), "AliasDefn(baz)"),
     ],
 )

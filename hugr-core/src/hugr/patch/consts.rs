@@ -46,7 +46,10 @@ impl<N: HugrNode> PatchVerification for RemoveLoadConstant<N> {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         iter::once(self.0)
     }
 }
@@ -93,7 +96,10 @@ impl<N: HugrNode> PatchVerification for RemoveConst<N> {
         Ok(())
     }
 
-    fn invalidation_set(&self) -> impl Iterator<Item = N> {
+    fn invalidated_nodes(
+        &self,
+        _: &impl HugrView<Node = Self::Node>,
+    ) -> impl Iterator<Item = Self::Node> {
         iter::once(self.0)
     }
 }
@@ -158,7 +164,7 @@ mod test {
 
         let remove_1 = RemoveLoadConstant(load_1_node);
         assert_eq!(
-            remove_1.invalidation_set().exactly_one().ok(),
+            remove_1.invalidated_nodes(&h).exactly_one().ok(),
             Some(load_1_node)
         );
 
@@ -166,7 +172,7 @@ mod test {
 
         let remove_con = RemoveConst(con_node);
         assert_eq!(
-            remove_con.invalidation_set().exactly_one().ok(),
+            remove_con.invalidated_nodes(&h).exactly_one().ok(),
             Some(con_node)
         );
 

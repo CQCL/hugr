@@ -14,19 +14,24 @@ from hugr.tys import (
     Bool,
     BoundedNatArg,
     BoundedNatParam,
+    BytesArg,
+    BytesParam,
     Either,
     ExtType,
+    FloatArg,
+    FloatParam,
     FunctionType,
+    ListArg,
     ListParam,
     Option,
     PolyFuncType,
     Qubit,
     RowVariable,
-    SequenceArg,
     StringArg,
     StringParam,
     Sum,
     Tuple,
+    TupleArg,
     TupleParam,
     Type,
     TypeArg,
@@ -85,13 +90,15 @@ def test_tys_sum_str(ty: Type, string: str, repr_str: str):
 @pytest.mark.parametrize(
     ("param", "string"),
     [
-        (TypeTypeParam(TypeBound.Any), "Any"),
+        (TypeTypeParam(TypeBound.Linear), "Linear"),
         (BoundedNatParam(3), "Nat(3)"),
         (BoundedNatParam(None), "Nat"),
         (StringParam(), "String"),
+        (FloatParam(), "Float"),
+        (BytesParam(), "Bytes"),
         (
-            TupleParam([TypeTypeParam(TypeBound.Any), BoundedNatParam(3)]),
-            "(Any, Nat(3))",
+            TupleParam([TypeTypeParam(TypeBound.Linear), BoundedNatParam(3)]),
+            "(Linear, Nat(3))",
         ),
         (ListParam(StringParam()), "[String]"),
     ],
@@ -105,9 +112,15 @@ def test_params_str(param: TypeParam, string: str):
     [
         (TypeTypeArg(Bool), "Type(Bool)"),
         (BoundedNatArg(3), "3"),
+        (FloatArg(3.141), "3.141"),
+        (BytesArg(b"0"), "bytes"),
         (StringArg("hello"), '"hello"'),
         (
-            SequenceArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
+            ListArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
+            "[Type(Qubit), 3]",
+        ),
+        (
+            TupleArg([TypeTypeArg(Qubit), BoundedNatArg(3)]),
             "(Type(Qubit), 3)",
         ),
         (VariableArg(2, StringParam()), "$2"),
@@ -123,7 +136,7 @@ def test_args_str(arg: TypeArg, string: str):
         (Array(Bool, 3), "array<3, Type(Bool)>"),
         (StaticArray(Bool), "static_array<Type(Bool)>"),
         (ValueArray(Bool, 3), "value_array<3, Type(Bool)>"),
-        (Variable(2, TypeBound.Any), "$2"),
+        (Variable(2, TypeBound.Linear), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
         (INT_T, "int<5>"),
@@ -132,10 +145,10 @@ def test_args_str(arg: TypeArg, string: str):
         (FunctionType([Bool, Qubit], [Qubit, Bool]), "Bool, Qubit -> Qubit, Bool"),
         (
             PolyFuncType(
-                [TypeTypeParam(TypeBound.Any), BoundedNatParam(7)],
+                [TypeTypeParam(TypeBound.Linear), BoundedNatParam(7)],
                 FunctionType([_int_tv(1)], [Variable(0, TypeBound.Copyable)]),
             ),
-            "∀ Any, Nat(7). int<$1> -> $0",
+            "∀ Linear, Nat(7). int<$1> -> $0",
         ),
     ],
 )
@@ -166,12 +179,12 @@ def test_array():
     ls = Array(Bool, 3)
     assert ls.ty == Bool
     assert ls.size == 3
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ls = Array(ty_var, len_var)
     assert ls.ty == ty_var
     assert ls.size is None
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ar_val = ArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
@@ -179,7 +192,7 @@ def test_array():
 
 
 def test_value_array():
-    ty_var = Variable(0, TypeBound.Any)
+    ty_var = Variable(0, TypeBound.Linear)
     len_var = VariableArg(1, BoundedNatParam())
 
     ls = ValueArray(Bool, 3)
@@ -190,7 +203,7 @@ def test_value_array():
     ls = ValueArray(ty_var, len_var)
     assert ls.ty == ty_var
     assert ls.size is None
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ar_val = ValueArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]

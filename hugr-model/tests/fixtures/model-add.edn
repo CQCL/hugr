@@ -2,14 +2,18 @@
 
 (mod)
 
-(define-func example.add
+(define-func
+  example.add
   (core.fn
-   [arithmetic.int.types.int arithmetic.int.types.int]
-   [arithmetic.int.types.int])
-  (dfg
-   [%0 %1]
-   [%2]
-   (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int]))
-   (arithmetic.int.iadd
-    [%0 %1] [%2]
-    (signature (core.fn [arithmetic.int.types.int arithmetic.int.types.int] [arithmetic.int.types.int])))))
+    [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+    [(arithmetic.int.types.int 6)])
+  (dfg [%0 %1] [%2]
+    (signature
+      (core.fn
+        [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+        [(arithmetic.int.types.int 6)]))
+    ((arithmetic.int.iadd 6) [%0 %1] [%2]
+      (signature
+        (core.fn
+          [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]
+          [(arithmetic.int.types.int 6)])))))

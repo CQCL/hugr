@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.1...hugr-model-v0.20.2) - 2025-06-25
+
+### New Features
+
+- better errors using metadata from generator ([#2368](https://github.com/CQCL/hugr/pull/2368))
+
 ## [0.20.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.19.0...hugr-model-v0.20.0) - 2025-05-14
 
 ### New Features

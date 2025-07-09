@@ -5,7 +5,6 @@ pub mod hugrmut;
 pub(crate) mod ident;
 pub mod internal;
 pub mod patch;
-pub mod persistent;
 pub mod serialize;
 pub mod validate;
 pub mod views;
@@ -554,8 +553,8 @@ pub(crate) mod test {
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
-    use crate::test_file;
     use crate::types::Signature;
+    use crate::{Visibility, test_file};
     use cool_asserts::assert_matches;
     use itertools::Either;
     use portgraph::LinkView;
@@ -673,6 +672,26 @@ pub(crate) mod test {
             None,
         );
         assert_matches!(&hugr, Ok(_));
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    fn load_funcs_no_visibility() {
+        let hugr = Hugr::load(
+            BufReader::new(File::open(test_file!("hugr-no-visibility.hugr")).unwrap()),
+            None,
+        )
+        .unwrap();
+
+        let [_mod, decl, defn] = hugr.nodes().take(3).collect_array().unwrap();
+        assert_eq!(
+            hugr.get_optype(decl).as_func_decl().unwrap().visibility(),
+            &Visibility::Public
+        );
+        assert_eq!(
+            hugr.get_optype(defn).as_func_defn().unwrap().visibility(),
+            &Visibility::Private
+        );
     }
 
     fn hugr_failing_2262() -> Hugr {

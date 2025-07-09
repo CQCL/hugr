@@ -1,10 +1,14 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-order.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
 (mod)
+
+(import core.meta.description)
+
+(import core.nat)
 
 (import core.order_hint.key)
 
@@ -14,47 +18,53 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-orde
 
 (import arithmetic.int.types.int)
 
-(import arithmetic.int.ineg)
+(declare-operation
+  arithmetic.int.ineg
+  (param ?0 core.nat)
+  (core.fn [(arithmetic.int.types.int ?0)] [(arithmetic.int.types.int ?0)])
+  (meta
+    (core.meta.description
+      "negation modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
   main
   (core.fn
-    [arithmetic.int.types.int
-     arithmetic.int.types.int
-     arithmetic.int.types.int
-     arithmetic.int.types.int]
-    [arithmetic.int.types.int
-     arithmetic.int.types.int
-     arithmetic.int.types.int
-     arithmetic.int.types.int])
+    [(arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)]
+    [(arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)
+     (arithmetic.int.types.int 6)])
   (dfg [%0 %1 %2 %3] [%4 %5 %6 %7]
     (signature
       (core.fn
-        [arithmetic.int.types.int
-         arithmetic.int.types.int
-         arithmetic.int.types.int
-         arithmetic.int.types.int]
-        [arithmetic.int.types.int
-         arithmetic.int.types.int
-         arithmetic.int.types.int
-         arithmetic.int.types.int]))
+        [(arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)]
+        [(arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)
+         (arithmetic.int.types.int 6)]))
     (meta (core.order_hint.order 4 7))
     (meta (core.order_hint.order 5 6))
     (meta (core.order_hint.order 5 4))
     (meta (core.order_hint.order 6 7))
-    (arithmetic.int.ineg [%0] [%4]
+    ((arithmetic.int.ineg 6) [%0] [%4]
       (signature
-        (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+        (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)]))
       (meta (core.order_hint.key 4)))
-    (arithmetic.int.ineg [%1] [%5]
+    ((arithmetic.int.ineg 6) [%1] [%5]
       (signature
-        (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+        (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)]))
       (meta (core.order_hint.key 5)))
-    (arithmetic.int.ineg [%2] [%6]
+    ((arithmetic.int.ineg 6) [%2] [%6]
       (signature
-        (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+        (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)]))
       (meta (core.order_hint.key 6)))
-    (arithmetic.int.ineg [%3] [%7]
+    ((arithmetic.int.ineg 6) [%3] [%7]
       (signature
-        (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+        (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)]))
       (meta (core.order_hint.key 7)))))
