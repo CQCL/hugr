@@ -27,7 +27,7 @@ expression: ast
       "negation modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
-  pub
+  public
   main
   (core.fn
     [(arithmetic.int.types.int 6)

@@ -297,9 +297,9 @@ fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     let visibility = take_rule(&mut pairs, Rule::visibility)
         .next()
         .map(|pair| match pair.as_str() {
-            "pub" => Ok(Visibility::Public),
-            "priv" => Ok(Visibility::Private),
-            _ => unreachable!("Expected 'pub' or 'priv', got {}", pair.as_str()),
+            "public" => Ok(Visibility::Public),
+            "private" => Ok(Visibility::Private),
+            _ => unreachable!("Expected 'public' or 'private', got {}", pair.as_str()),
         })
         .transpose()?;
     let name = parse_symbol_name(pairs.next().unwrap())?;

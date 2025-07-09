@@ -29,7 +29,7 @@ expression: ast
 (import core.adt)
 
 (define-func
-  pub
+  public
   example.bools
   (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%0 %1]
@@ -40,7 +40,7 @@ expression: ast
       (signature (core.fn [] [(core.adt [[] []])])))))
 
 (define-func
-  pub
+  public
   example.make-pair
   (core.fn
     []
@@ -77,7 +77,10 @@ expression: ast
              [[(collections.array.array 5 (arithmetic.int.types.int 6))
                arithmetic.float.types.float64]])])))))
 
-(define-func pub example.f64-json (core.fn [] [arithmetic.float.types.float64])
+(define-func
+  public
+  example.f64-json
+  (core.fn [] [arithmetic.float.types.float64])
   (dfg [] [%0 %1]
     (signature
       (core.fn

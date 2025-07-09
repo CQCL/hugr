@@ -14,7 +14,7 @@ expression: ast
 
 (import core.adt)
 
-(define-func priv example.loop (param ?0 core.type) (core.fn [?0] [?0])
+(define-func private example.loop (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]
     (signature (core.fn [?0] [?0]))
     (tail-loop [%0] [%1]

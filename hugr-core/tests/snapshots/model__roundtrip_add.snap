@@ -25,7 +25,7 @@ expression: ast
       "addition modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
-  pub
+  public
   example.add
   (core.fn
     [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]

@@ -17,14 +17,14 @@ expression: ast
 (import arithmetic.int.types.int)
 
 (declare-func
-  pub
+  public
   example.callee
   (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
   (meta (compat.meta_json "description" "\"This is a function declaration.\""))
   (meta (compat.meta_json "title" "\"Callee\"")))
 
 (define-func
-  priv
+  private
   example.caller
   (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
   (meta
@@ -43,7 +43,7 @@ expression: ast
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))))
 
 (define-func
-  priv
+  private
   example.load
   (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])])
   (dfg [] [%0]

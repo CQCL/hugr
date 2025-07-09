@@ -2,7 +2,9 @@
 
 (mod)
 
-(define-func priv example.loop
+(define-func
+  private
+  example.loop
   (param ?a core.type)
   (core.fn [?a] [?a])
   (dfg [%0] [%1]

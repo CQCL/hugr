@@ -17,7 +17,7 @@ expression: ast
 (import core.fn)
 
 (declare-func
-  priv
+  private
   array.replicate
   (param ?0 core.nat)
   (param ?1 core.type)
@@ -25,7 +25,7 @@ expression: ast
   (core.fn [?1] [(collections.array.array ?0 ?1)]))
 
 (declare-func
-  pub
+  public
   array.copy
   (param ?0 core.nat)
   (param ?1 core.type)
@@ -35,7 +35,7 @@ expression: ast
     [(collections.array.array ?0 ?1) (collections.array.array ?0 ?1)]))
 
 (define-func
-  pub
+  public
   util.copy
   (param ?0 core.type)
   (where (core.nonlinear ?0))

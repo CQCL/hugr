@@ -21,7 +21,7 @@ expression: ast
 (import core.float)
 
 (define-func
-  pub
+  public
   example.swap
   (param ?0 core.type)
   (param ?1 core.type)
@@ -29,7 +29,7 @@ expression: ast
   (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))
 
 (declare-func
-  pub
+  public
   example.literals
   (param ?0 core.str)
   (param ?1 core.nat)
@@ -37,7 +37,7 @@ expression: ast
   (param ?3 core.float)
   (core.fn [] []))
 
-(define-func priv example.call_literals (core.fn [] [])
+(define-func private example.call_literals (core.fn [] [])
   (dfg
     (signature (core.fn [] []))
     ((core.call

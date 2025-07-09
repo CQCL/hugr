@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func pub example.swap
+(define-func public example.swap
   ; The types of the values to be swapped are passed as implicit parameters.
   (param ?a core.type)
   (param ?b core.type)
@@ -10,14 +10,14 @@
   (dfg [%a %b] [%b %a]
        (signature (core.fn [?a ?b] [?b ?a]))))
 
-(declare-func pub example.literals
+(declare-func public example.literals
   (param ?a core.str)
   (param ?b core.nat)
   (param ?c core.bytes)
   (param ?d core.float)
   (core.fn [] []))
 
-(define-func priv example.call_literals
+(define-func private example.call_literals
   (core.fn [] [])
   (dfg [] []
     (signature (core.fn [] []))
