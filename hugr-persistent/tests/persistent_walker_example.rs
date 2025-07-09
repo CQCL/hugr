@@ -2,24 +2,24 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use hugr_core::{
-    Hugr, HugrView, PortIndex, SimpleReplacement,
+    Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
     builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
     extension::prelude::qb_t,
-    hugr::views::SiblingSubgraph,
+    ops::OpType,
     types::EdgeKind,
 };
 
-use hugr_persistent::{CommitStateSpace, PersistentReplacement, PersistentWire, Walker};
+use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, Walker};
 
 /// The maximum commit depth that we will consider in this example
-const MAX_COMMITS: usize = 2;
+const MAX_COMMITS: usize = 4;
 
 // We define a HUGR extension within this file, with CZ and H gates. Normally,
 // you would use an existing extension (e.g. as provided by tket2).
-use walker_example_extension::{cz_gate, h_gate};
+use walker_example_extension::cz_gate;
 mod walker_example_extension {
     use std::sync::Arc;
 
@@ -33,10 +33,6 @@ mod walker_example_extension {
 
     use super::*;
 
-    fn one_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(qb_t()).into()
-    }
-
     fn two_qb_func() -> PolyFuncTypeRV {
         FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
     }
@@ -48,15 +44,6 @@ mod walker_example_extension {
             EXTENSION_ID,
             Version::new(0, 0, 0),
             |extension, extension_ref| {
-                extension
-                    .add_op(
-                        OpName::new_inline("H"),
-                        "Hadamard".into(),
-                        one_qb_func(),
-                        extension_ref,
-                    )
-                    .unwrap();
-
                 extension
                     .add_op(
                         OpName::new_inline("CZ"),
@@ -72,10 +59,6 @@ mod walker_example_extension {
     lazy_static! {
         /// Quantum extension definition.
         static ref EXTENSION: Arc<Extension> = extension();
-    }
-
-    pub fn h_gate() -> ExtensionOp {
-        EXTENSION.instantiate_extension_op("H", []).unwrap()
     }
 
     pub fn cz_gate() -> ExtensionOp {
@@ -108,15 +91,12 @@ fn dfg_hugr() -> Hugr {
     builder.finish_hugr_with_outputs(vec![q0, q1, q2]).unwrap()
 }
 
-// TODO: currently empty replacements are buggy, so we have temporarily added
-// a single Hadamard gate on each qubit.
-fn empty_2qb_hugr() -> Hugr {
-    let mut builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
-    let [q0, q1] = builder.input_wires_arr();
-    let h0 = builder.add_dataflow_op(h_gate(), vec![q0]).unwrap();
-    let [q0] = h0.outputs_arr();
-    let h1 = builder.add_dataflow_op(h_gate(), vec![q1]).unwrap();
-    let [q1] = h1.outputs_arr();
+fn empty_2qb_hugr(flip_args: bool) -> Hugr {
+    let builder = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()])).unwrap();
+    let [mut q0, mut q1] = builder.input_wires_arr();
+    if flip_args {
+        (q0, q1) = (q1, q0);
+    }
     builder.finish_hugr_with_outputs(vec![q0, q1]).unwrap()
 }
 
@@ -182,7 +162,7 @@ fn build_state_space() -> CommitStateSpace {
             for subwalker in walker.expand(&wire, None) {
                 assert!(
                     subwalker.as_hugr_view().contains_node(pinned_node),
-                    "pinned node is deleted"
+                    "pinned node {pinned_node:?} is deleted",
                 );
                 wire_queue.push_back((subwalker.get_wire(pinned_node, pinned_port), subwalker));
             }
@@ -206,22 +186,16 @@ fn build_state_space() -> CommitStateSpace {
                 continue;
             }
 
-            let Some(repl) = create_replacement(wire, &walker) else {
+            let Some(new_commit) = create_commit(wire, &walker) else {
                 continue;
             };
 
             assert_eq!(
-                repl.subgraph()
-                    .nodes()
-                    .iter()
-                    .copied()
-                    .collect::<BTreeSet<_>>(),
+                new_commit.deleted_nodes().collect::<BTreeSet<_>>(),
                 patch_nodes
             );
 
-            state_space
-                .try_add_replacement(repl)
-                .expect("repl acts on non-empty subgraph");
+            state_space.try_add_commit(new_commit).unwrap();
 
             // enqueue new wires added by the replacement
             // (this will also add a lot of already visited wires, but they will
@@ -233,7 +207,7 @@ fn build_state_space() -> CommitStateSpace {
     state_space
 }
 
-fn create_replacement(wire: PersistentWire, walker: &Walker) -> Option<PersistentReplacement> {
+fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
     let hugr = walker.clone().into_persistent_hugr();
     let (out_node, _) = wire
         .single_outgoing_port(&hugr)
@@ -258,14 +232,27 @@ fn create_replacement(wire: PersistentWire, walker: &Walker) -> Option<Persisten
     let all_edges = hugr.node_connections(out_node, in_node).collect_vec();
     let n_shared_qubits = all_edges.len();
 
-    let (repl_hugr, subgraph) = match n_shared_qubits {
+    match n_shared_qubits {
         2 => {
             // out_node and in_node act on the same qubits
-            // => cancel out the two CZ gates
-            (
-                empty_2qb_hugr(),
-                SiblingSubgraph::try_from_nodes([out_node, in_node], &hugr).ok()?,
-            )
+            // => replace the two CZ gates with the empty 2qb HUGR
+
+            // If the two CZ gates have flipped port ordering, we need to insert
+            // a swap gate
+            let add_swap = all_edges[0][0].index() != all_edges[0][1].index();
+
+            // Get the wires between the two CZ gates
+            let wires = all_edges
+                .into_iter()
+                .map(|[out_port, _]| walker.get_wire(out_node, out_port));
+
+            // Create the commit
+            walker.try_create_commit(wires, empty_2qb_hugr(add_swap), |_, port| {
+                // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
+                // HUGR
+                let dir = port.direction();
+                Port::new(dir.reverse(), port.index())
+            })
         }
         1 => {
             // out_node and in_node share just one qubit
@@ -275,32 +262,49 @@ fn create_replacement(wire: PersistentWire, walker: &Walker) -> Option<Persisten
             // Need to figure out the permutation of the qubits
             // => establish which qubit is shared between the two CZ gates
             let [out_port, in_port] = all_edges.into_iter().exactly_one().unwrap();
-            let shared_qb_on_out_node = out_port.index();
-            let shared_qb_on_in_node = in_port.index();
+            let shared_qb_out = out_port.index();
+            let shared_qb_in = in_port.index();
 
-            let subgraph = SiblingSubgraph::try_new(
-                vec![
-                    vec![(out_node, shared_qb_on_out_node.into())],
-                    vec![(out_node, (1 - shared_qb_on_out_node).into())],
-                    vec![(in_node, (1 - shared_qb_on_in_node).into())],
-                ],
-                vec![
-                    (in_node, shared_qb_on_in_node.into()),
-                    (out_node, (1 - shared_qb_on_out_node).into()),
-                    (in_node, (1 - shared_qb_on_in_node).into()),
-                ],
-                &hugr,
-            )
-            .ok()?;
-
-            (repl_hugr, subgraph)
+            walker.try_create_commit([wire], repl_hugr, |node, port| {
+                // map the incoming/outgoing ports of the subgraph to the replacement as
+                // follows:
+                //  - the first qubit is the one that is shared between the two CZ gates
+                //  - the second qubit only touches the first CZ (out_node)
+                //  - the third qubit only touches the second CZ (in_node)
+                match port.as_directed() {
+                    Either::Left(incoming) => {
+                        let in_boundary: [(_, IncomingPort); 3] = [
+                            (out_node, shared_qb_out.into()),
+                            (out_node, (1 - shared_qb_out).into()),
+                            (in_node, (1 - shared_qb_in).into()),
+                        ];
+                        let out_index = in_boundary
+                            .iter()
+                            .position(|&(n, p)| n == node && p == incoming)
+                            .expect("invalid input port");
+                        OutgoingPort::from(out_index).into()
+                    }
+                    Either::Right(outgoing) => {
+                        let out_boundary: [(_, OutgoingPort); 3] = [
+                            (in_node, shared_qb_in.into()),
+                            (out_node, (1 - shared_qb_out).into()),
+                            (in_node, (1 - shared_qb_in).into()),
+                        ];
+                        let in_index = out_boundary
+                            .iter()
+                            .position(|&(n, p)| n == node && p == outgoing)
+                            .expect("invalid output port");
+                        IncomingPort::from(in_index).into()
+                    }
+                }
+            })
         }
         _ => unreachable!(),
-    };
-
-    SimpleReplacement::try_new(subgraph, &hugr, repl_hugr).ok()
+    }
+    .ok()
 }
 
+#[ignore = "takes 10s (todo: optimise)"]
 #[test]
 fn walker_example() {
     let state_space = build_state_space();
@@ -326,26 +330,16 @@ fn walker_example() {
         );
     }
 
-    // assert_eq!(state_space.all_commit_ids().count(), 13);
-
     let empty_commits = state_space
         .all_commit_ids()
-        // .filter(|&id| state_space.commit_hugr(id).num_nodes() == 3)
-        .filter(|&id| {
-            state_space
-                .inserted_nodes(id)
-                .filter(|&n| state_space.get_optype(n) == &h_gate().into())
-                .count()
-                == 2
-        })
+        .filter(|&id| state_space.inserted_nodes(id).count() == 0)
         .collect_vec();
 
     // there should be a combination of three empty commits that are compatible
     // and such that the resulting HUGR is empty
     let mut empty_hugr = None;
-    // for cs in empty_commits.iter().combinations(3) {
-    for cs in empty_commits.iter().combinations(2) {
-        let cs = cs.into_iter().copied().collect_vec();
+    for cs in empty_commits.iter().combinations(3) {
+        let cs = cs.into_iter().copied();
         if let Ok(hugr) = state_space.try_extract_hugr(cs) {
             empty_hugr = Some(hugr);
         }
@@ -353,16 +347,23 @@ fn walker_example() {
 
     let empty_hugr = empty_hugr.unwrap().to_hugr();
 
-    // assert_eq!(empty_hugr.num_nodes(), 3);
-
-    let n_cz = empty_hugr
-        .nodes()
-        .filter(|&n| empty_hugr.get_optype(n) == &cz_gate().into())
-        .count();
-    let n_h = empty_hugr
-        .nodes()
-        .filter(|&n| empty_hugr.get_optype(n) == &h_gate().into())
-        .count();
-    assert_eq!(n_cz, 2);
-    assert_eq!(n_h, 4);
+    // The empty hugr should have 7 nodes:
+    // module root, funcdef, 2 func IO, DFG root, 2 DFG IO
+    assert_eq!(empty_hugr.num_nodes(), 7);
+    assert_eq!(
+        empty_hugr
+            .nodes()
+            .filter(|&n| {
+                !matches!(
+                    empty_hugr.get_optype(n),
+                    OpType::Input(_)
+                        | OpType::Output(_)
+                        | OpType::FuncDefn(_)
+                        | OpType::Module(_)
+                        | OpType::DFG(_)
+                )
+            })
+            .count(),
+        0
+    );
 }
