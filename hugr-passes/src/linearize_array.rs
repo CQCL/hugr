@@ -53,9 +53,9 @@ impl Default for LinearizeArrayPass {
             Ok(Some(ArrayValue::new(ty, contents).into()))
         });
         for op_def in ArrayOpDef::iter() {
-            pass.replace_parametrized_op(
+            pass.replace_parametrized_op_with(
                 value_array::EXTENSION.get_op(&op_def.opdef_id()).unwrap(),
-                move |args| {
+                move |args, _| {
                     // `get` is only allowed for copyable elements. Assuming the Hugr was
                     // valid when we started, the only way for the element to become linear
                     // is if it used to contain nested `value_array`s. In that case, we
@@ -76,38 +76,38 @@ impl Default for LinearizeArrayPass {
                 },
             );
         }
-        pass.replace_parametrized_op(
+        pass.replace_parametrized_op_with(
             value_array::EXTENSION.get_op(&ARRAY_REPEAT_OP_ID).unwrap(),
-            |args| {
+            |args, _| {
                 Some(NodeTemplate::SingleOp(
                     ArrayRepeatDef::new().instantiate(args).unwrap().into(),
                 ))
             },
         );
-        pass.replace_parametrized_op(
+        pass.replace_parametrized_op_with(
             value_array::EXTENSION.get_op(&ARRAY_SCAN_OP_ID).unwrap(),
-            |args| {
+            |args, _| {
                 Some(NodeTemplate::SingleOp(
                     ArrayScanDef::new().instantiate(args).unwrap().into(),
                 ))
             },
         );
-        pass.replace_parametrized_op(
+        pass.replace_parametrized_op_with(
             value_array::EXTENSION
                 .get_op(&VArrayFromArrayDef::new().opdef_id())
                 .unwrap(),
-            |args| {
+            |args, _| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
                 Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),
                 ))
             },
         );
-        pass.replace_parametrized_op(
+        pass.replace_parametrized_op_with(
             value_array::EXTENSION
                 .get_op(&VArrayToArrayDef::new().opdef_id())
                 .unwrap(),
-            |args| {
+            |args, _| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
                 Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),

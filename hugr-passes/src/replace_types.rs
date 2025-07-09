@@ -748,7 +748,7 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
+        lw.replace_parametrized_op_with(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
             Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
@@ -1028,9 +1028,9 @@ mod test {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.replace_parametrized_op(
+        lowerer.replace_parametrized_op_with(
             e.get_op(READ).unwrap().as_ref(),
-            Box::new(|args: &[TypeArg]| {
+            |args: &[TypeArg], _| {
                 option_contents(just_elem_type(args)).map(|elem| {
                     NodeTemplate::SingleOp(
                         ListOp::get
@@ -1040,7 +1040,7 @@ mod test {
                             .into(),
                     )
                 })
-            }),
+            },
         );
         assert!(lowerer.run(&mut h).unwrap());
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
@@ -1134,7 +1134,7 @@ mod test {
             .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
+        lw.replace_parametrized_op_with(e.get_op(READ).unwrap().as_ref(), move |args, _| {
             Some(NodeTemplate::Call(read_func, args.to_owned()))
         });
         lw.run(&mut h).unwrap();
