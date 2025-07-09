@@ -15,7 +15,7 @@ use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
 /// results in types of such outports changing from [Copyable] to linear (i.e.
-/// [`hugr_core::types::TypeBound::Any`]).
+/// [`hugr_core::types::TypeBound::Linear`]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
 /// function polymorphic over a [Copyable] becomes called with a
@@ -78,7 +78,7 @@ pub trait Linearizer {
             let copy_discard_op = self
                 .copy_discard_op(&typ, targets.len())?
                 .add_hugr(hugr, src_parent)
-                .map_err(|e| LinearizeError::NestedTemplateError(typ, e))?;
+                .map_err(|e| LinearizeError::NestedTemplateError(Box::new(typ), Box::new(e)))?;
             for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
                 hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
             }
@@ -140,12 +140,12 @@ pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 #[non_exhaustive]
 pub enum LinearizeError {
     #[error("Need copy/discard op for {_0}")]
-    NeedCopyDiscard(Type),
+    NeedCopyDiscard(Box<Type>),
     #[error("Copy/discard op for {typ} with {num_outports} outputs had wrong signature {sig:?}")]
     WrongSignature {
-        typ: Type,
+        typ: Box<Type>,
         num_outports: usize,
-        sig: Option<Signature>,
+        sig: Option<Box<Signature>>,
     },
     #[error(
         "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})"
@@ -163,14 +163,14 @@ pub enum LinearizeError {
     /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
     /// or [Alias](TypeEnum::Alias)es.
     #[error("Cannot linearize type {_0}")]
-    UnsupportedType(Type),
+    UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
     #[error("Type {_0} is copyable")]
-    CopyableType(Type),
+    CopyableType(Box<Type>),
     /// Error may be returned by a callback for e.g. a container because it could
     /// not generate a [`NodeTemplate`] because of a problem with an element
     #[error("Could not generate NodeTemplate for contained type {0} because {1}")]
-    NestedTemplateError(Type, BuildError),
+    NestedTemplateError(Box<Type>, Box<BuildError>),
 }
 
 impl DelegatingLinearizer {
@@ -206,7 +206,7 @@ impl DelegatingLinearizer {
     ) -> Result<(), LinearizeError> {
         let typ = Type::new_extension(cty.clone());
         if typ.copyable() {
-            return Err(LinearizeError::CopyableType(typ));
+            return Err(LinearizeError::CopyableType(Box::new(typ)));
         }
         check_sig(&copy, &typ, 2)?;
         check_sig(&discard, &typ, 0)?;
@@ -247,9 +247,9 @@ impl DelegatingLinearizer {
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
     tmpl.check_signature(&typ.clone().into(), &vec![typ.clone(); num_outports].into())
         .map_err(|sig| LinearizeError::WrongSignature {
-            typ: typ.clone(),
+            typ: Box::new(typ.clone()),
             num_outports,
-            sig,
+            sig: sig.map(Box::new),
         })
 }
 
@@ -260,7 +260,7 @@ impl Linearizer for DelegatingLinearizer {
         num_outports: usize,
     ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
-            return Err(LinearizeError::CopyableType(typ.clone()));
+            return Err(LinearizeError::CopyableType(Box::new(typ.clone())));
         }
         assert!(num_outports != 1);
 
@@ -338,14 +338,14 @@ impl Linearizer for DelegatingLinearizer {
                     let copy_discard_fn = self
                         .copy_discard_parametric
                         .get(&cty.into())
-                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
+                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(Box::new(typ.clone())))?;
                     let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
                     check_sig(&tmpl, typ, num_outports)?;
                     Ok(tmpl)
                 }
             }
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
-            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
+            _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
 }
@@ -648,9 +648,9 @@ mod test {
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {
-                typ: lin_t.clone(),
+                typ: Box::new(lin_t.clone()),
                 num_outports: 2,
-                sig: sig3.clone()
+                sig: sig3.clone().map(Box::new)
             })
         );
 
@@ -663,9 +663,9 @@ mod test {
         assert_eq!(
             bad_discard,
             Err(LinearizeError::WrongSignature {
-                typ: lin_t.clone(),
+                typ: Box::new(lin_t.clone()),
                 num_outports: 0,
-                sig: sig3.clone()
+                sig: sig3.clone().map(Box::new)
             })
         );
 
@@ -685,9 +685,9 @@ mod test {
             replacer.run(&mut h),
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::WrongSignature {
-                    typ: lin_t.clone(),
+                    typ: Box::new(lin_t.clone()),
                     num_outports: 2,
-                    sig: sig3.clone()
+                    sig: sig3.clone().map(Box::new)
                 }
             ))
         );
@@ -842,14 +842,17 @@ mod test {
         let r = lower_discard_to_call.run(&mut backup.clone());
         // Note the error (or success) can be quite fragile, according to what the `discard_fn`
         // Node points at in the (hidden here) inner Hugr built by the array linearization helper.
-        assert!(matches!(
-            r,
-            Err(ReplaceTypesError::LinearizeError(
-                LinearizeError::NestedTemplateError(
-                    nested_t,
-                    BuildError::NodeNotFound { node } // Note `..` would be somewhat less fragile
-                )
-            )) if nested_t == lin_t && node == discard_fn
-        ));
+        if let Err(ReplaceTypesError::LinearizeError(LinearizeError::NestedTemplateError(
+            nested_t,
+            build_err,
+        ))) = r
+        {
+            assert_eq!(*nested_t, lin_t);
+            assert!(matches!(
+                *build_err, BuildError::NodeNotFound { node } if node == discard_fn
+            ));
+        } else {
+            panic!("Expected error");
+        }
     }
 }

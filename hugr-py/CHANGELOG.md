@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.4...hugr-py-v0.12.5) (2025-07-08)
+
+
+### Bug Fixes
+
+* map IntValue to unsigned repr when serializing ([#2413](https://github.com/CQCL/hugr/issues/2413)) ([4ad1d4e](https://github.com/CQCL/hugr/commit/4ad1d4e010eca07207306320b3cf74396f1f8181)), closes [#2409](https://github.com/CQCL/hugr/issues/2409)
+
 ## [0.12.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.3...hugr-py-v0.12.4) (2025-07-03)
 
 

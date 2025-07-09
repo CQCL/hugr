@@ -58,12 +58,12 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
                 .inner_function_type()
                 .ok_or(InvalidReplacement::InvalidDataflowGraph {
                     node: replacement.entrypoint(),
-                    op: replacement.get_optype(replacement.entrypoint()).to_owned(),
+                    op: Box::new(replacement.get_optype(replacement.entrypoint()).to_owned()),
                 })?;
         if subgraph_sig != repl_sig {
             return Err(InvalidReplacement::InvalidSignature {
-                expected: subgraph_sig,
-                actual: Some(repl_sig.into_owned()),
+                expected: Box::new(subgraph_sig),
+                actual: Some(Box::new(repl_sig.into_owned())),
             });
         }
         Ok(Self {

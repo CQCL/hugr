@@ -824,7 +824,7 @@ copied or discarded (multiple or 0 links from on output port respectively):
   allows multiple (or 0) outgoing edges from an outport; also these types can
   be sent down `Const` edges.
 
-Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `AnyType` or `Copyable`.
+Note that all dataflow inputs (`Value`, `Const` and `Function`) always require a single connection, regardless of whether the type is `Linear` or `Copyable`.
 
 **Rows** The `#` is a *row* which is a sequence of zero or more types. Types in the row can optionally be given names in metadata i.e. this does not affect behaviour of the HUGR. When writing literal types, we use `#` to distinguish between tuples and rows, e.g. `(int<1>,int<2>)` is a tuple while `Sum(#(int<1>),#(int<2>))` contains two rows.
 
@@ -890,7 +890,7 @@ TypeArg ::= Type(Type) -- could be a variable of kind Type, or contain variable(
 
 For example, a Function node declaring a `TypeParam::Opaque("Array", [5, TypeArg::Type(Type::Opaque("usize"))])`
 means that any `Call` to it must statically provide a *value* that is an array of 5 `usize`s;
-or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Any)` requires two TypeArgs,
+or a Function node declaring a `TypeParam::BoundedUSize(5)` and a `TypeParam::Type(Linear)` requires two TypeArgs,
 firstly a non-negative integer less than 5, secondly a type (which might be from an extension, e.g. `usize`).
 
 Given TypeArgs, the body of the Function node's type can be converted to a monomorphic signature by substitution,

@@ -276,6 +276,46 @@ impl<N: HugrNode> std::fmt::Display for Wire<N> {
     }
 }
 
+/// Marks [FuncDefn](crate::ops::FuncDefn)s and [FuncDecl](crate::ops::FuncDecl)s as
+/// to whether they should be considered for linking.
+#[derive(
+    Clone,
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub enum Visibility {
+    /// Function is visible or exported
+    Public,
+    /// Function is hidden, for use within the hugr only
+    Private,
+}
+
+impl From<hugr_model::v0::Visibility> for Visibility {
+    fn from(value: hugr_model::v0::Visibility) -> Self {
+        match value {
+            hugr_model::v0::Visibility::Private => Self::Private,
+            hugr_model::v0::Visibility::Public => Self::Public,
+        }
+    }
+}
+
+impl From<Visibility> for hugr_model::v0::Visibility {
+    fn from(value: Visibility) -> Self {
+        match value {
+            Visibility::Public => hugr_model::v0::Visibility::Public,
+            Visibility::Private => hugr_model::v0::Visibility::Private,
+        }
+    }
+}
+
 /// Enum for uniquely identifying the origin of linear wires in a circuit-like
 /// dataflow region.
 ///

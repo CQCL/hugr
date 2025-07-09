@@ -8,14 +8,9 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{self, OpParent};
-use crate::ops::{DataflowParent, Input, Output};
-use crate::{Direction, IncomingPort, OutgoingPort, Wire};
-
+use crate::ops::{self, DataflowParent, FuncDefn, Input, OpParent, Output};
 use crate::types::{PolyFuncType, Signature, Type};
-
-use crate::Node;
-use crate::{Hugr, hugr::HugrMut};
+use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -152,7 +147,9 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a `FuncDefn` rooted HUGR
+    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR;
+    /// the function will be private. (See also [Self::new_vis].)
+    ///
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
@@ -160,9 +157,25 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let op = ops::FuncDefn::new(name, signature);
+        Self::new_with_op(FuncDefn::new(name, signature))
+    }
+
+    /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified
+    /// [Visibility].
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn new_vis(
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        visibility: Visibility,
+    ) -> Result<Self, BuildError> {
+        Self::new_with_op(FuncDefn::new_vis(name, signature, visibility))
+    }
+
+    fn new_with_op(op: FuncDefn) -> Result<Self, BuildError> {
+        let body = op.signature().body().clone();
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
         let root = base.entrypoint();
@@ -437,7 +450,7 @@ pub(crate) mod test {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
             })
-            if typ == qb_t()
+            if *typ == qb_t()
         );
     }
 

@@ -125,7 +125,7 @@ where
     Input {
         /// The validation error that occurred.
         #[source]
-        err: ValidationError<N>,
+        err: Box<ValidationError<N>>,
         /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
@@ -134,13 +134,19 @@ where
     Output {
         /// The validation error that occurred.
         #[source]
-        err: ValidationError<N>,
+        err: Box<ValidationError<N>>,
         /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
     /// An error from the underlying pass.
     #[error(transparent)]
-    Underlying(#[from] E),
+    Underlying(Box<E>),
+}
+
+impl<N: HugrNode, E> From<E> for ValidatePassError<N, E> {
+    fn from(err: E) -> Self {
+        Self::Underlying(Box::new(err))
+    }
 }
 
 /// Runs an underlying pass, but with validation of the Hugr
@@ -172,12 +178,12 @@ where
 
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
-            err,
+            err: Box::new(err),
             pretty_hugr,
         })?;
-        let res = self.0.run(hugr).map_err(ValidatePassError::Underlying)?;
+        let res = self.0.run(hugr)?;
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Output {
-            err,
+            err: Box::new(err),
             pretty_hugr,
         })?;
         Ok(res)
@@ -228,7 +234,7 @@ pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
     if cfg!(test) {
         ValidatingPass::new(pass).run(hugr)
     } else {
-        pass.run(hugr).map_err(ValidatePassError::Underlying)
+        Ok(pass.run(hugr)?)
     }
 }
 
@@ -318,7 +324,7 @@ mod test {
         assert_eq!(h, backup); // Did nothing
 
         let r = ValidatingPass::new(cfold).run(&mut h);
-        assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
+        assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if *e == err));
     }
 
     #[test]

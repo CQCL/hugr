@@ -281,8 +281,8 @@ pub enum LowerFunc {
         /// [OpDef]
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
-        #[serde_as(as = "AsStringEnvelope")]
-        hugr: Hugr,
+        #[serde_as(as = "Box<AsStringEnvelope>")]
+        hugr: Box<Hugr>,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available extensions.
@@ -377,7 +377,7 @@ impl OpDef {
             .filter_map(|f| match f {
                 LowerFunc::FixedHugr { extensions, hugr } => {
                     if available_extensions.is_superset(extensions) {
-                        Some(hugr.clone())
+                        Some(hugr.as_ref().clone())
                     } else {
                         None
                     }
@@ -656,7 +656,7 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
@@ -664,7 +664,7 @@ pub(super) mod test {
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
                 extensions: ExtensionSet::new(),
-                hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
+                hugr: Box::new(crate::builder::test::simple_dfg_hugr()), // this is nonsense, but we are not testing the actual lowering here
             });
             def.add_misc("key", Default::default());
             assert_eq!(def.description(), "desc");
@@ -702,13 +702,13 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
                 let [TypeArg::BoundedNat(n)] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
                 let n = *n as usize;
                 let tvs: Vec<Type> = (0..n)
-                    .map(|_| Type::new_var_use(0, TypeBound::Any))
+                    .map(|_| Type::new_var_use(0, TypeBound::Linear))
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.clone()],
@@ -752,10 +752,10 @@ pub(super) mod test {
 
             // quick sanity check that we are validating the args - note changed bound:
             assert_eq!(
-                def.validate_args(&args, &[TypeBound::Any.into()]),
+                def.validate_args(&args, &[TypeBound::Linear.into()]),
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    actual: TypeBound::Any.into(),
-                    cached: TypeBound::Copyable.into()
+                    actual: Box::new(TypeBound::Linear.into()),
+                    cached: Box::new(TypeBound::Copyable.into())
                 })
             );
 
@@ -791,8 +791,8 @@ pub(super) mod test {
                 "SimpleOp".into(),
                 String::new(),
                 PolyFuncTypeRV::new(
-                    vec![TypeBound::Any.into()],
-                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                    vec![TypeBound::Linear.into()],
+                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
                 ),
                 extension_ref,
             )?;
@@ -807,8 +807,8 @@ pub(super) mod test {
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
                     TermTypeError::TypeMismatch {
-                        type_: TypeBound::Any.into(),
-                        term: arg,
+                        type_: Box::new(TypeBound::Linear.into()),
+                        term: Box::new(arg),
                     }
                 ))
             );
@@ -851,7 +851,7 @@ pub(super) mod test {
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
                         extensions,
-                        hugr: simple_dfg_hugr(),
+                        hugr: Box::new(simple_dfg_hugr()),
                     })
                     .boxed()
             }

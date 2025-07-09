@@ -939,7 +939,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDefn(FuncDefn::new(symbol.name, signature));
+            let optype = OpType::FuncDefn(FuncDefn::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.clone().into(),
+            ));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -964,7 +968,11 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportError> {
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new(symbol.name, signature));
+            let optype = OpType::FuncDecl(FuncDecl::new_vis(
+                symbol.name,
+                signature,
+                symbol.visibility.clone().into(),
+            ));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })
@@ -1203,7 +1211,7 @@ impl<'a> Context<'a> {
 
     /// Import a [`Term`] from a term that represents a static type or value.
     fn import_term(&mut self, term_id: table::TermId) -> Result<Term, ImportError> {
-        self.import_term_with_bound(term_id, TypeBound::Any)
+        self.import_term_with_bound(term_id, TypeBound::Linear)
     }
 
     fn import_term_with_bound(
@@ -1542,7 +1550,7 @@ impl<'a> Context<'a> {
                     }
                 }
                 table::Term::Var(table::VarId(_, index)) => {
-                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Any))
+                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Linear))
                         .map_err(|_| error_invalid!("expected a closed list"))?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }
@@ -1796,7 +1804,7 @@ impl LocalVar {
     pub fn new(r#type: table::TermId) -> Self {
         Self {
             r#type,
-            bound: TypeBound::Any,
+            bound: TypeBound::Linear,
         }
     }
 }

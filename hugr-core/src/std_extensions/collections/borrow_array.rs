@@ -139,13 +139,13 @@ impl BArrayUnsafeOpDef {
 
     fn signature_from_def(&self, def: &TypeDef, _: &sync::Weak<Extension>) -> SignatureFunc {
         let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let elem_ty_var = Type::new_var_use(1, TypeBound::Any);
+        let elem_ty_var = Type::new_var_use(1, TypeBound::Linear);
         let array_ty: Type = def
             .instantiate(vec![size_var, elem_ty_var.clone().into()])
             .unwrap()
             .into();
 
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
 
         let usize_t: Type = usize_t();
 
@@ -293,7 +293,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                     BORROW_ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
+                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
                     "Fixed-length borrow array".into(),
                     // Borrow array is linear, even if the elements are copyable.
                     TypeDefBound::any(),

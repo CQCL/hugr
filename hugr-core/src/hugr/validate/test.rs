@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
 use cool_asserts::assert_matches;
+use rstest::rstest;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
@@ -15,9 +17,9 @@ use crate::extension::prelude::{bool_t, qb_t, usize_t};
 use crate::extension::{Extension, ExtensionRegistry, PRELUDE, TypeDefBound};
 use crate::hugr::HugrMut;
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::dataflow::IOTrait;
+use crate::ops::dataflow::{DataflowParent, IOTrait};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, OpType, Value};
+use crate::ops::{self, FuncDecl, FuncDefn, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TermTypeError, TypeArg};
@@ -27,12 +29,16 @@ use crate::types::{
 };
 use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
-/// Creates a hugr with a single function definition that copies a bit `copies` times.
+/// Creates a hugr with a single, public, function definition that copies a bit `copies` times.
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-    let def_op: OpType =
-        ops::FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
+    let def_op: OpType = FuncDefn::new_vis(
+        "main",
+        Signature::new(bool_t(), vec![bool_t(); copies]),
+        Visibility::Public,
+    )
+    .into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
@@ -126,7 +132,7 @@ fn children_restrictions() {
 
     // Add a definition without children
     let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
-    let new_def = b.add_node_with_parent(root, ops::FuncDefn::new("main", def_sig));
+    let new_def = b.add_node_with_parent(root, FuncDefn::new("main", def_sig));
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
@@ -237,7 +243,7 @@ fn test_local_const() {
         Err(ValidationError::UnconnectedPort {
             node: and,
             port: IncomingPort::from(1).into(),
-            port_kind: EdgeKind::Value(bool_t())
+            port_kind: Box::new(EdgeKind::Value(bool_t()))
         })
     );
     let const_op: ops::Const = ops::Value::from_bool(true).into();
@@ -276,7 +282,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 
     let def = b.add_node_with_parent(
         b.entrypoint(),
-        ops::FuncDefn::new("main", Signature::new_endo(row.clone())),
+        FuncDefn::new("main", Signature::new_endo(row.clone())),
     );
 
     let input = b.add_node_with_parent(def, ops::Input::new(row.clone()));
@@ -320,7 +326,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     ));
     let mut hugr = identity_hugr_with_type(valid.clone()).0;
@@ -332,14 +338,14 @@ fn invalid_types() {
         "MyContainer",
         vec![valid.clone().into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: TypeBound::Copyable.into(),
-            term: valid.into()
+            type_: Box::new(TypeBound::Copyable.into()),
+            term: Box::new(valid.into())
         })
     );
 
@@ -354,7 +360,7 @@ fn invalid_types() {
         validate_to_sig_error(bad_bound.clone()),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Any
+            expected: TypeBound::Linear
         }
     );
 
@@ -363,14 +369,14 @@ fn invalid_types() {
         "MyContainer",
         vec![Type::new_extension(bad_bound).into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(nested),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Any
+            expected: TypeBound::Linear
         }
     );
 
@@ -378,7 +384,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into(), 3u64.into()],
         EXT_ID,
-        TypeBound::Any,
+        TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
@@ -393,8 +399,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            [TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -403,8 +409,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
+            [TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Linear)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -413,7 +419,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Any.into()],
+            [TypeBound::Linear.into()],
             Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
@@ -439,11 +445,12 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
     assert_matches!(
         hugr.unwrap_err(),
         BuildError::InvalidHUGR(ValidationError::InvalidParentOp {
-            child_optype: OpType::FuncDefn(_),
+            child_optype,
             allowed_children: OpTag::DataflowChild,
-            parent_optype: OpType::FuncDefn(_),
+            parent_optype,
             child, parent
-        }) => {assert_eq!(child, inner);
+        }) if matches!(*child_optype, OpType::FuncDefn(_)) && matches!(*parent_optype, OpType::FuncDefn(_)) => {
+            assert_eq!(child, inner);
             assert_eq!(parent, outer_node);
         }
     );
@@ -486,10 +493,10 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list_type(TypeBound::Any);
+    let rowp = TypeParam::new_list_type(TypeBound::Linear);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
-        let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
+        let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
+        let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
         let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
@@ -498,7 +505,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
+        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
@@ -548,13 +555,13 @@ fn list1ty(t: TypeRV) -> Term {
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list_type(TypeBound::Any)],
+            [TypeParam::new_list_type(TypeBound::Linear)],
             Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;
@@ -582,8 +589,8 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let id = m.declare(
         "id",
         PolyFuncType::new(
-            vec![TypeBound::Any.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            vec![TypeBound::Linear.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
         ),
     )?;
     let sig = Signature::new(
@@ -730,7 +737,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
         Err(ValidationError::TooManyConnections {
             node: middle.node(),
             port: Port::new(Direction::Outgoing, 0),
-            port_kind: EdgeKind::ControlFlow
+            port_kind: Box::new(EdgeKind::ControlFlow)
         })
     );
     Ok(())
@@ -753,4 +760,75 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     Ok(())
+}
+
+fn sig1() -> Signature {
+    Signature::new_endo(bool_t())
+}
+
+fn sig2() -> Signature {
+    Signature::new_endo(usize_t())
+}
+
+#[rstest]
+// Private FuncDefns never conflict even if different sig
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDefn::new("foo", sig2()),
+    None
+)]
+#[case(FuncDefn::new("foo", sig1()), FuncDecl::new("foo", sig2()), None)]
+// Public FuncDefn conflicts with anything Public even if same sig
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    Some("foo")
+)]
+#[case(
+    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
+    FuncDecl::new("foo", sig1()),
+    Some("foo")
+)]
+// Two public FuncDecls are ok with same sig
+#[case(FuncDecl::new("foo", sig1()), FuncDecl::new("foo", sig1()), None)]
+// But two public FuncDecls not ok if different sigs
+#[case(
+    FuncDecl::new("foo", sig1()),
+    FuncDecl::new("foo", sig2()),
+    Some("foo")
+)]
+fn validate_linkage(
+    #[case] f1: impl Into<OpType>,
+    #[case] f2: impl Into<OpType>,
+    #[case] err: Option<&str>,
+) {
+    let mut h = Hugr::new();
+    let [n1, n2] = [f1.into(), f2.into()].map(|f| {
+        let def_sig = f
+            .as_func_defn()
+            .map(FuncDefn::inner_signature)
+            .map(Cow::into_owned);
+        let n = h.add_node_with_parent(h.module_root(), f);
+        if let Some(Signature { input, output }) = def_sig {
+            let i = h.add_node_with_parent(n, ops::Input::new(input));
+            let o = h.add_node_with_parent(n, ops::Output::new(output));
+            h.connect(i, 0, o, 0); // Assume all sig's used in test are 1-ary endomorphic
+        }
+        n
+    });
+    let r = h.validate();
+    match err {
+        None => r.unwrap(),
+        Some(name) => {
+            let Err(ValidationError::DuplicateExport {
+                link_name,
+                children,
+            }) = r
+            else {
+                panic!("validate() should have produced DuplicateExport error not {r:?}")
+            };
+            assert_eq!(link_name, name);
+            assert!(children == [n1, n2] || children == [n2, n1]);
+        }
+    }
 }

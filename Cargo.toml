@@ -38,10 +38,6 @@ missing_docs = "warn"
 # https://github.com/rust-lang/rust-clippy/issues/5112
 debug_assert_with_mut_call = "warn"
 
-# TODO: Reduce the size of error types.
-result_large_err = "allow"
-large_enum_variant = "allow"
-
 [workspace.dependencies]
 anyhow = "1.0.98"
 insta = { version = "1.43.1" }

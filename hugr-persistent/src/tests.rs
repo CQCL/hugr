@@ -9,7 +9,6 @@ use hugr_core::{
     ops::handle::NodeHandle,
     std_extensions::logic::LogicOp,
 };
-use itertools::Itertools;
 use rstest::*;
 
 use crate::{

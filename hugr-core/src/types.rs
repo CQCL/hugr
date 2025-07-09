@@ -131,9 +131,11 @@ pub enum TypeBound {
     #[serde(rename = "C", alias = "E")] // alias to read in legacy Eq variants
     Copyable,
     /// No bound on the type.
+    ///
+    /// It cannot be copied nor discarded.
     #[serde(rename = "A")]
     #[default]
-    Any,
+    Linear,
 }
 
 impl TypeBound {
@@ -152,16 +154,16 @@ impl TypeBound {
     /// Report if this bound contains another.
     #[must_use]
     pub const fn contains(&self, other: TypeBound) -> bool {
-        use TypeBound::{Any, Copyable};
-        matches!((self, other), (Any, _) | (_, Copyable))
+        use TypeBound::{Copyable, Linear};
+        matches!((self, other), (Linear, _) | (_, Copyable))
     }
 }
 
 /// Calculate the least upper bound for an iterator of bounds
 pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
     tags.fold_while(TypeBound::Copyable, |acc, new| {
-        if acc == TypeBound::Any || new == TypeBound::Any {
-            Done(TypeBound::Any)
+        if acc == TypeBound::Linear || new == TypeBound::Linear {
+            Done(TypeBound::Linear)
         } else {
             Continue(acc.union(new))
         }
@@ -777,7 +779,7 @@ impl<'a> Substitution<'a> {
 
 /// A transformation that can be applied to a [Type] or [`TypeArg`].
 /// More general in some ways than a Substitution: can fail with a
-/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Any`],
+/// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Linear`],
 /// and applies to arbitrary extension types rather than type variables.
 pub trait TypeTransformer {
     /// Error returned when a [`CustomType`] cannot be transformed, or a type
@@ -839,8 +841,8 @@ pub(crate) fn check_typevar_decl(
                 Ok(())
             } else {
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: cached_decl.clone(),
-                    actual: actual.clone(),
+                    cached: Box::new(cached_decl.clone()),
+                    actual: Box::new(actual.clone()),
                 })
             }
         }
@@ -930,7 +932,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             TypeRV::UNIT.into(),
-            vec![TypeRV::new_row_var_use(0, TypeBound::Any)].into(),
+            vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
@@ -1027,8 +1029,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                type_: TypeBound::Copyable.into(),
-                term: qb_t().into()
+                type_: Box::new(TypeBound::Copyable.into()),
+                term: Box::new(qb_t().into())
             }))
         );
 
@@ -1039,8 +1041,8 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
-                type_: TypeBound::Copyable.into(),
-                term: mk_opt(qb_t()).into()
+                type_: Box::new(TypeBound::Copyable.into()),
+                term: Box::new(mk_opt(qb_t()).into())
             }))
         );
 
@@ -1105,5 +1107,84 @@ pub(crate) mod test {
                     .boxed()
             }
         }
+    }
+}
+
+#[cfg(test)]
+pub(super) mod proptest_utils {
+    use proptest::collection::vec;
+    use proptest::prelude::{Strategy, any_with};
+
+    use super::serialize::{TermSer, TypeArgSer, TypeParamSer};
+    use super::type_param::Term;
+
+    use crate::proptest::RecursionDepth;
+    use crate::types::serialize::ArrayOrTermSer;
+
+    fn term_is_serde_type_arg(t: &Term) -> bool {
+        let TermSer::TypeArg(arg) = TermSer::from(t.clone()) else {
+            return false;
+        };
+        match arg {
+            TypeArgSer::List { elems: terms }
+            | TypeArgSer::ListConcat { lists: terms }
+            | TypeArgSer::Tuple { elems: terms }
+            | TypeArgSer::TupleConcat { tuples: terms } => terms.iter().all(term_is_serde_type_arg),
+            TypeArgSer::Variable { v } => term_is_serde_type_param(&v.cached_decl),
+            TypeArgSer::Type { ty } => {
+                if let Some(cty) = ty.as_extension() {
+                    cty.args().iter().all(term_is_serde_type_arg)
+                } else {
+                    true
+                }
+            } // Do we need to inspect inside function types? sum types?
+            TypeArgSer::BoundedNat { .. }
+            | TypeArgSer::String { .. }
+            | TypeArgSer::Bytes { .. }
+            | TypeArgSer::Float { .. } => true,
+        }
+    }
+
+    fn term_is_serde_type_param(t: &Term) -> bool {
+        let TermSer::TypeParam(parm) = TermSer::from(t.clone()) else {
+            return false;
+        };
+        match parm {
+            TypeParamSer::Type { .. }
+            | TypeParamSer::BoundedNat { .. }
+            | TypeParamSer::String
+            | TypeParamSer::Bytes
+            | TypeParamSer::Float
+            | TypeParamSer::StaticType => true,
+            TypeParamSer::List { param } => term_is_serde_type_param(&param),
+            TypeParamSer::Tuple { params } => {
+                match &params {
+                    ArrayOrTermSer::Array(terms) => terms.iter().all(term_is_serde_type_param),
+                    ArrayOrTermSer::Term(b) => match &**b {
+                        Term::List(_) => panic!("Should be represented as ArrayOrTermSer::Array"),
+                        // This might be well-typed, but does not fit the (TODO: update) JSON schema
+                        Term::Variable(_) => false,
+                        // Similarly, but not produced by our `impl Arbitrary`:
+                        Term::ListConcat(_) => todo!("Update schema"),
+
+                        // The others do not fit the JSON schema, and are not well-typed,
+                        // but can be produced by our impl of Arbitrary, so we must filter out:
+                        _ => false,
+                    },
+                }
+            }
+        }
+    }
+
+    pub fn any_serde_type_arg(depth: RecursionDepth) -> impl Strategy<Value = Term> {
+        any_with::<Term>(depth).prop_filter("Term was not a TypeArg", term_is_serde_type_arg)
+    }
+
+    pub fn any_serde_type_arg_vec() -> impl Strategy<Value = Vec<Term>> {
+        vec(any_serde_type_arg(RecursionDepth::default()), 1..3)
+    }
+
+    pub fn any_serde_type_param(depth: RecursionDepth) -> impl Strategy<Value = Term> {
+        any_with::<Term>(depth).prop_filter("Term was not a TypeParam", term_is_serde_type_param)
     }
 }

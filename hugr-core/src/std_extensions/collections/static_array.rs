@@ -313,8 +313,8 @@ impl HasConcrete for StaticArrayOpDef {
                     .filter(|t| Copyable.contains(t.least_upper_bound()))
                     .ok_or(SignatureError::TypeArgMismatch(
                         TermTypeError::TypeMismatch {
-                            type_: Copyable.into(),
-                            term: arg.clone(),
+                            type_: Box::new(Copyable.into()),
+                            term: Box::new(arg.clone()),
                         },
                     ))?;
 

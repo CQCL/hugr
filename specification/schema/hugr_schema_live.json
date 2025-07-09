@@ -676,6 +676,15 @@
                 },
                 "signature": {
                     "$ref": "#/$defs/PolyFuncType"
+                },
+                "visibility": {
+                    "default": "Public",
+                    "enum": [
+                        "Public",
+                        "Private"
+                    ],
+                    "title": "Visibility",
+                    "type": "string"
                 }
             },
             "required": [
@@ -706,6 +715,15 @@
                 },
                 "signature": {
                     "$ref": "#/$defs/PolyFuncType"
+                },
+                "visibility": {
+                    "default": "Private",
+                    "enum": [
+                        "Public",
+                        "Private"
+                    ],
+                    "title": "Visibility",
+                    "type": "string"
                 }
             },
             "required": [
@@ -1976,5 +1994,16 @@
             "type": "object"
         }
     },
-    "title": "HUGR schema"
+    "title": "HUGR schema",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/SerialHugr"
+        },
+        {
+            "$ref": "#/$defs/Extension"
+        },
+        {
+            "$ref": "#/$defs/Package"
+        }
+    ]
 }

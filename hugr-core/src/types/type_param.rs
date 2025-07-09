@@ -70,7 +70,7 @@ pub type TypeParam = Term;
 pub enum Term {
     /// The type of runtime types.
     #[display("Type{}", match _0 {
-        TypeBound::Any => String::new(),
+        TypeBound::Linear => String::new(),
         _ => format!("[{_0}]")
     })]
     RuntimeType(TypeBound),
@@ -261,7 +261,7 @@ impl<const N: usize> From<[Term; N]> for Term {
 #[display("#{idx}")]
 pub struct TermVar {
     idx: usize,
-    cached_decl: Box<Term>,
+    pub(in crate::types) cached_decl: Box<Term>,
 }
 
 impl Term {
@@ -687,8 +687,8 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::RuntimeType(_), Term::StaticType) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
-            term: term.clone(),
-            type_: type_.clone(),
+            term: Box::new(term.clone()),
+            type_: Box::new(type_.clone()),
         }),
     }
 }
@@ -713,7 +713,7 @@ pub enum TermTypeError {
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
     #[error("Term {term} does not fit declared type {type_}")]
-    TypeMismatch { term: Term, type_: Term },
+    TypeMismatch { term: Box<Term>, type_: Box<Term> },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -730,7 +730,7 @@ pub enum TermTypeError {
     OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of type argument")]
-    InvalidValue(TypeArg),
+    InvalidValue(Box<TypeArg>),
 }
 
 /// Part of a sequence.
@@ -896,7 +896,7 @@ mod test {
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &seq_param).unwrap_err();
-        check_seq(&[usize_t()], &TypeBound::Any.into()).unwrap_err();
+        check_seq(&[usize_t()], &TypeBound::Linear.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
@@ -905,17 +905,17 @@ mod test {
         check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap();
         check_seq(
             &[
-                rowvar(1, TypeBound::Any),
+                rowvar(1, TypeBound::Linear),
                 usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
-            &TypeParam::new_list_type(TypeBound::Any),
+            &TypeParam::new_list_type(TypeBound::Linear),
         )
         .unwrap();
         // Next one fails because a list of Eq is required
         check_seq(
             &[
-                rowvar(1, TypeBound::Any),
+                rowvar(1, TypeBound::Linear),
                 usize_t().into(),
                 rowvar(0, TypeBound::Copyable),
             ],
@@ -957,8 +957,8 @@ mod test {
         )
         .unwrap_err(); // Wrong way around
         let two_types = TypeParam::new_tuple_type(Term::new_list([
-            TypeBound::Any.into(),
-            TypeBound::Any.into(),
+            TypeBound::Linear.into(),
+            TypeBound::Linear.into(),
         ]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
@@ -973,7 +973,7 @@ mod test {
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
-        let outer_param = Term::new_list_type(TypeBound::Any);
+        let outer_param = Term::new_list_type(TypeBound::Linear);
         let outer_arg = Term::new_list([
             TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
             usize_t().into(),
@@ -992,7 +992,7 @@ mod test {
 
     #[test]
     fn subst_list_list() {
-        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Any));
+        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Linear));
         let row_var_decl = Term::new_list_type(TypeBound::Copyable);
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
@@ -1011,9 +1011,9 @@ mod test {
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
-                term: usize_t().into(),
+                term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
-                type_: TypeParam::new_list_type(TypeBound::Any)
+                type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
             })
         );
 
@@ -1046,13 +1046,13 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{Term, Type, TypeBound};
+        use crate::types::{Term, Type, TypeBound, proptest_utils::any_serde_type_param};
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                (any::<usize>(), any_with::<Term>(depth))
+                (any::<usize>(), any_serde_type_param(depth))
                     .prop_map(|(idx, cached_decl)| Self {
                         idx,
                         cached_decl: Box::new(cached_decl),
