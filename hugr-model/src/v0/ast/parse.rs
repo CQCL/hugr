@@ -299,10 +299,7 @@ fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
         .map(|pair| match pair.as_str() {
             "pub" => Ok(Visibility::Public),
             "priv" => Ok(Visibility::Private),
-            _ => Err(ParseError::custom(
-                "Expected 'pub' or 'priv'",
-                pair.as_span(),
-            )),
+            _ => unreachable!("Expected 'pub' or 'priv', got {}", pair.as_str()),
         })
         .transpose()?;
     let name = parse_symbol_name(pairs.next().unwrap())?;
