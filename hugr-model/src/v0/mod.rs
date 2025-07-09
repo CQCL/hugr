@@ -287,6 +287,26 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 /// - **Result:** `core.meta`
 pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
 
+/// Metadata constructor for order hint keys on input nodes.
+///
+/// When the sources of a dataflow region are represented by an input operation
+/// within the region, this metadata can be attached the region to give the
+/// input node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_INPUT_KEY: &str = "core.order_hint.input_key";
+
+/// Metadata constructor for order hint keys on output nodes.
+///
+/// When the targets of a dataflow region are represented by an output operation
+/// within the region, this metadata can be attached the region to give the
+/// output node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_OUTPUT_KEY: &str = "core.order_hint.output_key";
+
 /// Metadata constructor for order hints.
 ///
 /// When this metadata is attached to a dataflow region, it can indicate a
