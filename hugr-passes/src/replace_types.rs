@@ -204,7 +204,8 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
+    param_ops:
+        HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate>>>,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -352,10 +353,27 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
+    #[deprecated(note = "use replace_parametrized_op_with")] // When removed, consider renaming back over this.
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
+    ) {
+        self.param_ops
+            .insert(src.into(), Arc::new(move |args, _| dest_fn(args)));
+    }
+
+    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s
+    /// (and a handle to the [ReplaceTypes], e.g. allowing access to [Self::linearizer]).
+    /// Note that the `TypeArgs` will already have been updated (e.g. they may not
+    /// fit the bounds of the original op).
+    ///
+    /// If the Callback returns None, the new typeargs will be applied to the original op.
+    pub fn replace_parametrized_op_with(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate> + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -461,7 +479,7 @@ impl ReplaceTypes {
                     if let Some(replacement) = self
                         .param_ops
                         .get(&def.as_ref().into())
-                        .and_then(|rep_fn| rep_fn(&args))
+                        .and_then(|rep_fn| rep_fn(&args, self))
                     {
                         replacement
                             .replace(hugr, n)
