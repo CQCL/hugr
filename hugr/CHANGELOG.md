@@ -2,6 +2,15 @@
 
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-v0.20.2...hugr-v0.21.0) - 2025-07-09
 
+
+This release includes a long list of changes:
+
+- The HUGR model serialization format is now stable, and should be preferred over the old JSON format.
+- Type parameters and type arguments are now unified into a single `Term` type.
+- Function definitions can no longer be nested inside dataflow regions. Now they must be defined at the top level module.
+- Function definitions and declarations now have a `Visibility` field, which define whether they are visible in the public API of the module.
+- And many more fixes and improvements.
+
 ### Bug Fixes
 
 - DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
