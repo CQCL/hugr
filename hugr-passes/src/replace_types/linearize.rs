@@ -55,7 +55,7 @@ pub trait Linearizer {
         let (tgt_node, tgt_inport) = if targets.len() == 1 {
             *targets.first().unwrap()
         } else {
-            // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
+            // Fail fast if the edges are nonlocal.
             let src_parent = hugr
                 .get_parent(src.node())
                 .expect("Root node cannot have out edges");
@@ -147,7 +147,8 @@ pub enum LinearizeError {
         sig: Option<Box<Signature>>,
     },
     #[error(
-        "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})"
+        "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent}).
+  Try using LocalizeEdges pass first."
     )]
     NoLinearNonLocalEdges {
         src: Node,
