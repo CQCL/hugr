@@ -349,8 +349,8 @@
             "additionalProperties": false,
             "properties": {
                 "tp": {
-                    "const": "Const",
-                    "default": "Const",
+                    "const": "ConstType",
+                    "default": "ConstType",
                     "title": "Tp",
                     "type": "string"
                 },
@@ -1884,7 +1884,7 @@
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
                     "Bytes": "#/$defs/BytesParam",
-                    "Const": "#/$defs/ConstParam",
+                    "ConstType": "#/$defs/ConstParam",
                     "Float": "#/$defs/FloatParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
