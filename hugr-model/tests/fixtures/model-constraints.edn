@@ -2,13 +2,14 @@
 
 (mod)
 
-(declare-func array.replicate
+(declare-func private array.replicate
               (param ?n core.nat)
               (param ?t core.type)
               (where (core.nonlinear ?t))
               (core.fn [?t] [(collections.array.array ?n ?t)]))
 
 (declare-func
+ public
  array.copy
  (param ?n core.nat)
  (param ?t core.type)
@@ -18,7 +19,7 @@
   [(collections.array.array ?n ?t)
    (collections.array.array ?n ?t)]))
 
-(define-func util.copy
+(define-func public util.copy
   (param ?t core.type)
   (where (core.nonlinear ?t))
   (core.fn [?t] [?t ?t])

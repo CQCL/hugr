@@ -95,6 +95,8 @@ struct Context<'a> {
     // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
 
+const NO_VIS: Option<Visibility> = None;
+
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
         let mut module = table::Module::default();
@@ -331,7 +333,7 @@ impl<'a> Context<'a> {
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let symbol = this.export_poly_func_type(
                     func.func_name(),
-                    func.visibility().clone().into(),
+                    Some(func.visibility().clone().into()),
                     func.signature(),
                 );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
@@ -345,7 +347,7 @@ impl<'a> Context<'a> {
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let symbol = this.export_poly_func_type(
                     func.func_name(),
-                    func.visibility().clone().into(),
+                    Some(func.visibility().clone().into()),
                     func.signature(),
                 );
                 table::Operation::DeclareFunc(symbol)
@@ -354,10 +356,8 @@ impl<'a> Context<'a> {
             OpType::AliasDecl(alias) => self.with_local_scope(node_id, |this| {
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
-                // Visibility is not spec'd in hugr-core
-                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility,
+                    visibility: &NO_VIS, // not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -370,10 +370,8 @@ impl<'a> Context<'a> {
                 let value = this.export_type(&alias.definition);
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
-                // Visibility is not spec'd in hugr-core
-                let visibility = this.bump.alloc(Visibility::default()); // good to common up!?
                 let symbol = this.bump.alloc(table::Symbol {
-                    visibility,
+                    visibility: &NO_VIS, // not spec'd in hugr-core
                     name: &alias.name,
                     params: &[],
                     constraints: &[],
@@ -548,8 +546,7 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            // Visibility of OpDef's has no effect
-            this.export_poly_func_type(name, Visibility::default(), poly_func_type)
+            this.export_poly_func_type(name, None, poly_func_type)
         });
 
         let meta = {
@@ -800,7 +797,7 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         name: &'a str,
-        visibility: Visibility,
+        visibility: Option<Visibility>,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);

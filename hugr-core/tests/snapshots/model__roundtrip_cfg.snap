@@ -16,7 +16,7 @@ expression: ast
 
 (import core.adt)
 
-(define-func example.cfg_loop (param ?0 core.type) (core.fn [?0] [?0])
+(define-func private example.cfg_loop (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]
     (signature (core.fn [?0] [?0]))
     (cfg [%0] [%1]
@@ -30,7 +30,7 @@ expression: ast
             ((core.make_adt 0) [%4] [%5]
               (signature (core.fn [?0] [(core.adt [[?0] [?0]])])))))))))
 
-(define-func example.cfg_order (param ?0 core.type) (core.fn [?0] [?0])
+(define-func public example.cfg_order (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]
     (signature (core.fn [?0] [?0]))
     (cfg [%0] [%1]

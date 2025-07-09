@@ -3,6 +3,7 @@
 (mod)
 
 (define-func
+  public
   example.add
   (core.fn
     [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]

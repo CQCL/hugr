@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func main
+(define-func public main
   (core.fn [] [])
   (meta core.entrypoint)
   (dfg [] []
@@ -10,7 +10,7 @@
 
 (mod)
 
-(define-func wrapper_dfg
+(define-func private wrapper_dfg
   (core.fn [] [])
   (dfg [] []
     (signature (core.fn [] []))
@@ -18,7 +18,7 @@
 
 (mod)
 
-(define-func wrapper_cfg
+(define-func public wrapper_cfg
   (core.fn [] [])
   (dfg [] []
     (signature (core.fn [] []))
