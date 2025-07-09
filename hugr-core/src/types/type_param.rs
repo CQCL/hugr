@@ -179,7 +179,7 @@ impl Term {
         Self::TupleType(Box::new(item_types.into()))
     }
 
-    /// Creates a new [`Term::Const`] from a runtime type.
+    /// Creates a new [`Term::ConstType`] from a runtime type.
     pub fn new_const(ty: impl Into<Type>) -> Self {
         Self::ConstType(Box::new(ty.into()))
     }
