@@ -52,8 +52,6 @@ pub trait Linearizer {
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
-        let sig = hugr.signature(src.node()).unwrap();
-        let typ = sig.port_type(src.source()).unwrap();
         let (tgt_node, tgt_inport) = if targets.len() == 1 {
             *targets.first().unwrap()
         } else {
@@ -74,7 +72,8 @@ pub trait Linearizer {
                     tgt_parent,
                 });
             }
-            let typ = typ.clone(); // Stop borrowing hugr in order to add_hugr to it
+            let sig = hugr.signature(src.node()).unwrap();
+            let typ = sig.port_type(src.source()).unwrap().clone();
             let copy_discard_op = self
                 .copy_discard_op(&typ, targets.len())?
                 .add_hugr(hugr, src_parent)
