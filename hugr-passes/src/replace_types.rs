@@ -204,8 +204,10 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops:
-        HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate>>>,
+    param_ops: HashMap<
+        ParametricOp,
+        Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>>,
+    >,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -360,7 +362,7 @@ impl ReplaceTypes {
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
         self.param_ops
-            .insert(src.into(), Arc::new(move |args, _| dest_fn(args)));
+            .insert(src.into(), Arc::new(move |args, _| Ok(dest_fn(args))));
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
@@ -373,7 +375,8 @@ impl ReplaceTypes {
     pub fn replace_parametrized_op_with(
         &mut self,
         src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate> + 'static,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -479,7 +482,9 @@ impl ReplaceTypes {
                     if let Some(replacement) = self
                         .param_ops
                         .get(&def.as_ref().into())
-                        .and_then(|rep_fn| rep_fn(&args, self))
+                        .map(|rep_fn| rep_fn(&args, self))
+                        .transpose()?
+                        .flatten()
                     {
                         replacement
                             .replace(hugr, n)
@@ -749,11 +754,11 @@ mod test {
             ),
         );
         lw.replace_parametrized_op_with(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
-            Some(NodeTemplate::CompoundOp(Box::new(
+            Ok(Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
                     .unwrap(),
-            )))
+            ))))
         });
         lw
     }
@@ -1031,7 +1036,7 @@ mod test {
         lowerer.replace_parametrized_op_with(
             e.get_op(READ).unwrap().as_ref(),
             |args: &[TypeArg], _| {
-                option_contents(just_elem_type(args)).map(|elem| {
+                Ok(option_contents(just_elem_type(args)).map(|elem| {
                     NodeTemplate::SingleOp(
                         ListOp::get
                             .with_type(elem)
@@ -1039,7 +1044,7 @@ mod test {
                             .unwrap()
                             .into(),
                     )
-                })
+                }))
             },
         );
         assert!(lowerer.run(&mut h).unwrap());
@@ -1135,7 +1140,7 @@ mod test {
 
         let mut lw = lowerer(&e);
         lw.replace_parametrized_op_with(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Some(NodeTemplate::Call(read_func, args.to_owned()))
+            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
         });
         lw.run(&mut h).unwrap();
 

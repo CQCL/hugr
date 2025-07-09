@@ -70,26 +70,26 @@ impl Default for LinearizeArrayPass {
                         "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
                     );
-                    Some(NodeTemplate::SingleOp(
+                    Ok(Some(NodeTemplate::SingleOp(
                         op_def.instantiate(args).unwrap().into(),
-                    ))
+                    )))
                 },
             );
         }
         pass.replace_parametrized_op_with(
             value_array::EXTENSION.get_op(&ARRAY_REPEAT_OP_ID).unwrap(),
             |args, _| {
-                Some(NodeTemplate::SingleOp(
+                Ok(Some(NodeTemplate::SingleOp(
                     ArrayRepeatDef::new().instantiate(args).unwrap().into(),
-                ))
+                )))
             },
         );
         pass.replace_parametrized_op_with(
             value_array::EXTENSION.get_op(&ARRAY_SCAN_OP_ID).unwrap(),
             |args, _| {
-                Some(NodeTemplate::SingleOp(
+                Ok(Some(NodeTemplate::SingleOp(
                     ArrayScanDef::new().instantiate(args).unwrap().into(),
-                ))
+                )))
             },
         );
         pass.replace_parametrized_op_with(
@@ -98,9 +98,9 @@ impl Default for LinearizeArrayPass {
                 .unwrap(),
             |args, _| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
-                Some(NodeTemplate::SingleOp(
+                Ok(Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),
-                ))
+                )))
             },
         );
         pass.replace_parametrized_op_with(
@@ -109,9 +109,9 @@ impl Default for LinearizeArrayPass {
                 .unwrap(),
             |args, _| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
-                Some(NodeTemplate::SingleOp(
+                Ok(Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),
-                ))
+                )))
             },
         );
         pass.linearizer()
