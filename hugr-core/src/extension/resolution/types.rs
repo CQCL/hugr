@@ -217,7 +217,7 @@ pub(super) fn collect_term_exts(
 ) {
     match term {
         Term::Runtime(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
-        Term::Const(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        Term::ConstType(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
         Term::List(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
