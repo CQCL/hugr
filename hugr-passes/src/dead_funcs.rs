@@ -10,7 +10,7 @@ use hugr_core::{
 use petgraph::visit::{Dfs, Walker};
 
 use crate::{
-    ComposablePass, IncludeExports,
+    ComposablePass, VisPolicy,
     composable::{ValidatePassError, validate_if_test},
 };
 
@@ -51,7 +51,7 @@ fn reachable_funcs<'a, H: HugrView>(
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
     entry_points: Vec<Node>,
-    include_exports: IncludeExports,
+    include_exports: VisPolicy,
 }
 
 impl RemoveDeadFuncsPass {
@@ -69,8 +69,8 @@ impl RemoveDeadFuncsPass {
     }
 
     /// Sets whether the exported [FuncDefn](hugr_core::ops::FuncDefn) children are
-    /// included as entry points for reachability analysis - see [IncludeExports].
-    pub fn include_module_exports(mut self, include: IncludeExports) -> Self {
+    /// included as entry points for reachability analysis - see [VisPolicy].
+    pub fn include_module_exports(mut self, include: VisPolicy) -> Self {
         self.include_exports = include;
         self
     }
@@ -152,7 +152,7 @@ pub fn remove_dead_funcs(
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
     validate_if_test(
         RemoveDeadFuncsPass::default()
-            .include_module_exports(IncludeExports::Never)
+            .include_module_exports(VisPolicy::None)
             .with_module_entry_points(entry_points),
         h,
     )
@@ -193,20 +193,20 @@ mod test {
     use hugr_core::{HugrView, Visibility, extension::prelude::usize_t, types::Signature};
 
     use super::RemoveDeadFuncsPass;
-    use crate::{ComposablePass, IncludeExports};
+    use crate::{ComposablePass, VisPolicy};
 
     #[rstest]
-    #[case(false, IncludeExports::default(), [], vec!["from_pub", "pubfunc"])]
-    #[case(false, IncludeExports::Never, ["ment"], vec!["from_ment", "ment"])]
-    #[case(false, IncludeExports::Never, ["from_ment", "from_pub"], vec!["from_ment", "from_pub"])]
-    #[case(false, IncludeExports::default(), ["from_ment"], vec!["from_ment", "from_pub", "pubfunc"])]
-    #[case(false, IncludeExports::Always, ["ment"], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
-    #[case(true, IncludeExports::default(), [], vec!["from_ment", "ment"])]
-    #[case(true, IncludeExports::Always, [], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
-    #[case(true, IncludeExports::Never, ["from_pub"], vec!["from_ment", "from_pub", "ment"])]
+    #[case(false, VisPolicy::default(), [], vec!["from_pub", "pubfunc"])]
+    #[case(false, VisPolicy::None, ["ment"], vec!["from_ment", "ment"])]
+    #[case(false, VisPolicy::None, ["from_ment", "from_pub"], vec!["from_ment", "from_pub"])]
+    #[case(false, VisPolicy::default(), ["from_ment"], vec!["from_ment", "from_pub", "pubfunc"])]
+    #[case(false, VisPolicy::AllPublic, ["ment"], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
+    #[case(true, VisPolicy::default(), [], vec!["from_ment", "ment"])]
+    #[case(true, VisPolicy::AllPublic, [], vec!["from_ment", "from_pub", "ment", "pubfunc"])]
+    #[case(true, VisPolicy::None, ["from_pub"], vec!["from_ment", "from_pub", "ment"])]
     fn remove_dead_funcs_entry_points(
         #[case] use_hugr_entrypoint: bool,
-        #[case] inc: IncludeExports,
+        #[case] inc: VisPolicy,
         #[case] entry_points: impl IntoIterator<Item = &'static str>,
         #[case] retained_funcs: Vec<&'static str>,
     ) -> Result<(), Box<dyn std::error::Error>> {

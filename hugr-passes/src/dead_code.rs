@@ -9,7 +9,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{ComposablePass, IncludeExports};
+use crate::{ComposablePass, VisPolicy};
 
 /// Configuration for Dead Code Elimination pass, i.e. which removes nodes
 /// beneath the [HugrView::entrypoint] that compute only unneeded values.
@@ -21,7 +21,7 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
-    include_exports: IncludeExports,
+    include_exports: VisPolicy,
 }
 
 impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
@@ -29,7 +29,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             preserve_callback: Arc::new(PreserveNode::default_for),
-            include_exports: IncludeExports::default(),
+            include_exports: VisPolicy::default(),
         }
     }
 }
@@ -42,7 +42,7 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
         #[derive(Debug)]
         struct DCEDebug<'a, N> {
             entry_points: &'a Vec<N>,
-            include_exports: IncludeExports,
+            include_exports: VisPolicy,
         }
 
         Debug::fmt(
@@ -115,10 +115,10 @@ impl<H: HugrView> DeadCodeElimPass<H> {
     /// Note that for non-module-entry Hugrs this has no effect, since we only remove
     /// code beneath the entrypoint: this cannot be affected by other module children.
     ///
-    /// So, for module-rooted-Hugrs: [IncludeExports::OnlyIfEntrypointIsModuleRoot] is
-    /// equivalent to [IncludeExports::Always]; and [IncludeExports::Never] will remove
+    /// So, for module-rooted-Hugrs: [VisPolicy::PublicIfModuleEntrypoint] is
+    /// equivalent to [VisPolicy::AllPublic]; and [VisPolicy::None] will remove
     /// all children, unless some are explicity added by [Self::with_entry_points].
-    pub fn include_module_exports(mut self, include: IncludeExports) -> Self {
+    pub fn include_module_exports(mut self, include: VisPolicy) -> Self {
         self.include_exports = include;
         self
     }
@@ -208,20 +208,20 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::{ComposablePass, IncludeExports};
+    use crate::{ComposablePass, VisPolicy};
 
     use super::{DeadCodeElimPass, PreserveNode};
 
     #[rstest]
-    #[case(false, IncludeExports::Never, true)]
-    #[case(false, IncludeExports::OnlyIfEntrypointIsModuleRoot, false)]
-    #[case(false, IncludeExports::Always, false)]
-    #[case(true, IncludeExports::Never, true)]
-    #[case(true, IncludeExports::OnlyIfEntrypointIsModuleRoot, false)]
-    #[case(true, IncludeExports::Always, false)]
+    #[case(false, VisPolicy::None, true)]
+    #[case(false, VisPolicy::PublicIfModuleEntrypoint, false)]
+    #[case(false, VisPolicy::AllPublic, false)]
+    #[case(true, VisPolicy::None, true)]
+    #[case(true, VisPolicy::PublicIfModuleEntrypoint, false)]
+    #[case(true, VisPolicy::AllPublic, false)]
     fn test_module_exports(
         #[case] include_dfn: bool,
-        #[case] module_exports: IncludeExports,
+        #[case] module_exports: VisPolicy,
         #[case] decl_removed: bool,
     ) {
         let mut mb = ModuleBuilder::new();

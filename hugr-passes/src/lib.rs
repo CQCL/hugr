@@ -35,21 +35,35 @@ pub use non_local::{ensure_no_nonlocal_edges, nonlocal_edges};
 pub use untuple::UntuplePass;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-/// A policy for whether to include the public (exported) functions of a Hugr
-/// (typically, as starting points for analysis)
-pub enum IncludeExports {
-    Always,
-    Never,
+/// A policy for selecting [FuncDefn] and [FuncDecl]s using their [Visibility],
+/// e.g. (typically) to use as starting points for analysis
+///
+/// [FuncDefn]: hugr_core::ops::FuncDefn
+/// [FuncDecl]: hugr_core::ops::FuncDecl
+/// [Visibility]: hugr_core::Visibility
+pub enum VisPolicy {
+    /// All [Public] functions should be used
+    ///
+    /// [Public]: hugr_core::Visibility::Public
+    AllPublic,
+    /// Do not select any functions
+    None,
+    /// Use the [Public] functions if the Hugr's [entrypoint] is the [module_root],
+    /// otherwise do not use any.
+    ///
+    /// [Public]: hugr_core::Visibility::Public
+    /// [entrypoint]: hugr_core::HugrView::entrypoint
+    /// [module_root]: hugr_core::HugrView::module_root
     #[default]
-    OnlyIfEntrypointIsModuleRoot,
+    PublicIfModuleEntrypoint,
 }
 
-impl IncludeExports {
+impl VisPolicy {
     /// Returns whether to include the public functions of a particular Hugr
     fn for_hugr(&self, h: &impl HugrView) -> bool {
         matches!(
             (self, h.entrypoint() == h.module_root()),
-            (Self::Always, _) | (Self::OnlyIfEntrypointIsModuleRoot, true)
+            (Self::AllPublic, _) | (Self::PublicIfModuleEntrypoint, true)
         )
     }
 }

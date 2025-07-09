@@ -30,12 +30,12 @@ use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
 use crate::dataflow::{DFContext, PartialValue, partial_from_const};
-use crate::{ComposablePass as _, IncludeExports};
+use crate::{ComposablePass as _, VisPolicy};
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, fold_constants};
 
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
-    fold_constants(h, IncludeExports::Always);
+    fold_constants(h, VisPolicy::AllPublic);
 }
 
 #[rstest]

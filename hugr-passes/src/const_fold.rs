@@ -18,7 +18,7 @@ use value_handle::ValueHandle;
 use crate::dead_code::{DeadCodeElimPass, PreserveNode};
 use crate::{ComposablePass, composable::validate_if_test};
 use crate::{
-    IncludeExports,
+    VisPolicy,
     dataflow::{
         ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
         partial_from_const,
@@ -83,7 +83,7 @@ impl ConstantFoldPass {
     /// Note that providing empty `inputs` indicates that we must preserve the ability
     /// to compute the result of `node` for all possible inputs.
     /// * If the entrypoint is the module-root, this method should be called for every
-    /// [FuncDefn] that is externally callable
+    ///   [FuncDefn] that is externally callable
     /// * Otherwise, i.e. if the entrypoint is not the module-root,
     ///    * The default is to assume the entrypoint is callable with any inputs;
     ///    * If `node` is the entrypoint, this method allows to restrict the possible inputs
@@ -227,7 +227,7 @@ pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H
 ///
 /// [`Module`]: hugr_core::ops::OpType::Module
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-pub fn fold_constants(h: &mut (impl HugrMut<Node = Node> + 'static), policy: IncludeExports) {
+pub fn fold_constants(h: &mut (impl HugrMut<Node = Node> + 'static), policy: VisPolicy) {
     let mut funcs = Vec::new();
     if !h.entrypoint_optype().is_module() {
         funcs.push(h.entrypoint());
