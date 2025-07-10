@@ -204,7 +204,7 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
+    param_ops: HashMap<ParametricOp, (Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>, bool)>,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -213,7 +213,6 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
-    process_replacements: bool,
 }
 
 impl Default for ReplaceTypes {
@@ -275,7 +274,6 @@ impl ReplaceTypes {
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
-            process_replacements: false,
         }
     }
 
@@ -354,12 +352,26 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
+    ///
+    /// See also [Self::replace_parametrized_op_recursive]
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
-        self.param_ops.insert(src.into(), Arc::new(dest_fn));
+        self.param_ops
+            .insert(src.into(), (Arc::new(dest_fn), false));
+    }
+
+    /// Like [Self::replace_parametrized_op] but the contents of any [NodeTemplate]
+    /// returned by the callback will be transformed (recursively) by the same
+    /// ReplaceTypes instance after insertion into the target Hugr.
+    pub fn replace_parametrized_op_recursive(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
+    ) {
+        self.param_ops.insert(src.into(), (Arc::new(dest_fn), true));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -387,14 +399,6 @@ impl ReplaceTypes {
         + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
-    }
-
-    /// Configures this instance to (recursively) process the RHS of any replacement
-    /// ops or subtrees - registered with [Self::replace_op] or from callbacks
-    /// registered with [Self::replace_parametrized_op].
-    /// The default is `false`, i.e. do not recurse on such.
-    pub fn process_replacements(&mut self, r: bool) {
-        self.process_replacements = r;
     }
 
     fn change_node(
@@ -461,25 +465,25 @@ impl ReplaceTypes {
                 let def = ext_op.def_arc();
                 let mut changed = false;
                 let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                    r @ Some(_) => r.cloned(),
+                    Some(r) => Some((r.clone(), false)),
                     None => {
                         let mut args = ext_op.args().to_vec();
                         changed = args.transform(self)?;
                         let r2 = self
                             .param_ops
                             .get(&def.as_ref().into())
-                            .and_then(|rep_fn| rep_fn(&args));
+                            .and_then(|(rep_fn, rec)| rep_fn(&args).map(|nt| (nt, *rec)));
                         if r2.is_none() && changed {
                             *ext_op = ExtensionOp::new(def.clone(), args)?;
                         }
                         r2
                     }
                 };
-                if let Some(replacement) = replacement {
+                if let Some((replacement, process_recursive)) = replacement {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if self.process_replacements {
+                    if process_recursive {
                         self.change_subtree(hugr, n, true)?;
                     }
                     true

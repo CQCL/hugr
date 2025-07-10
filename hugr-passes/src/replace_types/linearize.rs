@@ -876,7 +876,7 @@ mod test {
             },
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
-        lowerer.replace_parametrized_op(drop_op, |args| {
+        lowerer.replace_parametrized_op_recursive(drop_op, |args| {
             let [TypeArg::Runtime(ty)] = args else {
                 panic!("Expected just one type")
             };
@@ -886,7 +886,6 @@ mod test {
             std::mem::swap(&mut h, dfb.hugr_mut());
             Some(NodeTemplate::CompoundOp(Box::new(h)))
         });
-        lowerer.process_replacements(true);
 
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
