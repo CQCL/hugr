@@ -1,20 +1,25 @@
 [package]
 name = "hugr-persistent"
 version = "0.1.0"
-rust-version.workspace = true
-edition.workspace = true
-homepage.workspace = true
-repository.workspace = true
-license.workspace = true
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+readme = "README.md"
+documentation = "https://docs.rs/hugr-persistent/"
+homepage = { workspace = true }
+repository = { workspace = true }
+description = "Persistent IR structure for Quantinuum's HUGR"
+keywords = ["Quantum", "Quantinuum"]
+categories = ["compilers", "ir"]
 
 [[test]]
 name = "persistent_walker_example"
 
 [dependencies]
-hugr-core.path = "../hugr-core"
+hugr-core = { path = "../hugr-core", version = "0.21.0" }
 
+derive_more = { workspace = true, features = ["display", "error", "from"] }
 delegate.workspace = true
-derive_more.workspace = true
 itertools.workspace = true
 petgraph.workspace = true
 portgraph.workspace = true
@@ -22,10 +27,13 @@ relrc = { workspace = true, features = ["petgraph", "serde"] }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
-wyhash = "0.6.0"
+wyhash.workspace = true
 
 [lints]
 workspace = true
+
+[lib]
+bench = false
 
 [dev-dependencies]
 rstest.workspace = true

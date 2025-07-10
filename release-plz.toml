@@ -69,3 +69,8 @@ version_group = "hugr"
 name = "hugr-llvm"
 release = true
 version_group = "hugr"
+
+[[package]]
+name = "hugr-persistent"
+# TODO: Remove after the first release has been manually created.
+release = false
