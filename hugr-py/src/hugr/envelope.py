@@ -65,10 +65,10 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
             # `make_envelope_str`, but we prioritize speed for binary formats.
             payload = json_str.encode("utf-8")
 
-        case EnvelopeFormat.MODULE:
+        case EnvelopeFormat.MODEL:
             payload = bytes(package.to_model())
 
-        case EnvelopeFormat.MODULE_WITH_EXTS:
+        case EnvelopeFormat.MODEL_WITH_EXTS:
             package_bytes = bytes(package.to_model())
             extension_str = json.dumps(
                 [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
@@ -105,7 +105,7 @@ def read_envelope(envelope: bytes) -> Package:
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODULE | EnvelopeFormat.MODULE_WITH_EXTS:
+        case EnvelopeFormat.MODEL | EnvelopeFormat.MODEL_WITH_EXTS:
             msg = "Decoding HUGR envelopes in MODULE format is not supported yet."
             raise ValueError(msg)
 
@@ -150,10 +150,10 @@ def read_envelope_hugr_str(envelope: str) -> Hugr:
 class EnvelopeFormat(Enum):
     """Format used to encode a HUGR envelope."""
 
-    MODULE = 1
-    """A capnp-encoded hugr-module."""
-    MODULE_WITH_EXTS = 2
-    """A capnp-encoded hugr-module, immediately followed by a json-encoded
+    MODEL = 1
+    """A capnp-encoded hugr-model."""
+    MODEL_WITH_EXTS = 2
+    """A capnp-encoded hugr-model, immediately followed by a json-encoded
     extension registry."""
     JSON = 63  # '?' in ASCII
     """A json-encoded hugr-package. This format is ASCII-printable."""
@@ -232,4 +232,4 @@ class EnvelopeConfig:
 # Set EnvelopeConfig's class variables.
 # These can only be initialized _after_ the class is defined.
 EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
-EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
+EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=0)
