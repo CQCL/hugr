@@ -83,7 +83,7 @@ class ModelExport:
 
         match node_data.op:
             case DFG() as op:
-                region = self.export_region_dfg(node, standalone = False)
+                region = self.export_region_dfg(node, standalone=False)
 
                 return model.Node(
                     operation=model.Dfg(),
@@ -124,10 +124,8 @@ class ModelExport:
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(
-                        child,
-                        standalone = True
-                    ) for child in node_data.children
+                    self.export_region_dfg(child, standalone=True)
+                    for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
@@ -142,7 +140,7 @@ class ModelExport:
                 )
 
             case TailLoop() as op:
-                region = self.export_region_dfg(node, standalone = False)
+                region = self.export_region_dfg(node, standalone=False)
                 signature = op.outer_signature().to_model()
                 return model.Node(
                     operation=model.TailLoop(),
@@ -158,7 +156,7 @@ class ModelExport:
                 symbol = self.export_symbol(
                     name, op.visibility, op.signature.params, op.signature.body
                 )
-                region = self.export_region_dfg(node, standalone = False)
+                region = self.export_region_dfg(node, standalone=False)
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
@@ -324,7 +322,7 @@ class ModelExport:
                 )
 
             case DataflowBlock() as op:
-                region = self.export_region_dfg(node, standalone = False)
+                region = self.export_region_dfg(node, standalone=False)
 
                 input_types = [model.List([type.to_model() for type in op.inputs])]
 
@@ -430,10 +428,7 @@ class ModelExport:
         sources = []
         targets = []
 
-        if standalone:
-            meta = self.export_entrypoint_meta(node)
-        else:
-            meta = []
+        meta = self.export_entrypoint_meta(node) if standalone else []
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -555,7 +550,7 @@ class ModelExport:
             sources=[source],
             signature=signature,
             children=children,
-            meta=meta
+            meta=meta,
         )
 
     def export_symbol(
