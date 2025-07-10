@@ -30,8 +30,8 @@ use crate::{
     },
 };
 use fxhash::FxHashMap;
-use hugr_model::v0 as model;
 use hugr_model::v0::table;
+use hugr_model::v0::{self as model};
 use itertools::{Either, Itertools};
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
@@ -433,7 +433,7 @@ impl<'a> Context<'a> {
         let region_data = self.get_region(self.module.root)?;
 
         for node in region_data.children {
-            self.import_node(*node, self.hugr.entrypoint())?;
+            self.import_node(*node, self.hugr.module_root())?;
         }
 
         for meta_item in region_data.meta {
