@@ -107,9 +107,9 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(&self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
+    fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
-        let new_optype = match self.clone() {
+        let new_optype = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(new_h) => {
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
@@ -457,8 +457,25 @@ impl ReplaceTypes {
                 | rest.transform(self)?),
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
-            OpType::ExtensionOp(ext_op) => Ok(
-                if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+            OpType::ExtensionOp(ext_op) => Ok({
+                let def = ext_op.def_arc();
+                let mut changed = false;
+                let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                    r @ Some(_) => r.cloned(),
+                    None => {
+                        let mut args = ext_op.args().to_vec();
+                        changed = args.transform(self)?;
+                        let r2 = self
+                            .param_ops
+                            .get(&def.as_ref().into())
+                            .and_then(|rep_fn| rep_fn(&args));
+                        if r2.is_none() && changed {
+                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                        }
+                        r2
+                    }
+                };
+                if let Some(replacement) = replacement {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
@@ -467,29 +484,9 @@ impl ReplaceTypes {
                     }
                     true
                 } else {
-                    let def = ext_op.def_arc();
-                    let mut args = ext_op.args().to_vec();
-                    let ch = args.transform(self)?;
-                    if let Some(replacement) = self
-                        .param_ops
-                        .get(&def.as_ref().into())
-                        .and_then(|rep_fn| rep_fn(&args))
-                    {
-                        replacement
-                            .replace(hugr, n)
-                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                        if self.process_replacements {
-                            self.change_subtree(hugr, n, true)?;
-                        }
-                        true
-                    } else {
-                        if ch {
-                            *ext_op = ExtensionOp::new(def.clone(), args)?;
-                        }
-                        ch
-                    }
-                },
-            ),
+                    changed
+                }
+            }),
 
             OpType::OpaqueOp(_) => panic!("OpaqueOp should not be in a Hugr"),
 
