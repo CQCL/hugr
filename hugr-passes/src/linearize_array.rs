@@ -53,9 +53,9 @@ impl Default for LinearizeArrayPass {
             Ok(Some(ArrayValue::new(ty, contents).into()))
         });
         for op_def in ArrayOpDef::iter() {
-            pass.replace_parametrized_op_with(
+            pass.replace_parametrized_op(
                 value_array::EXTENSION.get_op(&op_def.opdef_id()).unwrap(),
-                move |args, _| {
+                move |args| {
                     // `get` is only allowed for copyable elements. Assuming the Hugr was
                     // valid when we started, the only way for the element to become linear
                     // is if it used to contain nested `value_array`s. In that case, we
@@ -70,51 +70,51 @@ impl Default for LinearizeArrayPass {
                         "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
                     );
-                    Ok(Some(NodeTemplate::SingleOp(
+                    Some(NodeTemplate::SingleOp(
                         op_def.instantiate(args).unwrap().into(),
-                    )))
+                    ))
                 },
             );
         }
-        pass.replace_parametrized_op_with(
+        pass.replace_parametrized_op(
             value_array::EXTENSION.get_op(&ARRAY_REPEAT_OP_ID).unwrap(),
-            |args, _| {
-                Ok(Some(NodeTemplate::SingleOp(
+            |args| {
+                Some(NodeTemplate::SingleOp(
                     ArrayRepeatDef::new().instantiate(args).unwrap().into(),
-                )))
+                ))
             },
         );
-        pass.replace_parametrized_op_with(
+        pass.replace_parametrized_op(
             value_array::EXTENSION.get_op(&ARRAY_SCAN_OP_ID).unwrap(),
-            |args, _| {
-                Ok(Some(NodeTemplate::SingleOp(
+            |args| {
+                Some(NodeTemplate::SingleOp(
                     ArrayScanDef::new().instantiate(args).unwrap().into(),
-                )))
+                ))
             },
         );
-        pass.replace_parametrized_op_with(
+        pass.replace_parametrized_op(
             value_array::EXTENSION
                 .get_op(&VArrayFromArrayDef::new().opdef_id())
                 .unwrap(),
-            |args, _| {
+            |args| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
-                Ok(Some(NodeTemplate::SingleOp(
+                Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),
-                )))
+                ))
             },
         );
-        pass.replace_parametrized_op_with(
+        pass.replace_parametrized_op(
             value_array::EXTENSION
                 .get_op(&VArrayToArrayDef::new().opdef_id())
                 .unwrap(),
-            |args, _| {
+            |args| {
                 let array_ty = array_type_parametric(args[0].clone(), args[1].clone()).unwrap();
-                Ok(Some(NodeTemplate::SingleOp(
+                Some(NodeTemplate::SingleOp(
                     Noop::new(array_ty).to_extension_op().unwrap().into(),
-                )))
+                ))
             },
         );
-        pass.linearizer_mut()
+        pass.linearizer()
             .register_callback(array_type_def(), copy_discard_array);
         Self(pass)
     }
@@ -139,7 +139,7 @@ impl LinearizeArrayPass {
     /// Allows to configure how to clone and discard arrays that are nested
     /// inside opaque extension values.
     pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
-        self.0.linearizer_mut()
+        self.0.linearizer()
     }
 }
 

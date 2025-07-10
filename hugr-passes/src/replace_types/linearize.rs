@@ -367,8 +367,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        inout_sig,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
@@ -392,7 +392,7 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
-    use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
@@ -455,7 +455,7 @@ mod test {
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
         lowerer.replace_type(usize_custom_t, Type::new_extension(lin_custom_t.clone()));
         lowerer
-            .linearizer_mut()
+            .linearizer()
             .register_simple(
                 lin_custom_t,
                 NodeTemplate::SingleOp(copy_op.into()),
@@ -577,7 +577,7 @@ mod test {
         let opdef = e.get_op("copy").unwrap();
         let opdef2 = opdef.clone();
         lowerer
-            .linearizer_mut()
+            .linearizer()
             .register_callback(lin_t_def, move |args, num_outs, _| {
                 assert!(args.is_empty());
                 Ok(NodeTemplate::SingleOp(
@@ -639,7 +639,7 @@ mod test {
         let mut replacer = ReplaceTypes::default();
         replacer.replace_type(usize_t().as_extension().unwrap().clone(), lin_t.clone());
 
-        let bad_copy = replacer.linearizer_mut().register_simple(
+        let bad_copy = replacer.linearizer().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy3.clone()),
             NodeTemplate::SingleOp(discard.clone().into()),
@@ -654,7 +654,7 @@ mod test {
             })
         );
 
-        let bad_discard = replacer.linearizer_mut().register_simple(
+        let bad_discard = replacer.linearizer().register_simple(
             lin_ct.clone(),
             NodeTemplate::SingleOp(copy2.into()),
             NodeTemplate::SingleOp(copy3.clone()),
@@ -671,7 +671,7 @@ mod test {
 
         // Try parametrized instead, but this version always returns 3 outports
         replacer
-            .linearizer_mut()
+            .linearizer()
             .register_callback(ext.get_type(LIN_T).unwrap(), move |_args, _, _| {
                 Ok(NodeTemplate::SingleOp(copy3.clone()))
             });
@@ -699,7 +699,7 @@ mod test {
         let (e, mut lowerer) = ext_lowerer();
 
         lowerer
-            .linearizer_mut()
+            .linearizer()
             .register_callback(value_array_type_def(), linearize_value_array);
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
         let opt_lin_ty = Type::from(option_type(lin_t.clone()));
@@ -817,7 +817,7 @@ mod test {
 
         let mut lower_discard_to_call = ReplaceTypes::default();
         lower_discard_to_call
-            .linearizer_mut()
+            .linearizer()
             .register_simple(
                 lin_ct.clone(),
                 NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
@@ -876,12 +876,17 @@ mod test {
             },
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
-        lowerer.replace_parametrized_op_with(drop_op, |args, rt| {
+        lowerer.replace_parametrized_op(drop_op, |args| {
             let [TypeArg::Runtime(ty)] = args else {
                 panic!("Expected just one type")
             };
-            Ok(rt.get_linearizer().copy_discard_op(ty, 0).map(Some)?)
+            // The Hugr here is invalid, so we have to pull it out manually
+            let mut h = Hugr::new();
+            let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+            std::mem::swap(&mut h, dfb.hugr_mut());
+            Some(NodeTemplate::CompoundOp(Box::new(h)))
         });
+        lowerer.process_replacements(true);
 
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();

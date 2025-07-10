@@ -204,10 +204,7 @@ pub struct ReplaceTypes {
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops: HashMap<
-        ParametricOp,
-        Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>>,
-    >,
+    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -216,6 +213,7 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
+    process_replacements: bool,
 }
 
 impl Default for ReplaceTypes {
@@ -277,6 +275,7 @@ impl ReplaceTypes {
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
+            process_replacements: false,
         }
     }
 
@@ -326,17 +325,6 @@ impl ReplaceTypes {
         self.param_types.insert(src.into(), Arc::new(dest_fn));
     }
 
-    /// Deprecated + Renamed to [Self::linearizer_mut]
-    #[deprecated(note = "Use linearizer_mut")] // When removed, rename get_linearizer to linearizer
-    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
-        self.linearizer_mut()
-    }
-
-    /// Allows access to the [Linearizer], e.g. for building [NodeTemplate::CompoundOp]s
-    pub fn get_linearizer(&self) -> &DelegatingLinearizer {
-        &self.linearize
-    }
-
     /// Allows to configure how to deal with types/wires that were [Copyable]
     /// but have become linear as a result of type-changing. Specifically,
     /// the [Linearizer] is used whenever lowering produces an outport which both
@@ -346,7 +334,7 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer_mut(&mut self) -> &mut DelegatingLinearizer {
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
     }
 
@@ -366,28 +354,10 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
-    #[deprecated(note = "use replace_parametrized_op_with")] // When removed, consider renaming back over this.
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-    ) {
-        self.param_ops
-            .insert(src.into(), Arc::new(move |args, _| Ok(dest_fn(args))));
-    }
-
-    /// Configures this instance to change occurrences of a parametrized op `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s
-    /// (and a handle to the [ReplaceTypes], e.g. allowing access to [Self::linearizer]).
-    /// Note that the `TypeArgs` will already have been updated (e.g. they may not
-    /// fit the bounds of the original op).
-    ///
-    /// If the Callback returns None, the new typeargs will be applied to the original op.
-    pub fn replace_parametrized_op_with(
-        &mut self,
-        src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
-        + 'static,
     ) {
         self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
@@ -417,6 +387,14 @@ impl ReplaceTypes {
         + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
+    }
+
+    /// Configures this instance to (recursively) process the RHS of any replacement
+    /// ops or subtrees - registered with [Self::replace_op] or from callbacks
+    /// registered with [Self::replace_parametrized_op].
+    /// The default is `false`, i.e. do not recurse on such.
+    pub fn process_replacements(&mut self, r: bool) {
+        self.process_replacements = r;
     }
 
     fn change_node(
@@ -480,11 +458,13 @@ impl ReplaceTypes {
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
             OpType::ExtensionOp(ext_op) => Ok(
-                // Copy/discard insertion done by caller
                 if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
+                    if self.process_replacements {
+                        self.change_subtree(hugr, n, true)?;
+                    }
                     true
                 } else {
                     let def = ext_op.def_arc();
@@ -493,13 +473,14 @@ impl ReplaceTypes {
                     if let Some(replacement) = self
                         .param_ops
                         .get(&def.as_ref().into())
-                        .map(|rep_fn| rep_fn(&args, self))
-                        .transpose()?
-                        .flatten()
+                        .and_then(|rep_fn| rep_fn(&args))
                     {
                         replacement
                             .replace(hugr, n)
                             .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
+                        if self.process_replacements {
+                            self.change_subtree(hugr, n, true)?;
+                        }
                         true
                     } else {
                         if ch {
@@ -552,21 +533,21 @@ impl ReplaceTypes {
             Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
-}
 
-impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
-    type Error = ReplaceTypesError;
-    type Result = bool;
-
-    fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
+    fn change_subtree<H: HugrMut<Node = Node>>(
+        &self,
+        hugr: &mut H,
+        root: H::Node,
+        linearize_if_no_change: bool,
+    ) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
-        for n in hugr.entry_descendants().collect::<Vec<_>>() {
+        for n in hugr.descendants(root).collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
-            let new_dfsig = hugr.get_optype(n).dataflow_signature();
-            if let Some(new_sig) = new_dfsig
-                .filter(|_| changed && n != hugr.entrypoint())
-                .map(Cow::into_owned)
-            {
+            if n == root || !(changed | linearize_if_no_change) {
+                continue;
+            }
+            if let Some(new_sig) = hugr.get_optype(n).dataflow_signature() {
+                let new_sig = new_sig.into_owned();
                 for outp in new_sig.output_ports() {
                     if !new_sig.out_port_type(outp).unwrap().copyable() {
                         let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
@@ -580,6 +561,15 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
             }
         }
         Ok(changed)
+    }
+}
+
+impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
+    type Error = ReplaceTypesError;
+    type Result = bool;
+
+    fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
+        self.change_subtree(hugr, hugr.entrypoint(), false)
     }
 }
 
@@ -764,12 +754,12 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op_with(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
-            Ok(Some(NodeTemplate::CompoundOp(Box::new(
+        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
+            Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
                     .unwrap(),
-            ))))
+            )))
         });
         lw
     }
@@ -1044,10 +1034,10 @@ mod test {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.replace_parametrized_op_with(
+        lowerer.replace_parametrized_op(
             e.get_op(READ).unwrap().as_ref(),
-            |args: &[TypeArg], _| {
-                Ok(option_contents(just_elem_type(args)).map(|elem| {
+            Box::new(|args: &[TypeArg]| {
+                option_contents(just_elem_type(args)).map(|elem| {
                     NodeTemplate::SingleOp(
                         ListOp::get
                             .with_type(elem)
@@ -1055,8 +1045,8 @@ mod test {
                             .unwrap()
                             .into(),
                     )
-                }))
-            },
+                })
+            }),
         );
         assert!(lowerer.run(&mut h).unwrap());
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
@@ -1150,8 +1140,8 @@ mod test {
             .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op_with(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
+        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
+            Some(NodeTemplate::Call(read_func, args.to_owned()))
         });
         lw.run(&mut h).unwrap();
 
