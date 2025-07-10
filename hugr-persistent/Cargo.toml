@@ -10,7 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "Persistent IR structure for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers", "ir"]
+categories = ["compilers"]
 
 [[test]]
 name = "persistent_walker_example"
