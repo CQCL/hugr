@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-v0.20.2...hugr-v0.21.0) - 2025-07-09
+
+
+This release includes a long list of changes:
+
+- The HUGR model serialization format is now stable, and should be preferred over the old JSON format.
+- Type parameters and type arguments are now unified into a single `Term` type.
+- Function definitions can no longer be nested inside dataflow regions. Now they must be defined at the top level module.
+- Function definitions and declarations now have a `Visibility` field, which define whether they are visible in the public API of the module.
+- And many more fixes and improvements.
+
+### Bug Fixes
+
+- DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
+- Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/pull/2324))
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+- Use List instead of Tuple in conversions for TypeArg/TypeRow ([#2378](https://github.com/CQCL/hugr/pull/2378))
+- Do extension resolution on loaded extensions from the model format ([#2389](https://github.com/CQCL/hugr/pull/2389))
+- Make JSON Schema checks actually work again ([#2412](https://github.com/CQCL/hugr/pull/2412))
+- Order hints on input and output nodes. ([#2422](https://github.com/CQCL/hugr/pull/2422))
+
+### Documentation
+
+- Hide hugr-persistent docs ([#2357](https://github.com/CQCL/hugr/pull/2357))
+
+### New Features
+
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+- [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- *(persistent)* Add serialisation for CommitStateSpace ([#2344](https://github.com/CQCL/hugr/pull/2344))
+- add TryFrom impls for TypeArg/TypeRow ([#2366](https://github.com/CQCL/hugr/pull/2366))
+- Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
+- Open lists and tuples in `Term` ([#2360](https://github.com/CQCL/hugr/pull/2360))
+- Call `FunctionBuilder::add_{in,out}put` for any AsMut<Hugr> ([#2376](https://github.com/CQCL/hugr/pull/2376))
+- Add Root checked methods to DataflowParentID ([#2382](https://github.com/CQCL/hugr/pull/2382))
+- Add PersistentWire type ([#2361](https://github.com/CQCL/hugr/pull/2361))
+- Add `BorrowArray` extension ([#2395](https://github.com/CQCL/hugr/pull/2395))
+- [**breaking**] Add Visibility to FuncDefn/FuncDecl. ([#2143](https://github.com/CQCL/hugr/pull/2143))
+- *(per)* [**breaking**] Support empty wires in commits ([#2349](https://github.com/CQCL/hugr/pull/2349))
+- [**breaking**] hugr-model use explicit Option<Visibility>, with ::Unspecified in capnp ([#2424](https://github.com/CQCL/hugr/pull/2424))
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
+
+### Refactor
+
+- [**breaking**] remove deprecated runtime extension errors ([#2369](https://github.com/CQCL/hugr/pull/2369))
+- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
+- [**breaking**] move PersistentHugr into separate crate ([#2277](https://github.com/CQCL/hugr/pull/2277))
+
+### Testing
+
+- Check hugr json serializations against the schema (again) ([#2216](https://github.com/CQCL/hugr/pull/2216))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-v0.20.1...hugr-v0.20.2) - 2025-06-25
 
 ### Bug Fixes
