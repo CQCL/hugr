@@ -132,9 +132,14 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         """
         new = cls.__new__(cls)
 
+        try:
+            num_outs = parent_op.num_out
+        except ops.IncompleteOp:
+            num_outs = None
+
         new.hugr = hugr
         new.parent_node = hugr.add_node(
-            parent_op, parent or hugr.entrypoint, num_outs=1
+            parent_op, parent or hugr.entrypoint, num_outs=num_outs
         )
         new._init_io_nodes(parent_op)
         return new
@@ -207,8 +212,13 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg.add_op(ops.Noop(), dfg.inputs()[0])
             Node(3)
         """
+        try:
+            num_outs = op.num_out
+        except ops.IncompleteOp:
+            num_outs = None
+
         new_n = self.hugr.add_node(
-            op, self.parent_node, metadata=metadata, num_outs=op.num_out
+            op, self.parent_node, metadata=metadata, num_outs=num_outs
         )
         self._wire_up(new_n, args)
         new_n._num_out_ports = op.num_out
