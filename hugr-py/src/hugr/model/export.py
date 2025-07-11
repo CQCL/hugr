@@ -49,8 +49,6 @@ class ModelExport:
         self.link_names: dict[InPort | OutPort, str] = {}
         self.link_next = 0
 
-        # TODO: Store the hugr entrypoint
-
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 
@@ -77,6 +75,7 @@ class ModelExport:
 
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = self.export_json_meta(node)
+        meta += self.export_entrypoint_meta(node)
 
         # Add an order hint key to the node if necessary
         if _has_order_links(self.hugr, node):
@@ -84,7 +83,7 @@ class ModelExport:
 
         match node_data.op:
             case DFG() as op:
-                region = self.export_region_dfg(node)
+                region = self.export_region_dfg(node, standalone=False)
 
                 return model.Node(
                     operation=model.Dfg(),
@@ -125,7 +124,8 @@ class ModelExport:
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(child) for child in node_data.children
+                    self.export_region_dfg(child, standalone=True)
+                    for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
@@ -140,7 +140,7 @@ class ModelExport:
                 )
 
             case TailLoop() as op:
-                region = self.export_region_dfg(node)
+                region = self.export_region_dfg(node, standalone=False)
                 signature = op.outer_signature().to_model()
                 return model.Node(
                     operation=model.TailLoop(),
@@ -156,7 +156,7 @@ class ModelExport:
                 symbol = self.export_symbol(
                     name, op.visibility, op.signature.params, op.signature.body
                 )
-                region = self.export_region_dfg(node)
+                region = self.export_region_dfg(node, standalone=False)
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
@@ -317,7 +317,7 @@ class ModelExport:
                 )
 
             case DataflowBlock() as op:
-                region = self.export_region_dfg(node)
+                region = self.export_region_dfg(node, standalone=False)
 
                 input_types = [model.List([type.to_model() for type in op.inputs])]
 
@@ -392,10 +392,18 @@ class ModelExport:
 
         return meta
 
+    def export_entrypoint_meta(self, node: Node) -> list[model.Term]:
+        """Export entrypoint metadata if the node is the module entrypoint."""
+        if self.hugr.entrypoint == node:
+            return [model.Apply("core.entrypoint")]
+        else:
+            return []
+
     def export_region_module(self, node: Node) -> model.Region:
         """Export a module node as a module region."""
         node_data = self.hugr[node]
         meta = self.export_json_meta(node)
+        meta += self.export_entrypoint_meta(node)
         children = []
 
         for child in node_data.children:
@@ -406,7 +414,7 @@ class ModelExport:
 
         return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
-    def export_region_dfg(self, node: Node) -> model.Region:
+    def export_region_dfg(self, node: Node, standalone: bool = True) -> model.Region:
         """Export the children of a node as a dataflow region."""
         node_data = self.hugr[node]
         children: list[model.Node] = []
@@ -414,7 +422,8 @@ class ModelExport:
         target_types: model.Term = model.Wildcard()
         sources = []
         targets = []
-        meta = []
+
+        meta = self.export_entrypoint_meta(node) if standalone else []
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -484,6 +493,7 @@ class ModelExport:
         source_types: model.Term = model.Wildcard()
         target_types: model.Term = model.Wildcard()
         children = []
+        meta = self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -535,6 +545,7 @@ class ModelExport:
             sources=[source],
             signature=signature,
             children=children,
+            meta=meta,
         )
 
     def export_symbol(
