@@ -907,7 +907,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         def _serialize_link(
             link: tuple[_SO, _SI],
-        ) -> tuple[tuple[NodeIdx, PortOffset], tuple[NodeIdx, PortOffset]]:
+        ) -> tuple[
+            tuple[NodeIdx, PortOffset | None], tuple[NodeIdx, PortOffset | None]
+        ]:
             src, dst = link
             s, d = self._constrain_offset(src.port), self._constrain_offset(dst.port)
             return (src.port.node.idx, s), (dst.port.node.idx, d)
@@ -934,16 +936,16 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             entrypoint=entrypoint,
         )
 
-    def _constrain_offset(self, p: P) -> PortOffset:
-        # An offset of -1 is a special case, indicating an order edge,
-        # not counted in the number of ports.
+    def _constrain_offset(self, p: P) -> PortOffset | None:
+        """Constrain an offset to be a valid encoded port offset.
+
+        Order edges and control flow edges should be encoded without an offset.
+        """
         if p.offset < 0:
             assert p.offset == -1, "Only order edges are allowed with offset < 0"
-            offset = self.num_ports(p.node, p.direction)
+            return None
         else:
-            offset = p.offset
-
-        return offset
+            return p.offset
 
     def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
         """Resolve extension types and operations in the HUGR by matching them to
@@ -1018,11 +1020,21 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 hugr.entrypoint = n
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
+            src_node = Node(src_node, _metadata=get_meta(src_node))
+            dst_node = Node(dst_node, _metadata=get_meta(dst_node))
             if src_offset is None or dst_offset is None:
-                continue
+                src_op = hugr[src_node].op
+                if isinstance(src_op, DataflowBlock | ExitBlock):
+                    # Control flow edge
+                    src_offset = 0
+                    dst_offset = 0
+                else:
+                    # Order edge
+                    hugr.add_order_link(src_node, dst_node)
+                    continue
             hugr.add_link(
-                Node(src_node, _metadata=get_meta(src_node)).out(src_offset),
-                Node(dst_node, _metadata=get_meta(dst_node)).inp(dst_offset),
+                src_node.out(src_offset),
+                dst_node.inp(dst_offset),
             )
 
         return hugr
