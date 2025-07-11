@@ -133,7 +133,9 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         new = cls.__new__(cls)
 
         new.hugr = hugr
-        new.parent_node = hugr.add_node(parent_op, parent or hugr.entrypoint)
+        new.parent_node = hugr.add_node(
+            parent_op, parent or hugr.entrypoint, num_outs=1
+        )
         new._init_io_nodes(parent_op)
         return new
 
