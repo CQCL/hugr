@@ -19,7 +19,7 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import comma_sep_str, ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -637,18 +637,18 @@ class Tag(DataflowOp):
         )
 
     def __repr__(self) -> str:
-        if len(self.sum_ty.variant_rows) != 2:
+        if len(self.sum_ty.variant_rows) == 2:
             left, right = self.sum_ty.variant_rows
             if len(left) == 0 and self.tag == 1:
-                return f"Some({right!r})"
+                return f"Some({comma_sep_repr(right)})"
             elif self.tag == 0:
-                return f"Left({left!r})"
+                return f"Left({left!r}, {right!r})"
             else:
                 return f"Right({left!r}, {right!r})"
         return f"Tag(tag={self.tag}, sum_ty={self.sum_ty!r})"
 
     def __str__(self) -> str:
-        if len(self.sum_ty.variant_rows) != 2:
+        if len(self.sum_ty.variant_rows) == 2:
             left, right = self.sum_ty.variant_rows
             if len(left) == 0 and self.tag == 1:
                 return "Some"
@@ -666,7 +666,7 @@ class Some(Tag):
     Example:
         # construct a Some variant holding a row of Bool and Unit types
         >>> Some(tys.Bool, tys.Unit)
-        Some
+        Some(Bool, Unit)
     """
 
     def __init__(self, *some_tys: tys.Type) -> None:
