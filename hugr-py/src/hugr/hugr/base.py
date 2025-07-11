@@ -1050,21 +1050,21 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 hugr.entrypoint = n
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
-            src_node = Node(src_node, _metadata=get_meta(src_node))
-            dst_node = Node(dst_node, _metadata=get_meta(dst_node))
+            src = Node(src_node, _metadata=get_meta(src_node))
+            dst = Node(dst_node, _metadata=get_meta(dst_node))
             if src_offset is None or dst_offset is None:
-                src_op = hugr[src_node].op
+                src_op = hugr[src].op
                 if isinstance(src_op, DataflowBlock | ExitBlock):
                     # Control flow edge
                     src_offset = 0
                     dst_offset = 0
                 else:
                     # Order edge
-                    hugr.add_order_link(src_node, dst_node)
+                    hugr.add_order_link(src, dst)
                     continue
             hugr.add_link(
-                src_node.out(src_offset),
-                dst_node.inp(dst_offset),
+                src.out(src_offset),
+                dst.inp(dst_offset),
             )
 
         return hugr
