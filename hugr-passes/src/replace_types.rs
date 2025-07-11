@@ -171,6 +171,37 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
+/// Options for how the replacement for an op is processed. May be specified by
+/// [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
+/// Otherwise (the default), replacements are inserted as is (without further processing).
+// TODO would be good to migrate to default being process_recursive: true
+#[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
+pub struct ReplacementOptions {
+    process_recursive: bool,
+    linearize: bool,
+}
+
+impl ReplacementOptions {
+    /// Specifies that the replacement should be processed by the same [ReplaceTypes].
+    /// This increases compositionality (in that replacements for different ops do not
+    /// need to account for each other), but would lead to an infinite loop if e.g.
+    /// changing an op for a DFG containing an instance of the same op.
+    pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
+        self.process_recursive = rec;
+        self
+    }
+
+    /// Specifies that the replacement should be linearized.
+    /// If [Self::with_recursive_replacement] has been set, this applies linearization
+    /// even to ops (within the original replacement) that are not altered by the
+    /// recursive processing. Otherwise, can be used to apply linearization without
+    /// changing any other ops.
+    pub fn with_linearization(mut self, lin: bool) -> Self {
+        self.linearize = lin;
+        self
+    }
+}
+
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [`Self::run`].
 ///
@@ -203,8 +234,14 @@ pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
-    op_map: HashMap<OpHashWrapper, NodeTemplate>,
-    param_ops: HashMap<ParametricOp, (Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>, bool)>,
+    op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
+    param_ops: HashMap<
+        ParametricOp,
+        (
+            Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>,
+            ReplacementOptions,
+        ),
+    >,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -337,13 +374,39 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
+    /// Equivalent to [Self::replace_op_with] with default [ReplacementOptions].
+    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        self.replace_op_with(src, dest, ReplacementOptions::default())
+    }
+
+    /// Configures this instance to change occurrences of `src` to `dest`.
+    ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
     /// precedence over [`Self::replace_parametrized_op`] where the `src`s overlap. Thus,
     /// this should only be used on already-*[monomorphize](super::monomorphize())d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
-    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
-        self.op_map.insert(OpHashWrapper::from(src), dest);
+    pub fn replace_op_with(
+        &mut self,
+        src: &ExtensionOp,
+        dest: NodeTemplate,
+        opts: ReplacementOptions,
+    ) {
+        self.op_map.insert(OpHashWrapper::from(src), (dest, opts));
+    }
+
+    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    /// Equivalent to [Self::replace_parametrized_op_with] with default [ReplacementOptions].
+    pub fn replace_parametrized_op(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
+    ) {
+        self.param_ops.insert(
+            src.into(),
+            (Arc::new(dest_fn), ReplacementOptions::default()),
+        );
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
@@ -352,26 +415,13 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
-    ///
-    /// See also [Self::replace_parametrized_op_recursive]
-    pub fn replace_parametrized_op(
+    pub fn replace_parametrized_op_with(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
+        opts: ReplacementOptions,
     ) {
-        self.param_ops
-            .insert(src.into(), (Arc::new(dest_fn), false));
-    }
-
-    /// Like [Self::replace_parametrized_op] but the contents of any [NodeTemplate]
-    /// returned by the callback will be transformed (recursively) by the same
-    /// ReplaceTypes instance after insertion into the target Hugr.
-    pub fn replace_parametrized_op_recursive(
-        &mut self,
-        src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-    ) {
-        self.param_ops.insert(src.into(), (Arc::new(dest_fn), true));
+        self.param_ops.insert(src.into(), (Arc::new(dest_fn), opts));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -465,26 +515,32 @@ impl ReplaceTypes {
                 let def = ext_op.def_arc();
                 let mut changed = false;
                 let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                    Some(r) => Some((r.clone(), false)),
+                    r @ Some(_) => r.cloned(),
                     None => {
                         let mut args = ext_op.args().to_vec();
                         changed = args.transform(self)?;
                         let r2 = self
                             .param_ops
                             .get(&def.as_ref().into())
-                            .and_then(|(rep_fn, rec)| rep_fn(&args).map(|nt| (nt, *rec)));
+                            .and_then(|(rep_fn, opts)| rep_fn(&args).map(|nt| (nt, opts.clone())));
                         if r2.is_none() && changed {
                             *ext_op = ExtensionOp::new(def.clone(), args)?;
                         }
                         r2
                     }
                 };
-                if let Some((replacement, process_recursive)) = replacement {
+                if let Some((replacement, opts)) = replacement {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if process_recursive {
-                        self.change_subtree(hugr, n, true)?;
+                    if opts.process_recursive {
+                        self.change_subtree(hugr, n, opts.linearize)?;
+                    } else if opts.linearize {
+                        for d in hugr.descendants(n).collect::<Vec<_>>() {
+                            if d != n {
+                                self.linearize_outputs(hugr, d)?;
+                            }
+                        }
                     }
                     true
                 } else {
@@ -544,24 +600,32 @@ impl ReplaceTypes {
         let mut changed = false;
         for n in hugr.descendants(root).collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
-            if n == root || !(changed | linearize_if_no_change) {
-                continue;
+            if n != root && (changed || linearize_if_no_change) {
+                self.linearize_outputs(hugr, n)?;
             }
-            if let Some(new_sig) = hugr.get_optype(n).dataflow_signature() {
-                let new_sig = new_sig.into_owned();
-                for outp in new_sig.output_ports() {
-                    if !new_sig.out_port_type(outp).unwrap().copyable() {
-                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                        if targets.len() != 1 {
-                            hugr.disconnect(n, outp);
-                            let src = Wire::new(n, outp);
-                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
-                        }
+        }
+        Ok(changed)
+    }
+
+    fn linearize_outputs<H: HugrMut<Node = Node>>(
+        &self,
+        hugr: &mut H,
+        n: H::Node,
+    ) -> Result<(), LinearizeError> {
+        if let Some(new_sig) = hugr.get_optype(n).dataflow_signature() {
+            let new_sig = new_sig.into_owned();
+            for outp in new_sig.output_ports() {
+                if !new_sig.out_port_type(outp).unwrap().copyable() {
+                    let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                    if targets.len() != 1 {
+                        hugr.disconnect(n, outp);
+                        let src = Wire::new(n, outp);
+                        self.linearize.insert_copy_discard(hugr, src, &targets)?;
                     }
                 }
             }
         }
-        Ok(changed)
+        Ok(())
     }
 }
 

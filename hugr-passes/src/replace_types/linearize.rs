@@ -392,7 +392,9 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
-    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{
+        LinearizeError, NodeTemplate, ReplaceTypesError, ReplacementOptions,
+    };
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
@@ -876,16 +878,19 @@ mod test {
             },
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
-        lowerer.replace_parametrized_op_recursive(drop_op, |args| {
-            let [TypeArg::Runtime(ty)] = args else {
-                panic!("Expected just one type")
-            };
-            // The Hugr here is invalid, so we have to pull it out manually
-            let mut h = Hugr::new();
-            let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
-            std::mem::swap(&mut h, dfb.hugr_mut());
-            Some(NodeTemplate::CompoundOp(Box::new(h)))
-        });
+        lowerer.replace_parametrized_op_with(
+            drop_op,
+            |args| {
+                let [TypeArg::Runtime(ty)] = args else {
+                    panic!("Expected just one type")
+                };
+                // The Hugr here is invalid, so we have to pull it out manually
+                let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+                let h = std::mem::take(dfb.hugr_mut());
+                Some(NodeTemplate::CompoundOp(Box::new(h)))
+            },
+            ReplacementOptions::default().with_linearization(true),
+        );
 
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
