@@ -35,14 +35,16 @@ from hugr.ops import (
     Conditional,
     Const,
     Custom,
+    DataflowBlock,
     DataflowOp,
+    ExitBlock,
     FuncDefn,
     IncompleteOp,
     Module,
     Op,
     is_dataflow_op,
 )
-from hugr.tys import Kind, Type, ValueKind
+from hugr.tys import Kind, OrderKind, Type, ValueKind
 from hugr.utils import BiMap
 from hugr.val import Value
 
@@ -150,7 +152,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             case None | Module():
                 pass
             case ops.FuncDefn():
-                self.entrypoint = self.add_node(entrypoint_op, self.module_root)
+                self.entrypoint = self.add_node(
+                    entrypoint_op, self.module_root, num_outs=1
+                )
             case _:
                 from hugr.build import Function
 
@@ -543,6 +547,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         source = src.out(-1)
         target = dst.inp(-1)
+        assert (
+            self.port_kind(source) == OrderKind()
+        ), f"Operation {self[src].op.name()} does not support order edges"
+        assert (
+            self.port_kind(target) == OrderKind()
+        ), f"Operation {self[dst].op.name()} does not support order edges"
         if not self.has_link(source, target):
             self.add_link(source, target)
 
@@ -588,6 +598,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Not necessarily the number of connected ports - if port `i` is
         connected, then all ports `0..i` are assumed to exist.
 
+        This value includes order ports.
+
         Args:
             node: Node to query.
             direction: Direction of ports to count.
@@ -597,6 +609,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> n1 = h.add_const(val.TRUE)
             >>> n2 = h.add_const(val.FALSE)
             >>> h.add_link(n1.out(0), n2.inp(2)) # not a valid link!
+            >>> h.add_order_link(n1, n2)
             >>> h.num_ports(n1, Direction.OUTGOING)
             1
             >>> h.num_ports(n2, Direction.INCOMING)
@@ -609,11 +622,17 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         )
 
     def num_in_ports(self, node: ToNode) -> int:
-        """The number of incoming ports of a node. See :meth:`num_ports`."""
+        """The number of incoming ports of a node. See :meth:`num_ports`.
+
+        This value does not include order ports.
+        """
         return self[node]._num_inps
 
     def num_out_ports(self, node: ToNode) -> int:
-        """The number of outgoing ports of a node. See :meth:`num_ports`."""
+        """The number of outgoing ports of a node. See :meth:`num_ports`.
+
+        This value cound does not include order ports.
+        """
         return self[node]._num_outs
 
     def _linked_ports(
@@ -695,8 +714,15 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             port = cast("P", node.port(offset, direction))
             yield port, list(self._linked_ports(port, links))
 
+        order_port = cast("P", node.port(-1, direction))
+        linked_order = list(self._linked_ports(order_port, links))
+        if linked_order:
+            yield order_port, linked_order
+
     def outgoing_links(self, node: ToNode) -> Iterable[tuple[OutPort, list[InPort]]]:
         """Iterator over outgoing links from a given node.
+
+        This number includes order ports.
 
         Args:
             node: Node to query.
@@ -709,13 +735,16 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg()
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
+            >>> df.hugr.add_order_link(df.input_node, df.output_node)
             >>> list(df.hugr.outgoing_links(df.input_node))
-            [(OutPort(Node(5), 0), [InPort(Node(6), 0), InPort(Node(6), 1)])]
-        """
+            [(OutPort(Node(5), 0), [InPort(Node(6), 0), InPort(Node(6), 1)]), (OutPort(Node(5), -1), [InPort(Node(6), -1)])]
+        """  # noqa: E501
         return self._node_links(node, self._links.fwd)
 
     def incoming_links(self, node: ToNode) -> Iterable[tuple[InPort, list[OutPort]]]:
         """Iterator over incoming links to a given node.
+
+        This number includes order ports.
 
         Args:
             node: Node to query.
@@ -728,8 +757,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df = dfg.Dfg()
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(0))
             >>> df.hugr.add_link(df.input_node.out(0), df.output_node.inp(1))
+            >>> df.hugr.add_order_link(df.input_node, df.output_node)
             >>> list(df.hugr.incoming_links(df.output_node))
-            [(InPort(Node(6), 0), [OutPort(Node(5), 0)]), (InPort(Node(6), 1), [OutPort(Node(5), 0)])]
+            [(InPort(Node(6), 0), [OutPort(Node(5), 0)]), (InPort(Node(6), 1), [OutPort(Node(5), 0)]), (InPort(Node(6), -1), [OutPort(Node(5), -1)])]
         """  # noqa: E501
         return self._node_links(node, self._links.bck)
 
