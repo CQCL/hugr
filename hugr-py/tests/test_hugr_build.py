@@ -197,7 +197,7 @@ def test_build_inter_graph(snapshot):
     validate(h.hugr, snap=snapshot)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
-    assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
+    assert h.hugr.num_outgoing(h.input_node) == 3
     assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
     assert len(list(h.hugr.incoming_order_links(nested))) == 1
     assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
