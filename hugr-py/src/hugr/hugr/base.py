@@ -810,7 +810,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df.hugr.num_incoming(df.output_node)
             1
         """
-        return sum(1 for _ in self.incoming_links(node))
+        return sum(len(links) for (_, links) in self.incoming_links(node))
 
     def num_outgoing(self, node: ToNode) -> int:
         """The number of outgoing links from a `node`.
@@ -821,7 +821,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> df.hugr.num_outgoing(df.input_node)
             1
         """
-        return sum(1 for _ in self.outgoing_links(node))
+        return sum(len(links) for (_, links) in self.outgoing_links(node))
 
     # TODO: num_links and _linked_ports
 
@@ -1007,9 +1007,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             parent: Node | None = Node(serial_node.root.parent)
 
             serial_node.root.parent = -1
-            n = hugr._add_node(
-                serial_node.root.deserialize(), parent, metadata=node_meta
-            )
+            op = serial_node.root.deserialize()
+            n = hugr._add_node(op, parent, metadata=node_meta, num_outs=op.num_out)
             assert (
                 n.idx == idx + boilerplate_nodes
             ), "Nodes should be added contiguously"
