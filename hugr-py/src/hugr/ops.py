@@ -636,6 +636,17 @@ class Tag(DataflowOp):
         if len(self.sum_ty.variant_rows) != 2:
             left, right = self.sum_ty.variant_rows
             if len(left) == 0 and self.tag == 1:
+                return f"Some({right!r})"
+            elif self.tag == 0:
+                return f"Left({left!r})"
+            else:
+                return f"Right({left!r}, {right!r})"
+        return f"Tag(tag={self.tag}, sum_ty={self.sum_ty!r})"
+
+    def __str__(self) -> str:
+        if len(self.sum_ty.variant_rows) != 2:
+            left, right = self.sum_ty.variant_rows
+            if len(left) == 0 and self.tag == 1:
                 return "Some"
             elif self.tag == 0:
                 return "Left"
