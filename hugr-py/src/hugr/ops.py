@@ -942,8 +942,10 @@ class Const(Op):
         match port:
             case OutPort(_, 0):
                 return tys.ConstKind(self.val.type_())
+            case InPort(_, -1) | OutPort(_, -1):
+                return tys.OrderKind()
             case _:
-                return DataflowOp.port_kind(self, port)
+                raise self._invalid_port(port)
 
     def __repr__(self) -> str:
         return f"Const({self.val})"
