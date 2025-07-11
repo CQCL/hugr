@@ -207,7 +207,9 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg.add_op(ops.Noop(), dfg.inputs()[0])
             Node(3)
         """
-        new_n = self.hugr.add_node(op, self.parent_node, metadata=metadata)
+        new_n = self.hugr.add_node(
+            op, self.parent_node, metadata=metadata, num_outs=op.num_out
+        )
         self._wire_up(new_n, args)
         new_n._num_out_ports = op.num_out
         return new_n
