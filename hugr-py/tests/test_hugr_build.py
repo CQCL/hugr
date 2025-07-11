@@ -215,7 +215,6 @@ def test_ancestral_sibling():
 @pytest.mark.parametrize(
     "val",
     [
-        val.Function(simple_id().hugr),
         val.Sum(1, tys.Sum([[INT_T], [tys.Bool, INT_T]]), [val.TRUE, IntVal(34)]),
         val.Tuple(val.TRUE, IntVal(23)),
     ],
@@ -346,6 +345,7 @@ def test_invalid_recursive_function() -> None:
         f_recursive.set_outputs(f_recursive.input_node[0])
 
 
+@pytest.mark.skip("Value::Function is deprecated and not supported by model encoding.")
 def test_higher_order(snapshot) -> None:
     noop_fn = Dfg(tys.Qubit)
     noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))

@@ -4524,8 +4524,9 @@ pub mod param {
 #[repr(u16)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Visibility {
-  Private = 0,
-  Public = 1,
+  Unspecified = 0,
+  Private = 1,
+  Public = 2,
 }
 
 impl ::capnp::introspect::Introspect for Visibility {
@@ -4538,8 +4539,9 @@ impl ::core::convert::TryFrom<u16> for Visibility {
   type Error = ::capnp::NotInSchema;
   fn try_from(value: u16) -> ::core::result::Result<Self, <Visibility as ::core::convert::TryFrom<u16>>::Error> {
     match value {
-      0 => ::core::result::Result::Ok(Self::Private),
-      1 => ::core::result::Result::Ok(Self::Public),
+      0 => ::core::result::Result::Ok(Self::Unspecified),
+      1 => ::core::result::Result::Ok(Self::Private),
+      2 => ::core::result::Result::Ok(Self::Public),
       n => ::core::result::Result::Err(::capnp::NotInSchema(n)),
     }
   }
@@ -4552,7 +4554,7 @@ impl ::capnp::traits::HasTypeId for Visibility {
   const TYPE_ID: u64 = 0x8d83_15f2_7a68_8301u64;
 }
 mod visibility {
-pub static ENCODED_NODE: [::capnp::Word; 26] = [
+pub static ENCODED_NODE: [::capnp::Word; 31] = [
   ::capnp::word(0, 0, 0, 0, 5, 0, 6, 0),
   ::capnp::word(1, 131, 104, 122, 242, 21, 131, 141),
   ::capnp::word(20, 0, 0, 0, 2, 0, 0, 0),
@@ -4562,7 +4564,7 @@ pub static ENCODED_NODE: [::capnp::Word; 26] = [
   ::capnp::word(21, 0, 0, 0, 250, 0, 0, 0),
   ::capnp::word(33, 0, 0, 0, 7, 0, 0, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
-  ::capnp::word(29, 0, 0, 0, 55, 0, 0, 0),
+  ::capnp::word(29, 0, 0, 0, 79, 0, 0, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
   ::capnp::word(99, 97, 112, 110, 112, 47, 104, 117),
@@ -4570,13 +4572,18 @@ pub static ENCODED_NODE: [::capnp::Word; 26] = [
   ::capnp::word(112, 110, 112, 58, 86, 105, 115, 105),
   ::capnp::word(98, 105, 108, 105, 116, 121, 0, 0),
   ::capnp::word(0, 0, 0, 0, 1, 0, 1, 0),
-  ::capnp::word(8, 0, 0, 0, 1, 0, 2, 0),
+  ::capnp::word(12, 0, 0, 0, 1, 0, 2, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
-  ::capnp::word(17, 0, 0, 0, 66, 0, 0, 0),
+  ::capnp::word(29, 0, 0, 0, 98, 0, 0, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
   ::capnp::word(1, 0, 0, 0, 0, 0, 0, 0),
-  ::capnp::word(9, 0, 0, 0, 58, 0, 0, 0),
+  ::capnp::word(25, 0, 0, 0, 66, 0, 0, 0),
   ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
+  ::capnp::word(2, 0, 0, 0, 0, 0, 0, 0),
+  ::capnp::word(17, 0, 0, 0, 58, 0, 0, 0),
+  ::capnp::word(0, 0, 0, 0, 0, 0, 0, 0),
+  ::capnp::word(117, 110, 115, 112, 101, 99, 105, 102),
+  ::capnp::word(105, 101, 100, 0, 0, 0, 0, 0),
   ::capnp::word(112, 114, 105, 118, 97, 116, 101, 0),
   ::capnp::word(112, 117, 98, 108, 105, 99, 0, 0),
 ];

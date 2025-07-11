@@ -1,6 +1,23 @@
 # Changelog
 
 
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.2...hugr-passes-v0.21.0) - 2025-07-09
+
+### Bug Fixes
+
+- DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
+
+### Refactor
+
+- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.20.2) - 2025-06-25
 
 ### Bug Fixes

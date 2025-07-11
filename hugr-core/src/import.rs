@@ -114,7 +114,7 @@ impl From<ExtensionError> for ImportError {
 enum OrderHintError {
     /// Duplicate order hint key in the same region.
     #[error("duplicate order hint key {0}")]
-    DuplicateKey(table::NodeId, u64),
+    DuplicateKey(table::RegionId, u64),
     /// Order hint including a key not defined in the region.
     #[error("order hint with unknown key {0}")]
     UnknownKey(u64),
@@ -608,7 +608,7 @@ impl<'a> Context<'a> {
             self.import_node(*child, node)?;
         }
 
-        self.create_order_edges(region)?;
+        self.create_order_edges(region, input, output)?;
 
         for meta_item in region_data.meta {
             self.import_node_metadata(node, *meta_item)?;
@@ -622,13 +622,18 @@ impl<'a> Context<'a> {
     /// Create order edges between nodes of a dataflow region based on order hint metadata.
     ///
     /// This method assumes that the nodes for the children of the region have already been imported.
-    fn create_order_edges(&mut self, region_id: table::RegionId) -> Result<(), ImportError> {
+    fn create_order_edges(
+        &mut self,
+        region_id: table::RegionId,
+        input: Node,
+        output: Node,
+    ) -> Result<(), ImportError> {
         let region_data = self.get_region(region_id)?;
         debug_assert_eq!(region_data.kind, model::RegionKind::DataFlow);
 
         // Collect order hint keys
         // PERFORMANCE: It might be worthwhile to reuse the map to avoid allocations.
-        let mut order_keys = FxHashMap::<u64, table::NodeId>::default();
+        let mut order_keys = FxHashMap::<u64, Node>::default();
 
         for child_id in region_data.children {
             let child_data = self.get_node(*child_id)?;
@@ -642,8 +647,42 @@ impl<'a> Context<'a> {
                     continue;
                 };
 
-                if order_keys.insert(*key, *child_id).is_some() {
-                    return Err(OrderHintError::DuplicateKey(*child_id, *key).into());
+                // NOTE: The lookups here are expected to succeed since we only
+                // process the order metadata after we have imported the nodes.
+                let child_node = self.nodes[child_id];
+                let child_optype = self.hugr.get_optype(child_node);
+
+                // Check that the node has order ports.
+                // NOTE: This assumes that a node has an input order port iff it has an output one.
+                if child_optype.other_output_port().is_none() {
+                    return Err(OrderHintError::NoOrderPort(*child_id).into());
+                }
+
+                if order_keys.insert(*key, child_node).is_some() {
+                    return Err(OrderHintError::DuplicateKey(region_id, *key).into());
+                }
+            }
+        }
+
+        // Collect the order hint keys for the input and output nodes
+        for meta_id in region_data.meta {
+            if let Some([key]) = self.match_symbol(*meta_id, model::ORDER_HINT_INPUT_KEY)? {
+                let table::Term::Literal(model::Literal::Nat(key)) = self.get_term(key)? else {
+                    continue;
+                };
+
+                if order_keys.insert(*key, input).is_some() {
+                    return Err(OrderHintError::DuplicateKey(region_id, *key).into());
+                }
+            }
+
+            if let Some([key]) = self.match_symbol(*meta_id, model::ORDER_HINT_OUTPUT_KEY)? {
+                let table::Term::Literal(model::Literal::Nat(key)) = self.get_term(key)? else {
+                    continue;
+                };
+
+                if order_keys.insert(*key, output).is_some() {
+                    return Err(OrderHintError::DuplicateKey(region_id, *key).into());
                 }
             }
         }
@@ -665,24 +704,13 @@ impl<'a> Context<'a> {
             let a = order_keys.get(a).ok_or(OrderHintError::UnknownKey(*a))?;
             let b = order_keys.get(b).ok_or(OrderHintError::UnknownKey(*b))?;
 
-            // NOTE: The lookups here are expected to succeed since we only
-            // process the order metadata after we have imported the nodes.
-            let a_node = self.nodes[a];
-            let b_node = self.nodes[b];
+            // NOTE: The unwrap here must succeed:
+            // - For all ordinary nodes we checked that they have an order port.
+            // - Input and output nodes always have an order port.
+            let a_port = self.hugr.get_optype(*a).other_output_port().unwrap();
+            let b_port = self.hugr.get_optype(*b).other_input_port().unwrap();
 
-            let a_port = self
-                .hugr
-                .get_optype(a_node)
-                .other_output_port()
-                .ok_or(OrderHintError::NoOrderPort(*a))?;
-
-            let b_port = self
-                .hugr
-                .get_optype(b_node)
-                .other_input_port()
-                .ok_or(OrderHintError::NoOrderPort(*b))?;
-
-            self.hugr.connect(a_node, a_port, b_node, b_port);
+            self.hugr.connect(*a, a_port, *b, b_port);
         }
 
         Ok(())
@@ -938,12 +966,12 @@ impl<'a> Context<'a> {
         node_data: &'a table::Node<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
+        let visibility = symbol.visibility.clone().ok_or(ImportErrorInner::Invalid(
+            "No visibility for FuncDefn".to_string(),
+        ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDefn(FuncDefn::new_vis(
-                symbol.name,
-                signature,
-                symbol.visibility.clone().into(),
-            ));
+            let optype =
+                OpType::FuncDefn(FuncDefn::new_vis(symbol.name, signature, visibility.into()));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -967,12 +995,12 @@ impl<'a> Context<'a> {
         symbol: &'a table::Symbol<'a>,
         parent: Node,
     ) -> Result<Node, ImportError> {
+        let visibility = symbol.visibility.clone().ok_or(ImportErrorInner::Invalid(
+            "No visibility for FuncDecl".to_string(),
+        ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
-            let optype = OpType::FuncDecl(FuncDecl::new_vis(
-                symbol.name,
-                signature,
-                symbol.visibility.clone().into(),
-            ));
+            let optype =
+                OpType::FuncDecl(FuncDecl::new_vis(symbol.name, signature, visibility.into()));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })

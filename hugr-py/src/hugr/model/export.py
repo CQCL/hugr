@@ -79,7 +79,7 @@ class ModelExport:
         meta = self.export_json_meta(node)
 
         # Add an order hint key to the node if necessary
-        if _needs_order_key(self.hugr, node):
+        if _has_order_links(self.hugr, node):
             meta.append(model.Apply("core.order_hint.key", [model.Literal(node.idx)]))
 
         match node_data.op:
@@ -427,12 +427,26 @@ class ModelExport:
                         for i in range(child_data._num_outs)
                     ]
 
+                    if _has_order_links(self.hugr, child):
+                        meta.append(
+                            model.Apply(
+                                "core.order_hint.input_key", [model.Literal(child.idx)]
+                            )
+                        )
+
                 case Output() as op:
                     target_types = model.List([type.to_model() for type in op.types])
                     targets = [
                         self.link_name(InPort(child, i))
                         for i in range(child_data._num_inps)
                     ]
+
+                    if _has_order_links(self.hugr, child):
+                        meta.append(
+                            model.Apply(
+                                "core.order_hint.output_key", [model.Literal(child.idx)]
+                            )
+                        )
 
                 case _:
                     child_node = self.export_node(child)
@@ -442,14 +456,13 @@ class ModelExport:
 
                     children.append(child_node)
 
-                    meta += [
-                        model.Apply(
-                            "core.order_hint.order",
-                            [model.Literal(child.idx), model.Literal(successor.idx)],
-                        )
-                        for successor in self.hugr.outgoing_order_links(child)
-                        if not isinstance(self.hugr[successor].op, Output)
-                    ]
+            meta += [
+                model.Apply(
+                    "core.order_hint.order",
+                    [model.Literal(child.idx), model.Literal(successor.idx)],
+                )
+                for successor in self.hugr.outgoing_order_links(child)
+            ]
 
         signature = model.Apply("core.fn", [source_types, target_types])
 
@@ -639,19 +652,12 @@ class _UnionFind(Generic[T]):
         self.sizes[a] += self.sizes[b]
 
 
-def _needs_order_key(hugr: Hugr, node: Node) -> bool:
-    """Checks whether the node has any order links for the purposes of
-    exporting order hint metadata. Order links to `Input` or `Output`
-    operations are ignored, since they are not present in the model format.
-    """
-    for succ in hugr.outgoing_order_links(node):
-        succ_op = hugr[succ].op
-        if not isinstance(succ_op, Output):
-            return True
+def _has_order_links(hugr: Hugr, node: Node) -> bool:
+    """Checks whether the node has any order links."""
+    for _succ in hugr.outgoing_order_links(node):
+        return True
 
-    for pred in hugr.incoming_order_links(node):
-        pred_op = hugr[pred].op
-        if not isinstance(pred_op, Input):
-            return True
+    for _pred in hugr.incoming_order_links(node):
+        return True
 
     return False

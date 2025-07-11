@@ -69,3 +69,7 @@ version_group = "hugr"
 name = "hugr-llvm"
 release = true
 version_group = "hugr"
+
+[[package]]
+name = "hugr-persistent"
+release = true

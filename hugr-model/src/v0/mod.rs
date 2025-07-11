@@ -92,10 +92,9 @@ use std::sync::Arc;
 use table::LinkIndex;
 
 /// Describes how a function or symbol should be acted upon by a linker
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Visibility {
     /// The linker should ignore this function or symbol
-    #[default]
     Private,
     /// The linker should act upon this function or symbol
     Public,
@@ -287,6 +286,26 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 /// - **Parameter:** `?key : core.nat`
 /// - **Result:** `core.meta`
 pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
+
+/// Metadata constructor for order hint keys on input nodes.
+///
+/// When the sources of a dataflow region are represented by an input operation
+/// within the region, this metadata can be attached the region to give the
+/// input node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_INPUT_KEY: &str = "core.order_hint.input_key";
+
+/// Metadata constructor for order hint keys on output nodes.
+///
+/// When the targets of a dataflow region are represented by an output operation
+/// within the region, this metadata can be attached the region to give the
+/// output node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_OUTPUT_KEY: &str = "core.order_hint.output_key";
 
 /// Metadata constructor for order hints.
 ///

@@ -292,15 +292,16 @@ fn parse_param(pair: Pair<Rule>) -> ParseResult<Param> {
 
 fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     debug_assert_eq!(Rule::symbol, pair.as_rule());
-    // The optional "pub" in the grammar seems to disappear in the Rule, making this
-    // a bit hacky. If we defined a rule for visibility as a choice between different
-    // specifiers (i.e. pub / empty), then presumably we could avoid this `starts-with`.
-    let visibility = if pair.as_str().starts_with("pub") {
-        Visibility::Public
-    } else {
-        Visibility::Private
-    };
+
     let mut pairs = pair.into_inner();
+    let visibility = take_rule(&mut pairs, Rule::visibility)
+        .next()
+        .map(|pair| match pair.as_str() {
+            "public" => Ok(Visibility::Public),
+            "private" => Ok(Visibility::Private),
+            _ => unreachable!("Expected 'public' or 'private', got {}", pair.as_str()),
+        })
+        .transpose()?;
     let name = parse_symbol_name(pairs.next().unwrap())?;
     let params = parse_params(&mut pairs)?;
     let constraints = parse_constraints(&mut pairs)?;

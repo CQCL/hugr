@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use derive_more::derive::{From, Into};
 use hugr_core::{
     IncomingPort, Node, OutgoingPort, SimpleReplacement,
-    builder::{DFGBuilder, Dataflow, DataflowHugr, inout_sig},
+    builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig, inout_sig},
     extension::prelude::bool_t,
     hugr::{Hugr, HugrView, patch::Patch, views::SiblingSubgraph},
     ops::handle::NodeHandle,
@@ -11,7 +11,10 @@ use hugr_core::{
 };
 use rstest::*;
 
-use crate::{Commit, CommitStateSpace, PatchNode, Resolver, state_space::CommitId};
+use crate::{
+    Commit, CommitStateSpace, PatchNode, PersistentHugr, PersistentReplacement, Resolver,
+    state_space::CommitId,
+};
 
 /// Creates a simple test Hugr with a DFG that contains a small boolean circuit
 ///
@@ -289,6 +292,44 @@ pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId
     };
 
     (state_space, [commit1, commit2, commit3, commit4])
+}
+
+#[fixture]
+pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [PatchNode; 3]) {
+    let (triple_not_hugr, not_nodes) = {
+        let mut dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let [mut w] = dfg_builder.input_wires_arr();
+        let not_nodes = [(); 3].map(|()| {
+            let handle = dfg_builder.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
+            [w] = handle.outputs_arr();
+            handle.node()
+        });
+        (
+            dfg_builder.finish_hugr_with_outputs([w]).unwrap(),
+            not_nodes,
+        )
+    };
+    let mut hugr = PersistentHugr::with_base(triple_not_hugr);
+    let empty_hugr = {
+        let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let inputs = dfg_builder.input_wires();
+        dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
+    };
+    let subg_nodes = [PatchNode(hugr.base(), not_nodes[1])];
+    let repl = PersistentReplacement::try_new(
+        SiblingSubgraph::try_from_nodes(subg_nodes, &hugr).unwrap(),
+        &hugr,
+        empty_hugr,
+    )
+    .unwrap();
+
+    let empty_commit = hugr.try_add_replacement(repl).unwrap();
+    let base_commit = hugr.base();
+    (
+        hugr,
+        [base_commit, empty_commit],
+        not_nodes.map(|n| PatchNode(base_commit, n)),
+    )
 }
 
 #[rstest]

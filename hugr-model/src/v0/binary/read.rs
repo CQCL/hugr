@@ -190,6 +190,16 @@ fn read_region_scope(reader: hugr_capnp::region_scope::Reader) -> ReadResult<tab
     Ok(table::RegionScope { links, ports })
 }
 
+impl From<hugr_capnp::Visibility> for Option<model::Visibility> {
+    fn from(value: hugr_capnp::Visibility) -> Self {
+        match value {
+            hugr_capnp::Visibility::Unspecified => None,
+            hugr_capnp::Visibility::Private => Some(model::Visibility::Private),
+            hugr_capnp::Visibility::Public => Some(model::Visibility::Public),
+        }
+    }
+}
+
 /// (Only) if `constraints` are None, then they are read from the `reader`
 fn read_symbol<'a>(
     bump: &'a Bump,
@@ -197,11 +207,7 @@ fn read_symbol<'a>(
     constraints: Option<&'a [table::TermId]>,
 ) -> ReadResult<&'a mut table::Symbol<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
-    let visibility = match reader.get_visibility() {
-        Ok(hugr_capnp::Visibility::Private) => model::Visibility::Private,
-        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public,
-        Err(_) => model::Visibility::default(),
-    };
+    let visibility = reader.get_visibility()?.into();
     let visibility = bump.alloc(visibility);
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {

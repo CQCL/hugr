@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func example.bools
+(define-func public example.bools
   (core.fn []
            [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%false %true]
@@ -12,7 +12,7 @@
        ((core.load_const (core.const.adt 1 (tuple))) [] [%true]
                                                                (signature (core.fn [] [(core.adt [[] []])])))))
 
-(define-func example.make-pair
+(define-func public example.make-pair
   (core.fn []
            [(core.adt
              [[(collections.array.array 5 (arithmetic.int.types.int 6))
@@ -45,7 +45,7 @@
         [[(collections.array.array 5 (arithmetic.int.types.int 6))
           arithmetic.float.types.float64]])])))))
 
-(define-func example.f64-json
+(define-func public example.f64-json
   (core.fn []
            [arithmetic.float.types.float64])
   (dfg [] [%0 %1]

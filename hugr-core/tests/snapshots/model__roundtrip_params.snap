@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-params.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -21,6 +21,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
 (import core.float)
 
 (define-func
+  public
   example.swap
   (param ?0 core.type)
   (param ?1 core.type)
@@ -28,6 +29,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))
 
 (declare-func
+  public
   example.literals
   (param ?0 core.str)
   (param ?1 core.nat)
@@ -35,7 +37,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-para
   (param ?3 core.float)
   (core.fn [] []))
 
-(define-func example.call_literals (core.fn [] [])
+(define-func private example.call_literals (core.fn [] [])
   (dfg
     (signature (core.fn [] []))
     ((core.call

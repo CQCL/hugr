@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func main
+(define-func public main
   (core.fn
     [(arithmetic.int.types.int 6)
       (arithmetic.int.types.int 6)
@@ -28,6 +28,11 @@
     (meta (core.order_hint.order 1 0))
     (meta (core.order_hint.order 2 3))
     (meta (core.order_hint.order 0 3))
+    (meta (core.order_hint.input_key 4))
+    (meta (core.order_hint.order 4 0))
+    (meta (core.order_hint.order 4 5))
+    (meta (core.order_hint.order 1 5))
+    (meta (core.order_hint.output_key 5))
 
     ((arithmetic.int.ineg 6)
       [%0] [%4]
