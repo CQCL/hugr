@@ -40,6 +40,7 @@ from hugr.ops import (
     IncompleteOp,
     Module,
     Op,
+    is_dataflow_op,
 )
 from hugr.tys import Kind, Type, ValueKind
 from hugr.utils import BiMap
@@ -962,7 +963,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         from hugr.build import Function
 
-        if not isinstance(self.entrypoint_op(), DataflowOp):
+        if not is_dataflow_op(self.entrypoint_op()):
             return
 
         func_node = self[self.entrypoint].parent
