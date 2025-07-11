@@ -132,11 +132,12 @@ class DataflowOp(Op, Protocol):
             Bool
 
         """
-        sig = self.outer_signature()
         if port.offset == -1:
             # Order port
             msg = "Order port has no type."
             raise ValueError(msg)
+
+        sig = self.outer_signature()
         try:
             if port.direction == Direction.INCOMING:
                 return sig.input[port.offset]
@@ -258,7 +259,10 @@ class Output(DataflowOp, _PartialOp):
     """
 
     _types: tys.TypeRow | None = field(default=None, repr=False)
-    num_out: int = field(default=0, repr=False)
+
+    @property
+    def num_out(self) -> int:
+        return 0
 
     @property
     def types(self) -> tys.TypeRow:
@@ -824,7 +828,7 @@ class CFG(DataflowOp):
 
 @dataclass
 class DataflowBlock(DfParentOp):
-    """Parent of non-entry basic block in a control flow graph."""
+    """Parent of non-exit basic block in a control flow graph."""
 
     #: Inputs types of the inner dataflow graph.
     inputs: tys.TypeRow
@@ -939,7 +943,7 @@ class Const(Op):
             case OutPort(_, 0):
                 return tys.ConstKind(self.val.type_())
             case _:
-                raise self._invalid_port(port)
+                return DataflowOp.port_kind(self, port)
 
     def __repr__(self) -> str:
         return f"Const({self.val})"
@@ -1402,7 +1406,9 @@ class LoadFunc(_CallOrLoad, DataflowOp):
             is provided.
     """
 
-    num_out: int = field(default=1, repr=False)
+    @property
+    def num_out(self) -> int:
+        return 1
 
     def _to_serial(self, parent: Node) -> sops.LoadFunction:
         return sops.LoadFunction(
