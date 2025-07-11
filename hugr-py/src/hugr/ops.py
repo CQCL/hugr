@@ -605,7 +605,7 @@ class UnpackTuple(AsExtOp, _PartialOp):
         return "UnpackTuple"
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Tag(DataflowOp):
     """Tag a row of incoming values to make them a variant of a sum type.
 
@@ -633,10 +633,18 @@ class Tag(DataflowOp):
         )
 
     def __repr__(self) -> str:
+        if len(self.sum_ty.variant_rows) != 2:
+            left, right = self.sum_ty.variant_rows
+            if len(left) == 0 and self.tag == 1:
+                return "Some"
+            elif self.tag == 0:
+                return "Left"
+            else:
+                return "Right"
         return f"Tag({self.tag})"
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Some(Tag):
     """Tag operation for the `Some` variant of an Option type.
 
@@ -649,30 +657,21 @@ class Some(Tag):
     def __init__(self, *some_tys: tys.Type) -> None:
         super().__init__(1, tys.Option(*some_tys))
 
-    def __repr__(self) -> str:
-        return "Some"
 
-
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Right(Tag):
     """Tag operation for the `Right` variant of an type."""
 
     def __init__(self, either_type: tys.Either) -> None:
         super().__init__(1, either_type)
 
-    def __repr__(self) -> str:
-        return "Right"
 
-
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Left(Tag):
     """Tag operation for the `Left` variant of an type."""
 
     def __init__(self, either_type: tys.Either) -> None:
         super().__init__(0, either_type)
-
-    def __repr__(self) -> str:
-        return "Left"
 
 
 class Continue(Left):
@@ -680,15 +679,9 @@ class Continue(Left):
     controlling Either type.
     """
 
-    def __repr__(self) -> str:
-        return "Continue"
-
 
 class Break(Right):
     """Tag operation for the `Break` variant of a TailLoop controlling Either type."""
-
-    def __repr__(self) -> str:
-        return "Break"
 
 
 class DfParentOp(Op, Protocol):
