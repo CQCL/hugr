@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
 use petgraph::{Direction, algo::tarjan_scc, visit::EdgeRef};
@@ -21,20 +21,12 @@ pub fn inline_acyclic<H: HugrMut>(
     let all_sccs: HashSet<_> = sccs.iter().flatten().collect::<HashSet<_>>();
     if h.entrypoint() == h.module_root() {
         // Can modify everywhere. Traverse post-order (callee before caller).
-        enum Status {
-            PushChildren,
-            Todo,
-            Done,
-        }
-        let mut status: HashMap<_, _> = g
-            .node_indices()
-            .map(|n| (n, Status::PushChildren))
-            .collect();
+        let mut seen = HashSet::new();
         let mut stack: Vec<_> = h
             .children(h.module_root())
-            .map(|n| cg.node_index(n).unwrap())
+            .map(|n| (cg.node_index(n).unwrap(), false))
             .collect();
-        while let Some(func) = stack.pop() {
+        while let Some((func, children_done)) = stack.pop() {
             let edges = cg
                 .graph()
                 .edges_directed(func, Direction::Outgoing)
@@ -43,30 +35,29 @@ pub fn inline_acyclic<H: HugrMut>(
                     let d = e.target();
                     (!all_sccs.contains(&d)).then_some((g.edge_weight(e.id()).unwrap(), d))
                 });
-            match status.get(&func).unwrap() {
-                Status::Done => (),
-                Status::PushChildren => {
-                    stack.push(func);
-                    status.insert(func, Status::Todo);
-                    stack.extend(edges.map(|(_, tgt)| tgt));
-                }
-                Status::Todo => {
-                    // Callees have all been inlined.
-                    for (edge, callee) in edges {
-                        let tgt_func: H::Node = match g.node_weight(callee).unwrap() {
-                            CallGraphNode::FuncDecl(_) => continue,
-                            CallGraphNode::FuncDefn(n) => *n,
-                            CallGraphNode::NonFuncRoot => unreachable!("Call to non-func"),
-                        };
-                        if let CallGraphEdge::Call(n) = edge {
-                            if filt_func(*n, tgt_func) {
-                                h.apply_patch(InlineCall::new(tgt_func)).unwrap();
-                            }
-                        }
+            if !children_done {
+                stack.push((func, true));
+                stack.extend(edges.map(|(_, tgt)| (tgt, false)));
+                // We know no tgt can push `func` because we have already filtered out cycles
+                continue
+            }
+            // Callees have all been processed.
+            if !seen.insert(func) { continue } // Caller has too!
+            for (edge, callee) in edges {
+                let tgt_func: H::Node = match g.node_weight(callee).unwrap() {
+                    CallGraphNode::FuncDecl(_) => continue,
+                    CallGraphNode::FuncDefn(n) => *n,
+                    CallGraphNode::NonFuncRoot => unreachable!("Call to non-func"),
+                };
+                if let CallGraphEdge::Call(n) = edge {
+                    // If we've processed `func` already, the calls will have become DFGs
+                    assert_eq!(h.static_source(*n), Some(tgt_func));
+                    if filt_func(*n, tgt_func) {
+                        h.apply_patch(InlineCall::new(tgt_func)).unwrap();
                     }
-                    status.insert(func, Status::Done);
                 }
             }
+            
         }
     } else {
         todo!() // Can only modify inside entrypoint. But, can keep inlining.
