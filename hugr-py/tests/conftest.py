@@ -147,6 +147,12 @@ def validate(
         snapshot: A hugr render snapshot. If not None, it will be compared against the
         rendered HUGR. Pass `--snapshot-update` to pytest to update the snapshot file.
     """
+    if snap is not None:
+        dot = h.render_dot() if isinstance(h, Hugr) else h.modules[0].render_dot()
+        assert snap == dot.source
+        if os.environ.get("HUGR_RENDER_DOT"):
+            dot.pipe("svg")
+
     # Encoding formats to test, indexed by the format name as used by
     # `hugr convert --format`.
     FORMATS = {
