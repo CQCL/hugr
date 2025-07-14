@@ -4,6 +4,7 @@ import pytest
 
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
+from hugr.std.collections.borrow_array import BorrowArray, BorrowArrayVal
 from hugr.std.collections.list import List, ListVal
 from hugr.std.collections.static_array import StaticArray, StaticArrayVal
 from hugr.std.collections.value_array import ValueArray, ValueArrayVal
@@ -136,6 +137,7 @@ def test_args_str(arg: TypeArg, string: str):
         (Array(Bool, 3), "array<3, Type(Bool)>"),
         (StaticArray(Bool), "static_array<Type(Bool)>"),
         (ValueArray(Bool, 3), "value_array<3, Type(Bool)>"),
+        (BorrowArray(Bool, 3), "borrow_array<3, Type(Bool)>"),
         (Variable(2, TypeBound.Linear), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
@@ -208,6 +210,25 @@ def test_value_array():
     ar_val = ValueArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
     assert ar_val.ty == ValueArray(Bool, 2)
+
+
+def test_borrow_array():
+    ty_var = Variable(0, TypeBound.Copyable)
+    len_var = VariableArg(1, BoundedNatParam())
+
+    ls = BorrowArray(Bool, 3)
+    assert ls.ty == Bool
+    assert ls.size == 3
+    assert ls.type_bound() == TypeBound.Linear
+
+    ls = BorrowArray(ty_var, len_var)
+    assert ls.ty == ty_var
+    assert ls.size is None
+    assert ls.type_bound() == TypeBound.Linear
+
+    ar_val = BorrowArrayVal([val.TRUE, val.FALSE], Bool)
+    assert ar_val.v == [val.TRUE, val.FALSE]
+    assert ar_val.ty == BorrowArray(Bool, 2)
 
 
 def test_static_array():
