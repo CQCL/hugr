@@ -204,6 +204,11 @@ class ModelExport:
                     error = f"Call node {node} is not connected to a function."
                     raise ValueError(error)
 
+                # We ignore the static input edge since the function is passed
+                # as an argument instead.
+                assert len(inputs) == len(input_types) + 1
+                inputs = inputs[0 : len(inputs) - 1]
+
                 func = model.Apply(func_name, func_args)
 
                 return model.Node(
@@ -295,7 +300,7 @@ class ModelExport:
                         model.Apply("core.load_const", [type, value])
                     ),
                     signature=signature,
-                    inputs=inputs,
+                    inputs=[],
                     outputs=outputs,
                     meta=meta,
                 )
