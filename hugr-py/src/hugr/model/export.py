@@ -75,7 +75,6 @@ class ModelExport:
 
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = self.export_json_meta(node)
-        meta += self.export_entrypoint_meta(node)
 
         # Add an order hint key to the node if necessary
         if _has_order_links(self.hugr, node):
@@ -83,7 +82,7 @@ class ModelExport:
 
         match node_data.op:
             case DFG() as op:
-                region = self.export_region_dfg(node, standalone=False)
+                region = self.export_region_dfg(node)
 
                 return model.Node(
                     operation=model.Dfg(),
@@ -124,8 +123,7 @@ class ModelExport:
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(child, standalone=True)
-                    for child in node_data.children
+                    self.export_region_dfg(child) for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
@@ -140,7 +138,7 @@ class ModelExport:
                 )
 
             case TailLoop() as op:
-                region = self.export_region_dfg(node, standalone=False)
+                region = self.export_region_dfg(node)
                 signature = op.outer_signature().to_model()
                 return model.Node(
                     operation=model.TailLoop(),
@@ -156,7 +154,7 @@ class ModelExport:
                 symbol = self.export_symbol(
                     name, op.visibility, op.signature.params, op.signature.body
                 )
-                region = self.export_region_dfg(node, standalone=False)
+                region = self.export_region_dfg(node)
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
@@ -322,7 +320,7 @@ class ModelExport:
                 )
 
             case DataflowBlock() as op:
-                region = self.export_region_dfg(node, standalone=False)
+                region = self.export_region_dfg(node)
 
                 input_types = [model.List([type.to_model() for type in op.inputs])]
 
@@ -419,7 +417,7 @@ class ModelExport:
 
         return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
-    def export_region_dfg(self, node: Node, standalone: bool = True) -> model.Region:
+    def export_region_dfg(self, node: Node) -> model.Region:
         """Export the children of a node as a dataflow region."""
         node_data = self.hugr[node]
         children: list[model.Node] = []
@@ -428,7 +426,7 @@ class ModelExport:
         sources = []
         targets = []
 
-        meta = self.export_entrypoint_meta(node) if standalone else []
+        meta = self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
