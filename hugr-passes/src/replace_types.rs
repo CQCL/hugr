@@ -270,7 +270,7 @@ impl TypeTransformer for ReplaceTypes {
     type Err = ReplaceTypesError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
-        Ok(if let Some(res) = self.type_map.get(ct) {
+        let next = if let Some(res) = self.type_map.get(ct) {
             Some(res.clone())
         } else if let Some(dest_fn) = self.param_types.get(&ct.into()) {
             // `ct` has not had args transformed
@@ -282,7 +282,10 @@ impl TypeTransformer for ReplaceTypes {
             dest_fn(&nargs)
         } else {
             None
-        })
+        };
+        let Some(mut ty) = next else { return Ok(None) };
+        ty.transform(self)?;
+        Ok(Some(ty))
     }
 }
 
