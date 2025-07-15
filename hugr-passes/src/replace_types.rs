@@ -185,7 +185,10 @@ impl ReplacementOptions {
     /// Specifies that the replacement should be processed by the same [ReplaceTypes].
     /// This increases compositionality (in that replacements for different ops do not
     /// need to account for each other), but would lead to an infinite loop if e.g.
-    /// changing an op for a DFG containing an instance of the same op.
+    /// changing an op for a DFG containing an instance of the same op. Also, note
+    /// that if the recursive processing changes the signature of the replacement,
+    /// this may break surrounding wires (e.g. from [Input] or to [Output] nodes)
+    /// because types are not subject to recursive replacement.
     pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
         self.process_recursive = rec;
         self
