@@ -98,6 +98,7 @@ expression: ast
       (signature (core.fn [] [arithmetic.float.types.float64])))))
 
 (declare-func
+  public
   example.const_as_param
   (param ?0 (core.const arithmetic.float.types.float64))
   (core.fn [] [?0]))
