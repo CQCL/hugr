@@ -1314,6 +1314,10 @@ mod test {
             .add_dataflow_op(ArrayOpDef::get.to_concrete(usize_t(), 64), [usizes, idx])
             .unwrap()
             .outputs_arr();
-        dfb.finish_hugr_with_outputs([b, bools, u, usizes]).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs([b, bools, u, usizes]).unwrap();
+
+        lowerer.run(&mut h).unwrap();
+
+        h.validate().unwrap();
     }
 }
