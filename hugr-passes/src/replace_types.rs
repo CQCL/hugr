@@ -171,8 +171,10 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
-/// Options for how the replacement for an op is processed. May be specified by
-/// [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
+// TODO also replacement consts.
+/// Options for how a replacement (op or type) is processed. May be specified by
+/// [ReplaceTypes::replace_op_with], [ReplaceTypes::replace_parametrized_op_with],
+/// [ReplaceTypes::replace_type_opts] or [ReplaceTypes::replace_parametrized_type_opts].
 /// Otherwise (the default), replacements are inserted as is (without further processing).
 // TODO would be good to migrate to default being process_recursive: true
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
@@ -182,19 +184,17 @@ pub struct ReplacementOptions {
 }
 
 impl ReplacementOptions {
-    /// Specifies that the replacement should be processed by the same [ReplaceTypes].
-    /// This increases compositionality (in that replacements for different ops do not
-    /// need to account for each other), but would lead to an infinite loop if e.g.
-    /// changing an op for a DFG containing an instance of the same op. Also, note
-    /// that if the recursive processing changes the signature of the replacement,
-    /// this may break surrounding wires (e.g. from [Input] or to [Output] nodes)
-    /// because types are not subject to recursive replacement.
+    /// Specifies that the replacement (op or type) should be processed by the same
+    /// [ReplaceTypes]. This increases compositionality (in that replacements for
+    /// other types/ops do not need to have already been applied to the RHS), but
+    /// would lead to an infinite loop if e.g. changing an op for a DFG containing
+    /// an instance of the same op.
     pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
         self.process_recursive = rec;
         self
     }
 
-    /// Specifies that the replacement should be linearized.
+    /// Specifies that the replacement for an op should be linearized.
     /// If [Self::with_recursive_replacement] has been set, this applies linearization
     /// even to ops (within the original replacement) that are not altered by the
     /// recursive processing. Otherwise, can be used to apply linearization without
