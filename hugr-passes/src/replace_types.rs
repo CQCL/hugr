@@ -403,10 +403,7 @@ impl ReplaceTypes {
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
-        self.param_ops.insert(
-            src.into(),
-            (Arc::new(dest_fn), ReplacementOptions::default()),
-        );
+        self.replace_parametrized_op_with(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
