@@ -234,8 +234,9 @@ impl ReplacementOptions {
 /// [monomorphization]: super::monomorphize()
 #[derive(Clone)]
 pub struct ReplaceTypes {
-    type_map: HashMap<CustomType, Type>,
-    param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
+    type_map: HashMap<CustomType, (Type, ReplacementOptions)>,
+    param_types:
+        HashMap<ParametricType, (Arc<dyn Fn(&[TypeArg]) -> Option<Type>>, ReplacementOptions)>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
     param_ops: HashMap<
@@ -272,19 +273,23 @@ impl TypeTransformer for ReplaceTypes {
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
         let next = if let Some(res) = self.type_map.get(ct) {
             Some(res.clone())
-        } else if let Some(dest_fn) = self.param_types.get(&ct.into()) {
+        } else if let Some((dest_fn, opts)) = self.param_types.get(&ct.into()) {
             // `ct` has not had args transformed
             let mut nargs = ct.args().to_vec();
             // We don't care if `nargs` are changed, we're just calling `dest_fn`
             nargs
                 .iter_mut()
                 .try_for_each(|ta| ta.transform(self).map(|_ch| ()))?;
-            dest_fn(&nargs)
+            dest_fn(&nargs).map(|ty| (ty, opts.clone()))
         } else {
             None
         };
-        let Some(mut ty) = next else { return Ok(None) };
-        ty.transform(self)?;
+        let Some((mut ty, opts)) = next else {
+            return Ok(None);
+        };
+        if opts.process_recursive {
+            ty.transform(self)?;
+        }
         Ok(Some(ty))
     }
 }
@@ -321,6 +326,14 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
+    /// Equivalent to [Self::replace_type_opts] with [ReplacementOptions::default()]
+    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
+        self.replace_type_opts(src, dest, ReplacementOptions::default())
+    }
+
+    /// Configures this instance to replace occurrences of type `src` with `dest`,
+    /// according to the given `ReplacementOptions`.
+    ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
     /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
@@ -333,14 +346,28 @@ impl ReplaceTypes {
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [`SignatureError`] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
     /// (This can be overridden by an additional [`Self::replace_type`].)
-    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
-        // We could check that 'dest' is copyable or 'src' is linear, but since we can't
-        // check that for parametrized types, we'll be consistent and not check here either.
-        self.type_map.insert(src, dest);
+    pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
+        // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
+        // discard functions are registered with the linearizer; but since we can't check
+        // that for parametrized types, we'll be consistent and not check here either.
+        self.type_map.insert(src, (dest, opts));
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    /// Equivalent to [Self::replace_parametrized_type_opts] with [ReplacementOptions::default].
+    pub fn replace_parametrized_type(
+        &mut self,
+        src: &TypeDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
+    ) {
+        self.replace_parametrized_type_opts(src, dest_fn, ReplacementOptions::default())
+    }
+
+    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s,
+    /// and using the given [ReplacementOptions].
+    ///
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
     /// no change (in which case the supplied `TypeArgs` will be given to `src`).
@@ -349,10 +376,11 @@ impl ReplaceTypes {
     /// [`Self::replace_consts_parametrized`] (or [`Self::replace_consts`]) as the
     /// [`LoadConstant`]s will be reparametrized (and this will break the edge from [Const] to
     /// [`LoadConstant`]).
-    pub fn replace_parametrized_type(
+    pub fn replace_parametrized_type_opts(
         &mut self,
         src: &TypeDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
+        opts: ReplacementOptions,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
@@ -363,7 +391,8 @@ impl ReplaceTypes {
         // dest_fn: impl Fn(&TypeArg) -> (Type,
         //                                Fn(&Linearizer) -> NodeTemplate, // copy
         //                                Fn(&Linearizer) -> NodeTemplate)` // discard
-        self.param_types.insert(src.into(), Arc::new(dest_fn));
+        self.param_types
+            .insert(src.into(), (Arc::new(dest_fn), opts));
     }
 
     /// Allows to configure how to deal with types/wires that were [Copyable]
