@@ -684,8 +684,8 @@ impl From<&OpDef> for ParametricOp {
 mod test {
     use std::sync::Arc;
 
-    use crate::replace_types::handlers::generic_array_const;
     use crate::replace_types::ReplacementOptions;
+    use crate::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder, inout_sig,
@@ -697,21 +697,23 @@ mod test {
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
-    use hugr_core::ops::constant::CustomConst;
-    use hugr_core::ops::constant::OpaqueValue;
+    use hugr_core::ops::constant::{CustomConst, OpaqueValue};
     use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use hugr_core::std_extensions::collections::array::{Array, ArrayKind, ArrayOpDef, GenericArrayValue};
-    use hugr_core::std_extensions::collections::value_array;
+    use hugr_core::std_extensions::collections::array::{
+        self, Array, ArrayKind, ArrayOpDef, GenericArrayValue, array_type, array_type_def,
+    };
     use hugr_core::std_extensions::collections::list::{
         ListOp, ListValue, list_type, list_type_def,
     };
     use hugr_core::std_extensions::collections::value_array::{
-        value_array_type, value_array_type_def, VArrayOp, VArrayOpDef, VArrayValue, ValueArray
+        VArrayOp, VArrayOpDef, VArrayValue, ValueArray, value_array_type,
     };
 
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow};
+    use hugr_core::types::{
+        PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
+    };
     use hugr_core::{Extension, HugrView, type_row};
     use itertools::Itertools;
     use rstest::rstest;
@@ -1227,42 +1229,91 @@ mod test {
     fn compositionality() {
         let ext = ext();
         let mut lowerer = lowerer(&ext);
-        lowerer.replace_parametrized_type(value_array_type_def(), {
+        lowerer.replace_parametrized_type(array_type_def(), {
             let ext2 = ext.clone();
             move |args| {
-                let [sz, ty] = args else {panic!("Expected two args to array")};
-                (sz == &Term::BoundedNat(64)).then_some(ext2.get_type(PACKED_VEC).unwrap().instantiate([ty.clone()]).unwrap().into())
+                let [sz, ty] = args else {
+                    panic!("Expected two args to array")
+                };
+                (sz == &Term::BoundedNat(64)).then_some(
+                    ext2.get_type(PACKED_VEC)
+                        .unwrap()
+                        .instantiate([ty.clone()])
+                        .unwrap()
+                        .into(),
+                )
             }
         });
-        
-        lowerer.replace_parametrized_op_with(value_array::EXTENSION.get_op(ArrayOpDef::get.opdef_id().as_str()).unwrap().as_ref(), {
-            let ext2 = ext.clone();
-            move |args| {
-                let [sz, Term::Runtime(ty)] = args else {panic!("Expected two args to array-get")};
-                if sz != &Term::BoundedNat(64) {return None}
-                let pv = ext2.get_type(PACKED_VEC).unwrap().instantiate([ty.clone().into()]).unwrap();
-                // No, need to wrap result of read into a Some
-                let mut dfb = DFGBuilder::new(Signature::new(
-                    vec![pv.clone().into(), usize_t()],
-                    vec![option_type(ty.clone()).into(), pv.into()])).unwrap();
-                let [pvec, idx] = dfb.input_wires_arr();
-                let [idx] = dfb.add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx]).unwrap().outputs_arr();
-                let [elem] = dfb.add_dataflow_op(read_op(&ext2, ty.clone()), [pvec, idx]).unwrap().outputs_arr();
-                let [wrapped_elem] = dfb.add_dataflow_op(ops::Tag::new(1, vec![type_row![], ty.clone().into()]), [elem]).unwrap().outputs_arr();
-                Some(NodeTemplate::CompoundOp(Box::new(dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap())))
-            }
-        }, ReplacementOptions::default().with_recursive_replacement(true));
 
-        // ValueArrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
-        // ValueArrays of 64 non-bools should thus become PackedVec<T> nad then back to ValueArray<64, T>
+        // Replacement is complex because we need to wrap result of read into a Some
+        lowerer.replace_parametrized_op_with(
+            array::EXTENSION
+                .get_op(ArrayOpDef::get.opdef_id().as_str())
+                .unwrap()
+                .as_ref(),
+            {
+                let ext2 = ext.clone();
+                move |args| {
+                    let [sz, Term::Runtime(ty)] = args else {
+                        panic!("Expected two args to array-get")
+                    };
+                    if sz != &Term::BoundedNat(64) {
+                        return None;
+                    }
+                    let pv = ext2
+                        .get_type(PACKED_VEC)
+                        .unwrap()
+                        .instantiate([ty.clone().into()])
+                        .unwrap();
+
+                    let mut dfb = DFGBuilder::new(Signature::new(
+                        vec![pv.clone().into(), usize_t()],
+                        vec![option_type(ty.clone()).into(), pv.into()],
+                    ))
+                    .unwrap();
+                    let [pvec, idx] = dfb.input_wires_arr();
+                    let [idx] = dfb
+                        .add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx])
+                        .unwrap()
+                        .outputs_arr();
+                    let [elem] = dfb
+                        .add_dataflow_op(read_op(&ext2, ty.clone()), [pvec, idx])
+                        .unwrap()
+                        .outputs_arr();
+                    let [wrapped_elem] = dfb
+                        .add_dataflow_op(
+                            ops::Tag::new(1, vec![type_row![], ty.clone().into()]),
+                            [elem],
+                        )
+                        .unwrap()
+                        .outputs_arr();
+                    Some(NodeTemplate::CompoundOp(Box::new(
+                        dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
+                    )))
+                }
+            },
+            ReplacementOptions::default().with_recursive_replacement(true),
+        );
+
+        // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
+        // Arrays of 64 non-bools should thus become PackedVec<T> nad then back to ValueArray<64, T>
+        let a64 = |t| array_type(64, t);
+        let op = |t| Type::from(option_type(t));
         let mut dfb = DFGBuilder::new(Signature::new(
-            vec![value_array_type(64, bool_t()), value_array_type(64, usize_t())],
-            vec![option_type(bool_t()).into(), option_type(usize_t()).into()]
-        )).unwrap();
+            vec![a64(bool_t()), a64(usize_t())],
+            vec![op(bool_t()), a64(bool_t()), op(usize_t()), a64(usize_t())],
+        ))
+        .unwrap();
         let [bools, usizes] = dfb.input_wires_arr();
         let idx = dfb.add_load_value(ConstUsize::new(5));
-        let [b, _] = dfb.add_dataflow_op(VArrayOpDef::get.to_concrete(bool_t(), 64), [bools, idx]).unwrap().outputs_arr();
-        let [u, _] = dfb.add_dataflow_op(VArrayOpDef::get.to_concrete(usize_t(), 64), [usizes, idx]).unwrap().outputs_arr();
-        dfb.finish_hugr_with_outputs([b, u]).unwrap();
+        let [b, bools] = dfb
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(bool_t(), 64), [bools, idx])
+            .unwrap()
+            .outputs_arr();
+        let [u, usizes] = dfb
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(usize_t(), 64), [usizes, idx])
+            .unwrap()
+            .outputs_arr();
+        dfb.finish_hugr_with_outputs([b, bools, u, usizes]).unwrap();
     }
 }
