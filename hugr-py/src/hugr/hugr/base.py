@@ -605,10 +605,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             direction: Direction of ports to count.
 
         Examples:
+            >>> from hugr.std.logic import Not
             >>> h = Hugr()
-            >>> n1 = h.add_const(val.TRUE)
-            >>> n2 = h.add_const(val.FALSE)
-            >>> h.add_link(n1.out(0), n2.inp(2)) # not a valid link!
+            >>> n1 = h.add_node(Not)
+            >>> n2 = h.add_node(Not)
+            >>> # Passing offset `2` here allocates new ports automatically
+            >>> h.add_link(n1.out(0), n2.inp(2))
             >>> h.add_order_link(n1, n2)
             >>> h.num_ports(n1, Direction.OUTGOING)
             1

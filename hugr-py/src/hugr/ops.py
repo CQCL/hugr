@@ -242,6 +242,12 @@ class Input(DataflowOp):
     def _inputs(self) -> tys.TypeRow:
         return []
 
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        # Input only allows order edges on outgoing ports
+        if port.offset == -1 and port.direction == Direction.OUTGOING:
+            return tys.OrderKind()
+        return tys.ValueKind(self.port_type(port))
+
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=self.types)
 
@@ -273,6 +279,12 @@ class Output(DataflowOp, _PartialOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.types
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        # Output only allows order edges on incoming ports
+        if port.offset == -1 and port.direction == Direction.INCOMING:
+            return tys.OrderKind()
+        return tys.ValueKind(self.port_type(port))
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[])
@@ -942,8 +954,6 @@ class Const(Op):
         match port:
             case OutPort(_, 0):
                 return tys.ConstKind(self.val.type_())
-            case InPort(_, -1) | OutPort(_, -1):
-                return tys.OrderKind()
             case _:
                 raise self._invalid_port(port)
 
