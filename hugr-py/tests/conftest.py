@@ -12,13 +12,14 @@ from typing_extensions import Self
 from hugr import ext, tys
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp, Command, DataflowOp, ExtOp, RegisteredOp
+from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
 from hugr.package import Package
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
     from syrupy.assertion import SnapshotAssertion
 
+    from hugr.hugr.node_port import Node
     from hugr.ops import ComWire
 
 QUANTUM_EXT = ext.Extension("pytest.quantum", ext.Version(0, 1, 0))
@@ -107,6 +108,32 @@ Measure = MeasureDef()
 
 
 @QUANTUM_EXT.register_op(
+    "MeasureFree",
+    signature=tys.FunctionType([tys.Qubit], [tys.Bool]),
+)
+@dataclass(frozen=True)
+class MeasureFreeDef(RegisteredOp):
+    def __call__(self, q: ComWire) -> Command:
+        return super().__call__(q)
+
+
+MeasureFree = MeasureFreeDef()
+
+
+@QUANTUM_EXT.register_op(
+    "QAlloc",
+    signature=tys.FunctionType([], [tys.Qubit]),
+)
+@dataclass(frozen=True)
+class QAllocDef(RegisteredOp):
+    def __call__(self) -> Command:
+        return super().__call__()
+
+
+QAlloc = QAllocDef()
+
+
+@QUANTUM_EXT.register_op(
     "Rz",
     signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
 )
@@ -146,45 +173,126 @@ def validate(
         snapshot: A hugr render snapshot. If not None, it will be compared against the
         rendered HUGR. Pass `--snapshot-update` to pytest to update the snapshot file.
     """
+    if snap is not None:
+        dot = h.render_dot() if isinstance(h, Hugr) else h.modules[0].render_dot()
+        assert snap == dot.source
+        if os.environ.get("HUGR_RENDER_DOT"):
+            dot.pipe("svg")
+
+    # Encoding formats to test, indexed by the format name as used by
+    # `hugr convert --format`.
+    FORMATS = {
+        "json": EnvelopeConfig.TEXT,
+        "model-exts": EnvelopeConfig.BINARY,
+    }
+    # TODO: "model-exts" comes with its own variety of errors.
+    # Fix them and add it to the list of write formats.
+    WRITE_FORMATS = ["json"]
+    # Model envelopes cannot currently be loaded from python.
+    # TODO: Add model envelope loading to python, and add it to the list.
+    LOAD_FORMATS = ["json"]
+
     cmd = [*_base_command(), "validate", "-"]
 
     # validate text and binary formats
-    for fmt in (EnvelopeConfig.TEXT, EnvelopeConfig.BINARY):
-        serial = h.to_bytes(fmt)
+    for write_fmt in WRITE_FORMATS:
+        serial = h.to_bytes(FORMATS[write_fmt])
         _run_hugr_cmd(serial, cmd)
 
-    if not roundtrip:
-        return
+        if roundtrip:
+            # Roundtrip tests:
+            # Try converting to all possible LOAD_FORMATS, load them back in,
+            # and check that the loaded HUGR corresponds to the original using
+            # a node hash comparison.
+            #
+            # Run `pytest` with `-vv` to see the hash diff.
+            for load_fmt in LOAD_FORMATS:
+                if load_fmt != write_fmt:
+                    cmd = [*_base_command(), "convert", "--format", load_fmt, "-"]
+                    out = _run_hugr_cmd(serial, cmd)
+                    converted_serial = out.stdout
+                else:
+                    converted_serial = serial
+                loaded = Package.from_bytes(converted_serial)
 
-    # Roundtrip checks
-    # 1. just roundtrip with Python
-    if isinstance(h, Hugr):
-        starting_json = h.to_str()
-        h2 = Hugr.from_str(starting_json)
-        roundtrip_json = h2.to_str()
-        assert roundtrip_json == starting_json
+                modules = [h] if isinstance(h, Hugr) else h.modules
 
-        if snap is not None:
-            dot = h.render_dot()
-            assert snap == dot.source
-            if os.environ.get("HUGR_RENDER_DOT"):
-                dot.pipe("svg")
-    else:
-        # Package
-        encoded = h.to_str(EnvelopeConfig.TEXT)
-        loaded = Package.from_str(encoded)
-        roundtrip_encoded = loaded.to_str(EnvelopeConfig.TEXT)
-        assert encoded == roundtrip_encoded
+                assert len(loaded.modules) == len(modules)
+                for m1, m2 in zip(loaded.modules, modules, strict=True):
+                    h1_hash = _NodeHash.hash_hugr(m1, "original")
+                    h2_hash = _NodeHash.hash_hugr(m2, "loaded")
+                    assert (
+                        h1_hash == h2_hash
+                    ), f"HUGRs are not the same for {write_fmt} -> {load_fmt}"
 
-    # 2. roundtrip through the CLI
 
-    # TODO once model loading is supported in Python
-    # try every combo of input and output formats
-    cmd = [*_base_command(), "convert", "-", "--text"]
+@dataclass(frozen=True, order=True)
+class _NodeHash:
+    op: str
+    entrypoint: bool
+    input_neighbours: int
+    output_neighbours: int
+    input_ports: int
+    output_ports: int
+    input_order_edges: int
+    output_order_edges: int
+    is_region: bool
+    node_depth: int
+    children_hashes: list[_NodeHash]
+    metadata: dict[str, str]
 
-    serial = h.to_bytes(EnvelopeConfig.BINARY)
-    out = _run_hugr_cmd(serial, cmd)
-    loaded = Package.from_bytes(out.stdout)
+    @classmethod
+    def hash_hugr(cls, h: Hugr, name: str) -> _NodeHash:
+        """Returns an order-independent hash of a HUGR."""
+        return cls._hash_node(h, h.module_root, 0, name)
+
+    @classmethod
+    def _hash_node(cls, h: Hugr, n: Node, depth: int, name: str) -> _NodeHash:
+        children = h.children(n)
+        child_hashes = sorted(cls._hash_node(h, c, depth + 1, name) for c in children)
+        metadata = {k: str(v) for k, v in h[n].metadata.items()}
+
+        # Pick a normalized representation of the op name.
+        op_type = h[n].op
+        if isinstance(op_type, AsExtOp):
+            op_type = op_type.ext_op.to_custom_op()
+            op = f"{op_type.extension}.{op_type.op_name}"
+        elif isinstance(op_type, Custom):
+            op = f"{op_type.extension}.{op_type.op_name}"
+        elif isinstance(op_type, Const):
+            # We need every custom value to have the same repr if they compare
+            # equal. For example, an `IntVal(42)` should be the same as the
+            # equivalent `Extension` value.
+            # This needs a lot of extra unwrapping, since each class implements
+            # different `__repr__` methods.
+            #
+            # Our solution here is to roundtrip via `sops.Value`. This may miss
+            # some errors, but it's the best we can do for now.
+            serial_val = op_type.val._to_serial_root()
+            val = serial_val.deserialize()
+            op = repr(Const(val, num_out=op_type.num_out))
+        else:
+            op = op_type.name()
+
+        return _NodeHash(
+            entrypoint=n == h.entrypoint,
+            op=op,
+            input_neighbours=h.num_incoming(n),
+            output_neighbours=h.num_outgoing(n),
+            input_ports=h.num_in_ports(n),
+            output_ports=h.num_out_ports(n),
+            input_order_edges=len(list(h.incoming_order_links(n))),
+            output_order_edges=len(list(h.outgoing_order_links(n))),
+            is_region=len(children) > 0,
+            node_depth=depth,
+            children_hashes=child_hashes,
+            metadata=metadata,
+        )
+
+
+def _get_mermaid(serial: bytes) -> str:  #
+    """Render a HUGR as a mermaid diagram using the CLI."""
+    return _run_hugr_cmd(serial, [*_base_command(), "mermaid", "-"]).stdout.decode()
 
 
 def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[bytes]:

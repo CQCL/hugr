@@ -197,7 +197,7 @@ def test_build_inter_graph(snapshot):
     validate(h.hugr, snap=snapshot)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
-    assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
+    assert h.hugr.num_outgoing(h.input_node) == 3
     assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
     assert len(list(h.hugr.incoming_order_links(nested))) == 1
     assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
@@ -466,3 +466,15 @@ def test_html_labels(snapshot) -> None:
     f.set_outputs(b)
 
     validate(f.hugr, snap=snapshot)
+
+
+# https://github.com/CQCL/hugr/issues/2438
+def test_fndef_output_ports(snapshot):
+    mod = Module()
+    main = mod.define_function("main", [], [tys.Unit, tys.Unit, tys.Unit, tys.Unit])
+    unit = main.add_op(ops.MakeTuple())
+    main.set_outputs(*4 * [unit])
+
+    assert mod.hugr.num_out_ports(main) == 1
+
+    validate(mod.hugr, snap=snapshot)
