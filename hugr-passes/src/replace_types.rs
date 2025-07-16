@@ -566,8 +566,9 @@ impl ReplaceTypes {
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                     if opts.process_recursive {
-                        self.change_subtree(hugr, n, opts.linearize)?;
-                    } else if opts.linearize {
+                        self.run(&mut hugr.with_entrypoint_mut(n))?;
+                    }
+                    if opts.linearize {
                         for d in hugr.descendants(n).collect::<Vec<_>>() {
                             if d != n {
                                 self.linearize_outputs(hugr, d)?;
@@ -623,22 +624,6 @@ impl ReplaceTypes {
         }
     }
 
-    fn change_subtree<H: HugrMut<Node = Node>>(
-        &self,
-        hugr: &mut H,
-        root: H::Node,
-        linearize_if_no_change: bool,
-    ) -> Result<bool, ReplaceTypesError> {
-        let mut changed = false;
-        for n in hugr.descendants(root).collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
-            if n != root && (changed || linearize_if_no_change) {
-                self.linearize_outputs(hugr, n)?;
-            }
-        }
-        Ok(changed)
-    }
-
     fn linearize_outputs<H: HugrMut<Node = Node>>(
         &self,
         hugr: &mut H,
@@ -666,7 +651,14 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
-        self.change_subtree(hugr, hugr.entrypoint(), false)
+        let mut changed = false;
+        for n in hugr.entry_descendants().collect::<Vec<_>>() {
+            changed |= self.change_node(hugr, n)?;
+            if n != hugr.entrypoint() && changed {
+                self.linearize_outputs(hugr, n)?;
+            }
+        }
+        Ok(changed)
     }
 }
 
