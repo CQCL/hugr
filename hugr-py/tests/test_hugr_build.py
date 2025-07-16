@@ -466,3 +466,15 @@ def test_html_labels(snapshot) -> None:
     f.set_outputs(b)
 
     validate(f.hugr, snap=snapshot)
+
+
+# https://github.com/CQCL/hugr/issues/2438
+def test_fndef_output_ports(snapshot):
+    mod = Module()
+    main = mod.define_function("main", [], [tys.Unit, tys.Unit, tys.Unit, tys.Unit])
+    unit = main.add_op(ops.MakeTuple())
+    main.set_outputs(*4 * [unit])
+
+    assert mod.hugr.num_out_ports(main) == 1
+
+    validate(mod.hugr, snap=snapshot)

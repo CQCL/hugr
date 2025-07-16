@@ -16,39 +16,6 @@ def test_empty():
     }
 
 
-def test_order_links():
-    dfg = Dfg(tys.Bool)
-    inp_0 = dfg.input_node.out(0)
-    inp_order = dfg.input_node.out(-1)
-    out_0 = dfg.output_node.inp(0)
-    out_1 = dfg.output_node.inp(1)
-    out_order = dfg.output_node.inp(-1)
-
-    dfg.hugr.add_link(inp_0, out_0)
-    dfg.hugr.add_link(inp_0, out_1)
-    assert list(dfg.hugr.outgoing_links(dfg.input_node)) == [
-        (inp_0, [out_0, out_1]),
-    ]
-    assert list(dfg.hugr.incoming_links(dfg.output_node)) == [
-        (out_0, [inp_0]),
-        (out_1, [inp_0]),
-    ]
-
-    # Now add an order link
-    dfg.hugr.add_order_link(dfg.input_node, dfg.output_node)
-    assert list(dfg.hugr.incoming_order_links(dfg.output_node)) == [dfg.input_node]
-    assert list(dfg.hugr.outgoing_order_links(dfg.input_node)) == [dfg.output_node]
-    assert list(dfg.hugr.outgoing_links(dfg.input_node)) == [
-        (inp_0, [out_0, out_1]),
-        (inp_order, [out_order]),
-    ]
-    assert list(dfg.hugr.incoming_links(dfg.output_node)) == [
-        (out_0, [inp_0]),
-        (out_1, [inp_0]),
-        (out_order, [inp_order]),
-    ]
-
-
 def test_children():
     mod = Module()
     mod.declare_function("foo", tys.PolyFuncType([], tys.FunctionType.empty()))

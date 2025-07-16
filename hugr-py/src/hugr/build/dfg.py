@@ -746,7 +746,6 @@ class Function(DfBase[ops.FuncDefn]):
         defined yet. The wires passed to :meth:`set_outputs` must match the
         declared output types.
         """
-        self._set_parent_output_count(len(output_types))
         self.parent_op._set_out_types(output_types)
 
     def set_outputs(self, *args: Wire) -> None:

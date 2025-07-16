@@ -108,6 +108,32 @@ Measure = MeasureDef()
 
 
 @QUANTUM_EXT.register_op(
+    "MeasureFree",
+    signature=tys.FunctionType([tys.Qubit], [tys.Bool]),
+)
+@dataclass(frozen=True)
+class MeasureFreeDef(RegisteredOp):
+    def __call__(self, q: ComWire) -> Command:
+        return super().__call__(q)
+
+
+MeasureFree = MeasureFreeDef()
+
+
+@QUANTUM_EXT.register_op(
+    "QAlloc",
+    signature=tys.FunctionType([], [tys.Qubit]),
+)
+@dataclass(frozen=True)
+class QAllocDef(RegisteredOp):
+    def __call__(self) -> Command:
+        return super().__call__()
+
+
+QAlloc = QAllocDef()
+
+
+@QUANTUM_EXT.register_op(
     "Rz",
     signature=tys.FunctionType([tys.Qubit, FLOAT_T], [tys.Qubit]),
 )
