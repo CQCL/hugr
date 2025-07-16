@@ -55,8 +55,8 @@ class StaticArrayVal(val.ExtensionValue):
         # into specialized `Value`s).
         serial_val = {
             "value": {
-                "values": [v._to_serial_root().model_dump_json() for v in self.v],
-                "typ": self.ty.ty._to_serial_root().model_dump_json(),
+                "values": [v._to_serial_root() for v in self.v],
+                "typ": self.ty.ty._to_serial_root(),
             },
             "name": self.name,
         }

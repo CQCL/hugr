@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import Self
 
 from hugr import ext, tys
+from hugr._serialization import ops as sops
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
@@ -262,14 +263,18 @@ class _NodeHash:
         elif isinstance(op_type, Const):
             # We need every custom value to have the same repr if they compare
             # equal. For example, an `IntVal(42)` should be the same as the
-            # equivalent `Extension` value.
-            # This needs a lot of extra unwrapping, since each class implements
-            # different `__repr__` methods.
+            # equivalent `Extension` value. This needs a lot of extra
+            # unwrapping, since each class implements different `__repr__`
+            # methods.
             #
-            # Our solution here is to roundtrip via `sops.Value`. This may miss
-            # some errors, but it's the best we can do for now.
-            serial_val = op_type.val._to_serial_root()
-            val = serial_val.deserialize()
+            # Our solution here is to roundtrip via JSON. This may miss some
+            # errors, but it's the best we can do for now. Note that
+            # roundtripping via `sops.Value` is not enough, since nested
+            # specialized values don't get serialized straight away. (e.g.
+            # StaticArrayVal's dictionary payload containing a SumValue
+            # internally, see `test_val_static_array`).
+            value_dict = op_type.val._to_serial_root().model_dump()
+            val = sops.Value(**value_dict).deserialize()
             op = repr(Const(val, num_out=op_type.num_out))
         else:
             op = op_type.name()
