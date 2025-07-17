@@ -10,7 +10,7 @@ use petgraph::algo::tarjan_scc;
 use crate::call_graph::{CallGraph, CallGraphNode};
 
 /// Error raised by [inline_acyclic]
-#[derive(Clone, Debug, thiserror::Error)]
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
 pub enum InlineAllError<N> {
     /// Raised to indicate a request to inline calls to a node that is not a FuncDefn
     #[error("Can only inline calls to FuncDefns; {0} is a {1:?}")]
@@ -166,6 +166,21 @@ mod test {
                     .is_some_and(|fd| fd.func_name() == name)
             })
             .unwrap()
+    }
+
+    #[test]
+    fn test_illegal() {
+        let h = make_test_hugr();
+        let decl = h.nodes().find(|n| h.get_optype(*n).is_func_decl()).unwrap();
+        for n in [h.module_root(), decl] {
+            let mut h2 = h.clone();
+            let r = inline_acyclic(&mut h2, HashSet::from([n]), |_, _, _| panic!());
+            assert_eq!(
+                r,
+                Err(InlineAllError::NotAFuncDefn(n, h.get_optype(n).clone()))
+            );
+            assert_eq!(h, h2); // Did nothing
+        }
     }
 
     #[rstest]
