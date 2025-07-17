@@ -42,8 +42,7 @@ pub fn inline_acyclic<H: HugrMut>(
 ) -> Result<(), InlineAllError<H::Node>> {
     let cg = CallGraph::new(&*h);
     let g = cg.graph();
-    let sccs = tarjan_scc(g);
-    let sccs = sccs
+    let sccs = tarjan_scc(g)
         .into_iter()
         .filter_map(|ns| {
             if let Ok(n) = ns.iter().exactly_one() {
@@ -64,7 +63,6 @@ pub fn inline_acyclic<H: HugrMut>(
         })
         .collect::<Vec<_>>();
     let all_sccs: HashSet<_> = sccs.iter().cloned().flatten().collect();
-    eprintln!("ALAN {all_sccs:?}");
     let target_funcs = if target_funcs.is_empty() {
         h.children(h.module_root())
             .filter(|n| !all_sccs.contains(n))
@@ -80,10 +78,6 @@ pub fn inline_acyclic<H: HugrMut>(
         if h.get_optype(n).is_call() {
             if let Some(t) = h.static_source(n) {
                 if target_funcs.contains(&t) && filt_func(&h, n, t) {
-                    eprintln!(
-                        "ALAN inlining call {n} to {t}=={}",
-                        h.get_optype(t).as_func_defn().unwrap().func_name()
-                    );
                     h.apply_patch(InlineCall::new(n)).unwrap();
                 }
             }
@@ -222,11 +216,11 @@ mod test {
                         else {
                             panic!()
                         };
-
-                        match h.get_optype(*fd) {
-                            hugr_core::ops::OpType::FuncDefn(fd) => fd.func_name().as_str(),
-                            o => panic!("Expected funcdefn, got {o}"),
-                        }
+                        h.get_optype(*fd)
+                            .as_func_defn()
+                            .unwrap()
+                            .func_name()
+                            .as_str()
                     })
                     .collect::<HashSet<_>>(),
                 HashSet::from_iter(tgts),
