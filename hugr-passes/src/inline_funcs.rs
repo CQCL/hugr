@@ -3,7 +3,6 @@ use std::collections::{HashSet, VecDeque};
 
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::patch::inline_call::InlineCall;
-use hugr_core::ops::OpType;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
@@ -12,36 +11,19 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
-pub enum InlineAllError<N> {
-    /// Raised to indicate a request to inline calls to a node that is not a FuncDefn
-    #[error("Can only inline calls to FuncDefns; {0} is a {1:?}")]
-    NotAFuncDefn(N, Box<OpType>),
-    /// Raised to indicate a request to inline calls to a function that is part of an SCC
-    /// in the call graph.
-    #[error("Cannot inline calls to {0} as in a cycle {1:?}")]
-    FunctionOnCycle(N, Vec<N>),
-}
+pub enum InlineAllError {}
 
 /// Inline all [Call]s to the specified `target_funcs` subject to a filter function
 /// that is given the [Call] node and the target [FuncDefn] node. (Note the [Call]
 /// may be created as a result of inlining and so may not have existed in the input
 /// Hugr).
 ///
-/// If `target_funcs` is empty, rather than inlining no functions, inline all
-/// possible functions (i.e. all that are part of a cycle).
-///
-/// # Errors
-///
-/// [InlineAllError::FunctionOnCycle] if any element of `target_funcs` is in a cycle
-/// in the call graph
-///
 /// [Call]: hugr_core::ops::Call
 /// [FuncDefn]: hugr_core::ops::FuncDefn
 pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
-    target_funcs: HashSet<H::Node>, // If empty, inline ALL
     filt_func: impl Fn(&H, H::Node, H::Node) -> bool,
-) -> Result<(), InlineAllError<H::Node>> {
+) -> Result<(), InlineAllError> {
     let cg = CallGraph::new(&*h);
     let g = cg.graph();
     let sccs = tarjan_scc(g)
@@ -64,23 +46,10 @@ pub fn inline_acyclic<H: HugrMut>(
         })
         .collect::<Vec<_>>();
     let all_sccs: HashSet<_> = sccs.iter().flatten().cloned().collect();
-    let target_funcs = if target_funcs.is_empty() {
-        h.children(h.module_root())
-            .filter(|n| h.get_optype(*n).is_func_defn() && !all_sccs.contains(n))
-            .collect()
-    } else {
-        for &tgt in &target_funcs {
-            let op = h.get_optype(tgt);
-            if !op.is_func_defn() {
-                return Err(InlineAllError::NotAFuncDefn(tgt, Box::new(op.clone())));
-            }
-            if all_sccs.contains(&tgt) {
-                let scc = sccs.iter().find(|ns| ns.as_slice().contains(&tgt)).unwrap();
-                return Err(InlineAllError::FunctionOnCycle(tgt, scc.clone()));
-            }
-        }
-        target_funcs
-    };
+    let target_funcs: HashSet<H::Node> = h
+        .children(h.module_root())
+        .filter(|n| h.get_optype(*n).is_func_defn() && !all_sccs.contains(n))
+        .collect();
     let mut q = VecDeque::from([h.entrypoint()]);
     while let Some(n) = q.pop_front() {
         if h.get_optype(n).is_call() {
@@ -112,7 +81,7 @@ mod test {
     use rstest::rstest;
 
     use crate::call_graph::{CallGraph, CallGraphNode};
-    use crate::inline_funcs::{InlineAllError, inline_acyclic};
+    use crate::inline_funcs::inline_acyclic;
 
     ///          /->-\
     /// main -> f     g -> b -> c
@@ -168,44 +137,8 @@ mod test {
             .unwrap()
     }
 
-    #[test]
-    fn test_illegal() {
-        let h = make_test_hugr();
-        let decl = h.nodes().find(|n| h.get_optype(*n).is_func_decl()).unwrap();
-        for n in [h.module_root(), decl] {
-            let mut h2 = h.clone();
-            let r = inline_acyclic(&mut h2, HashSet::from([n]), |_, _, _| panic!());
-            let op = h.get_optype(n).clone();
-            assert_eq!(r, Err(InlineAllError::NotAFuncDefn(n, Box::new(op))));
-            assert_eq!(h, h2); // Did nothing
-        }
-    }
-
     #[rstest]
-    #[case(["f"], "f")]
-    #[case(["g", "a", "b"], "g")]
-    fn test_cycles(
-        #[case] funcs: impl IntoIterator<Item = &'static str>,
-        #[case] exp_err: &'static str,
-    ) {
-        let h = make_test_hugr();
-        let target_funcs = funcs.into_iter().map(|name| find_func(&h, name)).collect();
-        let mut h2 = h.clone();
-        let r = inline_acyclic(&mut h2, target_funcs, |_, _, _| panic!());
-        assert_eq!(h, h2); // Did nothing
-        let Err(InlineAllError::FunctionOnCycle(tgt, scc)) = r else {
-            panic!()
-        };
-        assert_eq!(
-            h.get_optype(tgt).as_func_defn().unwrap().func_name(),
-            exp_err
-        );
-        let [f, g] = ["f", "g"].map(|n| find_func(&h, n));
-        assert_eq!(HashSet::from([f, g]), HashSet::from_iter(scc));
-    }
-
-    #[rstest]
-    #[case([], ["a", "b", "c"], [vec!["g", "x"], vec!["f"], vec!["x"], vec![], vec![]])]
+    #[case(["a", "b", "c"], ["a", "b", "c"], [vec!["g", "x"], vec!["f"], vec!["x"], vec![], vec![]])]
     #[case(["a", "b"], ["a", "b"], [vec!["g", "x"], vec!["f", "c"], vec!["x"], vec!["c"], vec![]])]
     #[case(["c"], ["c"], [vec!["g", "a"], vec!("f", "b"), vec!["x"], vec![], vec![]])]
     fn test_inline(
@@ -214,8 +147,16 @@ mod test {
         #[case] calls_fgabc: [Vec<&'static str>; 5],
     ) {
         let mut h = make_test_hugr();
-        let target_funcs = req.into_iter().map(|name| find_func(&h, name)).collect();
-        inline_acyclic(&mut h, target_funcs, |_, _, _| true).unwrap();
+        let target_funcs = req
+            .into_iter()
+            .map(|name| find_func(&h, name))
+            .collect::<HashSet<_>>();
+        inline_acyclic(&mut h, |h, _, tgt| {
+            // Check the callback is never asked about an impossible inlining
+            assert!(["a", "b", "c"].contains(&func_name(h, tgt).as_str()));
+            target_funcs.contains(&tgt)
+        })
+        .unwrap();
         let cg = CallGraph::new(&h);
         for fname in check_not_called {
             let fnode = find_func(&h, fname);
@@ -249,11 +190,11 @@ mod test {
     }
 
     #[test]
-    fn test_filter() {
+    fn test_filter_caller() {
         let mut h = make_test_hugr();
         let [g, b, c] = ["g", "b", "c"].map(|n| find_func(&h, n));
         // Inline calls contained within `g`
-        inline_acyclic(&mut h, HashSet::new(), |h, mut call, _| {
+        inline_acyclic(&mut h, |h, mut call, _| {
             loop {
                 if call == g {
                     return true;
