@@ -226,6 +226,12 @@ def validate(
                         h1_hash == h2_hash
                     ), f"HUGRs are not the same for {write_fmt} -> {load_fmt}"
 
+                # Lowering functions are currently ignored in Python,
+                # because we don't support loading -model envelopes yet.
+                for ext in loaded.extensions:
+                    for op in ext.operations.values():
+                        assert op.lower_funcs == []
+
 
 @dataclass(frozen=True, order=True)
 class _NodeHash:

@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::Hugr;
-use crate::envelope::serde_with::AsStringEnvelope;
+use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
@@ -268,8 +268,12 @@ impl Debug for SignatureFunc {
 
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other extensions.
+///
+/// Does not implement [`serde::Deserialize`] directly since the serde error for
+/// untagged enums is unhelpful. Use [`deserialize_lower_funcs`] with
+/// [`serde(deserialize_with = "deserialize_lower_funcs")] instead.
 #[serde_as]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Serialize)]
 #[serde(untagged)]
 pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
@@ -281,7 +285,7 @@ pub enum LowerFunc {
         /// [OpDef]
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
-        #[serde_as(as = "Box<AsStringEnvelope>")]
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
         hugr: Box<Hugr>,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
@@ -304,7 +308,7 @@ where
     #[derive(serde::Deserialize)]
     struct FixedHugrDeserializer {
         pub extensions: ExtensionSet,
-        #[serde_as(as = "Box<AsStringEnvelope>")]
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
         pub hugr: Box<Hugr>,
     }
 

@@ -329,12 +329,12 @@ macro_rules! impl_serde_as_binary_envelope {
                             // skip the base64 decoding.
                             let reader = std::io::Cursor::new(value.as_bytes());
                             $crate::package::Package::load(reader, Some(extensions))
-                                .map_err(serde::de::Error::custom)
+                                .map_err(|e| serde::de::Error::custom(format!("{e:?}")))
                         } else {
                             let reader = DecoderReader::new(value.as_bytes(), &STANDARD);
                             let buf_reader = std::io::BufReader::new(reader);
                             $crate::package::Package::load(buf_reader, Some(extensions))
-                                .map_err(serde::de::Error::custom)
+                                .map_err(|e| serde::de::Error::custom(format!("{e:?}")))
                         }
                     }
                 }
@@ -375,12 +375,12 @@ macro_rules! impl_serde_as_binary_envelope {
                             // skip the base64 decoding.
                             let reader = std::io::Cursor::new(value.as_bytes());
                             $crate::Hugr::load(reader, Some(extensions))
-                                .map_err(serde::de::Error::custom)
+                                .map_err(|e| serde::de::Error::custom(format!("{e:?}")))
                         } else {
                             let reader = DecoderReader::new(value.as_bytes(), &STANDARD);
                             let buf_reader = std::io::BufReader::new(reader);
                             $crate::Hugr::load(buf_reader, Some(extensions))
-                                .map_err(serde::de::Error::custom)
+                                .map_err(|e| serde::de::Error::custom(format!("{e:?}")))
                         }
                     }
 

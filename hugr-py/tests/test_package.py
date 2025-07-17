@@ -62,8 +62,4 @@ def test_lower_func():
 
     pkg = Package([hugr.hugr], [ext])
 
-    # Lowering functions are currently ignored in Python,
-    # because we don't support loading -model envelopes yet.
-    assert pkg.extensions[0].operations["dummy_op"].lower_funcs == []
-
     validate(pkg)
