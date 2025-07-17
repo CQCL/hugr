@@ -36,7 +36,7 @@ mod type_def;
 pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
-    ValidateJustArgs, ValidateTypeArgs,
+    ValidateJustArgs, ValidateTypeArgs, deserialize_lower_funcs,
 };
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub use type_def::{TypeDef, TypeDefBound};

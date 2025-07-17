@@ -300,7 +300,7 @@ pub enum LowerFunc {
 /// deserialization fails it just returns an opaque "data did not match any
 /// variant of untagged enum LowerFunc" error. This function will return the
 /// internal errors instead.
-fn deserialize_lower_funcs<'de, D>(deserializer: D) -> Result<Vec<LowerFunc>, D::Error>
+pub fn deserialize_lower_funcs<'de, D>(deserializer: D) -> Result<Vec<LowerFunc>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
