@@ -2,7 +2,7 @@
 use std::collections::{HashSet, VecDeque};
 
 use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::patch::inline_call::{InlineCall, InlineCallError};
+use hugr_core::hugr::patch::inline_call::InlineCall;
 use hugr_core::ops::OpType;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
@@ -14,14 +14,11 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 pub enum InlineAllError<N> {
     /// Raised to indicate a request to inline calls to a node that is not a FuncDefn
     #[error("Can only inline calls to FuncDefns; {0} is a {1:?}")]
-    NotAFuncDefn(N, OpType),
+    NotAFuncDefn(N, Box<OpType>),
     /// Raised to indicate a request to inline calls to a function that is part of an SCC
     /// in the call graph.
     #[error("Cannot inline calls to {0} as in a cycle {1:?}")]
     FunctionOnCycle(N, Vec<N>),
-    /// An error inlining a call.
-    #[error(transparent)]
-    InlineCallError(#[from] InlineCallError),
 }
 
 /// Inline all [Call]s to the specified `target_funcs` subject to a filter function
@@ -50,9 +47,8 @@ pub fn inline_acyclic<H: HugrMut>(
         .into_iter()
         .filter_map(|ns| {
             if let Ok(n) = ns.iter().exactly_one() {
-                if g.edges_connecting(*n, *n).next().is_none() {
-                    return None; // A 1-node SCC might be a cycle, but this is just a node.
-                }
+                // Keep single-node SCCs with self-edges, discard those without
+                g.edges_connecting(*n, *n).next()?;
             }
             Some(
                 ns.into_iter()
@@ -66,7 +62,7 @@ pub fn inline_acyclic<H: HugrMut>(
             )
         })
         .collect::<Vec<_>>();
-    let all_sccs: HashSet<_> = sccs.iter().cloned().flatten().collect();
+    let all_sccs: HashSet<_> = sccs.iter().flatten().cloned().collect();
     let target_funcs = if target_funcs.is_empty() {
         h.children(h.module_root())
             .filter(|n| h.get_optype(*n).is_func_defn() && !all_sccs.contains(n))
@@ -75,7 +71,7 @@ pub fn inline_acyclic<H: HugrMut>(
         for &tgt in &target_funcs {
             let op = h.get_optype(tgt);
             if !op.is_func_defn() {
-                return Err(InlineAllError::NotAFuncDefn(tgt, op.clone()));
+                return Err(InlineAllError::NotAFuncDefn(tgt, Box::new(op.clone())));
             }
             if all_sccs.contains(&tgt) {
                 let scc = sccs.iter().find(|ns| ns.as_slice().contains(&tgt)).unwrap();
@@ -88,7 +84,8 @@ pub fn inline_acyclic<H: HugrMut>(
     while let Some(n) = q.pop_front() {
         if h.get_optype(n).is_call() {
             if let Some(t) = h.static_source(n) {
-                if target_funcs.contains(&t) && filt_func(&h, n, t) {
+                if target_funcs.contains(&t) && filt_func(h, n, t) {
+                    // We've already checked all error conditions
                     h.apply_patch(InlineCall::new(n)).unwrap();
                 }
             }
@@ -175,10 +172,8 @@ mod test {
         for n in [h.module_root(), decl] {
             let mut h2 = h.clone();
             let r = inline_acyclic(&mut h2, HashSet::from([n]), |_, _, _| panic!());
-            assert_eq!(
-                r,
-                Err(InlineAllError::NotAFuncDefn(n, h.get_optype(n).clone()))
-            );
+            let op = h.get_optype(n).clone();
+            assert_eq!(r, Err(InlineAllError::NotAFuncDefn(n, Box::new(op))));
             assert_eq!(h, h2); // Did nothing
         }
     }
