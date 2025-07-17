@@ -115,35 +115,29 @@ mod test {
     use crate::inline_funcs::{InlineAllError, inline_acyclic};
 
     ///          /->-\
-    /// main -> f     g -> a -> b -> x
+    /// main -> f     g -> b -> c
     ///        / \-<-/
     ///       /
-    ///       \-> c -> d
+    ///       \-> a -> x
     fn make_test_hugr() -> Hugr {
         let sig = || Signature::new_endo(qb_t());
         let mut mb = ModuleBuilder::new();
         let x = mb.declare("x", sig().into()).unwrap();
-        let b = {
-            let mut fb = mb.define_function("b", sig()).unwrap();
+        let a = {
+            let mut fb = mb.define_function("a", sig()).unwrap();
             let ins = fb.input_wires();
             let res = fb.call(&x, &[], ins).unwrap();
             fb.finish_with_outputs(res.outputs()).unwrap()
         };
-        let a = {
-            let mut fb = mb.define_function("a", sig()).unwrap();
-            let ins = fb.input_wires();
-            let res = fb.call(b.handle(), &[], ins).unwrap().outputs();
-            fb.finish_with_outputs(res).unwrap()
-        };
-        let d = {
-            let fb = mb.define_function("d", sig()).unwrap();
+        let c = {
+            let fb = mb.define_function("c", sig()).unwrap();
             let ins = fb.input_wires();
             fb.finish_with_outputs(ins).unwrap()
         };
-        let c = {
-            let mut fb = mb.define_function("c", sig()).unwrap();
+        let b = {
+            let mut fb = mb.define_function("b", sig()).unwrap();
             let ins = fb.input_wires();
-            let res = fb.call(d.handle(), &[], ins).unwrap().outputs();
+            let res = fb.call(c.handle(), &[], ins).unwrap().outputs();
             fb.finish_with_outputs(res).unwrap()
         };
         let f = mb.declare("f", sig().into()).unwrap();
@@ -151,14 +145,14 @@ mod test {
             let mut fb = mb.define_function("g", sig()).unwrap();
             let ins = fb.input_wires();
             let c1 = fb.call(&f, &[], ins).unwrap();
-            let c2 = fb.call(a.handle(), &[], c1.outputs()).unwrap();
+            let c2 = fb.call(b.handle(), &[], c1.outputs()).unwrap();
             fb.finish_with_outputs(c2.outputs()).unwrap()
         };
         let _f = {
             let mut fb = mb.define_declaration(&f).unwrap();
             let ins = fb.input_wires();
             let c1 = fb.call(g.handle(), &[], ins).unwrap();
-            let c2 = fb.call(c.handle(), &[], c1.outputs()).unwrap();
+            let c2 = fb.call(a.handle(), &[], c1.outputs()).unwrap();
             fb.finish_with_outputs(c2.outputs()).unwrap()
         };
         mb.finish_hugr().unwrap()
@@ -176,7 +170,7 @@ mod test {
 
     #[rstest]
     #[case(["f"], "f")]
-    #[case(["g", "a", "b", "d"], "g")]
+    #[case(["g", "a", "b"], "g")]
     fn test_cycles(
         #[case] funcs: impl IntoIterator<Item = &'static str>,
         #[case] exp_err: &'static str,
@@ -198,9 +192,9 @@ mod test {
     }
 
     #[rstest]
-    #[case([], ["a", "b", "c", "d"], [("f", vec!["g"]), ("g", vec!["f", "x"]), ("c", vec![]), ("a", vec!["x"])])]
-    #[case(["a", "c"], ["a", "c"], [("f", vec!["g", "d"]), ("g", vec!["f", "b"]), ("c", vec!["d"]), ("a", vec!["b"])])]
-    #[case(["b", "d"], ["b", "d"], [("f", vec!["g", "c"]), ("g", vec!("f", "a")), ("a", vec!["x"]), ("c", vec![])])]
+    #[case([], ["a", "b", "c"], [("f", vec!["g", "x"]), ("g", vec!["f"]), ("a", vec!["x"]), ("b", vec![]), ("c", vec![])])]
+    #[case(["a", "b"], ["a", "b"], [("f", vec!["g", "x"]), ("g", vec!["f", "c"]), ("a", vec!["x"]), ("b", vec!["c"]), ("c", vec![])])]
+    #[case(["c"], ["c"], [("f", vec!["g", "a"]), ("g", vec!("f", "b")), ("a", vec!["x"]), ("b", vec![]), ("c", vec![])])]
     fn test_inline(
         #[case] req: impl IntoIterator<Item = &'static str>,
         #[case] check_not_called: impl IntoIterator<Item = &'static str>,
