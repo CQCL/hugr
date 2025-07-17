@@ -11,6 +11,7 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
+#[non_exhaustive]
 pub enum InlineAllError<N> {
     /// Raised to indicate a request to inline calls to a node that is not a FuncDefn
     #[error("Can only inline calls to FuncDefns; {0} is a {1:?}")]
