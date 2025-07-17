@@ -49,8 +49,6 @@ class ModelExport:
         self.link_names: dict[InPort | OutPort, str] = {}
         self.link_next = 0
 
-        # TODO: Store the hugr entrypoint
-
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 
@@ -204,6 +202,11 @@ class ModelExport:
                     error = f"Call node {node} is not connected to a function."
                     raise ValueError(error)
 
+                # We ignore the static input edge since the function is passed
+                # as an argument instead.
+                assert len(inputs) == len(input_types) + 1
+                inputs = inputs[0 : len(inputs) - 1]
+
                 func = model.Apply(func_name, func_args)
 
                 return model.Node(
@@ -295,7 +298,7 @@ class ModelExport:
                         model.Apply("core.load_const", [type, value])
                     ),
                     signature=signature,
-                    inputs=inputs,
+                    inputs=[],
                     outputs=outputs,
                     meta=meta,
                 )
@@ -392,10 +395,18 @@ class ModelExport:
 
         return meta
 
+    def export_entrypoint_meta(self, node: Node) -> list[model.Term]:
+        """Export entrypoint metadata if the node is the module entrypoint."""
+        if self.hugr.entrypoint == node:
+            return [model.Apply("core.entrypoint")]
+        else:
+            return []
+
     def export_region_module(self, node: Node) -> model.Region:
         """Export a module node as a module region."""
         node_data = self.hugr[node]
         meta = self.export_json_meta(node)
+        meta += self.export_entrypoint_meta(node)
         children = []
 
         for child in node_data.children:
@@ -414,7 +425,8 @@ class ModelExport:
         target_types: model.Term = model.Wildcard()
         sources = []
         targets = []
-        meta = []
+
+        meta = self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -484,6 +496,7 @@ class ModelExport:
         source_types: model.Term = model.Wildcard()
         target_types: model.Term = model.Wildcard()
         children = []
+        meta = self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -535,6 +548,7 @@ class ModelExport:
             sources=[source],
             signature=signature,
             children=children,
+            meta=meta,
         )
 
     def export_symbol(
