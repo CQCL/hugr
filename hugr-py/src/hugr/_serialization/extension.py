@@ -66,11 +66,11 @@ class TypeDef(ConfiguredBaseModel):
 
 
 class FixedHugr(ConfiguredBaseModel):
-    """Fixed HUGR used to define the lowering of an operations.
+    """Fixed HUGR used to define the lowering of an operation.
 
     Args:
         extensions: Extensions used in the HUGR.
-        hugr: Base64 encoded HUGR envelope.
+        hugr: Base64-encoded HUGR envelope.
     """
 
     extensions: ExtensionSet
