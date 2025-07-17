@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func private
+(define-func public
   example.cond
   (core.fn
     [(core.adt [[] []]) (arithmetic.int.types.int 6)]

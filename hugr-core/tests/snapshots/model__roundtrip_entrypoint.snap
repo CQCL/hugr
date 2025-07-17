@@ -19,7 +19,7 @@ expression: ast
 
 (import core.entrypoint)
 
-(define-func private wrapper_dfg (core.fn [] [])
+(define-func public wrapper_dfg (core.fn [] [])
   (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
 
 (mod)

@@ -970,8 +970,10 @@ impl<'a> Context<'a> {
             "No visibility for FuncDefn".to_string(),
         ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+            let func_name = ctx.import_title_metadata(node_id)?.unwrap_or(symbol.name);
+
             let optype =
-                OpType::FuncDefn(FuncDefn::new_vis(symbol.name, signature, visibility.into()));
+                OpType::FuncDefn(FuncDefn::new_vis(func_name, signature, visibility.into()));
 
             let node = ctx.make_node(node_id, optype, parent)?;
 
@@ -999,8 +1001,10 @@ impl<'a> Context<'a> {
             "No visibility for FuncDecl".to_string(),
         ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
+            let func_name = ctx.import_title_metadata(node_id)?.unwrap_or(symbol.name);
+
             let optype =
-                OpType::FuncDecl(FuncDecl::new_vis(symbol.name, signature, visibility.into()));
+                OpType::FuncDecl(FuncDecl::new_vis(func_name, signature, visibility.into()));
             let node = ctx.make_node(node_id, optype, parent)?;
             Ok(node)
         })
@@ -1816,6 +1820,30 @@ impl<'a> Context<'a> {
             name,
             N
         ))
+    }
+
+    /// Searches for `core.title` metadata on the given node.
+    fn import_title_metadata(
+        &self,
+        node_id: table::NodeId,
+    ) -> Result<Option<&'a str>, ImportError> {
+        let node_data = self.get_node(node_id)?;
+        for meta in node_data.meta {
+            let Some([name]) = self.match_symbol(*meta, model::CORE_TITLE)? else {
+                continue;
+            };
+
+            let table::Term::Literal(model::Literal::Str(name)) = self.get_term(name)? else {
+                return Err(error_invalid!(
+                    "`{}` metadata expected a string literal as argument",
+                    model::CORE_TITLE
+                ));
+            };
+
+            return Ok(Some(name.as_str()));
+        }
+
+        Ok(None)
     }
 }
 

@@ -2,7 +2,7 @@
 
 (mod)
 
-(define-func private example.cfg_loop
+(define-func public example.cfg_loop
   (param ?a core.type)
   (core.fn [?a] [?a])
   (dfg [%0] [%1]

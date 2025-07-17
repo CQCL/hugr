@@ -1,4 +1,5 @@
 //! Exporting HUGR graphs to their `hugr-model` representation.
+use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::types::type_param::Term;
@@ -20,13 +21,14 @@ use crate::{
 };
 
 use fxhash::{FxBuildHasher, FxHashMap};
-use hugr_model::v0::Visibility;
+use hugr_model::v0::bumpalo;
 use hugr_model::v0::{
     self as model,
     bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
     table,
 };
 use petgraph::unionfind::UnionFind;
+use smol_str::ToSmolStr;
 use std::fmt::Write;
 
 /// Exports a deconstructed `Package` to its representation in the model.
@@ -95,7 +97,7 @@ struct Context<'a> {
     // that ensures that the `node_to_id` and `id_to_node` maps stay in sync.
 }
 
-const NO_VIS: Option<Visibility> = None;
+const NO_VIS: Option<model::Visibility> = None;
 
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
@@ -261,8 +263,12 @@ impl<'a> Context<'a> {
 
         // We record the name of the symbol defined by the node, if any.
         let symbol = match optype {
-            OpType::FuncDefn(func_defn) => Some(func_defn.func_name().as_str()),
-            OpType::FuncDecl(func_decl) => Some(func_decl.func_name().as_str()),
+            OpType::FuncDefn(_) | OpType::FuncDecl(_) => {
+                // Functions aren't exported using their core name but with a mangled
+                // name derived from their id. The function's core name will be recorded
+                // using `core.title` metadata.
+                Some(self.mangled_name(node))
+            }
             OpType::AliasDecl(alias_decl) => Some(alias_decl.name.as_str()),
             OpType::AliasDefn(alias_defn) => Some(alias_defn.name.as_str()),
             _ => None,
@@ -282,6 +288,7 @@ impl<'a> Context<'a> {
         // the node id. This is necessary to establish the correct node id for the
         // local scope introduced by some operations. We will overwrite this node later.
         let mut regions: &[_] = &[];
+        let mut meta = Vec::new();
 
         let node = self.id_to_node[&node_id];
         let optype = self.hugr.get_optype(node);
@@ -331,8 +338,10 @@ impl<'a> Context<'a> {
             }
 
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
+                let symbol_name = this.export_func_name(node, &mut meta);
+
                 let symbol = this.export_poly_func_type(
-                    func.func_name(),
+                    symbol_name,
                     Some(func.visibility().clone().into()),
                     func.signature(),
                 );
@@ -345,8 +354,10 @@ impl<'a> Context<'a> {
             }),
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
+                let symbol_name = this.export_func_name(node, &mut meta);
+
                 let symbol = this.export_poly_func_type(
-                    func.func_name(),
+                    symbol_name,
                     Some(func.visibility().clone().into()),
                     func.signature(),
                 );
@@ -502,12 +513,9 @@ impl<'a> Context<'a> {
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
 
-        let meta = {
-            let mut meta = Vec::new();
-            self.export_node_json_metadata(node, &mut meta);
-            self.export_node_order_metadata(node, &mut meta);
-            self.bump.alloc_slice_copy(&meta)
-        };
+        self.export_node_json_metadata(node, &mut meta);
+        self.export_node_order_metadata(node, &mut meta);
+        let meta = self.bump.alloc_slice_copy(&meta);
 
         self.module.nodes[node_id.index()] = table::Node {
             operation,
@@ -803,7 +811,7 @@ impl<'a> Context<'a> {
     pub fn export_poly_func_type<RV: MaybeRV>(
         &mut self,
         name: &'a str,
-        visibility: Option<Visibility>,
+        visibility: Option<model::Visibility>,
         t: &PolyFuncTypeBase<RV>,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
@@ -1121,6 +1129,33 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Used when exporting function definitions or declarations. When the
+    /// function is public, its symbol name will be the core name. For private
+    /// functions, the symbol name is derived from the node id and the core name
+    /// is exported as `core.title` metadata.
+    ///
+    /// This is a hack, necessary due to core names for functions being
+    /// non-functional. Once functions have a "link name", that should be used as the symbol name here.
+    fn export_func_name(&mut self, node: Node, meta: &mut Vec<table::TermId>) -> &'a str {
+        let (name, vis) = match self.hugr.get_optype(node) {
+            OpType::FuncDefn(func_defn) => (func_defn.func_name(), func_defn.visibility()),
+            OpType::FuncDecl(func_decl) => (func_decl.func_name(), func_decl.visibility()),
+            _ => panic!(
+                "`export_func_name` is only supposed to be used on function declarations and definitions"
+            ),
+        };
+
+        match vis {
+            Visibility::Public => name,
+            Visibility::Private => {
+                let literal =
+                    self.make_term(table::Term::Literal(model::Literal::Str(name.to_smolstr())));
+                meta.push(self.make_term_apply(model::CORE_TITLE, &[literal]));
+                self.mangled_name(node)
+            }
+        }
+    }
+
     pub fn make_json_meta(&mut self, name: &str, value: &serde_json::Value) -> table::TermId {
         let value = serde_json::to_string(value).expect("json values are always serializable");
         let value = self.make_term(model::Literal::Str(value.into()).into());
@@ -1146,6 +1181,11 @@ impl<'a> Context<'a> {
         let symbol = self.resolve_symbol(name);
         let args = self.bump.alloc_slice_copy(args);
         self.make_term(table::Term::Apply(symbol, args))
+    }
+
+    /// Creates a mangled name for a particular node.
+    fn mangled_name(&self, node: Node) -> &'a str {
+        bumpalo::format!(in &self.bump, "_{}", node.index()).into_bump_str()
     }
 }
 

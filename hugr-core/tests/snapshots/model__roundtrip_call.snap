@@ -24,7 +24,7 @@ expression: ast
   (meta (compat.meta_json "title" "\"Callee\"")))
 
 (define-func
-  private
+  public
   example.caller
   (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
   (meta
@@ -43,7 +43,7 @@ expression: ast
         (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))))
 
 (define-func
-  private
+  public
   example.load
   (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])])
   (dfg [] [%0]
