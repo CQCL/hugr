@@ -200,6 +200,7 @@ mod test {
     #[rstest]
     #[case([], ["a", "b", "c", "d"], [("f", vec!["g"]), ("g", vec!["f", "x"]), ("c", vec![]), ("a", vec!["x"])])]
     #[case(["a", "c"], ["a", "c"], [("f", vec!["g", "d"]), ("g", vec!["f", "b"]), ("c", vec!["d"]), ("a", vec!["b"])])]
+    #[case(["b", "d"], ["b", "d"], [("f", vec!["g", "c"]), ("g", vec!("f", "a")), ("a", vec!["x"]), ("c", vec![])])]
     fn test_inline(
         #[case] req: impl IntoIterator<Item = &'static str>,
         #[case] check_not_called: impl IntoIterator<Item = &'static str>,
