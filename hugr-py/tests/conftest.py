@@ -187,9 +187,11 @@ def validate(
         "json": EnvelopeConfig.TEXT,
         "model-exts": EnvelopeConfig.BINARY,
     }
-    # TODO: "model-exts" comes with its own variety of errors.
-    # Fix them and add it to the list of write formats.
-    WRITE_FORMATS = ["json"]
+    # Envelope formats used when exporting test hugrs.
+    WRITE_FORMATS = ["json", "model-exts"]
+    # Envelope formats used as target for `hugr convert` before loading back the
+    # test hugrs.
+    #
     # Model envelopes cannot currently be loaded from python.
     # TODO: Add model envelope loading to python, and add it to the list.
     LOAD_FORMATS = ["json"]
