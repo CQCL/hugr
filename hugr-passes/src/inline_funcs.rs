@@ -102,6 +102,7 @@ mod test {
 
     use hugr_core::core::HugrNode;
     use hugr_core::ops::OpType;
+    use itertools::Itertools;
     use petgraph::visit::EdgeRef;
 
     use hugr_core::HugrView;
@@ -203,13 +204,13 @@ mod test {
     }
 
     #[rstest]
-    #[case([], ["a", "b", "c"], [("f", vec!["g", "x"]), ("g", vec!["f"]), ("a", vec!["x"]), ("b", vec![]), ("c", vec![])])]
-    #[case(["a", "b"], ["a", "b"], [("f", vec!["g", "x"]), ("g", vec!["f", "c"]), ("a", vec!["x"]), ("b", vec!["c"]), ("c", vec![])])]
-    #[case(["c"], ["c"], [("f", vec!["g", "a"]), ("g", vec!("f", "b")), ("a", vec!["x"]), ("b", vec![]), ("c", vec![])])]
+    #[case([], ["a", "b", "c"], [vec!["g", "x"], vec!["f"], vec!["x"], vec![], vec![]])]
+    #[case(["a", "b"], ["a", "b"], [vec!["g", "x"], vec!["f", "c"], vec!["x"], vec!["c"], vec![]])]
+    #[case(["c"], ["c"], [vec!["g", "a"], vec!("f", "b"), vec!["x"], vec![], vec![]])]
     fn test_inline(
         #[case] req: impl IntoIterator<Item = &'static str>,
         #[case] check_not_called: impl IntoIterator<Item = &'static str>,
-        #[case] check_calls: impl IntoIterator<Item = (&'static str, Vec<&'static str>)>,
+        #[case] calls_fgabc: [Vec<&'static str>; 5],
     ) {
         let mut h = make_test_hugr();
         let target_funcs = req.into_iter().map(|name| find_func(&h, name)).collect();
@@ -225,7 +226,7 @@ mod test {
                     .next()
             );
         }
-        for (fname, tgts) in check_calls {
+        for (fname, tgts) in ["f", "g", "a", "b", "c"].into_iter().zip_eq(calls_fgabc) {
             let fnode = find_func(&h, fname);
             assert_eq!(
                 outgoing_calls(&cg, fnode)
