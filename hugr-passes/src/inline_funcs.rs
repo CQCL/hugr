@@ -3,6 +3,7 @@ use std::collections::{HashSet, VecDeque};
 
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::patch::inline_call::{InlineCall, InlineCallError};
+use hugr_core::ops::OpType;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
@@ -11,6 +12,9 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum InlineAllError<N> {
+    /// Raised to indicate a request to inline calls to a node that is not a FuncDefn
+    #[error("Can only inline calls to FuncDefns; {0} is a {1:?}")]
+    NotAFuncDefn(N, OpType),
     /// Raised to indicate a request to inline calls to a function that is part of an SCC
     /// in the call graph.
     #[error("Cannot inline calls to {0} as in a cycle {1:?}")]
@@ -65,12 +69,19 @@ pub fn inline_acyclic<H: HugrMut>(
     let all_sccs: HashSet<_> = sccs.iter().cloned().flatten().collect();
     let target_funcs = if target_funcs.is_empty() {
         h.children(h.module_root())
-            .filter(|n| !all_sccs.contains(n))
+            .filter(|n| h.get_optype(*n).is_func_defn() && !all_sccs.contains(n))
             .collect()
-    } else if let Some(n) = target_funcs.intersection(&all_sccs).next() {
-        let scc = sccs.iter().find(|ns| ns.as_slice().contains(n)).unwrap();
-        return Err(InlineAllError::FunctionOnCycle(*n, scc.clone()));
     } else {
+        for &tgt in &target_funcs {
+            let op = h.get_optype(tgt);
+            if !op.is_func_defn() {
+                return Err(InlineAllError::NotAFuncDefn(tgt, op.clone()));
+            }
+            if all_sccs.contains(&tgt) {
+                let scc = sccs.iter().find(|ns| ns.as_slice().contains(&tgt)).unwrap();
+                return Err(InlineAllError::FunctionOnCycle(tgt, scc.clone()));
+            }
+        }
         target_funcs
     };
     let mut q = VecDeque::from([h.entrypoint()]);
@@ -92,6 +103,7 @@ pub fn inline_acyclic<H: HugrMut>(
 mod test {
     use std::collections::HashSet;
 
+    use hugr_core::ops::OpType;
     use petgraph::visit::EdgeRef;
 
     use hugr_core::HugrView;
@@ -103,17 +115,19 @@ mod test {
     use crate::inline_funcs::{InlineAllError, inline_acyclic};
 
     ///          /->-\
-    /// main -> f     g -> a -> b
+    /// main -> f     g -> a -> b -> x
     ///        / \-<-/
     ///       /
     ///       \-> c -> d
-    fn test_hugr() -> Hugr {
+    fn make_test_hugr() -> Hugr {
         let sig = || Signature::new_endo(qb_t());
         let mut mb = ModuleBuilder::new();
+        let x = mb.declare("x", sig().into()).unwrap();
         let b = {
-            let fb = mb.define_function("b", sig()).unwrap();
+            let mut fb = mb.define_function("b", sig()).unwrap();
             let ins = fb.input_wires();
-            fb.finish_with_outputs(ins).unwrap()
+            let res = fb.call(&x, &[], ins).unwrap();
+            fb.finish_with_outputs(res.outputs()).unwrap()
         };
         let a = {
             let mut fb = mb.define_function("a", sig()).unwrap();
@@ -167,7 +181,7 @@ mod test {
         #[case] funcs: impl IntoIterator<Item = &'static str>,
         #[case] exp_err: &'static str,
     ) {
-        let h = test_hugr();
+        let h = make_test_hugr();
         let target_funcs = funcs.into_iter().map(|name| find_func(&h, name)).collect();
         let mut h2 = h.clone();
         let r = inline_acyclic(&mut h2, target_funcs, |_, _, _| panic!());
@@ -184,14 +198,14 @@ mod test {
     }
 
     #[rstest]
-    #[case([], ["a", "b", "c", "d"], [("f", vec!["g"]), ("g", vec!["f"]), ("c", vec![]), ("a", vec![])])]
+    #[case([], ["a", "b", "c", "d"], [("f", vec!["g"]), ("g", vec!["f", "x"]), ("c", vec![]), ("a", vec!["x"])])]
     #[case(["a", "c"], ["a", "c"], [("f", vec!["g", "d"]), ("g", vec!["f", "b"]), ("c", vec!["d"]), ("a", vec!["b"])])]
     fn test_inline(
         #[case] req: impl IntoIterator<Item = &'static str>,
         #[case] check_not_called: impl IntoIterator<Item = &'static str>,
         #[case] check_calls: impl IntoIterator<Item = (&'static str, Vec<&'static str>)>,
     ) {
-        let mut h = test_hugr();
+        let mut h = make_test_hugr();
         let target_funcs = req.into_iter().map(|name| find_func(&h, name)).collect();
         inline_acyclic(&mut h, target_funcs, |_, _, _| true).unwrap();
         let cg = CallGraph::new(&h);
@@ -211,21 +225,23 @@ mod test {
             assert_eq!(
                 cg.graph()
                     .edges_directed(fnode, petgraph::Direction::Outgoing)
-                    .map(|e| {
-                        let Some(CallGraphNode::FuncDefn(fd)) = cg.graph().node_weight(e.target())
-                        else {
-                            panic!()
-                        };
-                        h.get_optype(*fd)
-                            .as_func_defn()
-                            .unwrap()
-                            .func_name()
-                            .as_str()
-                    })
+                    .map(|e| { get_name(&h, cg.graph().node_weight(e.target()).unwrap()).as_str() })
                     .collect::<HashSet<_>>(),
                 HashSet::from_iter(tgts),
                 "Calls from {fname}"
             );
+        }
+    }
+
+    fn get_name<'a, H: HugrView>(h: &'a H, cgn: &'a CallGraphNode<H::Node>) -> &'a String {
+        let n = match cgn {
+            CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => n,
+            CallGraphNode::NonFuncRoot => panic!(),
+        };
+        match h.get_optype(*n) {
+            OpType::FuncDecl(fd) => fd.func_name(),
+            OpType::FuncDefn(fd) => fd.func_name(),
+            _ => panic!(),
         }
     }
 }
