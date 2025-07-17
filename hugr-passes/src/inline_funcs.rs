@@ -100,6 +100,7 @@ pub fn inline_acyclic<H: HugrMut>(
 mod test {
     use std::collections::HashSet;
 
+    use hugr_core::core::HugrNode;
     use hugr_core::ops::OpType;
     use petgraph::visit::EdgeRef;
 
@@ -226,11 +227,10 @@ mod test {
         }
         for (fname, tgts) in check_calls {
             let fnode = find_func(&h, fname);
-            let fnode = cg.node_index(fnode).unwrap();
             assert_eq!(
-                cg.graph()
-                    .edges_directed(fnode, petgraph::Direction::Outgoing)
-                    .map(|e| { get_name(&h, cg.graph().node_weight(e.target()).unwrap()).as_str() })
+                outgoing_calls(&cg, fnode)
+                    .into_iter()
+                    .map(|n| func_name(&h, n).as_str())
                     .collect::<HashSet<_>>(),
                 HashSet::from_iter(tgts),
                 "Calls from {fname}"
@@ -238,12 +238,47 @@ mod test {
         }
     }
 
-    fn get_name<'a, H: HugrView>(h: &'a H, cgn: &'a CallGraphNode<H::Node>) -> &'a String {
-        let n = match cgn {
-            CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => n,
+    fn outgoing_calls<N: HugrNode>(cg: &CallGraph<N>, src: N) -> Vec<N> {
+        let src = cg.node_index(src).unwrap();
+        cg.graph()
+            .edges_directed(src, petgraph::Direction::Outgoing)
+            .map(|e| func_node(cg.graph().node_weight(e.target()).unwrap()))
+            .collect()
+    }
+
+    #[test]
+    fn test_filter() {
+        let mut h = make_test_hugr();
+        let [g, b, c] = ["g", "b", "c"].map(|n| find_func(&h, n));
+        // Inline calls contained within `g`
+        inline_acyclic(&mut h, HashSet::new(), |h, mut call, _| {
+            loop {
+                if call == g {
+                    return true;
+                };
+                let Some(parent) = h.get_parent(call) else {
+                    return false;
+                };
+                call = parent;
+            }
+        })
+        .unwrap();
+        let cg = CallGraph::new(&h);
+        // b and then c should have been inlined into g, leaving only cyclic call to f
+        assert_eq!(outgoing_calls(&cg, g), [find_func(&h, "f")]);
+        // But c should not have been inlined into b:
+        assert_eq!(outgoing_calls(&cg, b), [c]);
+    }
+
+    fn func_node<N: Copy>(cgn: &CallGraphNode<N>) -> N {
+        match cgn {
+            CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
             CallGraphNode::NonFuncRoot => panic!(),
-        };
-        match h.get_optype(*n) {
+        }
+    }
+
+    fn func_name<H: HugrView>(h: &H, n: H::Node) -> &String {
+        match h.get_optype(n) {
             OpType::FuncDecl(fd) => fd.func_name(),
             OpType::FuncDefn(fd) => fd.func_name(),
             _ => panic!(),
