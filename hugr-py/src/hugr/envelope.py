@@ -46,6 +46,12 @@ if TYPE_CHECKING:
 # This is a hard-coded magic number that identifies the start of a HUGR envelope.
 MAGIC_NUMBERS = b"HUGRiHJv"
 
+# The all-unset header flags configuration.
+# Bit 7 is always set to ensure we have a printable ASCII character.
+_DEFAULT_FLAGS = 0b0100_0000
+# The ZSTD flag bit in the header's flags.
+_ZSTD_FLAG = 0b0000_0001
+
 
 def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
     """Encode a HUGR or Package into an envelope, using the given configuration."""
@@ -180,9 +186,9 @@ class EnvelopeHeader:
     def to_bytes(self) -> bytes:
         header_bytes = bytearray(MAGIC_NUMBERS)
         header_bytes.append(self.format.value)
-        flags = 0b01000000
+        flags = _DEFAULT_FLAGS
         if self.zstd:
-            flags |= 0b00000001
+            flags |= _ZSTD_FLAG
         header_bytes.append(flags)
         return bytes(header_bytes)
 
@@ -204,7 +210,15 @@ class EnvelopeHeader:
         format: EnvelopeFormat = EnvelopeFormat(data[8])
 
         flags = data[9]
-        zstd = bool(flags & 0b00000001)
+        zstd = bool(flags & _ZSTD_FLAG)
+        other_flags = (flags ^ _DEFAULT_FLAGS) & ~_ZSTD_FLAG
+        if other_flags:
+            flag_ids = [i for i in range(8) if other_flags & (1 << i)]
+            msg = (
+                f"Unrecognised Envelope flags {flag_ids}."
+                + " Please update your HUGR version."
+            )
+            raise ValueError(msg)
 
         return EnvelopeHeader(format=format, zstd=zstd)
 
