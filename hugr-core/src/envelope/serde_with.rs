@@ -472,3 +472,122 @@ pub mod base64 {
     pub use base64::read::DecoderReader;
     pub use base64::write::EncoderStringWriter;
 }
+
+#[cfg(test)]
+mod test {
+    use rstest::rstest;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+
+    use crate::Hugr;
+    use crate::package::Package;
+
+    use super::*;
+
+    #[serde_as]
+    #[derive(Deserialize, Serialize)]
+    struct TextPkg {
+        #[serde_as(as = "AsStringEnvelope")]
+        data: Package,
+    }
+
+    #[serde_as]
+    #[derive(Default, Deserialize, Serialize)]
+    struct TextHugr {
+        #[serde_as(as = "AsStringEnvelope")]
+        data: Hugr,
+    }
+
+    #[serde_as]
+    #[derive(Deserialize, Serialize)]
+    struct BinaryPkg {
+        #[serde_as(as = "AsBinaryEnvelope")]
+        data: Package,
+    }
+
+    #[serde_as]
+    #[derive(Default, Deserialize, Serialize)]
+    struct BinaryHugr {
+        #[serde_as(as = "AsBinaryEnvelope")]
+        data: Hugr,
+    }
+
+    #[derive(Default, Deserialize, Serialize)]
+    struct LegacyHugr {
+        #[serde(deserialize_with = "Hugr::serde_deserialize")]
+        #[serde(serialize_with = "Hugr::serde_serialize")]
+        data: Hugr,
+    }
+
+    impl Default for TextPkg {
+        fn default() -> Self {
+            // Default package with a single hugr (so it can be decoded as a hugr too).
+            Self {
+                data: Package::from_hugr(Hugr::default()),
+            }
+        }
+    }
+
+    impl Default for BinaryPkg {
+        fn default() -> Self {
+            // Default package with a single hugr (so it can be decoded as a hugr too).
+            Self {
+                data: Package::from_hugr(Hugr::default()),
+            }
+        }
+    }
+
+    fn decode<T: for<'a> serde::Deserialize<'a>>(encoded: String) -> Result<(), serde_json::Error> {
+        let _: T = serde_json::de::from_str(&encoded)?;
+        Ok(())
+    }
+
+    #[rstest]
+    // Text formats are swappable
+    #[case::text_pkg_text_pkg(TextPkg::default(), decode::<TextPkg>, false)]
+    #[case::text_pkg_text_hugr(TextPkg::default(), decode::<TextHugr>, false)]
+    #[case::text_hugr_text_pkg(TextHugr::default(), decode::<TextPkg>, false)]
+    #[case::text_hugr_text_hugr(TextHugr::default(), decode::<TextHugr>, false)]
+    // Binary formats can read each other
+    #[case::bin_pkg_bin_pkg(BinaryPkg::default(), decode::<BinaryPkg>, false)]
+    #[case::bin_pkg_bin_hugr(BinaryPkg::default(), decode::<BinaryHugr>, false)]
+    #[case::bin_hugr_bin_pkg(BinaryHugr::default(), decode::<BinaryPkg>, false)]
+    #[case::bin_hugr_bin_hugr(BinaryHugr::default(), decode::<BinaryHugr>, false)]
+    // Binary formats can read text ones
+    #[case::text_pkg_bin_pkg(TextPkg::default(), decode::<BinaryPkg>, false)]
+    #[case::text_pkg_bin_hugr(TextPkg::default(), decode::<BinaryHugr>, false)]
+    #[case::text_hugr_bin_pkg(TextHugr::default(), decode::<BinaryPkg>, false)]
+    #[case::text_hugr_bin_hugr(TextHugr::default(), decode::<BinaryHugr>, false)]
+    // But text formats can't read binary
+    #[case::bin_pkg_text_pkg(BinaryPkg::default(), decode::<TextPkg>, true)]
+    #[case::bin_pkg_text_hugr(BinaryPkg::default(), decode::<TextHugr>, true)]
+    #[case::bin_hugr_text_pkg(BinaryHugr::default(), decode::<TextPkg>, true)]
+    #[case::bin_hugr_text_hugr(BinaryHugr::default(), decode::<TextHugr>, true)]
+    // We can read old hugrs into hugrs, but not packages
+    #[case::legacy_hugr_text_pkg(LegacyHugr::default(), decode::<TextPkg>, true)]
+    #[case::legacy_hugr_text_hugr(LegacyHugr::default(), decode::<TextHugr>, false)]
+    #[case::legacy_hugr_bin_pkg(LegacyHugr::default(), decode::<BinaryPkg>, true)]
+    #[case::legacy_hugr_bin_hugr(LegacyHugr::default(), decode::<BinaryHugr>, false)]
+    // Decoding any new format as legacy hugr always fails
+    #[case::text_pkg_legacy_hugr(TextPkg::default(), decode::<LegacyHugr>, true)]
+    #[case::text_hugr_legacy_hugr(TextHugr::default(), decode::<LegacyHugr>, true)]
+    #[case::bin_pkg_legacy_hugr(BinaryPkg::default(), decode::<LegacyHugr>, true)]
+    #[case::bin_hugr_legacy_hugr(BinaryHugr::default(), decode::<LegacyHugr>, true)]
+    fn check_format_compatibility(
+        #[case] encoder: impl serde::Serialize,
+        #[case] decoder: fn(String) -> Result<(), serde_json::Error>,
+        #[case] errors: bool,
+    ) {
+        let encoded = serde_json::to_string(&encoder).unwrap();
+        let decoded = decoder(encoded);
+        match (errors, decoded) {
+            (false, Err(e)) => {
+                panic!("Decoding error: {e}");
+            }
+            (true, Ok(_)) => {
+                panic!("Roundtrip should have failed");
+            }
+            _ => {}
+        }
+    }
+}
