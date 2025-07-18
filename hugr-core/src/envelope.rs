@@ -88,26 +88,27 @@ pub fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
 
 /// Format a generator value from the metadata.
 pub fn format_generator(json_val: &serde_json::Value) -> String {
-    let mut out = String::new();
-
-    if let Some(generator) = json_val.as_str() {
-        // just a string, use it directly
-        out.push_str(generator);
-    } else if let Some(obj) = json_val.as_object() {
-        // for expected structure print "generator vX.Y.Z"
-        if let Some(name) = obj.get("name").and_then(|v| v.as_str()) {
-            out.push_str(name);
+    match json_val {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(obj) => {
+            if let (Some(name), version) = (
+                obj.get("name").and_then(|v| v.as_str()),
+                obj.get("version").and_then(|v| v.as_str()),
+            ) {
+                if let Some(version) = version {
+                    // Expected format: {"name": "generator", "version": "1.0.0"}
+                    format!("{name}-v{version}")
+                } else {
+                    name.to_string()
+                }
+            } else {
+                // just print the whole object as a string
+                json_val.to_string()
+            }
         }
-        if let Some(version) = obj.get("version").and_then(|v| v.as_str()) {
-            out.push_str("-v");
-            out.push_str(version);
-        }
-    } else {
-        // fallback to just printing the JSON value
-        out.push_str(json_val.to_string().as_str());
+        // Raw JSON string fallback
+        _ => json_val.to_string(),
     }
-
-    out
 }
 
 fn gen_str(generator: &Option<String>) -> String {
