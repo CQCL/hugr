@@ -304,7 +304,7 @@ pub enum EnvelopeError {
         source: hugr_model::v0::binary::WriteError,
     },
     /// Error reading a HUGR model payload.
-    #[error(transparent)]
+    #[error("Model text parsing error")]
     ModelTextRead {
         /// The source error.
         #[from]
