@@ -581,6 +581,7 @@
             "type": "object"
         },
         "FixedHugr": {
+            "description": "Fixed HUGR used to define the lowering of an operation.\n\nArgs:\n    extensions: Extensions used in the HUGR.\n    hugr: Base64-encoded HUGR envelope.",
             "properties": {
                 "extensions": {
                     "items": {
