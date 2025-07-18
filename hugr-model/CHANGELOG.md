@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.21.0...hugr-model-v0.22.0) - 2025-07-18
+
+### New Features
+
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.2...hugr-model-v0.21.0) - 2025-07-09
 
 ### Bug Fixes
