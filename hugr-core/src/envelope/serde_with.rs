@@ -392,7 +392,7 @@ macro_rules! impl_serde_as_binary_envelope {
                         // string, we may have a legacy HUGR serde structure instead. In that
                         // case, we can add an envelope header and try again.
                         //
-                        // TODO: Remove this fallback in 0.21.0
+                        // TODO: Remove this fallback in a breaking change
                         let deserializer = serde::de::value::MapAccessDeserializer::new(map);
                         #[allow(deprecated)]
                         let mut hugr =
@@ -443,13 +443,17 @@ macro_rules! impl_serde_as_binary_envelope {
                         extra_extensions.register_updated(ext.clone());
                     }
                 }
+                use $crate::envelope::serde_with::base64::{EncoderStringWriter, STANDARD};
 
-                let str = source
-                    .store_str_with_exts(
-                        $crate::envelope::EnvelopeConfig::text(),
+                let mut writer = EncoderStringWriter::new(&STANDARD);
+                source
+                    .store_with_exts(
+                        &mut writer,
+                        $crate::envelope::EnvelopeConfig::binary(),
                         &extra_extensions,
                     )
                     .map_err(serde::ser::Error::custom)?;
+                let str = writer.into_inner();
                 serializer.collect_str(&str)
             }
         }
