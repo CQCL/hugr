@@ -322,6 +322,18 @@ pub const ORDER_HINT_OUTPUT_KEY: &str = "core.order_hint.output_key";
 /// - **Result:** `core.meta`
 pub const ORDER_HINT_ORDER: &str = "core.order_hint.order";
 
+/// Metadata constructor for symbol titles.
+///
+/// The names of functions in `hugr-core` are currently not used for symbol
+/// resolution, but rather serve as a short description of the function.
+/// As such, there is no requirement for uniqueness or formatting.
+/// This metadata can be used to preserve that name when serializing through
+/// `hugr-model`.
+///
+/// - **Parameter:** `?title: core.str`
+/// - **Result:** `core.meta`
+pub const CORE_TITLE: &str = "core.title";
+
 pub mod ast;
 pub mod binary;
 pub mod scope;
