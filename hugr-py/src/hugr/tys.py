@@ -814,7 +814,7 @@ class Opaque(Type):
         return _type_str(self.id, self.args)
 
     def to_model(self) -> model.Term:
-        # This cast is only neccessary because `Type` can both be an
+        # This cast is only necessary because `Type` can both be an
         # actual type or a row variable.
         args = [cast(model.Term, arg.to_model()) for arg in self.args]
 

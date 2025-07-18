@@ -77,15 +77,16 @@ pub(super) fn to_json_writer<'h>(
 /// Error raised while loading a package.
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
+#[display("Error reading or writing a package in JSON format.")]
 pub enum PackageEncodingError {
     /// Error raised while parsing the package json.
-    JsonEncoding(serde_json::Error),
+    JsonEncoding(#[from] serde_json::Error),
     /// Error raised while reading from a file.
-    IOError(io::Error),
+    IOError(#[from] io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    ExtensionResolution(WithGenerator<ExtensionResolutionError>),
+    ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
     /// Error raised while checking for breaking extension version mismatch.
-    ExtensionVersion(WithGenerator<ExtensionBreakingError>),
+    ExtensionVersion(#[from] WithGenerator<ExtensionBreakingError>),
 }
 
 /// A private package structure implementing the serde traits.

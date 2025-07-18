@@ -7,7 +7,9 @@ use crate::v0::table;
 /// An error encounter while serializing a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
+#[display("Error encoding a package in HUGR model format.")]
 pub enum WriteError {
+    #[from(forward)]
     /// An error encountered while encoding a `capnproto` buffer.
     EncodingError(capnp::Error),
 }
