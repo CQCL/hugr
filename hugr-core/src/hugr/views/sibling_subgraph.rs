@@ -575,7 +575,7 @@ fn pick_parent<'a, N: HugrNode>(
 }
 
 fn make_boundary<'a, H: HugrView>(
-    region: &impl LinkView,
+    region: &impl LinkView<PortOffsetBase = u32>,
     node_map: &H::RegionPortgraphNodes,
     inputs: &'a IncomingPorts<H::Node>,
     outputs: &'a OutgoingPorts<H::Node>,
