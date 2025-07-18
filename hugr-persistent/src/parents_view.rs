@@ -37,7 +37,7 @@ impl<'a> ParentsView<'a> {
 
 impl HugrInternals for ParentsView<'_> {
     type RegionPortgraph<'p>
-        = portgraph::MultiPortGraph
+        = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
 

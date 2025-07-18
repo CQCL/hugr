@@ -113,7 +113,7 @@ pub enum HUGRSerializationError {
     AttachError(#[from] AttachError),
     /// Failed to add edge.
     #[error("Failed to build edge when deserializing: {0}.")]
-    LinkError(#[from] LinkError),
+    LinkError(#[from] LinkError<u32>),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
     #[error(
         "Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}."

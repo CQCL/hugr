@@ -21,7 +21,7 @@ use crate::ops::handle::NodeHandle;
 /// view.
 pub trait HugrInternals {
     /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
-    type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq> + Clone + 'p
+    type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq, PortOffsetBase = u32> + Clone + 'p
     where
         Self: 'p;
 
@@ -109,7 +109,7 @@ impl<N: HugrNode> PortgraphNodeMap<N> for std::collections::HashMap<N, Node> {
 
 impl HugrInternals for Hugr {
     type RegionPortgraph<'p>
-        = &'p MultiPortGraph
+        = &'p MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
 
@@ -397,7 +397,7 @@ impl Hugr {
     pub fn into_region_portgraph(
         self,
         parent: Node,
-    ) -> portgraph::view::FlatRegion<'static, MultiPortGraph> {
+    ) -> portgraph::view::FlatRegion<'static, MultiPortGraph<u32, u32, u32>> {
         let root = parent.into_portgraph();
         let Self {
             graph, hierarchy, ..
