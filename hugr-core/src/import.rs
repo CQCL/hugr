@@ -179,7 +179,8 @@ fn get_generator(ctx: &Context<'_>) -> Option<String> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == crate::envelope::GENERATOR_KEY).then_some(json_val.to_string())
+            (name == crate::envelope::GENERATOR_KEY)
+                .then_some(crate::envelope::format_generator(&json_val))
         })
 }
 

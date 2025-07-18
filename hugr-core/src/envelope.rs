@@ -73,17 +73,41 @@ pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 /// If multiple modules have different generators, a comma-separated list is returned in
 /// module order.
 /// If no generator is found, `None` is returned.
-fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
+pub fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
     let generators: Vec<String> = modules
         .iter()
         .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
-        .map(|v| v.to_string())
+        .map(format_generator)
         .collect();
     if generators.is_empty() {
         return None;
     }
 
     Some(generators.join(", "))
+}
+
+/// Format a generator value from the metadata.
+pub fn format_generator(json_val: &serde_json::Value) -> String {
+    let mut out = String::new();
+
+    if let Some(generator) = json_val.as_str() {
+        // just a string, use it directly
+        out.push_str(generator);
+    } else if let Some(obj) = json_val.as_object() {
+        // for expected structure print "generator vX.Y.Z"
+        if let Some(name) = obj.get("name").and_then(|v| v.as_str()) {
+            out.push_str(name);
+        }
+        if let Some(version) = obj.get("version").and_then(|v| v.as_str()) {
+            out.push_str("-v");
+            out.push_str(version);
+        }
+    } else {
+        // fallback to just printing the JSON value
+        out.push_str(json_val.to_string().as_str());
+    }
+
+    out
 }
 
 fn gen_str(generator: &Option<String>) -> String {
@@ -826,6 +850,6 @@ pub(crate) mod test {
 
         let err_msg = with_gen.to_string();
         assert!(err_msg.contains("Extension 'test' version mismatch"));
-        assert!(err_msg.contains(generator_name.to_string().as_str()));
+        assert!(err_msg.contains("TestGenerator-v1.2.3"));
     }
 }
