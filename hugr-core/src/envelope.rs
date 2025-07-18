@@ -300,6 +300,15 @@ pub enum EnvelopeError {
         #[from]
         source: crate::extension::ExtensionRegistryLoadError,
     },
+    /// The specified payload format is not supported.
+    #[error(
+        "The envelope configuration has unknown {}. Please update your HUGR version.",
+        if flag_ids.len() == 1 {format!("flag #{}", flag_ids[0])} else {format!("flags {}", flag_ids.iter().join(", "))}
+    )]
+    FlagUnsupported {
+        /// The unrecognized flag bits.
+        flag_ids: Vec<usize>,
+    },
 }
 
 /// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
