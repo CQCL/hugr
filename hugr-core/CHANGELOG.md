@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.21.0...hugr-core-v0.22.0) - 2025-07-18
+
+### New Features
+
+- Export entrypoint metadata in Python and fix bug in import ([#2434](https://github.com/CQCL/hugr/pull/2434))
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- [**breaking**] Use binary envelopes for operation lower_func encoding  ([#2447](https://github.com/CQCL/hugr/pull/2447))
+- [**breaking**] Update portgraph dependency to 0.15 ([#2455](https://github.com/CQCL/hugr/pull/2455))
+- Detect and fail on unrecognised envelope flags ([#2453](https://github.com/CQCL/hugr/pull/2453))
+
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.2...hugr-core-v0.21.0) - 2025-07-09
 
 ### Bug Fixes
