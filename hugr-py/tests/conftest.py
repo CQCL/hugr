@@ -188,7 +188,7 @@ def validate(
     }
     # TODO: "model-exts" comes with its own variety of errors.
     # Fix them and add it to the list of write formats.
-    WRITE_FORMATS = ["json"]
+    WRITE_FORMATS = ["json", "model-exts"]
     # Model envelopes cannot currently be loaded from python.
     # TODO: Add model envelope loading to python, and add it to the list.
     LOAD_FORMATS = ["json"]
