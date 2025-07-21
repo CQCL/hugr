@@ -279,7 +279,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
             |node: Node| -> Node { portgraph::NodeIndex::new(node.index() + padding_nodes).into() };
 
         for node_ser in nodes {
-            hugr.add_node_with_parent(node_ser.parent, node_ser.op);
+            hugr.add_node_with_parent(hugr_node(node_ser.parent), node_ser.op);
         }
 
         if let Some(entrypoint) = entrypoint {
