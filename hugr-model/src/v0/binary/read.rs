@@ -8,6 +8,7 @@ use std::io::BufRead;
 /// An error encountered while deserialising a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
+#[display("Error reading a HUGR model payload.")]
 pub enum ReadError {
     #[from(forward)]
     /// An error encountered while decoding a model from a `capnproto` buffer.

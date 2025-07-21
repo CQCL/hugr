@@ -706,6 +706,7 @@ pub enum ExtensionRegistryError {
 /// An error that can occur while loading an extension registry.
 #[derive(Debug, Error)]
 #[non_exhaustive]
+#[error("Extension registry load error")]
 pub enum ExtensionRegistryLoadError {
     /// Deserialization error.
     #[error(transparent)]
