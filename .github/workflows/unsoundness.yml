@@ -34,8 +34,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v0-miri
+
+      # Run miri unsoundness checks.
+      #
+      # The default "zstd" feature requires FFI to the zstd library encode/decode envelopes.
+      # As this is not supported in miri, we must disable it here.
       - name: Test with Miri
-        run: cargo miri test
+        run: cargo miri test --no-default-features
 
 
   create-issue:
