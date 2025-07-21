@@ -573,6 +573,7 @@ mod test {
     #[case::text_hugr_legacy_hugr(TextHugr::default(), decode::<LegacyHugr>, true)]
     #[case::bin_pkg_legacy_hugr(BinaryPkg::default(), decode::<LegacyHugr>, true)]
     #[case::bin_hugr_legacy_hugr(BinaryHugr::default(), decode::<LegacyHugr>, true)]
+    #[cfg_attr(all(miri, feature = "zstd"), ignore)] // FFI calls (required to compress with zstd) are not supported in miri
     fn check_format_compatibility(
         #[case] encoder: impl serde::Serialize,
         #[case] decoder: fn(String) -> Result<(), serde_json::Error>,
