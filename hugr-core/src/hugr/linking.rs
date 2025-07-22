@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::Node;
+use crate::{HugrView, Node, Visibility, ops::OpType, types::PolyFuncType};
 
 /// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
 /// or [insert_from_view_link_nodes].
@@ -54,6 +54,211 @@ impl<TN> NodeLinkingDirective<TN> {
     pub const fn add() -> Self {
         Self::Add { replace: None }
     }
+
+    /// The new node should replace the specified node (already existing)
+    /// in the target. (Could lead to an invalid Hugr if they have
+    /// different signatures.)
+    pub const fn replace(node: TN) -> Self {
+        Self::Add {
+            replace: Some(node),
+        }
+    }
+}
+
+/// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
+/// Note SN = Source Node, TN=Target Node
+pub enum LinkingPolicy {
+    /// Do not use linking - just insert all functions from source Hugr into target.
+    /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
+    AddAll,
+    /// Do not use linking - break any edges from functions in the source Hugr to the insert part.
+    AddNone,
+    /// Identify public functions in source and target Hugr by name.
+    /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
+    /// will be combined, taking the FuncDefn from either Hugr.
+    LinkByName {
+        /// If true, all private functions from the source hugr are inserted into the target.
+        /// (Since these are private, name conflicts do not make the Hugr invalid.)
+        /// If false, instead edges from said private functions to any inserted parts
+        /// of the source Hugr will be broken, making the target Hugr invalid.
+        copy_private_funcs: bool,
+        /// How to handle cases where the same (public) name is present in both
+        /// inserted and target Hugr but with different signatures.
+        /// `true` means an error is raised and nothing is added to the target Hugr.
+        /// `false` means the new function will be added alongside the existing one
+        ///   - this will give an invalid Hugr (duplicate names)
+        // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
+        //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
+        //   * use (or replace) the existing function --> incompatible ports
+        // but given you'll need to patch the Hugr up afterwards, you can get there just
+        // by setting this to `false` (and maybe removing one FuncDefn), or via [LinkingPolicy::Explicit].
+        error_on_conflicting_sig: bool,
+        /// How to handle cases where both target and inserted Hugr have a FuncDefn
+        /// with the same name and signature.
+        multi_impls: MultipleImplHandling,
+        // TODO Renames to apply to public functions in the inserted Hugr. These take effect
+        // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
+        // rename_map: HashMap<String, String>
+    },
+}
+
+/// What to do when [LinkingPolicy::LinkByName] finds both target and inserted Hugr
+/// have a [Visibility::Public] FuncDefn with the same name and signature.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum MultipleImplHandling {
+    /// Do not perform insertion; raise an error instead
+    ErrorDontInsert,
+    /// Keep the implementation already in the target Hugr
+    UseExisting,
+    /// Keep the implementation in the source Hugr (replacing the target)
+    UseNew,
+    /// Add the new function alongside the existing one in the target Hugr,
+    /// preserving (separately) uses of both. (The Hugr will be invalid because
+    /// of duplicate names.)
+    UseBoth,
+}
+
+/// A conflict between [Visibility::Public] functions in source and target Hugrs.
+/// (SN = Source Node, TN = Target Node)
+// ALAN not quite right, "containing entrypoint" is not such an error
+pub enum ConflictError<SN, TN> {
+    /// Both source and target contained a [FuncDefn] (public and with same name
+    /// and signature).
+    MultipleImpls(SN, TN),
+    /// Source and target containing public functions with conflicting signatures
+    // should we indicate which were decls or defns? via an extra enum?
+    Signatures(SN, Box<PolyFuncType>, TN, Box<PolyFuncType>),
+    /// A [Visibility::Public] function in the source, whose body is being added
+    /// to the target, contained the entrypoint (which needs to be added
+    /// in a different place).
+    AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
+}
+
+/// Builds an explicit map of [NodeLinkingDirectives] that implements this policy for a given
+/// source (inserted) and target (inserted-into) Hugr.
+/// The map should be such that no [NodeLinkingError] will occur.
+pub fn to_explicit<T: HugrView, S: HugrView>(
+    target: &T,
+    source: &S,
+    policy: &LinkingPolicy,
+) -> Result<HashMap<S::Node, NodeLinkingDirective<T::Node>>, ConflictError<S::Node, T::Node>> {
+    let (copy_private, err_conf_sig, multi_impls) = match policy {
+        LinkingPolicy::AddAll => {
+            return Ok(source
+                .children(source.module_root())
+                .map(|n| (n, NodeLinkingDirective::add()))
+                .collect());
+        }
+        LinkingPolicy::AddNone => return Ok(HashMap::new()),
+        LinkingPolicy::LinkByName {
+            copy_private_funcs,
+            error_on_conflicting_sig,
+            multi_impls,
+        } => (*copy_private_funcs, *error_on_conflicting_sig, *multi_impls),
+    };
+
+    let existing = target
+        .children(target.module_root())
+        .filter_map(|n| match target.get_optype(n) {
+            OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
+                Some((fd.func_name(), (n, true, fd.signature())))
+            }
+            OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
+                Some((fd.func_name(), (n, false, fd.signature())))
+            }
+            _ => None,
+        })
+        .collect::<HashMap<_, _>>();
+    let mut res = HashMap::new();
+
+    for n in source.children(source.module_root()) {
+        res.insert(
+            n,
+            match source.get_optype(n) {
+                OpType::FuncDecl(fd) => {
+                    if fd.visibility() == &Visibility::Public {
+                        let Some(&(existing, _, sig)) = existing.get(fd.func_name()) else {
+                            continue;
+                        };
+                        if sig == fd.signature() {
+                            // if is_defn is false, then Add {replace: existing} is equivalent
+                            NodeLinkingDirective::UseExisting(existing)
+                        } else if err_conf_sig {
+                            return Err(ConflictError::Signatures(
+                                n,
+                                Box::new(fd.signature().clone()),
+                                existing,
+                                Box::new(sig.clone()),
+                            ));
+                        } else {
+                            NodeLinkingDirective::add()
+                        }
+                    } else if copy_private {
+                        NodeLinkingDirective::add()
+                    } else {
+                        continue;
+                    }
+                }
+                OpType::FuncDefn(fd) => {
+                    if fd.visibility() == &Visibility::Public {
+                        let Some(&(existing, existing_is_defn, sig)) = existing.get(fd.func_name())
+                        else {
+                            continue;
+                        };
+                        if sig == fd.signature() {
+                            let handling = if existing_is_defn {
+                                multi_impls
+                            } else {
+                                MultipleImplHandling::UseNew
+                            };
+                            match handling {
+                                MultipleImplHandling::UseExisting => {
+                                    NodeLinkingDirective::UseExisting(existing)
+                                }
+                                MultipleImplHandling::ErrorDontInsert => {
+                                    return Err(ConflictError::MultipleImpls(n, existing));
+                                }
+                                MultipleImplHandling::UseNew => {
+                                    NodeLinkingDirective::replace(existing)
+                                }
+                                MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
+                            }
+                        } else if err_conf_sig {
+                            return Err(ConflictError::Signatures(
+                                n,
+                                Box::new(fd.signature().clone()),
+                                existing,
+                                Box::new(sig.clone()),
+                            ));
+                        } else {
+                            NodeLinkingDirective::add()
+                        }
+                    } else if copy_private {
+                        NodeLinkingDirective::add()
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            },
+        );
+    }
+    let mut n = source.entrypoint();
+    while let Some(p) = source.get_parent(n) {
+        if p == source.module_root() {
+            if let Some(dirv) = res.get(&n) {
+                // Would need to add entrypoint-subtree in two places.
+                // TODO allow if entrypoint *is* module child and inserting under
+                // target module-root ??
+                return Err(ConflictError::AddFunctionContainingEntrypoint(
+                    n,
+                    dirv.clone(),
+                ));
+            }
+        }
+        n = p;
+    }
+    Ok(res)
 }
 
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
