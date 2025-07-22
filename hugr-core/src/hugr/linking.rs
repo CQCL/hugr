@@ -174,13 +174,12 @@ impl NameLinkingPolicy {
             let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
                 continue;
             };
+            let mut dirv = NodeLinkingDirective::add();
             if !vis.is_public() {
-                if copy_private {
-                    res.insert(n, NodeLinkingDirective::add());
+                if !copy_private {
+                    continue;
                 }
-                continue;
-            }
-            let dirv = if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
+            } else if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
                 if sig != ex_sig {
                     if err_conf_sig {
                         return Err(ConflictError::Signatures(
@@ -190,13 +189,12 @@ impl NameLinkingPolicy {
                             Box::new(ex_sig.clone()),
                         ));
                     }
-                    NodeLinkingDirective::add()
                 } else if !is_defn {
-                    NodeLinkingDirective::UseExisting(ex_n)
+                    dirv = NodeLinkingDirective::UseExisting(ex_n)
                 } else if !ex_is_defn {
-                    NodeLinkingDirective::replace(ex_n)
+                    dirv = NodeLinkingDirective::replace(ex_n)
                 } else {
-                    match multi_impls {
+                    dirv = match multi_impls {
                         MultipleImplHandling::UseExisting => {
                             NodeLinkingDirective::UseExisting(ex_n)
                         }
@@ -207,8 +205,6 @@ impl NameLinkingPolicy {
                         MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
                     }
                 }
-            } else {
-                NodeLinkingDirective::add()
             };
             res.insert(n, dirv);
         }
