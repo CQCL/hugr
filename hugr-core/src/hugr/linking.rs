@@ -29,15 +29,18 @@ pub enum NodeLinkingError<N: Display> {
 
 // Directive for how to treat a particular FuncDefn/FuncDecl in the source Hugr.
 /// (TN is a node in the target Hugr.)
+/// ALAN what happened to doc
+/// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
+/// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum NodeLinkingDirective<TN = Node> {
     /// Insert the FuncDecl, or the FuncDefn and its subtree, into the target Hugr.
     Add {
         // TODO If non-None, change the name of the inserted function
         //rename: Option<String>,
-        // TODO ALAN If non-None, the specified node+subtree in the target Hugr will be removed,
-        // with any ([EdgeKind::Function]) edges from it changed to come from the newly-inserted node instead.
-        //replace: Option<TN>,
+        /// If non-None, the specified node+subtree in the target Hugr will be removed,
+        /// with any ([EdgeKind::Function]) edges from it changed to come from the newly-inserted node instead.
+        replace: Option<TN>,
     },
     /// Do not insert the node/subtree from the source, but for any inserted node
     /// with an ([EdgeKind::Function]) edge from it, change that edge to come from
@@ -52,6 +55,6 @@ impl<TN> NodeLinkingDirective<TN> {
     ///
     /// [Public]: crate::Visibility::Public
     pub const fn add() -> Self {
-        Self::Add {}
+        Self::Add { replace: None }
     }
 }

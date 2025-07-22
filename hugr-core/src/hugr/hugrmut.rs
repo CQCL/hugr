@@ -10,8 +10,7 @@ use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError};
 use crate::hugr::views::SiblingSubgraph;
-use crate::hugr::{HugrView, Node, OpType};
-use crate::hugr::{NodeMetadata, Patch};
+use crate::hugr::{HugrView, Node, NodeMetadata, OpType, Patch};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
@@ -184,6 +183,7 @@ pub trait HugrMut: HugrMutInternals {
     /// Unless `other.entrypoint() == other.module_root()`, then any children of
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
     /// inserted under the Module root of this Hugr - see [Self::insert_hugr_link_nodes].
+    /// TODO ALAN change!
     ///
     /// Note there are two cases here which produce an invalid Hugr:
     /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
@@ -651,25 +651,30 @@ fn insert_hugr_internal<H: HugrView>(
             children.contains_key(&n).then_some(hugr_root)
         }
     });
-    // Now enact any `Replace`s, removing the copied children
+    // Now enact any `Add`s with replaces, and `UseExisting`s, removing the copied children
     for (ch, m) in children {
-        let NodeLinkingDirective::UseExisting(replace_with) = m else {
-            continue;
-        };
-        let copy = node_map.remove(&ch).unwrap();
-
-        // Node types in `hugr` are not reliable here (and it is not easy to tell
-        // which edges from `other` have been copied).
-        let targets = hugr.all_linked_inputs(copy).collect::<Vec<_>>();
-        for (target, inport) in targets {
-            let (src_node, outport) = hugr.single_linked_output(target, inport).unwrap();
-            debug_assert_eq!(src_node, copy);
-            hugr.disconnect(target, inport);
-            hugr.connect(replace_with, outport, target, inport);
+        match m {
+            NodeLinkingDirective::UseExisting(replace_with) => {
+                replace_static_src(hugr, node_map.remove(&ch).unwrap(), replace_with)
+            }
+            NodeLinkingDirective::Add {
+                replace: Some(replace),
+            } => replace_static_src(hugr, replace, node_map.remove(&ch).unwrap()),
+            _ => (),
         }
-        hugr.remove_node(copy);
     }
     Ok(node_map)
+}
+
+fn replace_static_src(hugr: &mut Hugr, old_src: Node, new_src: Node) {
+    let targets = hugr.all_linked_inputs(old_src).collect::<Vec<_>>();
+    for (target, inport) in targets {
+        let (src_node, outport) = hugr.single_linked_output(target, inport).unwrap();
+        debug_assert_eq!(src_node, old_src);
+        hugr.disconnect(target, inport);
+        hugr.connect(new_src, outport, target, inport);
+    }
+    hugr.remove_node(old_src);
 }
 
 /// Internal implementation of `insert_hugr`, `insert_view`, and
