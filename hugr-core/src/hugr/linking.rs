@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{HugrView, Node, ops::OpType, types::PolyFuncType};
+use crate::{HugrView, Node, Visibility, ops::OpType, types::PolyFuncType};
 
 /// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
 /// or [insert_from_view_link_nodes].
@@ -142,6 +142,7 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
     source: &S,
     policy: &LinkingPolicy,
 ) -> Result<HashMap<S::Node, NodeLinkingDirective<T::Node>>, ConflictError<S::Node, T::Node>> {
+    // Get some easy cases out of the way first
     let (copy_private, err_conf_sig, multi_impls) = match policy {
         LinkingPolicy::AddAll => {
             return Ok(source
@@ -157,91 +158,66 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
         } => (*copy_private_funcs, *error_on_conflicting_sig, *multi_impls),
     };
 
+    fn link_sig<H: HugrView>(
+        h: &H,
+        n: H::Node,
+    ) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
+        match h.get_optype(n) {
+            OpType::FuncDecl(fd) => Some((fd.func_name(), false, fd.visibility(), fd.signature())),
+            OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
+            _ => None,
+        }
+    }
+
     let existing = target
         .children(target.module_root())
-        .filter_map(|n| match target.get_optype(n) {
-            OpType::FuncDefn(fd) if fd.visibility().is_public() => {
-                Some((fd.func_name(), (n, true, fd.signature())))
-            }
-            OpType::FuncDecl(fd) if fd.visibility().is_public() => {
-                Some((fd.func_name(), (n, false, fd.signature())))
-            }
-            _ => None,
+        .filter_map(|n| {
+            link_sig(target, n).and_then(|(fname, is_defn, vis, sig)| {
+                vis.is_public().then_some((fname, (n, is_defn, sig)))
+            })
         })
         .collect::<HashMap<_, _>>();
     let mut res = HashMap::new();
 
     for n in source.children(source.module_root()) {
-        res.insert(
-            n,
-            match source.get_optype(n) {
-                OpType::FuncDecl(fd) => {
-                    if fd.visibility().is_public() {
-                        let Some(&(existing, _, sig)) = existing.get(fd.func_name()) else {
-                            continue;
-                        };
-                        if sig == fd.signature() {
-                            // if is_defn is false, then Add {replace: existing} is equivalent
-                            NodeLinkingDirective::UseExisting(existing)
-                        } else if err_conf_sig {
-                            return Err(ConflictError::Signatures(
-                                n,
-                                Box::new(fd.signature().clone()),
-                                existing,
-                                Box::new(sig.clone()),
-                            ));
-                        } else {
-                            NodeLinkingDirective::add()
-                        }
-                    } else if copy_private {
-                        NodeLinkingDirective::add()
-                    } else {
-                        continue;
-                    }
+        let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
+            continue;
+        };
+        if !vis.is_public() {
+            if copy_private {
+                res.insert(n, NodeLinkingDirective::add());
+            }
+            continue;
+        }
+        let dirv = if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
+            if sig != ex_sig {
+                if err_conf_sig {
+                    return Err(ConflictError::Signatures(
+                        n,
+                        Box::new(sig.clone()),
+                        ex_n,
+                        Box::new(ex_sig.clone()),
+                    ));
                 }
-                OpType::FuncDefn(fd) => {
-                    if fd.visibility().is_public() {
-                        let Some(&(existing, existing_is_defn, sig)) = existing.get(fd.func_name())
-                        else {
-                            continue;
-                        };
-                        if sig == fd.signature() {
-                            let handling = if existing_is_defn {
-                                multi_impls
-                            } else {
-                                MultipleImplHandling::UseNew
-                            };
-                            match handling {
-                                MultipleImplHandling::UseExisting => {
-                                    NodeLinkingDirective::UseExisting(existing)
-                                }
-                                MultipleImplHandling::ErrorDontInsert => {
-                                    return Err(ConflictError::MultipleImpls(n, existing));
-                                }
-                                MultipleImplHandling::UseNew => {
-                                    NodeLinkingDirective::replace(existing)
-                                }
-                                MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
-                            }
-                        } else if err_conf_sig {
-                            return Err(ConflictError::Signatures(
-                                n,
-                                Box::new(fd.signature().clone()),
-                                existing,
-                                Box::new(sig.clone()),
-                            ));
-                        } else {
-                            NodeLinkingDirective::add()
-                        }
-                    } else if copy_private {
-                        NodeLinkingDirective::add()
-                    } else {
-                        continue;
+                NodeLinkingDirective::add()
+            } else if !is_defn {
+                NodeLinkingDirective::UseExisting(ex_n)
+            } else if !ex_is_defn {
+                NodeLinkingDirective::replace(ex_n)
+            } else {
+                match multi_impls {
+                    MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(ex_n),
+                    MultipleImplHandling::ErrorDontInsert => {
+                        return Err(ConflictError::MultipleImpls(n, ex_n));
                     }
+                    MultipleImplHandling::UseNew => NodeLinkingDirective::replace(ex_n),
+                    MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
                 }
-                _ => continue,
-            },
-        );
+            }
+        } else {
+            NodeLinkingDirective::add()
+        };
+        res.insert(n, dirv);
     }
     let mut n = source.entrypoint();
     while let Some(p) = source.get_parent(n) {
