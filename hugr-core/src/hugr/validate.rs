@@ -20,7 +20,7 @@ use crate::ops::validate::{
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
-use crate::{Direction, Port, Visibility};
+use crate::{Direction, Port};
 
 use super::internal::PortgraphNodeMap;
 use super::views::HugrView;
@@ -91,10 +91,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
         for c in self.hugr.children(self.hugr.module_root()) {
             let (func_name, sig, is_defn) = match self.hugr.get_optype(c) {
-                OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
+                OpType::FuncDecl(fd) if fd.visibility().is_public() => {
                     (fd.func_name(), fd.signature(), false)
                 }
-                OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
+                OpType::FuncDefn(fd) if fd.visibility().is_public() => {
                     (fd.func_name(), fd.signature(), true)
                 }
                 _ => continue,

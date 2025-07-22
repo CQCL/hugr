@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{HugrView, Node, Visibility, ops::OpType, types::PolyFuncType};
+use crate::{HugrView, Node, ops::OpType, types::PolyFuncType};
 
 /// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
 /// or [insert_from_view_link_nodes].
@@ -160,10 +160,10 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
     let existing = target
         .children(target.module_root())
         .filter_map(|n| match target.get_optype(n) {
-            OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
+            OpType::FuncDefn(fd) if fd.visibility().is_public() => {
                 Some((fd.func_name(), (n, true, fd.signature())))
             }
-            OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
+            OpType::FuncDecl(fd) if fd.visibility().is_public() => {
                 Some((fd.func_name(), (n, false, fd.signature())))
             }
             _ => None,
@@ -176,7 +176,7 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
             n,
             match source.get_optype(n) {
                 OpType::FuncDecl(fd) => {
-                    if fd.visibility() == &Visibility::Public {
+                    if fd.visibility().is_public() {
                         let Some(&(existing, _, sig)) = existing.get(fd.func_name()) else {
                             continue;
                         };
@@ -200,7 +200,7 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
                     }
                 }
                 OpType::FuncDefn(fd) => {
-                    if fd.visibility() == &Visibility::Public {
+                    if fd.visibility().is_public() {
                         let Some(&(existing, existing_is_defn, sig)) = existing.get(fd.func_name())
                         else {
                             continue;
