@@ -351,7 +351,7 @@ pub(crate) mod test {
     use crate::extension::SignatureError;
     use crate::extension::prelude::Noop;
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::hugr::hugrmut::InsertDefnMode;
+    use crate::hugr::linking::NodeLinkingDirective;
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
 
@@ -601,12 +601,12 @@ pub(crate) mod test {
             .func_name()
             .clone();
         let decl_mode = if replace {
-            InsertDefnMode::Replace(my_decl.node())
+            NodeLinkingDirective::UseExisting(my_decl.node())
         } else {
-            InsertDefnMode::Add
+            NodeLinkingDirective::add()
         };
         let link_spec = HashMap::from([
-            (ins_defn.node(), InsertDefnMode::Add),
+            (ins_defn.node(), NodeLinkingDirective::add()),
             (ins_decl.node(), decl_mode),
         ]);
         let inserted = if view {

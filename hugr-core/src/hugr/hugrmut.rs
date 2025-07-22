@@ -8,7 +8,7 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::hugr::linking::NodeLinkingError;
+use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError};
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType};
 use crate::hugr::{NodeMetadata, Patch};
@@ -204,7 +204,7 @@ pub trait HugrMut: HugrMutInternals {
             children.extend(
                 other
                     .children(other.module_root())
-                    .map(|n| (n, InsertDefnMode::Add)),
+                    .map(|n| (n, NodeLinkingDirective::add())),
             );
             while children.remove(&n).is_none() {
                 n = other.get_parent(n).unwrap()
@@ -217,13 +217,13 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
     /// specified `parent` in this Hugr, and `children` of the Module root of `other`
-    /// are either inserted with their subtrees or linked according to their [InsertDefnMode].
+    /// are either inserted with their subtrees or linked according to their [NodeLinkingDirective].
     ///
     /// # Errors
     ///
     /// * If `children` are not `children` of the root of `other`
     /// * If `other`s entrypoint is among `children`, or descends from an element
-    ///   of `children` with [InsertDefnMode::Add]
+    ///   of `children` with [NodeLinkingDirective::Add]
     ///
     /// # Panics
     ///
@@ -232,7 +232,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: Hugr,
-        children: HashMap<Node, InsertDefnMode<Self::Node>>,
+        children: HashMap<Node, NodeLinkingDirective<Self::Node>>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
@@ -258,13 +258,13 @@ pub trait HugrMut: HugrMutInternals {
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
     /// is copied under the specified `parent` of this; each element of `children`,
     /// which must be a child of `other.module_root()`, will be copied with its subtree,
-    /// or linked according to its [InsertDefnMode].
+    /// or linked according to its [NodeLinkingDirective].
     ///
     /// # Errors
     ///
     /// * If `children` are not `children` of the root of `other`
     /// * If `other`s entrypoint is among `children`, or descends from an element
-    ///   of `children` with [InsertDefnMode::Add]
+    ///   of `children` with [NodeLinkingDirective::Add]
     ///
     /// # Panics
     ///
@@ -274,7 +274,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: &H,
-        children: HashMap<H::Node, InsertDefnMode<Self::Node>>,
+        children: HashMap<H::Node, NodeLinkingDirective<Self::Node>>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
@@ -479,7 +479,7 @@ impl HugrMut for Hugr {
         &mut self,
         parent: Self::Node,
         mut other: Hugr,
-        children: HashMap<Node, InsertDefnMode>,
+        children: HashMap<Node, NodeLinkingDirective>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>> {
         let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
@@ -505,7 +505,7 @@ impl HugrMut for Hugr {
         &mut self,
         parent: Self::Node,
         other: &H,
-        children: HashMap<H::Node, InsertDefnMode>,
+        children: HashMap<H::Node, NodeLinkingDirective>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
         let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
@@ -606,25 +606,11 @@ impl HugrMut for Hugr {
     }
 }
 
-/// An instruction to [HugrMut::insert_hugr_link_nodes] or [HugrMut::insert_from_view_link_nodes]
-/// as to how to insert a child of the module root from the inserted Hugr.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum InsertDefnMode<N = Node> {
-    /// Add the module child to the Module root of the target Hugr,
-    /// with its subtree of the hierarchy
-    Add,
-    /// Do not copy the module child into the target Hugr, but do
-    /// copy all edges from it, changing their source to the specified
-    /// node already existing in the target
-    Replace(N),
-}
-
 fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     parent: Node,
     other: &H,
-    children: HashMap<H::Node, InsertDefnMode>,
+    children: HashMap<H::Node, NodeLinkingDirective>,
 ) -> Result<HashMap<H::Node, Node>, NodeLinkingError<H::Node>> {
     if other.entrypoint() == other.module_root() {
         if let Some(c) = children.keys().next() {
@@ -636,7 +622,7 @@ fn insert_hugr_internal<H: HugrView>(
             return Err(NodeLinkingError::ChildContainsEntrypoint(n));
         }
         while let Some(p) = other.get_parent(n) {
-            if children.get(&p) == Some(&InsertDefnMode::Add) {
+            if matches!(children.get(&p), Some(NodeLinkingDirective::Add { .. })) {
                 return Err(NodeLinkingError::ChildContainsEntrypoint(p));
             }
             n = p
@@ -653,8 +639,8 @@ fn insert_hugr_internal<H: HugrView>(
     let nodes = children
         .iter()
         .flat_map(|(&ch, m)| match m {
-            InsertDefnMode::Add => Either::Left(other.descendants(ch)),
-            InsertDefnMode::Replace(_) => Either::Right(std::iter::once(ch)),
+            NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
+            NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
         })
         .chain(other.entry_descendants());
     let hugr_root = hugr.module_root();
@@ -667,7 +653,7 @@ fn insert_hugr_internal<H: HugrView>(
     });
     // Now enact any `Replace`s, removing the copied children
     for (ch, m) in children {
-        let InsertDefnMode::Replace(replace_with) = m else {
+        let NodeLinkingDirective::UseExisting(replace_with) = m else {
             continue;
         };
         let copy = node_map.remove(&ch).unwrap();
@@ -868,9 +854,9 @@ mod test {
             let (insert, defn, decl) = dfg_calling_defn_decl();
             let mod_children = HashMap::from_iter(
                 call1
-                    .then_some((defn.node(), InsertDefnMode::Add))
+                    .then_some((defn.node(), NodeLinkingDirective::add()))
                     .into_iter()
-                    .chain(call2.then_some((decl.node(), InsertDefnMode::Add))),
+                    .chain(call2.then_some((decl.node(), NodeLinkingDirective::add()))),
             );
 
             let mut h = simple_dfg_hugr();
@@ -924,7 +910,8 @@ mod test {
     #[test]
     fn insert_link_nodes_replace() {
         let (insert, defn, decl) = dfg_calling_defn_decl();
-        let mut chmap = HashMap::from([defn.node(), decl.node()].map(|n| (n, InsertDefnMode::Add)));
+        let mut chmap =
+            HashMap::from([defn.node(), decl.node()].map(|n| (n, NodeLinkingDirective::add())));
         let (h, res) = {
             let mut h = simple_dfg_hugr();
             let res = h
@@ -941,23 +928,26 @@ mod test {
         // No reason we can't add the decl again, or replace the defn with the decl,
         // but here we'll limit to the "interesting" (likely) cases
         for decl_replacement in [inserted_defn, inserted_decl] {
-            let decl_mode = InsertDefnMode::Replace(decl_replacement);
+            let decl_mode = NodeLinkingDirective::UseExisting(decl_replacement);
             chmap.insert(decl.node(), decl_mode);
-            for defn_mode in [InsertDefnMode::Add, InsertDefnMode::Replace(inserted_defn)] {
-                chmap.insert(defn.node(), defn_mode);
+            for defn_mode in [
+                NodeLinkingDirective::add(),
+                NodeLinkingDirective::UseExisting(inserted_defn),
+            ] {
+                chmap.insert(defn.node(), defn_mode.clone());
                 let mut h = h.clone();
                 h.insert_hugr_link_nodes(h.entrypoint(), insert.clone(), chmap.clone())
                     .unwrap();
                 h.validate().unwrap();
-                if defn_mode != InsertDefnMode::Add {
+                if defn_mode != NodeLinkingDirective::add() {
                     assert_eq!(h.num_nodes(), num_nodes + num_ep_nodes);
                 }
                 assert_eq!(
                     h.children(h.module_root()).count(),
-                    3 + (defn_mode == InsertDefnMode::Add) as usize
+                    3 + (defn_mode == NodeLinkingDirective::add()) as usize
                 );
                 let expected_defn_uses = 1
-                    + (defn_mode == InsertDefnMode::Replace(inserted_defn)) as usize
+                    + (defn_mode == NodeLinkingDirective::UseExisting(inserted_defn)) as usize
                     + (decl_replacement == inserted_defn) as usize;
                 assert_eq!(
                     h.static_targets(inserted_defn).unwrap().count(),
@@ -983,7 +973,7 @@ mod test {
         let r = h.insert_from_view_link_nodes(
             h.entrypoint(),
             &insert,
-            HashMap::from([(epp, InsertDefnMode::Add)]),
+            HashMap::from([(epp, NodeLinkingDirective::add())]),
         );
         assert_eq!(
             r.err().unwrap(),
@@ -995,7 +985,7 @@ mod test {
         let r = h.insert_from_view_link_nodes(
             h.entrypoint(),
             &insert,
-            HashMap::from([(inp, InsertDefnMode::Add)]),
+            HashMap::from([(inp, NodeLinkingDirective::add())]),
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::NotChildOfRoot(inp));
         assert_eq!(h, backup);
@@ -1007,7 +997,7 @@ mod test {
             &insert,
             HashMap::from([(
                 defn,
-                InsertDefnMode::Replace(h.get_parent(h.entrypoint()).unwrap()),
+                NodeLinkingDirective::UseExisting(h.get_parent(h.entrypoint()).unwrap()),
             )]),
         );
         assert_eq!(
@@ -1020,7 +1010,7 @@ mod test {
         let r = h.insert_hugr_link_nodes(
             h.module_root(),
             insert,
-            HashMap::from([(decl, InsertDefnMode::Add)]),
+            HashMap::from([(decl, NodeLinkingDirective::add())]),
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::ChildOfEntrypoint(decl));
     }
