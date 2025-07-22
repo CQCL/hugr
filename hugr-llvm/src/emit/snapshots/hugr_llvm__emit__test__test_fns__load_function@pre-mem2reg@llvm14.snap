@@ -1,11 +1,11 @@
 ---
-source: src/emit/test.rs
-expression: module.to_string()
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define void ()* @_hl.main.2() {
+define private void ()* @_hl.main.2() {
 alloca_block:
   %"0" = alloca void ()*, align 8
   %"5_0" = alloca void ()*, align 8
@@ -19,4 +19,4 @@ entry_block:                                      ; preds = %alloca_block
   ret void ()* %"02"
 }
 
-declare void @_hl.target_func.1()
+declare private void @_hl.target_func.1()

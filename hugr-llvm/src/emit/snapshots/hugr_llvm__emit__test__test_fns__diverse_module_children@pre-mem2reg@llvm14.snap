@@ -1,11 +1,11 @@
 ---
-source: src/emit/test.rs
-expression: module.to_string()
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define void @_hl.f1.1() {
+define private void @_hl.f1.1() {
 alloca_block:
   br label %entry_block
 
@@ -13,7 +13,7 @@ entry_block:                                      ; preds = %alloca_block
   ret void
 }
 
-define void @_hl.f2.4() {
+define private void @_hl.f2.4() {
 alloca_block:
   br label %entry_block
 
