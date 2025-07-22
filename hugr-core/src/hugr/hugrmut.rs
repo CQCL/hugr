@@ -8,7 +8,9 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError, NodeLinkingPolicy};
+use crate::hugr::linking::{
+    NameLinkingError, NameLinkingPolicy, NodeLinkingDirective, NodeLinkingError, NodeLinkingPolicy,
+};
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, NodeMetadata, OpType, Patch};
 use crate::ops::OpTrait;
@@ -204,15 +206,16 @@ pub trait HugrMut: HugrMutInternals {
             children.extend(
                 other
                     .children(other.module_root())
-                    .map(|n| (n, NodeLinkingDirective::add())),
+                    .map(|n| (n, NodeLinkingDirective::<Self::Node>::add())),
             );
             while children.remove(&n).is_none() {
                 n = other.get_parent(n).unwrap()
             }
         };
 
-        self.insert_hugr_link_nodes(root, other, children)
-            .expect("Construction of `children` should ensure no possibility of NodeLinkingError")
+        // TODO ALAN We need to handle inclusion-of-entrypoint error
+        self.insert_hugr_link_names(root, other, NameLinkingPolicy::default())
+            .unwrap()
     }
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
@@ -235,24 +238,41 @@ pub trait HugrMut: HugrMutInternals {
         children: NodeLinkingPolicy<Node, Self::Node>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
 
-    /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
-    /// This will result in an invalid Hugr (with disconnected edges) if there are any
-    /// nonlocal edges (including [Const] / [Function]) into the entrypoint-subtree.
-    /// (See [Self::insert_from_view_link_nodes].)
+    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
+    /// is copied under the specified `parent` of this; other module-children of `other`
+    /// are inserted under the module-root of this according to the [NameLinkingPolicy].
+    ///
+    /// # Errors
     ///
     /// # Panics
     ///
     /// If `parent` is not in the graph.
+    #[allow(clippy::type_complexity)]
+    fn insert_hugr_link_names(
+        &mut self,
+        parent: Self::Node,
+        other: Hugr,
+        policy: NameLinkingPolicy,
+    ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
+        let per_node = policy.to_node_linking(self, &other)?;
+        Ok(self
+            .insert_hugr_link_nodes(parent, other, per_node)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
+
+    /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     ///
-    /// [Const]: crate::types::EdgeKind::Const
-    /// [Function]: crate::types::EdgeKind::Function
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        self.insert_from_view_link_nodes(root, other, HashMap::new())
-            .expect("No defns being inserted so no possibility of error")
+        // TODO ALAN We need to handle inclusion-of-entrypoint error
+        self.insert_from_view_link_names(root, other, NameLinkingPolicy::default())
+            .unwrap()
     }
 
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
@@ -276,6 +296,28 @@ pub trait HugrMut: HugrMutInternals {
         other: &H,
         children: NodeLinkingPolicy<H::Node, Self::Node>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
+
+    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
+    /// is copied under the specified `parent` of this; other module-children of `other`
+    /// are inserted under the module-root of this according to the [NameLinkingPolicy].
+    ///
+    /// # Errors
+    ///
+    /// # Panics
+    ///
+    /// If `parent` is not in the graph.
+    #[allow(clippy::type_complexity)]
+    fn insert_from_view_link_names<H: HugrView>(
+        &mut self,
+        parent: Self::Node,
+        other: &H,
+        policy: NameLinkingPolicy,
+    ) -> Result<InsertionResult<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
+        let per_node = policy.to_node_linking(self, other)?;
+        Ok(self
+            .insert_from_view_link_nodes(parent, other, per_node)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///

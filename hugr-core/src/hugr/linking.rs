@@ -166,7 +166,7 @@ impl NameLinkingPolicy {
     /// source (inserted) and target (inserted-into) Hugr.
     /// The map should be such that no [NodeLinkingError] will occur.
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking<T: HugrView, S: HugrView>(
+    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView + ?Sized>(
         &self,
         target: &T,
         source: &S,
@@ -253,7 +253,10 @@ impl NameLinkingPolicy {
     }
 }
 
-fn link_sig<H: HugrView>(h: &H, n: H::Node) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
+fn link_sig<H: HugrView + ?Sized>(
+    h: &H,
+    n: H::Node,
+) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
     match h.get_optype(n) {
         OpType::FuncDecl(fd) => Some((fd.func_name(), false, fd.visibility(), fd.signature())),
         OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
