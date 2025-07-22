@@ -1,6 +1,6 @@
 //! Directives and errors relating to linking Hugrs.
 
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
 use crate::Node;
 
@@ -27,11 +27,8 @@ pub enum NodeLinkingError<N: Display> {
     NotChildOfRoot(N),
 }
 
-// Directive for how to treat a particular FuncDefn/FuncDecl in the source Hugr.
+/// Directive for how to treat a particular FuncDefn/FuncDecl in the source Hugr.
 /// (TN is a node in the target Hugr.)
-/// ALAN what happened to doc
-/// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
-/// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum NodeLinkingDirective<TN = Node> {
     /// Insert the FuncDecl, or the FuncDefn and its subtree, into the target Hugr.
@@ -58,3 +55,11 @@ impl<TN> NodeLinkingDirective<TN> {
         Self::Add { replace: None }
     }
 }
+
+/// Details, node-by-node, how module-children of a source Hugr should be inserted into a
+/// target Hugr (beneath the module root). For use with [insert_hugr_link_nodes] and
+/// [insert_from_view_link_nodes].
+///
+/// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
+/// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
+pub type NodeLinkingPolicy<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;

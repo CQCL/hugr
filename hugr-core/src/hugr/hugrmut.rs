@@ -8,7 +8,7 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError};
+use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError, NodeLinkingPolicy};
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, NodeMetadata, OpType, Patch};
 use crate::ops::OpTrait;
@@ -232,7 +232,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: Hugr,
-        children: HashMap<Node, NodeLinkingDirective<Self::Node>>,
+        children: NodeLinkingPolicy<Node, Self::Node>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
@@ -274,7 +274,7 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         parent: Self::Node,
         other: &H,
-        children: HashMap<H::Node, NodeLinkingDirective<Self::Node>>,
+        children: NodeLinkingPolicy<H::Node, Self::Node>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
