@@ -67,7 +67,7 @@ impl<TN> NodeLinkingDirective<TN> {
 
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
 /// Note SN = Source Node, TN=Target Node
-pub enum LinkingPolicy {
+pub enum NameLinkingPolicy {
     /// Do not use linking - just insert all functions from source Hugr into target.
     /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
     AddAll,
@@ -91,7 +91,7 @@ pub enum LinkingPolicy {
         //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
         //   * use (or replace) the existing function --> incompatible ports
         // but given you'll need to patch the Hugr up afterwards, you can get there just
-        // by setting this to `false` (and maybe removing one FuncDefn), or via [LinkingPolicy::Explicit].
+        // by setting this to `false` (and maybe removing one FuncDefn), or via [NameLinkingPolicy::Explicit].
         error_on_conflicting_sig: bool,
         /// How to handle cases where both target and inserted Hugr have a FuncDefn
         /// with the same name and signature.
@@ -102,7 +102,7 @@ pub enum LinkingPolicy {
     },
 }
 
-/// What to do when [LinkingPolicy::LinkByName] finds both target and inserted Hugr
+/// What to do when [NameLinkingPolicy::LinkByName] finds both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MultipleImplHandling {
@@ -137,21 +137,22 @@ pub enum ConflictError<SN, TN> {
 /// Builds an explicit map of [NodeLinkingDirectives] that implements this policy for a given
 /// source (inserted) and target (inserted-into) Hugr.
 /// The map should be such that no [NodeLinkingError] will occur.
+#[allow(clippy::type_complexity)]
 pub fn to_explicit<T: HugrView, S: HugrView>(
     target: &T,
     source: &S,
-    policy: &LinkingPolicy,
-) -> Result<HashMap<S::Node, NodeLinkingDirective<T::Node>>, ConflictError<S::Node, T::Node>> {
+    policy: &NameLinkingPolicy,
+) -> Result<NodeLinkingPolicy<S::Node, T::Node>, ConflictError<S::Node, T::Node>> {
     // Get some easy cases out of the way first
     let (copy_private, err_conf_sig, multi_impls) = match policy {
-        LinkingPolicy::AddAll => {
+        NameLinkingPolicy::AddAll => {
             return Ok(source
                 .children(source.module_root())
                 .map(|n| (n, NodeLinkingDirective::add()))
                 .collect());
         }
-        LinkingPolicy::AddNone => return Ok(HashMap::new()),
-        LinkingPolicy::LinkByName {
+        NameLinkingPolicy::AddNone => return Ok(NodeLinkingPolicy::new()),
+        NameLinkingPolicy::LinkByName {
             copy_private_funcs,
             error_on_conflicting_sig,
             multi_impls,
@@ -177,7 +178,7 @@ pub fn to_explicit<T: HugrView, S: HugrView>(
             })
         })
         .collect::<HashMap<_, _>>();
-    let mut res = HashMap::new();
+    let mut res = NodeLinkingPolicy::new();
 
     for n in source.children(source.module_root()) {
         let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
