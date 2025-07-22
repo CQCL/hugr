@@ -578,7 +578,7 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    fn add_hugr_with_defns(
+    fn add_hugr_link_nodes(
         #[values(false, true)] replace: bool,
         #[values(true, false)] view: bool,
     ) {
