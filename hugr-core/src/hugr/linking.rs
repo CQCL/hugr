@@ -189,20 +189,18 @@ impl NameLinkingPolicy {
                             Box::new(ex_sig.clone()),
                         ));
                     }
-                } else if !is_defn {
-                    dirv = NodeLinkingDirective::UseExisting(ex_n)
-                } else if !ex_is_defn {
-                    dirv = NodeLinkingDirective::replace(ex_n)
                 } else {
-                    dirv = match multi_impls {
-                        MultipleImplHandling::UseExisting => {
+                    dirv = match (is_defn, ex_is_defn, multi_impls) {
+                        (false, _, _) | (_, true, MultipleImplHandling::UseExisting) => {
                             NodeLinkingDirective::UseExisting(ex_n)
                         }
-                        MultipleImplHandling::ErrorDontInsert => {
+                        (_, false, _) | (_, _, MultipleImplHandling::UseNew) => {
+                            NodeLinkingDirective::replace(ex_n)
+                        }
+                        (_, _, MultipleImplHandling::ErrorDontInsert) => {
                             return Err(ConflictError::MultipleImpls(n, ex_n));
                         }
-                        MultipleImplHandling::UseNew => NodeLinkingDirective::replace(ex_n),
-                        MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
+                        (_, _, MultipleImplHandling::UseBoth) => NodeLinkingDirective::add(),
                     }
                 }
             };
