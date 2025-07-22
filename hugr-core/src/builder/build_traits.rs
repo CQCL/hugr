@@ -1,5 +1,6 @@
 use crate::extension::prelude::MakeTuple;
-use crate::hugr::hugrmut::{InsertDefnMode, InsertionResult};
+use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::linking::NodeLinkingDirective;
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
@@ -228,7 +229,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashMap<Node, InsertDefnMode>,
+        defns: HashMap<Node, NodeLinkingDirective>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = self.container_node();
         let node = self
@@ -263,7 +264,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: &H,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashMap<H::Node, InsertDefnMode>,
+        defns: HashMap<H::Node, NodeLinkingDirective>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = self.container_node();
         let node = self
