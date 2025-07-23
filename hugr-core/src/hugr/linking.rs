@@ -75,18 +75,19 @@ pub enum NameLinkingPolicy {
     AddNone,
     /// Identify public functions in source and target Hugr by name.
     /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
-    /// will be combined, taking the FuncDefn from either Hugr.
+    /// will be combined, taking the FuncDefn from either Hugr. This is the default.
     LinkByName {
         /// If true, all private functions from the source hugr are inserted into the target.
         /// (Since these are private, name conflicts do not make the Hugr invalid.)
         /// If false, instead edges from said private functions to any inserted parts
         /// of the source Hugr will be broken, making the target Hugr invalid.
+        /// Defaults to `true`.
         copy_private_funcs: bool,
         /// How to handle cases where the same (public) name is present in both
         /// inserted and target Hugr but with different signatures.
         /// `true` means an error is raised and nothing is added to the target Hugr.
         /// `false` means the new function will be added alongside the existing one
-        ///   - this will give an invalid Hugr (duplicate names)
+        ///   - this will give an invalid Hugr (duplicate names). This is the default.
         // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
         //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
         //   * use (or replace) the existing function --> incompatible ports
@@ -102,15 +103,30 @@ pub enum NameLinkingPolicy {
     },
 }
 
+impl Default for NameLinkingPolicy {
+    fn default() -> Self {
+        Self::LinkByName {
+            copy_private_funcs: true,
+            error_on_conflicting_sig: false,
+            multi_impls: MultipleImplHandling::default(),
+        }
+    }
+}
+
 /// What to do when [NameLinkingPolicy::LinkByName] finds both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub enum MultipleImplHandling {
     /// Do not perform insertion; raise an error instead
     ErrorDontInsert,
-    /// Keep the implementation already in the target Hugr
+    /// Keep the implementation already in the target Hugr. (Edges in the source
+    /// Hugr will be redirected to use the function from the target.)
+    /// This is the default.
+    #[default]
     UseExisting,
-    /// Keep the implementation in the source Hugr (replacing the target)
+    /// Keep the implementation in the source Hugr. (Edges in the target Hugr
+    /// will be redirected to use the funtion from the source; the previously-existing
+    /// function in the target Hugr will be removed.)
     UseNew,
     /// Add the new function alongside the existing one in the target Hugr,
     /// preserving (separately) uses of both. (The Hugr will be invalid because
