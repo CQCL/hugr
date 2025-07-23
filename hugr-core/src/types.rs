@@ -4,7 +4,7 @@ mod check;
 pub mod custom;
 mod poly_func;
 mod row_var;
-mod serialize;
+pub(crate) mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;

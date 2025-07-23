@@ -9,6 +9,7 @@ use std::hash::{Hash, Hasher};
 use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
 use crate::envelope::serde_with::AsStringEnvelope;
+use crate::types::serialize::SerSimpleType;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
 
@@ -107,14 +108,14 @@ impl AsRef<Value> for Const {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct SerialSum {
     #[serde(default)]
     tag: usize,
     #[serde(rename = "vs")]
     values: Vec<Value>,
     #[serde(default, rename = "typ")]
-    sum_type: Option<SumType>,
+    sum_type: Option<SerSimpleType>,
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -170,7 +171,7 @@ impl TryFrom<SerialSum> for Sum {
             sum_type,
         } = value;
 
-        let sum_type = if let Some(sum_type) = sum_type {
+        let sum_type = if let Some(SerSimpleType::Sum(sum_type)) = sum_type {
             sum_type
         } else {
             if tag != 0 {
@@ -192,7 +193,7 @@ impl From<Sum> for SerialSum {
         Self {
             tag: value.tag,
             values: value.values,
-            sum_type: Some(value.sum_type),
+            sum_type: Some(SerSimpleType::Sum(value.sum_type)),
         }
     }
 }
