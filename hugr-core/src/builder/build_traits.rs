@@ -231,7 +231,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
         defns: HashMap<Node, NodeLinkingDirective>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let parent = self.container_node();
+        let parent = Some(self.container_node());
         let node = self
             .hugr_mut()
             .insert_hugr_link_nodes(parent, hugr, defns)?
@@ -266,7 +266,7 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
         defns: HashMap<H::Node, NodeLinkingDirective>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let parent = self.container_node();
+        let parent = Some(self.container_node());
         let node = self
             .hugr_mut()
             .insert_from_view_link_nodes(parent, hugr, defns)
