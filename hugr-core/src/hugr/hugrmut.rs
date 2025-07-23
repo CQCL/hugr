@@ -208,7 +208,7 @@ pub trait HugrMut: HugrMutInternals {
                 per_node.remove(&anc).unwrap();
             }
         }
-        self.insert_hugr_link_nodes(root, other, per_node)
+        self.insert_hugr_link_nodes(Some(root), other, per_node)
             .expect("Policy constructed to avoid any errors")
     }
 
@@ -227,7 +227,7 @@ pub trait HugrMut: HugrMutInternals {
     /// If `parent` is not in this graph.
     fn insert_hugr_link_nodes(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         other: Hugr,
         children: NodeLinkingPolicy<Node, Self::Node>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
@@ -244,7 +244,7 @@ pub trait HugrMut: HugrMutInternals {
     #[allow(clippy::type_complexity)]
     fn insert_hugr_link_names(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         other: Hugr,
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
@@ -278,7 +278,7 @@ pub trait HugrMut: HugrMutInternals {
                 per_node.remove(&anc).unwrap();
             }
         }
-        self.insert_from_view_link_nodes(root, other, per_node)
+        self.insert_from_view_link_nodes(Some(root), other, per_node)
             .expect("Policy constructed to avoid any errors")
     }
 
@@ -299,7 +299,7 @@ pub trait HugrMut: HugrMutInternals {
     #[allow(clippy::type_complexity)]
     fn insert_from_view_link_nodes<H: HugrView>(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         other: &H,
         children: NodeLinkingPolicy<H::Node, Self::Node>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
@@ -316,7 +316,7 @@ pub trait HugrMut: HugrMutInternals {
     #[allow(clippy::type_complexity)]
     fn insert_from_view_link_names<H: HugrView>(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         other: &H,
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
@@ -546,7 +546,7 @@ impl HugrMut for Hugr {
 
     fn insert_hugr_link_nodes(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         mut other: Hugr,
         children: HashMap<Node, NodeLinkingDirective>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>> {
@@ -572,7 +572,7 @@ impl HugrMut for Hugr {
 
     fn insert_from_view_link_nodes<H: HugrView>(
         &mut self,
-        parent: Self::Node,
+        parent: Option<Self::Node>,
         other: &H,
         children: HashMap<H::Node, NodeLinkingDirective>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
@@ -677,29 +677,31 @@ impl HugrMut for Hugr {
 
 fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
-    parent: Node,
+    parent: Option<Node>,
     other: &H,
     children: HashMap<H::Node, NodeLinkingDirective>,
 ) -> Result<HashMap<H::Node, Node>, NodeLinkingError<H::Node>> {
-    if other.entrypoint() == other.module_root() {
-        if let Some(c) = children.keys().next() {
-            return Err(NodeLinkingError::ChildOfEntrypoint(*c));
-        }
-    } else {
-        let mut n = other.entrypoint();
-        if children.contains_key(&n) {
-            return Err(NodeLinkingError::ChildContainsEntrypoint(n));
-        }
-        while let Some(p) = other.get_parent(n) {
-            if matches!(children.get(&p), Some(NodeLinkingDirective::Add { .. })) {
-                return Err(NodeLinkingError::ChildContainsEntrypoint(p));
+    if parent.is_some() {
+        if other.entrypoint() == other.module_root() {
+            if let Some(c) = children.keys().next() {
+                return Err(NodeLinkingError::ChildOfEntrypoint(*c));
             }
-            n = p
-        }
-        for &c in children.keys() {
-            if other.get_parent(c) != Some(other.module_root()) {
-                return Err(NodeLinkingError::NotChildOfRoot(c));
+        } else {
+            let mut n = other.entrypoint();
+            if children.contains_key(&n) {
+                return Err(NodeLinkingError::ChildContainsEntrypoint(n));
             }
+            while let Some(p) = other.get_parent(n) {
+                if matches!(children.get(&p), Some(NodeLinkingDirective::Add { .. })) {
+                    return Err(NodeLinkingError::ChildContainsEntrypoint(p));
+                }
+                n = p
+            }
+        }
+    }
+    for &c in children.keys() {
+        if other.get_parent(c) != Some(other.module_root()) {
+            return Err(NodeLinkingError::NotChildOfRoot(c));
         }
     }
     // In fact we'll copy all `children`, but only including subtrees
@@ -711,11 +713,11 @@ fn insert_hugr_internal<H: HugrView>(
             NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
             NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
         })
-        .chain(other.entry_descendants());
+        .chain(parent.iter().flat_map(|_| other.entry_descendants()));
     let hugr_root = hugr.module_root();
     let mut node_map = insert_hugr_nodes(hugr, &other, nodes, |&n| {
         if n == other.entrypoint() {
-            Some(parent)
+            parent // If parent is None, quite possible this case will not be used
         } else {
             children.contains_key(&n).then_some(hugr_root)
         }
@@ -934,12 +936,12 @@ mod test {
             );
 
             let mut h = simple_dfg_hugr();
-            h.insert_from_view_link_nodes(h.entrypoint(), &insert, mod_children.clone())
+            h.insert_from_view_link_nodes(Some(h.entrypoint()), &insert, mod_children.clone())
                 .unwrap();
             check_insertion(h, call1, call2);
 
             let mut h = simple_dfg_hugr();
-            h.insert_hugr_link_nodes(h.entrypoint(), insert, mod_children)
+            h.insert_hugr_link_nodes(Some(h.entrypoint()), insert, mod_children)
                 .unwrap();
             check_insertion(h, call1, call2);
         }
@@ -989,7 +991,7 @@ mod test {
         let (h, res) = {
             let mut h = simple_dfg_hugr();
             let res = h
-                .insert_from_view_link_nodes(h.entrypoint(), &insert, chmap.clone())
+                .insert_from_view_link_nodes(Some(h.entrypoint()), &insert, chmap.clone())
                 .unwrap();
             (h, res)
         };
@@ -1010,7 +1012,7 @@ mod test {
             ] {
                 chmap.insert(defn.node(), defn_mode.clone());
                 let mut h = h.clone();
-                h.insert_hugr_link_nodes(h.entrypoint(), insert.clone(), chmap.clone())
+                h.insert_hugr_link_nodes(Some(h.entrypoint()), insert.clone(), chmap.clone())
                     .unwrap();
                 h.validate().unwrap();
                 if defn_mode != NodeLinkingDirective::add() {
@@ -1045,7 +1047,7 @@ mod test {
 
         let epp = insert.get_parent(insert.entrypoint()).unwrap();
         let r = h.insert_from_view_link_nodes(
-            h.entrypoint(),
+            Some(h.entrypoint()),
             &insert,
             HashMap::from([(epp, NodeLinkingDirective::add())]),
         );
@@ -1057,7 +1059,7 @@ mod test {
 
         let [inp, _] = insert.get_io(defn).unwrap();
         let r = h.insert_from_view_link_nodes(
-            h.entrypoint(),
+            Some(h.entrypoint()),
             &insert,
             HashMap::from([(inp, NodeLinkingDirective::add())]),
         );
@@ -1067,7 +1069,7 @@ mod test {
         let mut insert = insert;
         insert.set_entrypoint(defn);
         let r = h.insert_from_view_link_nodes(
-            h.module_root(),
+            Some(h.module_root()),
             &insert,
             HashMap::from([(
                 defn,
@@ -1082,7 +1084,7 @@ mod test {
         assert_eq!(h, backup);
         insert.set_entrypoint(insert.module_root());
         let r = h.insert_hugr_link_nodes(
-            h.module_root(),
+            Some(h.module_root()),
             insert,
             HashMap::from([(decl, NodeLinkingDirective::add())]),
         );
