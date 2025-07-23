@@ -1,7 +1,6 @@
 //! Low-level interface for modifying a HUGR.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
-use std::fmt::Display;
 use std::sync::Arc;
 
 use itertools::Either;
@@ -9,6 +8,7 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::hugr::linking::NodeLinkingError;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType};
 use crate::hugr::{NodeMetadata, Patch};
@@ -212,7 +212,7 @@ pub trait HugrMut: HugrMutInternals {
         };
 
         self.insert_hugr_link_nodes(root, other, children)
-            .expect("Construction of `children` should ensure no possibility of InsertDefnError")
+            .expect("Construction of `children` should ensure no possibility of NodeLinkingError")
     }
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
@@ -233,7 +233,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Self::Node,
         other: Hugr,
         children: HashMap<Node, InsertDefnMode<Self::Node>>,
-    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>>;
+    ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     /// This will result in an invalid Hugr (with disconnected edges) if there are any
@@ -275,7 +275,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Self::Node,
         other: &H,
         children: HashMap<H::Node, InsertDefnMode<Self::Node>>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>>;
+    ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -480,7 +480,7 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         mut other: Hugr,
         children: HashMap<Node, InsertDefnMode>,
-    ) -> Result<InsertionResult<Node, Self::Node>, InsertDefnError<Node>> {
+    ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>> {
         let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -506,7 +506,7 @@ impl HugrMut for Hugr {
         parent: Self::Node,
         other: &H,
         children: HashMap<H::Node, InsertDefnMode>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, InsertDefnError<H::Node>> {
+    ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
         let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -620,51 +620,30 @@ pub enum InsertDefnMode<N = Node> {
     Replace(N),
 }
 
-/// An error from an [InsertDefnMode] passed to [HugrMut::insert_hugr_link_nodes]
-/// or [HugrMut::insert_from_view_link_nodes].
-#[derive(Clone, Debug, PartialEq, thiserror::Error)]
-#[non_exhaustive]
-pub enum InsertDefnError<N: Display> {
-    /// Module-children were requested in addition to the module entrypoint
-    // ALAN is this worth bothering with as a separate case? Inserting a hugr
-    // whose entrypoint is the module is a strange case, as you'll get two Module
-    // nodes in the target Hugr!
-    #[error(
-        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
-    )]
-    ChildOfEntrypoint(N),
-    /// A module-child requested contained (or was) the entrypoint
-    #[error("Requested to insert module-child {_0} but this contains the entrypoint")]
-    ChildContainsEntrypoint(N),
-    /// A module-child requested was not a child of the module root
-    #[error("{_0} was not a child of the module root")]
-    NotChildOfRoot(N),
-}
-
 fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     parent: Node,
     other: &H,
     children: HashMap<H::Node, InsertDefnMode>,
-) -> Result<HashMap<H::Node, Node>, InsertDefnError<H::Node>> {
+) -> Result<HashMap<H::Node, Node>, NodeLinkingError<H::Node>> {
     if other.entrypoint() == other.module_root() {
         if let Some(c) = children.keys().next() {
-            return Err(InsertDefnError::ChildOfEntrypoint(*c));
+            return Err(NodeLinkingError::ChildOfEntrypoint(*c));
         }
     } else {
         let mut n = other.entrypoint();
         if children.contains_key(&n) {
-            return Err(InsertDefnError::ChildContainsEntrypoint(n));
+            return Err(NodeLinkingError::ChildContainsEntrypoint(n));
         }
         while let Some(p) = other.get_parent(n) {
             if children.get(&p) == Some(&InsertDefnMode::Add) {
-                return Err(InsertDefnError::ChildContainsEntrypoint(p));
+                return Err(NodeLinkingError::ChildContainsEntrypoint(p));
             }
             n = p
         }
         for &c in children.keys() {
             if other.get_parent(c) != Some(other.module_root()) {
-                return Err(InsertDefnError::NotChildOfRoot(c));
+                return Err(NodeLinkingError::NotChildOfRoot(c));
             }
         }
     }
@@ -1008,7 +987,7 @@ mod test {
         );
         assert_eq!(
             r.err().unwrap(),
-            InsertDefnError::ChildContainsEntrypoint(epp)
+            NodeLinkingError::ChildContainsEntrypoint(epp)
         );
         assert_eq!(h, backup);
 
@@ -1018,7 +997,7 @@ mod test {
             &insert,
             HashMap::from([(inp, InsertDefnMode::Add)]),
         );
-        assert_eq!(r.err().unwrap(), InsertDefnError::NotChildOfRoot(inp));
+        assert_eq!(r.err().unwrap(), NodeLinkingError::NotChildOfRoot(inp));
         assert_eq!(h, backup);
 
         let mut insert = insert;
@@ -1033,7 +1012,7 @@ mod test {
         );
         assert_eq!(
             r.err().unwrap(),
-            InsertDefnError::ChildContainsEntrypoint(defn)
+            NodeLinkingError::ChildContainsEntrypoint(defn)
         );
 
         assert_eq!(h, backup);
@@ -1043,7 +1022,7 @@ mod test {
             insert,
             HashMap::from([(decl, InsertDefnMode::Add)]),
         );
-        assert_eq!(r.err().unwrap(), InsertDefnError::ChildOfEntrypoint(decl));
+        assert_eq!(r.err().unwrap(), NodeLinkingError::ChildOfEntrypoint(decl));
     }
 
     // (End) tests of insert_{hugr,from_view}(_link_nodes) ====================================
