@@ -203,10 +203,8 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, &other)
             .expect("Policy copies functions to avoid conflicts");
-        if per_node.remove(&other.entrypoint()).is_none() {
-            if let Some((anc, NodeLinkingDirective::Add { .. })) =
-                ancestor_entry(&other, &per_node, other.entrypoint())
-            {
+        if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+            if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
                 per_node.remove(&anc).unwrap();
             }
         }
@@ -251,12 +249,11 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
-        if let Some((n, dirv)) = per_node
-            .get(&other.entrypoint())
-            .map(|dirv| (other.entrypoint(), dirv))
-            .or_else(|| ancestor_entry(&other, &per_node, other.entrypoint()))
-        {
-            return Err(NameLinkingError::AddFunctionContainingEntrypoint(n, dirv.clone()));
+        if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+            return Err(NameLinkingError::AddFunctionContainingEntrypoint(
+                n,
+                dirv.clone(),
+            ));
         }
         Ok(self
             .insert_hugr_link_nodes(parent, other, per_node)
@@ -276,10 +273,8 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
-        if per_node.remove(&other.entrypoint()).is_none() {
-            if let Some((anc, NodeLinkingDirective::Add { .. })) =
-                ancestor_entry(other, &per_node, other.entrypoint())
-            {
+        if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+            if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
                 per_node.remove(&anc).unwrap();
             }
         }
@@ -326,12 +321,11 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, other)?;
-        if let Some((n, dirv)) = per_node
-            .get(&other.entrypoint())
-            .map(|dirv| (other.entrypoint(), dirv))
-            .or_else(||ancestor_entry(&other, &per_node, other.entrypoint()))
-        {
-            return Err(NameLinkingError::AddFunctionContainingEntrypoint(n, dirv.clone()));
+        if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+            return Err(NameLinkingError::AddFunctionContainingEntrypoint(
+                n,
+                dirv.clone(),
+            ));
         };
         Ok(self
             .insert_from_view_link_nodes(parent, other, per_node)
@@ -419,16 +413,16 @@ fn translate_indices<N: HugrNode>(
         .map(move |(k, v)| (source_node(k), target_node(v)))
 }
 
-fn ancestor_entry<'a, H: HugrView, V>(
+fn get_entrypoint_ancestor<'a, H: HugrView, V>(
     h: &H,
     map: &'a HashMap<H::Node, V>,
-    mut n: H::Node,
 ) -> Option<(H::Node, &'a V)> {
-    while let Some(p) = h.get_parent(n) {
-        if let Some(v) = map.get(&p) {
-            return Some((p, v));
+    let mut n = Some(h.entrypoint());
+    while let Some(n2) = n {
+        if let Some(v) = map.get(&n2) {
+            return Some((n2, v));
         }
-        n = p;
+        n = h.get_parent(n2);
     }
     None
 }
