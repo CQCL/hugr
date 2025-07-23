@@ -262,15 +262,17 @@ pub trait HugrMut: HugrMutInternals {
         ExtensionRegistry: Extend<Reg>;
 }
 
-/// Records the result of inserting a Hugr or view
-/// via [`HugrMut::insert_hugr`] or [`HugrMut::insert_from_view`].
+/// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
+/// [`HugrMut::insert_from_view`], or [`HugrMut::insert_region`].
 ///
-/// Contains a map from the nodes in the source HUGR to the nodes in the
-/// target HUGR, using their respective `Node` types.
+/// Contains a map from the nodes in the source HUGR to the nodes in the target
+/// HUGR, using their respective `Node` types.
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
-    /// The node, after insertion, that was the entrypoint of the inserted Hugr.
+    /// The node, after insertion, that was the root of the inserted Hugr.
     ///
-    /// That is, the value in [`InsertionResult::node_map`] under the key that was the [`HugrView::entrypoint`].
+    /// That is, the value in [`InsertionResult::node_map`] under the key that
+    /// was the the `region` passed to [`HugrMut::insert_region`] or the
+    /// [`HugrView::entrypoint`] in the other cases.
     pub inserted_entrypoint: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
