@@ -15,7 +15,7 @@ pub enum NodeLinkingError<N: Display> {
     /// Inserting the whole Hugr, yet also asked to insert some of its children
     /// (so the inserted Hugr's entrypoint was its module-root).
     #[error(
-        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
+        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (with module entrypoint)"
     )]
     ChildOfEntrypoint(N),
     /// A module-child requested contained (or was) the entrypoint
@@ -138,21 +138,26 @@ pub enum MultipleImplHandling {
     UseBoth,
 }
 
-/// A conflict between [Visibility::Public] functions in source and target Hugrs.
+/// An error in using names to determine how to link functions in source and target Hugrs.
 /// (SN = Source Node, TN = Target Node)
-// ALAN not quite right, "containing entrypoint" is not such an error
-pub enum ConflictError<SN, TN> {
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
+pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     /// Both source and target contained a [FuncDefn] (public and with same name
     /// and signature).
     ///
     /// [FuncDefn]: crate::ops::FuncDefn
-    MultipleImpls(SN, TN),
+    #[error("Source ({_1}) and target ({_2}) both contained FuncDefn with same public name {_0}")]
+    MultipleImpls(String, SN, TN),
     /// Source and target containing public functions with conflicting signatures
     // TODO ALAN Should we indicate which were decls or defns? via an extra enum?
-    Signatures(SN, Box<PolyFuncType>, TN, Box<PolyFuncType>),
+    #[error(
+        "Conflicting signatures for name {_0} - Source ({_1}) has {_2}, Target ({_3}) has ({_4})"
+    )]
+    Signatures(String, SN, Box<PolyFuncType>, TN, Box<PolyFuncType>),
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
     /// in a different place).
+    #[error("The entrypoint is contained within function {_0} which will be added as {_1:?}")]
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
 }
 
@@ -165,7 +170,7 @@ impl NameLinkingPolicy {
         &self,
         target: &T,
         source: &S,
-    ) -> Result<NodeLinkingPolicy<S::Node, T::Node>, ConflictError<S::Node, T::Node>> {
+    ) -> Result<NodeLinkingPolicy<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         // Get some easy cases out of the way first
         let (copy_private, err_conf_sig, multi_impls) = match self {
             Self::AddAll => {
@@ -204,7 +209,8 @@ impl NameLinkingPolicy {
             } else if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
                 if sig != ex_sig {
                     if err_conf_sig {
-                        return Err(ConflictError::Signatures(
+                        return Err(NameLinkingError::Signatures(
+                            name.clone(),
                             n,
                             Box::new(sig.clone()),
                             ex_n,
@@ -220,7 +226,7 @@ impl NameLinkingPolicy {
                             NodeLinkingDirective::replace(ex_n)
                         }
                         (_, _, MultipleImplHandling::ErrorDontInsert) => {
-                            return Err(ConflictError::MultipleImpls(n, ex_n));
+                            return Err(NameLinkingError::MultipleImpls(name.clone(), n, ex_n));
                         }
                         (_, _, MultipleImplHandling::UseBoth) => NodeLinkingDirective::add(),
                     }
@@ -235,7 +241,7 @@ impl NameLinkingPolicy {
                     // Would need to add entrypoint-subtree in two places.
                     // TODO allow if entrypoint *is* module child and inserting under
                     // target module-root ??
-                    return Err(ConflictError::AddFunctionContainingEntrypoint(
+                    return Err(NameLinkingError::AddFunctionContainingEntrypoint(
                         n,
                         dirv.clone(),
                     ));
