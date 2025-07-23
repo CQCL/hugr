@@ -178,11 +178,11 @@ pub enum BuildError {
         node: Node,
     },
 
-    /// From [Dataflow::add_hugr_with_wires_defns]
+    /// From [Dataflow::add_hugr_with_wires_link_nodes]
     #[error{"In inserting Hugr: {0}"}]
     HugrInsertionError(#[from] InsertDefnError<Node>),
 
-    /// From [Dataflow::add_hugr_view_with_wires_defns].
+    /// From [Dataflow::add_hugr_view_with_wires_link_nodes].
     /// Note that because the type of node in the [InsertDefnError] depends
     /// upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
