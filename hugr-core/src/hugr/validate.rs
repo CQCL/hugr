@@ -707,6 +707,8 @@ pub enum ValidationError<N: HugrNode> {
     /// Multiple, incompatible, nodes with [Visibility::Public] use the same `func_name`
     /// in a [Module](super::Module). (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with
     /// the same signature are allowed)
+    ///
+    /// [Visibility::Public]: crate::Visibility::Public
     #[error("FuncDefn/Decl {} is exported under same name {link_name} as earlier node {}", children[0], children[1])]
     DuplicateExport {
         /// The `func_name` of a public `FuncDecl` or `FuncDefn`

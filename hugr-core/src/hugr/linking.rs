@@ -7,7 +7,6 @@ use crate::{HugrView, Node, Visibility, ops::OpType, types::PolyFuncType};
 /// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
 /// or [insert_from_view_link_nodes].
 ///
-/// [NodeLinkingDirective]: crate::hugr::hugrmut::NodeLinkingDirective
 /// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
 /// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
@@ -36,12 +35,17 @@ pub enum NodeLinkingDirective<TN = Node> {
         // TODO If non-None, change the name of the inserted function
         //rename: Option<String>,
         /// If non-None, the specified node+subtree in the target Hugr will be removed,
-        /// with any ([EdgeKind::Function]) edges from it changed to come from the newly-inserted node instead.
+        /// with any ([EdgeKind::Function]) edges from it changed to come from the
+        /// newly-inserted node instead.
+        ///
+        /// [EdgeKind::Function]: crate::types::EdgeKind::Function
         replace: Option<TN>,
     },
     /// Do not insert the node/subtree from the source, but for any inserted node
     /// with an ([EdgeKind::Function]) edge from it, change that edge to come from
     /// the specified existing node instead.
+    ///
+    /// [EdgeKind::Function]: crate::types::EdgeKind::Function
     UseExisting(TN),
 }
 
@@ -92,7 +96,7 @@ pub enum NameLinkingPolicy {
         //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
         //   * use (or replace) the existing function --> incompatible ports
         // but given you'll need to patch the Hugr up afterwards, you can get there just
-        // by setting this to `false` (and maybe removing one FuncDefn), or via [NameLinkingPolicy::Explicit].
+        // by setting this to `false` (and maybe removing one FuncDefn), or via explicit node linking.
         error_on_conflicting_sig: bool,
         /// How to handle cases where both target and inserted Hugr have a FuncDefn
         /// with the same name and signature.
@@ -140,9 +144,11 @@ pub enum MultipleImplHandling {
 pub enum ConflictError<SN, TN> {
     /// Both source and target contained a [FuncDefn] (public and with same name
     /// and signature).
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
     MultipleImpls(SN, TN),
     /// Source and target containing public functions with conflicting signatures
-    // should we indicate which were decls or defns? via an extra enum?
+    // TODO ALAN Should we indicate which were decls or defns? via an extra enum?
     Signatures(SN, Box<PolyFuncType>, TN, Box<PolyFuncType>),
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
@@ -151,7 +157,7 @@ pub enum ConflictError<SN, TN> {
 }
 
 impl NameLinkingPolicy {
-    /// Builds an explicit map of [NodeLinkingDirectives] that implements this policy for a given
+    /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
     /// source (inserted) and target (inserted-into) Hugr.
     /// The map should be such that no [NodeLinkingError] will occur.
     #[allow(clippy::type_complexity)]
