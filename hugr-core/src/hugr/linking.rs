@@ -129,7 +129,7 @@ pub enum MultipleImplHandling {
     #[default]
     UseExisting,
     /// Keep the implementation in the source Hugr. (Edges in the target Hugr
-    /// will be redirected to use the funtion from the source; the previously-existing
+    /// will be redirected to use the function from the source; the previously-existing
     /// function in the target Hugr will be removed.)
     UseNew,
     /// Add the new function alongside the existing one in the target Hugr,
