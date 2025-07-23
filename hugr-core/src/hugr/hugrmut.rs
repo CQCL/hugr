@@ -203,7 +203,9 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, &other)
             .expect("Policy copies functions to avoid conflicts");
-        if let Some(anc) = ancestor_key(&other, &per_node, other.entrypoint()) {
+        if let Some((anc, NodeLinkingDirective::Add { .. })) =
+            ancestor_entry(&other, &per_node, other.entrypoint())
+        {
             per_node.remove(&anc).unwrap();
         }
         self.insert_hugr_link_nodes(root, other, per_node)
@@ -265,7 +267,9 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
-        if let Some(anc) = ancestor_key(other, &per_node, other.entrypoint()) {
+        if let Some((anc, NodeLinkingDirective::Add { .. })) =
+            ancestor_entry(other, &per_node, other.entrypoint())
+        {
             per_node.remove(&anc).unwrap();
         }
         self.insert_from_view_link_nodes(root, other, per_node)
@@ -397,14 +401,14 @@ fn translate_indices<N: HugrNode>(
         .map(move |(k, v)| (source_node(k), target_node(v)))
 }
 
-fn ancestor_key<'a, H: HugrView, V>(
+fn ancestor_entry<'a, H: HugrView, V>(
     h: &H,
-    map: &HashMap<H::Node, V>,
+    map: &'a HashMap<H::Node, V>,
     mut n: H::Node,
-) -> Option<H::Node> {
+) -> Option<(H::Node, &'a V)> {
     loop {
-        if map.contains_key(&n) {
-            return Some(n);
+        if let Some(v) = map.get(&n) {
+            return Some((n, v));
         }
         let Some(p) = h.get_parent(n) else {
             return None;
