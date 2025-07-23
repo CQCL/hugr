@@ -51,6 +51,8 @@ impl HugrBuilder for ModuleBuilder<Hugr> {
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// Continue building a module from an existing hugr.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
     #[must_use]
     pub fn with_hugr(hugr: T) -> Self {
         ModuleBuilder(hugr)

@@ -1,8 +1,8 @@
 use crate::hugr::views::HugrView;
 use crate::types::{Signature, TypeRow};
 
+use crate::ops;
 use crate::ops::handle::{CaseID, NodeHandle};
-use crate::ops::{self};
 
 use super::HugrBuilder;
 use super::build_traits::SubContainer;
@@ -87,6 +87,47 @@ impl<H: AsMut<Hugr> + AsRef<Hugr>> SubContainer for ConditionalBuilder<H> {
     }
 }
 impl<B: AsMut<Hugr> + AsRef<Hugr>> ConditionalBuilder<B> {
+    /// Initialize a new Conditional container in an existing Hugr.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Args
+    ///
+    /// - `parent` must be the parent of an existing dataflow region in the HUGR,
+    ///   which will contain the new conditional.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding child nodes.
+    pub fn with_hugr(
+        mut hugr: B,
+        parent: Node,
+        sum_rows: impl IntoIterator<Item = TypeRow>,
+        other_inputs: impl Into<TypeRow>,
+        outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let sum_rows: Vec<_> = sum_rows.into_iter().collect();
+        let other_inputs = other_inputs.into();
+        let outputs: TypeRow = outputs.into();
+
+        let n_out_wires = outputs.len();
+        let n_cases = sum_rows.len();
+
+        let op = ops::Conditional {
+            sum_rows,
+            other_inputs,
+            outputs,
+        };
+        let conditional_node = hugr.as_mut().add_node_with_parent(parent, op);
+
+        Ok(ConditionalBuilder {
+            base: hugr,
+            conditional_node,
+            n_out_wires,
+            case_nodes: vec![None; n_cases],
+        })
+    }
+
     /// Return a builder the Case node with index `case`.
     ///
     /// # Panics

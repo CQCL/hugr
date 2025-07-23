@@ -22,6 +22,27 @@ pub struct DFGBuilder<T> {
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
+    /// Initialize a new DFG container in an existing Hugr.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Args
+    ///
+    /// - `parent` must be the parent of an existing dataflow region in the HUGR,
+    ///   which will contain the new DFG.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn with_hugr(mut hugr: T, parent: Node, signature: Signature) -> Result<Self, BuildError> {
+        let op = ops::DFG {
+            signature: signature.clone(),
+        };
+        let dfg = hugr.as_mut().add_node_with_parent(parent, op);
+
+        DFGBuilder::create_with_io(hugr, dfg, signature)
+    }
+
     /// Returns a new `DFGBuilder` with the given base and parent node.
     ///
     /// Sets up the input and output nodes of the region. If `parent` already has

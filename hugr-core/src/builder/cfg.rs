@@ -162,6 +162,34 @@ impl HugrBuilder for CFGBuilder<Hugr> {
 }
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
+    /// Initialize a new CFG container in an existing Hugr.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Args
+    ///
+    /// - `parent` must be the parent of an existing dataflow region in the HUGR,
+    ///   which will contain the new CFG.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding child nodes.
+    pub fn with_hugr(
+        mut hugr: B,
+        parent: Node,
+        input: TypeRow,
+        output: TypeRow,
+    ) -> Result<Self, BuildError> {
+        let signature = Signature::new(input.clone(), output.clone());
+        let op = ops::CFG { signature };
+        let cfg = hugr.as_mut().add_node_with_parent(parent, op);
+
+        CFGBuilder::create(hugr, cfg, input, output)
+    }
+
+    /// Create a new [`CFGBuilder`] for an existing CFG node with no children.
+    ///
+    /// Initializes the exit block.
     pub(super) fn create(
         mut base: B,
         cfg_node: Node,

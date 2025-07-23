@@ -1,3 +1,4 @@
+use crate::hugr::HugrMut;
 use crate::ops::{self, DataflowOpTrait};
 
 use crate::hugr::views::HugrView;
@@ -14,6 +15,35 @@ use super::{
 pub type TailLoopBuilder<B> = DFGWrapper<B, BuildHandle<TailLoopID>>;
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>> TailLoopBuilder<B> {
+    /// Initialize a new Tail Loop container in an existing Hugr.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Args
+    ///
+    /// - `parent` must be the parent of an existing dataflow region in the HUGR,
+    ///   which will contain the new tail loop.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding child nodes.
+    pub fn with_hugr(
+        mut hugr: B,
+        parent: Node,
+        just_inputs: impl Into<TypeRow>,
+        inputs_outputs: impl Into<TypeRow>,
+        just_outputs: impl Into<TypeRow>,
+    ) -> Result<Self, BuildError> {
+        let op = ops::TailLoop {
+            just_inputs: just_inputs.into(),
+            just_outputs: just_outputs.into(),
+            rest: inputs_outputs.into(),
+        };
+        let loop_node = hugr.as_mut().add_node_with_parent(parent, op.clone());
+
+        Self::create_with_io(hugr, loop_node, &op)
+    }
+
     pub(super) fn create_with_io(
         base: B,
         loop_node: Node,
