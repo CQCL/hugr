@@ -134,108 +134,109 @@ pub enum ConflictError<SN, TN> {
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
 }
 
-/// Builds an explicit map of [NodeLinkingDirectives] that implements this policy for a given
-/// source (inserted) and target (inserted-into) Hugr.
-/// The map should be such that no [NodeLinkingError] will occur.
-#[allow(clippy::type_complexity)]
-pub fn to_explicit<T: HugrView, S: HugrView>(
-    target: &T,
-    source: &S,
-    policy: &NameLinkingPolicy,
-) -> Result<NodeLinkingPolicy<S::Node, T::Node>, ConflictError<S::Node, T::Node>> {
-    // Get some easy cases out of the way first
-    let (copy_private, err_conf_sig, multi_impls) = match policy {
-        NameLinkingPolicy::AddAll => {
-            return Ok(source
-                .children(source.module_root())
-                .map(|n| (n, NodeLinkingDirective::add()))
-                .collect());
-        }
-        NameLinkingPolicy::AddNone => return Ok(NodeLinkingPolicy::new()),
-        NameLinkingPolicy::LinkByName {
-            copy_private_funcs,
-            error_on_conflicting_sig,
-            multi_impls,
-        } => (*copy_private_funcs, *error_on_conflicting_sig, *multi_impls),
-    };
-
-    fn link_sig<H: HugrView>(
-        h: &H,
-        n: H::Node,
-    ) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
-        match h.get_optype(n) {
-            OpType::FuncDecl(fd) => Some((fd.func_name(), false, fd.visibility(), fd.signature())),
-            OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
-            _ => None,
-        }
-    }
-
-    let existing = target
-        .children(target.module_root())
-        .filter_map(|n| {
-            link_sig(target, n).and_then(|(fname, is_defn, vis, sig)| {
-                vis.is_public().then_some((fname, (n, is_defn, sig)))
-            })
-        })
-        .collect::<HashMap<_, _>>();
-    let mut res = NodeLinkingPolicy::new();
-
-    for n in source.children(source.module_root()) {
-        let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
-            continue;
-        };
-        if !vis.is_public() {
-            if copy_private {
-                res.insert(n, NodeLinkingDirective::add());
+impl NameLinkingPolicy {
+    /// Builds an explicit map of [NodeLinkingDirectives] that implements this policy for a given
+    /// source (inserted) and target (inserted-into) Hugr.
+    /// The map should be such that no [NodeLinkingError] will occur.
+    #[allow(clippy::type_complexity)]
+    pub fn to_node_linking<T: HugrView, S: HugrView>(
+        &self,
+        target: &T,
+        source: &S,
+    ) -> Result<NodeLinkingPolicy<S::Node, T::Node>, ConflictError<S::Node, T::Node>> {
+        // Get some easy cases out of the way first
+        let (copy_private, err_conf_sig, multi_impls) = match self {
+            Self::AddAll => {
+                return Ok(source
+                    .children(source.module_root())
+                    .map(|n| (n, NodeLinkingDirective::add()))
+                    .collect());
             }
-            continue;
+            Self::AddNone => return Ok(NodeLinkingPolicy::new()),
+            Self::LinkByName {
+                copy_private_funcs,
+                error_on_conflicting_sig,
+                multi_impls,
+            } => (*copy_private_funcs, *error_on_conflicting_sig, *multi_impls),
+        };
+
+        let existing = target
+            .children(target.module_root())
+            .filter_map(|n| {
+                link_sig(target, n).and_then(|(fname, is_defn, vis, sig)| {
+                    vis.is_public().then_some((fname, (n, is_defn, sig)))
+                })
+            })
+            .collect::<HashMap<_, _>>();
+        let mut res = NodeLinkingPolicy::new();
+
+        for n in source.children(source.module_root()) {
+            let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
+                continue;
+            };
+            if !vis.is_public() {
+                if copy_private {
+                    res.insert(n, NodeLinkingDirective::add());
+                }
+                continue;
+            }
+            let dirv = if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
+                if sig != ex_sig {
+                    if err_conf_sig {
+                        return Err(ConflictError::Signatures(
+                            n,
+                            Box::new(sig.clone()),
+                            ex_n,
+                            Box::new(ex_sig.clone()),
+                        ));
+                    }
+                    NodeLinkingDirective::add()
+                } else if !is_defn {
+                    NodeLinkingDirective::UseExisting(ex_n)
+                } else if !ex_is_defn {
+                    NodeLinkingDirective::replace(ex_n)
+                } else {
+                    match multi_impls {
+                        MultipleImplHandling::UseExisting => {
+                            NodeLinkingDirective::UseExisting(ex_n)
+                        }
+                        MultipleImplHandling::ErrorDontInsert => {
+                            return Err(ConflictError::MultipleImpls(n, ex_n));
+                        }
+                        MultipleImplHandling::UseNew => NodeLinkingDirective::replace(ex_n),
+                        MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
+                    }
+                }
+            } else {
+                NodeLinkingDirective::add()
+            };
+            res.insert(n, dirv);
         }
-        let dirv = if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
-            if sig != ex_sig {
-                if err_conf_sig {
-                    return Err(ConflictError::Signatures(
+        let mut n = source.entrypoint();
+        while let Some(p) = source.get_parent(n) {
+            if p == source.module_root() {
+                if let Some(dirv) = res.get(&n) {
+                    // Would need to add entrypoint-subtree in two places.
+                    // TODO allow if entrypoint *is* module child and inserting under
+                    // target module-root ??
+                    return Err(ConflictError::AddFunctionContainingEntrypoint(
                         n,
-                        Box::new(sig.clone()),
-                        ex_n,
-                        Box::new(ex_sig.clone()),
+                        dirv.clone(),
                     ));
                 }
-                NodeLinkingDirective::add()
-            } else if !is_defn {
-                NodeLinkingDirective::UseExisting(ex_n)
-            } else if !ex_is_defn {
-                NodeLinkingDirective::replace(ex_n)
-            } else {
-                match multi_impls {
-                    MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(ex_n),
-                    MultipleImplHandling::ErrorDontInsert => {
-                        return Err(ConflictError::MultipleImpls(n, ex_n));
-                    }
-                    MultipleImplHandling::UseNew => NodeLinkingDirective::replace(ex_n),
-                    MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
-                }
             }
-        } else {
-            NodeLinkingDirective::add()
-        };
-        res.insert(n, dirv);
-    }
-    let mut n = source.entrypoint();
-    while let Some(p) = source.get_parent(n) {
-        if p == source.module_root() {
-            if let Some(dirv) = res.get(&n) {
-                // Would need to add entrypoint-subtree in two places.
-                // TODO allow if entrypoint *is* module child and inserting under
-                // target module-root ??
-                return Err(ConflictError::AddFunctionContainingEntrypoint(
-                    n,
-                    dirv.clone(),
-                ));
-            }
+            n = p;
         }
-        n = p;
+        Ok(res)
     }
-    Ok(res)
+}
+
+fn link_sig<H: HugrView>(h: &H, n: H::Node) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
+    match h.get_optype(n) {
+        OpType::FuncDecl(fd) => Some((fd.func_name(), false, fd.visibility(), fd.signature())),
+        OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
+        _ => None,
+    }
 }
 
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
