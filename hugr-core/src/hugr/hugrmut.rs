@@ -203,10 +203,12 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, &other)
             .expect("Policy copies functions to avoid conflicts");
-        if let Some((anc, NodeLinkingDirective::Add { .. })) =
-            ancestor_entry(&other, &per_node, other.entrypoint())
-        {
-            per_node.remove(&anc).unwrap();
+        if per_node.remove(&other.entrypoint()).is_none() {       
+            if let Some((anc, NodeLinkingDirective::Add { .. })) =
+                ancestor_entry(&other, &per_node, other.entrypoint())
+            {
+                per_node.remove(&anc).unwrap();
+            }
         }
         self.insert_hugr_link_nodes(root, other, per_node)
             .expect("Policy constructed to avoid any errors")
@@ -267,10 +269,12 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
-        if let Some((anc, NodeLinkingDirective::Add { .. })) =
-            ancestor_entry(other, &per_node, other.entrypoint())
-        {
-            per_node.remove(&anc).unwrap();
+        if per_node.remove(&other.entrypoint()).is_none() {       
+            if let Some((anc, NodeLinkingDirective::Add { .. })) =
+                ancestor_entry(other, &per_node, other.entrypoint())
+            {
+                per_node.remove(&anc).unwrap();
+            }
         }
         self.insert_from_view_link_nodes(root, other, per_node)
             .expect("Policy constructed to avoid any errors")
@@ -406,15 +410,13 @@ fn ancestor_entry<'a, H: HugrView, V>(
     map: &'a HashMap<H::Node, V>,
     mut n: H::Node,
 ) -> Option<(H::Node, &'a V)> {
-    loop {
-        if let Some(v) = map.get(&n) {
-            return Some((n, v));
+    while let Some(p) = h.get_parent(n) {
+        if let Some(v) = map.get(&p) {
+            return Some((p, v));
         }
-        let Some(p) = h.get_parent(n) else {
-            return None;
-        };
         n = p;
     }
+    None
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.
