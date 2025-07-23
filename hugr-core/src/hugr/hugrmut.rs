@@ -192,7 +192,8 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Panics
     ///
-    /// If the root node is not in the graph.
+    /// - If the root node is not in the graph.
+    /// - If the `region` node is not in `other`.
     fn insert_region(
         &mut self,
         root: Self::Node,
