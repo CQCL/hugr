@@ -138,6 +138,7 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
                 fn disconnect(&mut self, node: Self::Node, port: impl Into<crate::Port>);
                 fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
                 fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
+                fn insert_region(&mut self, root: Self::Node, other: crate::Hugr, region: crate::Node) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
                 fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
                 fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
                 fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
