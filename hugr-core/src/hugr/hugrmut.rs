@@ -200,22 +200,14 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let mut n = other.entrypoint();
-        let mut children = HashMap::new();
-        if n != other.module_root() {
-            children.extend(
-                other
-                    .children(other.module_root())
-                    .map(|n| (n, NodeLinkingDirective::<Self::Node>::add())),
-            );
-            while children.remove(&n).is_none() {
-                n = other.get_parent(n).unwrap()
-            }
-        };
-
-        // TODO ALAN We need to handle inclusion-of-entrypoint error
-        self.insert_hugr_link_names(root, other, NameLinkingPolicy::default())
-            .unwrap()
+        let mut per_node = NameLinkingPolicy::default()
+            .to_node_linking(&*self, &other)
+            .expect("Policy copies functions to avoid conflicts");
+        if let Some(anc) = ancestor_key(&other, &per_node, other.entrypoint()) {
+            per_node.remove(&anc).unwrap();
+        }
+        self.insert_hugr_link_nodes(root, other, per_node)
+            .expect("Policy constructed to avoid any errors")
     }
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
@@ -270,9 +262,14 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        // TODO ALAN We need to handle inclusion-of-entrypoint error
-        self.insert_from_view_link_names(root, other, NameLinkingPolicy::default())
-            .unwrap()
+        let mut per_node = NameLinkingPolicy::default()
+            .to_node_linking(&*self, other)
+            .expect("Policy copies functions to avoid conflicts");
+        if let Some(anc) = ancestor_key(other, &per_node, other.entrypoint()) {
+            per_node.remove(&anc).unwrap();
+        }
+        self.insert_from_view_link_nodes(root, other, per_node)
+            .expect("Policy constructed to avoid any errors")
     }
 
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
@@ -398,6 +395,22 @@ fn translate_indices<N: HugrNode>(
     node_map
         .into_iter()
         .map(move |(k, v)| (source_node(k), target_node(v)))
+}
+
+fn ancestor_key<'a, H: HugrView, V>(
+    h: &H,
+    map: &HashMap<H::Node, V>,
+    mut n: H::Node,
+) -> Option<H::Node> {
+    loop {
+        if map.contains_key(&n) {
+            return Some(n);
+        }
+        let Some(p) = h.get_parent(n) else {
+            return None;
+        };
+        n = p;
+    }
 }
 
 /// Impl for non-wrapped Hugrs. Overwrites the recursive default-impls to directly use the hugr.

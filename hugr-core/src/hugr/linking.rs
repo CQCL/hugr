@@ -234,21 +234,6 @@ impl NameLinkingPolicy {
             };
             res.insert(n, dirv);
         }
-        let mut n = source.entrypoint();
-        while let Some(p) = source.get_parent(n) {
-            if p == source.module_root() {
-                if let Some(dirv) = res.get(&n) {
-                    // Would need to add entrypoint-subtree in two places.
-                    // TODO allow if entrypoint *is* module child and inserting under
-                    // target module-root ??
-                    return Err(NameLinkingError::AddFunctionContainingEntrypoint(
-                        n,
-                        dirv.clone(),
-                    ));
-                }
-            }
-            n = p;
-        }
         Ok(res)
     }
 }
