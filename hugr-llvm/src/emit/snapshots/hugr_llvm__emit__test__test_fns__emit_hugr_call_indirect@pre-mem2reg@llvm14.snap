@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define void @_hl.main_void.1() {
+define private void @_hl.main_void.1() {
 alloca_block:
   %"4_0" = alloca void ()*, align 8
   br label %entry_block
@@ -17,7 +17,7 @@ entry_block:                                      ; preds = %alloca_block
   ret void
 }
 
-define i1 @_hl.main_unary.6(i1 %0) {
+define private i1 @_hl.main_unary.6(i1 %0) {
 alloca_block:
   %"0" = alloca i1, align 1
   %"9_0" = alloca i1 (i1)*, align 8
@@ -38,7 +38,7 @@ entry_block:                                      ; preds = %alloca_block
   ret i1 %"04"
 }
 
-define { i1, i1 } @_hl.main_binary.11(i1 %0, i1 %1) {
+define private { i1, i1 } @_hl.main_binary.11(i1 %0, i1 %1) {
 alloca_block:
   %"0" = alloca i1, align 1
   %"1" = alloca i1, align 1

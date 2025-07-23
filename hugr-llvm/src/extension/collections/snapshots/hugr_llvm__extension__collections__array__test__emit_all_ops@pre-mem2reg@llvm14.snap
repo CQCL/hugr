@@ -16,7 +16,7 @@ source_filename = "test_context"
 @4 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
 @prelude.panic_template.4 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
-define void @_hl.main.1() {
+define private void @_hl.main.1() {
 alloca_block:
   %"12_0" = alloca i64, align 8
   %"10_0" = alloca i64, align 8

@@ -134,7 +134,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             .ok_or(anyhow!("function has type params"))?;
         let llvm_func_ty = self.llvm_func_type(func_ty)?;
         let name = self.name_func(name, node);
-        self.get_func_impl(name, llvm_func_ty, None)
+        self.get_func_impl(name, llvm_func_ty, Some(Linkage::Private))
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDefn`].
