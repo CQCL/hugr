@@ -203,7 +203,7 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, &other)
             .expect("Policy copies functions to avoid conflicts");
-        if per_node.remove(&other.entrypoint()).is_none() {       
+        if per_node.remove(&other.entrypoint()).is_none() {
             if let Some((anc, NodeLinkingDirective::Add { .. })) =
                 ancestor_entry(&other, &per_node, other.entrypoint())
             {
@@ -251,6 +251,13 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
+        if let Some((n, dirv)) = per_node
+            .get(&other.entrypoint())
+            .map(|dirv| (other.entrypoint(), dirv))
+            .or_else(|| ancestor_entry(&other, &per_node, other.entrypoint()))
+        {
+            return Err(NameLinkingError::AddFunctionContainingEntrypoint(n, dirv.clone()));
+        }
         Ok(self
             .insert_hugr_link_nodes(parent, other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
@@ -269,7 +276,7 @@ pub trait HugrMut: HugrMutInternals {
         let mut per_node = NameLinkingPolicy::default()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
-        if per_node.remove(&other.entrypoint()).is_none() {       
+        if per_node.remove(&other.entrypoint()).is_none() {
             if let Some((anc, NodeLinkingDirective::Add { .. })) =
                 ancestor_entry(other, &per_node, other.entrypoint())
             {
@@ -319,6 +326,13 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, other)?;
+        if let Some((n, dirv)) = per_node
+            .get(&other.entrypoint())
+            .map(|dirv| (other.entrypoint(), dirv))
+            .or_else(||ancestor_entry(&other, &per_node, other.entrypoint()))
+        {
+            return Err(NameLinkingError::AddFunctionContainingEntrypoint(n, dirv.clone()));
+        };
         Ok(self
             .insert_from_view_link_nodes(parent, other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
