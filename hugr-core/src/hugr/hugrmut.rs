@@ -413,6 +413,8 @@ fn translate_indices<N: HugrNode>(
         .map(move |(k, v)| (source_node(k), target_node(v)))
 }
 
+// ALAN TODO what about adding FuncDefn over multiple FuncDecls?
+//     (Adding multiple FuncDecls over 1 FuncDefn might work already?)
 fn get_entrypoint_ancestor<'a, H: HugrView, V>(
     h: &H,
     map: &'a HashMap<H::Node, V>,
