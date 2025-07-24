@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::Version;
+use crate::CURRENT_VERSION;
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
 use crate::v0::{self as model, table};
 
@@ -47,12 +47,12 @@ pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
 
 fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Package) {
     write_list!(builder, init_modules, write_module, package.modules);
-    write_version(builder.init_version(), Version::current());
+    write_version(builder.init_version(), &CURRENT_VERSION);
 }
 
-fn write_version(mut builder: hugr_capnp::version::Builder, version: Version) {
-    builder.set_major(version.major);
-    builder.set_minor(version.minor);
+fn write_version(mut builder: hugr_capnp::version::Builder, version: &semver::Version) {
+    builder.set_major(version.major as u32);
+    builder.set_minor(version.minor as u32);
 }
 
 fn write_module(mut builder: hugr_capnp::module::Builder, module: &table::Module) {

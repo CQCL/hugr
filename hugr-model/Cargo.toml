@@ -27,6 +27,7 @@ ordered-float = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 pretty = { workspace = true }
+semver = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 pyo3 = { workspace = true, optional = true, features = ["extension-module"] }

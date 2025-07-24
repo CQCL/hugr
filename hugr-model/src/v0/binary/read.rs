@@ -1,6 +1,6 @@
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
 use crate::v0::table;
-use crate::{Version, v0 as model};
+use crate::{CURRENT_VERSION, v0 as model};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::io::BufRead;
@@ -18,9 +18,9 @@ pub enum ReadError {
     #[display("Can not read file with version {actual} (tooling version {current}).")]
     VersionError {
         /// The current version of the hugr-model format.
-        current: Version,
+        current: semver::Version,
         /// The version of the hugr-model format in the file.
-        actual: Version,
+        actual: semver::Version,
     },
 }
 
@@ -68,11 +68,10 @@ fn read_package<'a>(
     reader: hugr_capnp::package::Reader,
 ) -> ReadResult<table::Package<'a>> {
     let version = read_version(reader.get_version()?)?;
-    let current_version = Version::current();
 
-    if version.major != current_version.major || version.minor > current_version.minor {
+    if version.major != CURRENT_VERSION.major || version.minor > CURRENT_VERSION.minor {
         return Err(ReadError::VersionError {
-            current: current_version,
+            current: CURRENT_VERSION.clone(),
             actual: version,
         });
     }
@@ -86,10 +85,10 @@ fn read_package<'a>(
     Ok(table::Package { modules })
 }
 
-fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<Version> {
+fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<semver::Version> {
     let major = reader.get_major();
     let minor = reader.get_minor();
-    Ok(Version { minor, major })
+    Ok(semver::Version::new(major as u64, minor as u64, 0))
 }
 
 fn read_module<'a>(
