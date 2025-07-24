@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import Self
 
 from hugr import ext, tys
-from hugr._serialization import ops as sops
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
@@ -18,6 +17,8 @@ from hugr.package import Package
 from hugr.std.float import FLOAT_T
 
 if TYPE_CHECKING:
+    import typing
+
     from syrupy.assertion import SnapshotAssertion
 
     from hugr.hugr.node_port import Node
@@ -235,7 +236,7 @@ def validate(
 
 @dataclass(frozen=True, order=True)
 class _NodeHash:
-    op: str
+    op: _OpHash
     entrypoint: bool
     input_neighbours: int
     output_neighbours: int
@@ -263,9 +264,9 @@ class _NodeHash:
         op_type = h[n].op
         if isinstance(op_type, AsExtOp):
             op_type = op_type.ext_op.to_custom_op()
-            op = f"{op_type.extension}.{op_type.op_name}"
+            op = _OpHash(f"{op_type.extension}.{op_type.op_name}")
         elif isinstance(op_type, Custom):
-            op = f"{op_type.extension}.{op_type.op_name}"
+            op = _OpHash(f"{op_type.extension}.{op_type.op_name}")
         elif isinstance(op_type, Const):
             # We need every custom value to have the same repr if they compare
             # equal. For example, an `IntVal(42)` should be the same as the
@@ -273,17 +274,16 @@ class _NodeHash:
             # unwrapping, since each class implements different `__repr__`
             # methods.
             #
-            # Our solution here is to roundtrip via JSON. This may miss some
-            # errors, but it's the best we can do for now. Note that
+            # Our solution here is to encode the value into JSON and compare those.
+            # This may miss some errors, but it's the best we can do for now. Note that
             # roundtripping via `sops.Value` is not enough, since nested
             # specialized values don't get serialized straight away. (e.g.
             # StaticArrayVal's dictionary payload containing a SumValue
             # internally, see `test_val_static_array`).
-            value_dict = op_type.val._to_serial_root().model_dump()
-            val = sops.Value(**value_dict).deserialize()
-            op = repr(Const(val, num_out=op_type.num_out))
+            value_dict = op_type.val._to_serial_root().model_dump(mode="json")
+            op = _OpHash("Const", value_dict)
         else:
-            op = op_type.name()
+            op = _OpHash(op_type.name())
 
         return _NodeHash(
             entrypoint=n == h.entrypoint,
@@ -299,6 +299,16 @@ class _NodeHash:
             children_hashes=child_hashes,
             metadata=metadata,
         )
+
+
+@dataclass(frozen=True)
+class _OpHash:
+    name: str
+    payload: None | typing.Any = None
+
+    def __lt__(self, other: _OpHash) -> bool:
+        """Compare two op hashes by name and payload."""
+        return (self.name, repr(self.payload)) < (other.name, repr(other.payload))
 
 
 def _get_mermaid(serial: bytes) -> str:  #
