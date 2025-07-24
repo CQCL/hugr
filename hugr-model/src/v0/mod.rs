@@ -91,6 +91,12 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
 
+/// The current major version of the `hugr-model` format.
+pub const VERSION_MAJOR: u32 = 0;
+
+/// The current minor version of the `hugr-model` format.
+pub const VERSION_MINOR: u32 = 0;
+
 /// Describes how a function or symbol should be acted upon by a linker
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Visibility {
