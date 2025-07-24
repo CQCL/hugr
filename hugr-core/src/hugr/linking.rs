@@ -138,9 +138,16 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     /// Source and target containing public functions with conflicting signatures
     // TODO ALAN Should we indicate which were decls or defns? via an extra enum?
     #[error(
-        "Conflicting signatures for name {_0} - Source ({_1}) has {_2}, Target ({_3}) has ({_4})"
+        "Conflicting signatures for name {name} - Source ({src_node}) has {src_sig}, Target ({tgt_node}) has ({tgt_sig})"
     )]
-    Signatures(String, SN, Box<PolyFuncType>, TN, Box<PolyFuncType>),
+    #[allow(missing_docs)]
+    Signatures {
+        name: String,
+        src_node: SN,
+        src_sig: Box<PolyFuncType>,
+        tgt_node: TN,
+        tgt_sig: Box<PolyFuncType>,
+    },
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
     /// in a different place).
@@ -248,13 +255,13 @@ impl NameLinkingPolicy {
                         (_, _, MultipleImplHandling::UseBoth) => NodeLinkingDirective::add(),
                     }));
                 } else if err_conflict {
-                    return Err(NameLinkingError::Signatures(
-                        name.clone(),
-                        new_n,
-                        Box::new(new_sig.clone()),
-                        ex_n,
-                        Box::new(ex_sig.clone()),
-                    ));
+                    return Err(NameLinkingError::Signatures {
+                        name: name.clone(),
+                        src_node: new_n,
+                        src_sig: Box::new(new_sig.clone()),
+                        tgt_node: ex_n,
+                        tgt_sig: Box::new(ex_sig.clone()),
+                    });
                 }
             }
             Some(NodeLinkingDirective::add())
