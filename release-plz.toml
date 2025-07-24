@@ -22,6 +22,11 @@ pr_labels = ["release"]
 release_always = false
 
 [changelog]
+
+header = """# Changelog
+
+"""
+
 sort_commits = "oldest"
 
 # Allowed conventional commit types
