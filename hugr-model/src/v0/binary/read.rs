@@ -1,5 +1,5 @@
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
-use crate::v0::{VERSION, table};
+use crate::v0::table;
 use crate::{Version, v0 as model};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
@@ -68,10 +68,11 @@ fn read_package<'a>(
     reader: hugr_capnp::package::Reader,
 ) -> ReadResult<table::Package<'a>> {
     let version = read_version(reader.get_version()?)?;
+    let current_version = Version::current();
 
-    if version.major != VERSION.major || version.minor > VERSION.minor {
+    if version.major != current_version.major || version.minor > current_version.minor {
         return Err(ReadError::VersionError {
-            current: VERSION,
+            current: current_version,
             actual: version,
         });
     }
@@ -85,7 +86,7 @@ fn read_package<'a>(
     Ok(table::Package { modules })
 }
 
-fn read_version<'a>(reader: hugr_capnp::version::Reader) -> ReadResult<Version> {
+fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<Version> {
     let major = reader.get_major();
     let minor = reader.get_minor();
     Ok(Version { minor, major })

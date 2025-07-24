@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::Version;
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
-use crate::v0::{self as model, VERSION, table};
+use crate::v0::{self as model, table};
 
 /// An error encounter while serializing a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
@@ -47,7 +47,7 @@ pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
 
 fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Package) {
     write_list!(builder, init_modules, write_module, package.modules);
-    write_version(builder.init_version(), VERSION);
+    write_version(builder.init_version(), Version::current());
 }
 
 fn write_version(mut builder: hugr_capnp::version::Builder, version: Version) {
