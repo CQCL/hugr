@@ -79,19 +79,18 @@ pub enum NameLinkingPolicy {
     AddNone,
     /// Identify public functions in source and target Hugr by name.
     /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
-    /// will be combined, taking the FuncDefn from either Hugr. This is the default.
+    /// will be combined, taking the FuncDefn from either Hugr.
     LinkByName {
         /// If true, all private functions from the source hugr are inserted into the target.
         /// (Since these are private, name conflicts do not make the Hugr invalid.)
         /// If false, instead edges from said private functions to any inserted parts
         /// of the source Hugr will be broken, making the target Hugr invalid.
-        /// Defaults to `true`.
         copy_private_funcs: bool,
         /// How to handle cases where the same (public) name is present in both
         /// inserted and target Hugr but with different signatures.
         /// `true` means an error is raised and nothing is added to the target Hugr.
         /// `false` means the new function will be added alongside the existing one
-        ///   - this will give an invalid Hugr (duplicate names). This is the default.
+        ///   - this will give an invalid Hugr (duplicate names).
         // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
         //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
         //   * use (or replace) the existing function --> incompatible ports
@@ -107,26 +106,14 @@ pub enum NameLinkingPolicy {
     },
 }
 
-impl Default for NameLinkingPolicy {
-    fn default() -> Self {
-        Self::LinkByName {
-            copy_private_funcs: true,
-            error_on_conflicting_sig: false,
-            multi_impls: MultipleImplHandling::default(),
-        }
-    }
-}
-
 /// What to do when [NameLinkingPolicy::LinkByName] finds both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
-#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MultipleImplHandling {
     /// Do not perform insertion; raise an error instead
     ErrorDontInsert,
     /// Keep the implementation already in the target Hugr. (Edges in the source
     /// Hugr will be redirected to use the function from the target.)
-    /// This is the default.
-    #[default]
     UseExisting,
     /// Keep the implementation in the source Hugr. (Edges in the target Hugr
     /// will be redirected to use the function from the source; the previously-existing
@@ -162,6 +149,38 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
+    /// The default policy used by [HugrMut::insert_hugr].
+    /// * All private functions are copied
+    /// * If public functions have conflicting signatures, we keep both
+    /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
+    ///     the *newly inserted* one replaces the original
+    ///
+    /// [HugrMut::insert_hugr]: crate::hugr::HugrMut::insert_hugr
+    // TODO ALAN or we could just use NameLinkingPolicy::AddAll ?
+    pub fn default_for_hugr() -> Self {
+        Self::LinkByName {
+            copy_private_funcs: true,
+            error_on_conflicting_sig: false,
+            multi_impls: MultipleImplHandling::UseNew,
+        }
+    }
+
+    /// The default policy used by [HugrMut::insert_from_view].
+    /// * Private functions are not copied, i.e. edges from them into the inserted portion, are disconnected in the target
+    /// * If public functions have conflicting signatures, we keep both
+    /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
+    ///     the original is used in place of the new.
+    ///
+    /// [HugrMut::insert_from_view]: crate::hugr::HugrMut::insert_from_view
+    // TODO ALAN or we could just use NameLinkingPolicy::AddNone ? Or same as default_for_hugr (and make Default)?
+    pub fn default_for_view() -> Self {
+        Self::LinkByName {
+            copy_private_funcs: false,
+            error_on_conflicting_sig: false,
+            multi_impls: MultipleImplHandling::UseExisting,
+        }
+    }
+
     /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
     /// source (inserted) and target (inserted-into) Hugr.
     /// The map should be such that no [NodeLinkingError] will occur.

@@ -9,7 +9,8 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::linking::{
-    NameLinkingError, NameLinkingPolicy, NodeLinkingDirective, NodeLinkingError, NodeLinkingPolicy,
+    MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective,
+    NodeLinkingError, NodeLinkingPolicy,
 };
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, NodeMetadata, OpType, Patch};
@@ -200,7 +201,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let mut per_node = NameLinkingPolicy::default()
+        let mut per_node = NameLinkingPolicy::default_for_hugr()
             .to_node_linking(&*self, &other)
             .expect("Policy copies functions to avoid conflicts");
         if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
@@ -270,7 +271,7 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        let mut per_node = NameLinkingPolicy::default()
+        let mut per_node = NameLinkingPolicy::default_for_view()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
         if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
