@@ -1319,6 +1319,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "pyo3",
+ "semver",
  "smol_str",
  "thiserror 2.0.12",
 ]
