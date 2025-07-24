@@ -1,5 +1,30 @@
 # Changelog
 
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-v0.21.0...hugr-v0.22.0) - 2025-07-24
+
+This release fixes multiple inconsistencies between the serialization formats
+and improves the error messages when loading unsupported envelopes.
+
+We now also support nodes with up to `2^32` connections to the same port (up from `2^16`).
+
+### Bug Fixes
+
+- Ensure SumTypes have the same json encoding in -rs and -py ([#2465](https://github.com/CQCL/hugr/pull/2465))
+
+### New Features
+
+- ReplaceTypes allows linearizing inside Op replacements ([#2435](https://github.com/CQCL/hugr/pull/2435))
+- Add pass for DFG inlining ([#2460](https://github.com/CQCL/hugr/pull/2460))
+- Export entrypoint metadata in Python and fix bug in import ([#2434](https://github.com/CQCL/hugr/pull/2434))
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- [**breaking**] Use binary envelopes for operation lower_func encoding  ([#2447](https://github.com/CQCL/hugr/pull/2447))
+- [**breaking**] Update portgraph dependency to 0.15 ([#2455](https://github.com/CQCL/hugr/pull/2455))
+- Detect and fail on unrecognised envelope flags ([#2453](https://github.com/CQCL/hugr/pull/2453))
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+- [**breaking**] Add `insert_region` to HugrMut ([#2463](https://github.com/CQCL/hugr/pull/2463))
+- Non-region entrypoints in `hugr-model`. ([#2467](https://github.com/CQCL/hugr/pull/2467))
+
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-v0.20.2...hugr-v0.21.0) - 2025-07-09
 
 
