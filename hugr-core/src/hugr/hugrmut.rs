@@ -9,8 +9,7 @@ use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::linking::{
-    MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective,
-    NodeLinkingError, NodeLinkingPolicy,
+    NameLinkingError, NameLinkingPolicy, NodeLinkingDirective, NodeLinkingError, NodeLinkingPolicy,
 };
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, NodeMetadata, OpType, Patch};
@@ -182,34 +181,48 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
-    /// Unless `other.entrypoint() == other.module_root()`, then any children of
+    /// Insert another hugr into this one, with the entrypoint-subtree placed under the given
+    /// parent node. Unless `other.entrypoint() == other.module_root()`, then any children of
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
-    /// inserted under the Module root of this Hugr - see [Self::insert_hugr_link_nodes].
-    /// TODO ALAN change!
+    /// inserted under the Module root of this Hugr, with linking according to
+    /// [NameLinkingPolicy::default_for_hugr]:
+    /// * public FuncDecls in `other` will be replaced with any existing public function in `self`
+    ///   with the same name and signature
+    /// * public FuncDefns in `other` will replace any existing public function in `self` with the
+    ///   same name and signature
     ///
-    /// Note there are two cases here which produce an invalid Hugr:
+    /// Note there are a number of cases here which produce an invalid Hugr:
     /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
     ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
     ///    its root is to set the entrypoint to a child of the root.
+    ///    (ALAN note: there just doesn't seem to be a good thing to do here. Linking is only
+    ///    gonna make the invalid Hugr even weirder - where do merged funcdefns/decls end up?)
     /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and
     ///    contains a (recursive) [`OpType::Call`] (or `LoadFunction`) to that ancestor
     ///    FuncDefn. In such a case, the containing FuncDefn will not be inserted, so the
     ///    `Call` will have no callee.
+    /// 3. Public functions with the same name but different signatures in `self` and `other`
+    ///    will sit alongside each other.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let mut per_node = NameLinkingPolicy::default_for_hugr()
-            .to_node_linking(&*self, &other)
-            .expect("Policy copies functions to avoid conflicts");
-        if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
-            if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
-                per_node.remove(&anc).unwrap();
+        let children = if other.entrypoint() == other.module_root() {
+            NodeLinkingPolicy::new()
+        } else {
+            let mut per_node = NameLinkingPolicy::default_for_hugr()
+                .to_node_linking(&*self, &other)
+                .expect("Policy copies functions to avoid conflicts");
+            // `get_entrypoint_ancestor` always returns None if other's entrypoint is its module-root
+            if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+                if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
+                    per_node.remove(&anc).unwrap();
+                }
             }
-        }
-        self.insert_hugr_link_nodes(Some(root), other, per_node)
+            per_node
+        };
+        self.insert_hugr_link_nodes(Some(root), other, children)
             .expect("Policy constructed to avoid any errors")
     }
 
@@ -233,15 +246,27 @@ pub trait HugrMut: HugrMutInternals {
         children: NodeLinkingPolicy<Node, Self::Node>,
     ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
 
-    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
-    /// is copied under the specified `parent` of this; other module-children of `other`
-    /// are inserted under the module-root of this according to the [NameLinkingPolicy].
+    /// Copy nodes from another hugr into this one. If `parent` is `Some`, then the
+    /// entrypoint-subtree of `other` is copied under it. Other module-children of `other`
+    /// are inserted under the module-root of `self` according to the [NameLinkingPolicy].
     ///
     /// # Errors
     ///
+    /// * If [NameLinkingPolicy::LinkByName::error_on_conflicting_sig] is true and there are public
+    ///   functions with the same name but different signatures
+    ///
+    /// * If [NameLinkingPolicy::LinkByName] is used with [MultipleImplHandling::ErrorDontInsert]
+    ///   and both `self` and `other` have public [FuncDefn]s with the same name and signature
+    ///
+    /// * If `parent` is not None and the `other.entrypoint()` is (or is within) a function
+    ///   that will be added according to the [NameLinkingPolicy]
+    ///
     /// # Panics
     ///
-    /// If `parent` is not in the graph.
+    /// If `parent` is `Some` but not in the graph.
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     #[allow(clippy::type_complexity)]
     fn insert_hugr_link_names(
         &mut self,
@@ -250,11 +275,13 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
-        if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
-            return Err(NameLinkingError::AddFunctionContainingEntrypoint(
-                n,
-                dirv.clone(),
-            ));
+        if parent.is_some() {
+            if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+                return Err(NameLinkingError::AddFunctionContainingEntrypoint(
+                    n,
+                    dirv.clone(),
+                ));
+            }
         }
         Ok(self
             .insert_hugr_link_nodes(parent, other, per_node)
@@ -262,15 +289,36 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
+    /// Public functions (children of the module-root of `other`) are also copied under the
+    /// module-root of `self`, with linking according to [NameLinkingPolicy::default_for_view]:
+    /// * Public [FuncDecl]s in `other` are replaced by public functions in `self` with the same
+    ///   name and signature
+    /// * Public [FuncDefn]s in `other` are replaced by public [FuncDefn]s in `self` with the
+    ///   same name and signature, but replace any such public [FuncDecl]s.
+    ///
+    /// (ALAN NOTE: alternatively we could just use NameLinkingPolicy::AddNone ?
+    /// Or same as default_for_hugr, and make that Default?)
+    ///
+    /// Note there are a number of situations where this can lead to an invalid Hugr.
+    /// * If `other.entrypoint() == other.module_root(), as this leads to `self` containing
+    ///   two module nodes.
+    /// * An inserted portion contains an edge from a private function in `other` (private
+    ///   functions are not copied); this will be disconnected.
+    /// * There are public functions with the same name but different signatures in `self` and
+    ///   `other` (these will sit alongside each other, which is invalid)
     ///
     /// # Panics
     ///
     /// If `parent` is not in the graph.
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [FuncDecl]: crate::ops::FuncDecl
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
+        // ALAN TODO: use empty NodeLinkingPolicy if other.entrypoint() == other.module_root() ?
         let mut per_node = NameLinkingPolicy::default_for_view()
             .to_node_linking(&*self, other)
             .expect("Policy copies functions to avoid conflicts");
@@ -283,20 +331,21 @@ pub trait HugrMut: HugrMutInternals {
             .expect("Policy constructed to avoid any errors")
     }
 
-    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
-    /// is copied under the specified `parent` of this; each element of `children`,
-    /// which must be a child of `other.module_root()`, will be copied with its subtree,
-    /// or linked according to its [NodeLinkingDirective].
+    /// Copy nodes from another hugr into this one. If `parent` is `Some`, then the
+    /// entrypoint-subtree of `other` is copied beneath it. Also, each element of `children`,
+    /// which must be a child of `other.module_root()`, will be copied (with its subtree)
+    /// beneath `self.module_root()`,  or linked according to its [NodeLinkingDirective].
     ///
     /// # Errors
     ///
     /// * If `children` are not `children` of the root of `other`
-    /// * If `other`s entrypoint is among `children`, or descends from an element
-    ///   of `children` with [NodeLinkingDirective::Add]
+    /// * If `parent` is Some, and `other.entrypoint()` is either
+    ///   * among `children`, or
+    ///   * descends from an element of `children` with [NodeLinkingDirective::Add]
     ///
     /// # Panics
     ///
-    /// If `parent` is not in the graph.
+    /// If `parent` is `Some` but not in the graph.
     #[allow(clippy::type_complexity)]
     fn insert_from_view_link_nodes<H: HugrView>(
         &mut self,
@@ -305,15 +354,27 @@ pub trait HugrMut: HugrMutInternals {
         children: NodeLinkingPolicy<H::Node, Self::Node>,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
 
-    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
-    /// is copied under the specified `parent` of this; other module-children of `other`
+    /// Copy nodes from another hugr into this one. If `parent` is `Some`, then the
+    ///  entrypoint-subtree of `other` is copied beneath it. Also the module-children of `other`
     /// are inserted under the module-root of this according to the [NameLinkingPolicy].
     ///
     /// # Errors
     ///
+    /// * If [NameLinkingPolicy::LinkByName::error_on_conflicting_sig] is true and there are public
+    ///   functions with the same name but different signatures
+    ///
+    /// * If [NameLinkingPolicy::LinkByName] is used with [MultipleImplHandling::ErrorDontInsert]
+    ///   and both `self` and `other` have public [FuncDefn]s with the same name and signature
+    ///
+    /// * If `parent` is not None and the `other.entrypoint()` is (or is within) a function
+    ///   that will be added according to the [NameLinkingPolicy]
+    ///
     /// # Panics
     ///
-    /// If `parent` is not in the graph.
+    /// If `parent` is `Some` but not in the graph.
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     #[allow(clippy::type_complexity)]
     fn insert_from_view_link_names<H: HugrView>(
         &mut self,

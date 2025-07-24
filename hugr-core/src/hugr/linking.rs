@@ -160,10 +160,9 @@ impl NameLinkingPolicy {
     /// * All private functions are copied
     /// * If public functions have conflicting signatures, we keep both
     /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
-    ///     the *newly inserted* one replaces the original
+    ///   the newly inserted one replaces the original
     ///
     /// [HugrMut::insert_hugr]: crate::hugr::HugrMut::insert_hugr
-    // TODO ALAN or we could just use NameLinkingPolicy::AddAll ?
     pub fn default_for_hugr() -> Self {
         Self::LinkByName {
             copy_private_funcs: true,
@@ -176,10 +175,9 @@ impl NameLinkingPolicy {
     /// * Private functions are not copied, i.e. edges from them into the inserted portion, are disconnected in the target
     /// * If public functions have conflicting signatures, we keep both
     /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
-    ///     the original is used in place of the new.
+    ///   the original is used in place of the new.
     ///
     /// [HugrMut::insert_from_view]: crate::hugr::HugrMut::insert_from_view
-    // TODO ALAN or we could just use NameLinkingPolicy::AddNone ? Or same as default_for_hugr (and make Default)?
     pub fn default_for_view() -> Self {
         Self::LinkByName {
             copy_private_funcs: false,
