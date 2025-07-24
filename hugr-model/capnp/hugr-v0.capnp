@@ -20,8 +20,12 @@ using LinkIndex = UInt32;
 
 struct Package {
     modules @0 :List(Module);
-    versionMajor @1 :UInt32;
-    versionMinor @2 :UInt32;
+    version @1 :Version;
+}
+
+struct Version {
+    major @0 :UInt32;
+    minor @1 :UInt32;
 }
 
 struct Module {

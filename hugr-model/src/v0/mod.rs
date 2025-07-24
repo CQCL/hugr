@@ -91,11 +91,8 @@ use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
 
-/// The current major version of the `hugr-model` format.
-pub const VERSION_MAJOR: u32 = 0;
-
-/// The current minor version of the `hugr-model` format.
-pub const VERSION_MINOR: u32 = 0;
+/// The current version of the `hugr-model` format.
+pub const VERSION: Version = Version { major: 0, minor: 0 };
 
 /// Describes how a function or symbol should be acted upon by a linker
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -346,6 +343,8 @@ pub mod scope;
 pub mod table;
 
 pub use bumpalo;
+
+use crate::Version;
 
 /// Type to indicate whether scopes are open or closed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
