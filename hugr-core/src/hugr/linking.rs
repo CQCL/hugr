@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{HugrView, Node, Visibility, ops::OpType, types::PolyFuncType};
+use crate::{HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
 /// or [insert_from_view_link_nodes].
@@ -190,22 +190,6 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<NodeLinkingPolicy<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        // Get some easy cases out of the way first
-        let (copy_private, err_conf_sig, multi_impls) = match self {
-            Self::AddAll => {
-                return Ok(source
-                    .children(source.module_root())
-                    .map(|n| (n, NodeLinkingDirective::add()))
-                    .collect());
-            }
-            Self::AddNone => return Ok(NodeLinkingPolicy::new()),
-            Self::LinkByName {
-                copy_private_funcs,
-                error_on_conflicting_sig,
-                multi_impls,
-            } => (*copy_private_funcs, *error_on_conflicting_sig, *multi_impls),
-        };
-
         let existing = target
             .children(target.module_root())
             .filter_map(|n| {
@@ -220,24 +204,38 @@ impl NameLinkingPolicy {
             let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
                 continue;
             };
-            let mut dirv = NodeLinkingDirective::add();
-            if !vis.is_public() {
-                if !copy_private {
-                    continue;
-                }
-            } else if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
-                if sig != ex_sig {
-                    if err_conf_sig {
-                        return Err(NameLinkingError::Signatures(
-                            name.clone(),
-                            n,
-                            Box::new(sig.clone()),
-                            ex_n,
-                            Box::new(ex_sig.clone()),
-                        ));
-                    }
-                } else {
-                    dirv = match (is_defn, ex_is_defn, multi_impls) {
+            if let Some(dirv) = self.directive(name, vis, n, is_defn, sig, &existing)? {
+                res.insert(n, dirv);
+            }
+        }
+        Ok(res)
+    }
+
+    fn directive<SN: Display, TN: HugrNode>(
+        &self,
+        name: &String,
+        new_vis: &Visibility,
+        new_n: SN,
+        new_defn: bool,
+        new_sig: &PolyFuncType,
+        existing: &HashMap<&String, (TN, bool, &PolyFuncType)>,
+    ) -> Result<Option<NodeLinkingDirective<TN>>, NameLinkingError<SN, TN>> {
+        let (copy_private, err_conflict, multi_impls) = match self {
+            NameLinkingPolicy::AddAll => return Ok(Some(NodeLinkingDirective::add())),
+            NameLinkingPolicy::AddNone => return Ok(None),
+            NameLinkingPolicy::LinkByName {
+                copy_private_funcs,
+                error_on_conflicting_sig,
+                multi_impls,
+            } => (*copy_private_funcs, *error_on_conflicting_sig, multi_impls),
+        };
+
+        Ok(if !new_vis.is_public() {
+            copy_private.then(NodeLinkingDirective::add)
+        } else {
+            if let Some(&(ex_n, ex_is_defn, ex_sig)) = existing.get(name) {
+                if new_sig == ex_sig {
+                    return Ok(Some(match (new_defn, ex_is_defn, multi_impls) {
                         (false, _, _) | (_, true, MultipleImplHandling::UseExisting) => {
                             NodeLinkingDirective::UseExisting(ex_n)
                         }
@@ -245,15 +243,22 @@ impl NameLinkingPolicy {
                             NodeLinkingDirective::replace(ex_n)
                         }
                         (_, _, MultipleImplHandling::ErrorDontInsert) => {
-                            return Err(NameLinkingError::MultipleImpls(name.clone(), n, ex_n));
+                            return Err(NameLinkingError::MultipleImpls(name.clone(), new_n, ex_n));
                         }
                         (_, _, MultipleImplHandling::UseBoth) => NodeLinkingDirective::add(),
-                    }
+                    }));
+                } else if err_conflict {
+                    return Err(NameLinkingError::Signatures(
+                        name.clone(),
+                        new_n,
+                        Box::new(new_sig.clone()),
+                        ex_n,
+                        Box::new(ex_sig.clone()),
+                    ));
                 }
-            };
-            res.insert(n, dirv);
-        }
-        Ok(res)
+            }
+            Some(NodeLinkingDirective::add())
+        })
     }
 }
 
