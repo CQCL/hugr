@@ -6,6 +6,11 @@ on:
     branches:
       - main
 
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.github.event_name }}
+  cancel-in-progress: true
+
 env:
   LLVM_VERSION: "14.0"
 
