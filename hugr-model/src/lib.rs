@@ -5,6 +5,8 @@
 mod capnp;
 
 pub mod v0;
+mod version;
+pub use version::*;
 
 // This is required here since the generated code assumes it's in the package root.
 use capnp::hugr_v0_capnp;

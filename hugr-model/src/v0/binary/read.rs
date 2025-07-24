@@ -1,6 +1,6 @@
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
-use crate::v0 as model;
 use crate::v0::table;
+use crate::{Version, v0 as model};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::io::BufRead;
@@ -13,6 +13,15 @@ pub enum ReadError {
     #[from(forward)]
     /// An error encountered while decoding a model from a `capnproto` buffer.
     DecodingError(capnp::Error),
+
+    /// The file could not be read due to a version mismatch.
+    #[display("Can not read file with version {actual} (tooling version {current}).")]
+    VersionError {
+        /// The current version of the hugr-model format.
+        current: Version,
+        /// The version of the hugr-model format in the file.
+        actual: Version,
+    },
 }
 
 type ReadResult<T> = Result<T, ReadError>;
@@ -58,6 +67,16 @@ fn read_package<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::package::Reader,
 ) -> ReadResult<table::Package<'a>> {
+    let version = read_version(reader.get_version()?)?;
+    let current_version = Version::current();
+
+    if version.major != current_version.major || version.minor > current_version.minor {
+        return Err(ReadError::VersionError {
+            current: current_version,
+            actual: version,
+        });
+    }
+
     let modules = reader
         .get_modules()?
         .iter()
@@ -65,6 +84,12 @@ fn read_package<'a>(
         .collect::<ReadResult<_>>()?;
 
     Ok(table::Package { modules })
+}
+
+fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<Version> {
+    let major = reader.get_major();
+    let minor = reader.get_minor();
+    Ok(Version { minor, major })
 }
 
 fn read_module<'a>(
