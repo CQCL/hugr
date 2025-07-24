@@ -922,7 +922,7 @@ mod test {
 
         // Defaults
         h.insert_from_view(h.entrypoint(), &insert);
-        check_insertion(h, false, false);
+        check_insertion(h, false, true); // FuncDecl is public so copied
 
         let mut h = simple_dfg_hugr();
         h.insert_hugr(h.entrypoint(), insert);
