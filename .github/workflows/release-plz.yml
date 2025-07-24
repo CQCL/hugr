@@ -14,6 +14,8 @@ jobs:
     name: Release-plz
     runs-on: ubuntu-latest
     environment: crate-release
+    permissions:
+      id-token: write     # Required for OIDC token exchange
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
