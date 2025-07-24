@@ -35,7 +35,7 @@ pub type CommitId = relrc::NodeId;
 #[derive(
     Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize,
 )]
-pub struct PatchNode(pub CommitId, #[serde(with = "serialize_node")] pub Node);
+pub struct PatchNode(pub CommitId, pub Node);
 
 impl PatchNode {
     /// Get the commit ID of the commit that owns this node.
@@ -54,22 +54,6 @@ impl std::fmt::Debug for PatchNode {
 impl std::fmt::Display for PatchNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self:?}")
-    }
-}
-
-/// Helper for to serialize and deserialize nodes as their usize index.
-mod serialize_node {
-    use hugr_core::{Node, NodeIndex};
-    use serde::{Deserialize, Serialize};
-    use serde::{Deserializer, Serializer};
-
-    pub fn serialize<S: Serializer>(v: &Node, s: S) -> Result<S::Ok, S::Error> {
-        v.index().serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Node, D::Error> {
-        let index = usize::deserialize(d)?;
-        Ok(Node::from(portgraph::NodeIndex::new(index)))
     }
 }
 

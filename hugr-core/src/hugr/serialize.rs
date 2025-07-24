@@ -79,7 +79,7 @@ impl<T: DeserializeOwned> Versioned<T> {
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
     /// Node index of the parent.
-    parent: usize,
+    parent: Node,
     #[serde(flatten)]
     op: OpType,
 }
@@ -90,7 +90,7 @@ struct SerHugrLatest {
     /// For each node: (parent, `node_operation`)
     nodes: Vec<NodeSer>,
     /// for each edge: (src, `src_offset`, tgt, `tgt_offset`)
-    edges: Vec<[(usize, Option<u32>); 2]>,
+    edges: Vec<[(Node, Option<u32>); 2]>,
     /// for each node: (metadata)
     #[serde(default)]
     metadata: Option<Vec<Option<NodeMetadataMap>>>,
@@ -102,7 +102,7 @@ struct SerHugrLatest {
     /// For backwards compatibility, if `None` the entrypoint is set to the root
     /// of the node hierarchy.
     #[serde(default)]
-    entrypoint: Option<usize>,
+    entrypoint: Option<Node>,
 }
 
 /// Errors that can occur while serializing a HUGR.
@@ -201,7 +201,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             let opt = hugr.get_optype(n);
             let new_node = node_rekey[&n].index();
             nodes[new_node] = Some(NodeSer {
-                parent: parent.index(),
+                parent,
                 op: opt.clone(),
             });
             metadata[new_node].clone_from(hugr.metadata.get(n.into_portgraph()));
@@ -211,14 +211,13 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             .collect::<Option<Vec<_>>>()
             .expect("Could not reach one of the nodes");
 
-        let find_offset =
-            |node: Node, offset: usize, dir: Direction, hugr: &Hugr| -> (usize, Option<u32>) {
-                let op = hugr.get_optype(node);
-                let is_value_port = offset < op.value_port_count(dir);
-                let is_static_input = op.static_port(dir).is_some_and(|p| p.index() == offset);
-                let offset = (is_value_port || is_static_input).then_some(offset as u32);
-                (node_rekey[&node].index(), offset)
-            };
+        let find_offset = |node: Node, offset: usize, dir: Direction, hugr: &Hugr| {
+            let op = hugr.get_optype(node);
+            let is_value_port = offset < op.value_port_count(dir);
+            let is_static_input = op.static_port(dir).is_some_and(|p| p.index() == offset);
+            let offset = (is_value_port || is_static_input).then_some(offset as u32);
+            (node_rekey[&node], offset)
+        };
 
         let edges: Vec<_> = hugr
             .nodes()
@@ -242,7 +241,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             edges,
             metadata: Some(metadata),
             encoder,
-            entrypoint: Some(node_rekey[&hugr.entrypoint()].index()),
+            entrypoint: Some(node_rekey[&hugr.entrypoint()]),
         })
     }
 }
@@ -265,8 +264,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
             op: root_type,
             ..
         } = nodes.next().unwrap();
-        if root_parent != 0 {
-            let root_parent = portgraph::NodeIndex::new(root_parent).into();
+        if root_parent.index() != 0 {
             return Err(HUGRSerializationError::FirstNodeNotRoot(root_parent));
         }
         // if there are any unconnected ports or copy nodes the capacity will be
@@ -277,9 +275,8 @@ impl TryFrom<SerHugrLatest> for Hugr {
         // encoded file did not have a module at the root), we need a function
         // to map the node indices.
         let padding_nodes = hugr.entrypoint.index();
-        let hugr_node = |node: usize| -> Node {
-            portgraph::NodeIndex::new(node.index() + padding_nodes).into()
-        };
+        let hugr_node =
+            |node: Node| -> Node { portgraph::NodeIndex::new(node.index() + padding_nodes).into() };
 
         for node_ser in nodes {
             hugr.add_node_with_parent(hugr_node(node_ser.parent), node_ser.op);
@@ -292,7 +289,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
         if let Some(metadata) = metadata {
             for (node_idx, metadata) in metadata.into_iter().enumerate() {
                 if let Some(metadata) = metadata {
-                    let node = hugr_node(node_idx);
+                    let node = hugr_node(portgraph::NodeIndex::new(node_idx).into());
                     hugr.metadata[node.into_portgraph()] = Some(metadata);
                 }
             }

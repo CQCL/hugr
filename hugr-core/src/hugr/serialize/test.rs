@@ -607,7 +607,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
-        parent: 0,
+        parent: portgraph::NodeIndex::new(0).into(),
         op: optype.into(),
     });
 }
@@ -636,7 +636,10 @@ mod proptest {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            ((0..i32::MAX as usize), any::<OpType>())
+            (
+                (0..i32::MAX as usize).prop_map(|x| portgraph::NodeIndex::new(x).into()),
+                any::<OpType>(),
+            )
                 .prop_map(|(parent, op)| {
                     if let OpType::ExtensionOp(ext_op) = op {
                         let opaque: OpaqueOp = ext_op.into();
