@@ -1,5 +1,8 @@
 # Filters used by [dorny/path-filters](https://github.com/dorny/paths-filter)
 # to detect changes in each subproject, and only run the corresponding jobs.
+#
+# We use a composable action to add some additional checks.
+# When adding a new category here, make sure to also update `.github/actions/check-changes/action.yml`
 
 # Dependencies and common workspace configuration.
 rust-config: &rust-config

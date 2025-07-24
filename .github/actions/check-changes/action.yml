@@ -1,9 +1,13 @@
 name: Detect changed files.
 description: Checks if any relevant files have changed in the current pull request or commit. Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
 
+# The file filters are defined in `.github/change-filters.yml`.
+#
 # Requires
+# ```
 # permissions:
 #   pull-requests: read
+# ```
 
 # Set job outputs to values from filter step
 # These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
