@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.21.0...hugr-cli-v0.22.0) - 2025-07-24
+
+### New Features
+
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.2...hugr-cli-v0.21.0) - 2025-07-09
 
 ### New Features
