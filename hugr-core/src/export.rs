@@ -309,6 +309,7 @@ impl<'a> Context<'a> {
                     node,
                     model::ScopeClosure::Open,
                     false,
+                    false,
                 )]);
                 table::Operation::Dfg
             }
@@ -333,6 +334,7 @@ impl<'a> Context<'a> {
                     node,
                     model::ScopeClosure::Open,
                     false,
+                    false,
                 )]);
                 table::Operation::Block
             }
@@ -348,6 +350,7 @@ impl<'a> Context<'a> {
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
                     model::ScopeClosure::Closed,
+                    false,
                     false,
                 )]);
                 table::Operation::DefineFunc(symbol)
@@ -462,6 +465,7 @@ impl<'a> Context<'a> {
                     node,
                     model::ScopeClosure::Open,
                     false,
+                    false,
                 )]);
                 table::Operation::TailLoop
             }
@@ -515,6 +519,7 @@ impl<'a> Context<'a> {
 
         self.export_node_json_metadata(node, &mut meta);
         self.export_node_order_metadata(node, &mut meta);
+        self.export_node_entrypoint_metadata(node, &mut meta);
         let meta = self.bump.alloc_slice_copy(&meta);
 
         self.module.nodes[node_id.index()] = table::Node {
@@ -613,6 +618,7 @@ impl<'a> Context<'a> {
         node: Node,
         closure: model::ScopeClosure,
         export_json_meta: bool,
+        export_entrypoint_meta: bool,
     ) -> table::RegionId {
         let region = self.module.insert_region(table::Region::default());
 
@@ -631,7 +637,9 @@ impl<'a> Context<'a> {
         if export_json_meta {
             self.export_node_json_metadata(node, &mut meta);
         }
-        self.export_node_entrypoint_metadata(node, &mut meta);
+        if export_entrypoint_meta {
+            self.export_node_entrypoint_metadata(node, &mut meta);
+        }
 
         let children = self.hugr.children(node);
         let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
@@ -801,7 +809,7 @@ impl<'a> Context<'a> {
                 panic!("expected a `Case` node as a child of a `Conditional` node");
             };
 
-            regions.push(self.export_dfg(child, model::ScopeClosure::Open, true));
+            regions.push(self.export_dfg(child, model::ScopeClosure::Open, true, true));
         }
 
         regions.into_bump_slice()
@@ -1076,7 +1084,7 @@ impl<'a> Context<'a> {
 
                 let region = match hugr.entrypoint_optype() {
                     OpType::DFG(_) => {
-                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed, true)
+                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed, true, true)
                     }
                     _ => panic!("Value::Function root must be a DFG"),
                 };
