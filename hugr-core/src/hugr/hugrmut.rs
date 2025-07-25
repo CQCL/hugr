@@ -795,10 +795,14 @@ fn insert_hugr_internal<H: HugrView>(
                 debug_assert_eq!(hugr.children(copy).next(), None);
                 replace_static_src(hugr, copy, replace_with);
             }
-            NodeLinkingDirective::Add {
-                replace: Some(replace),
-            } => replace_static_src(hugr, replace, node_map.remove(&ch).unwrap()),
-            _ => (),
+            NodeLinkingDirective::Add { replace } => {
+                let new_node = *node_map.get(&ch).unwrap();
+                for replace in replace {
+                    replace_static_src(hugr, replace, new_node);
+                    panic!("ALAN NO TEST COVERAGE"); // when there is, following line will break, remove:
+                    hugr.remove_subtree(replace);
+                }
+            }
         }
     }
     Ok(node_map)
