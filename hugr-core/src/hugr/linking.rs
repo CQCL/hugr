@@ -198,34 +198,7 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<NodeLinkingPolicy<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        let existing = target
-            .children(target.module_root())
-            .filter_map(|n| {
-                link_sig(target, n).and_then(|(fname, is_defn, vis, sig)| {
-                    let ns = if is_defn {
-                        Either::Left(n)
-                    } else {
-                        Either::Right(n)
-                    };
-                    vis.is_public().then_some((fname, (ns, sig)))
-                })
-            })
-            .into_grouping_map()
-            .aggregate(|acc: Option<PubFuncs<T::Node>>, name, (new, sig2)| {
-                let Some((mut acc, sig1)) = acc else {
-                    return Some((new.map_right(|n| (n, vec![])), sig2));
-                };
-                assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
-                let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
-                    let err = match acc.is_left() && new.is_left() {
-                        true => "Multiple FuncDefns",
-                        false => "FuncDefn and FuncDecl(s)",
-                    };
-                    panic!("Invalid Hugr: {err} for {name}");
-                };
-                decls.push(*ndecl);
-                Some((acc, sig2))
-            });
+        let existing = gather_existing(target);
         let mut res = NodeLinkingPolicy::new();
 
         for n in source.children(source.module_root()) {
@@ -306,6 +279,33 @@ fn link_sig<H: HugrView + ?Sized>(
         OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
         _ => None,
     }
+}
+
+fn gather_existing<H: HugrView + ?Sized>(h: &H) -> HashMap<&String, PubFuncs<H::Node>> {
+    let left_if = |b| if b { Either::Left } else { Either::Right };
+    h.children(h.module_root())
+        .filter_map(|n| {
+            link_sig(h, n).and_then(|(fname, is_defn, vis, sig)| {
+                vis.is_public()
+                    .then_some((fname, (left_if(is_defn)(n), sig)))
+            })
+        })
+        .into_grouping_map()
+        .aggregate(|acc: Option<PubFuncs<H::Node>>, name, (new, sig2)| {
+            let Some((mut acc, sig1)) = acc else {
+                return Some((new.map_right(|n| (n, vec![])), sig2));
+            };
+            assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
+            let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
+                let err = match acc.is_left() && new.is_left() {
+                    true => "Multiple FuncDefns",
+                    false => "FuncDefn and FuncDecl(s)",
+                };
+                panic!("Invalid Hugr: {err} for {name}");
+            };
+            decls.push(*ndecl);
+            Some((acc, sig2))
+        })
 }
 
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
