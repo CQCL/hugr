@@ -205,27 +205,27 @@ impl NameLinkingPolicy {
                     let ns = if is_defn {
                         Either::Left(n)
                     } else {
-                        Either::Right((n, vec![]))
+                        Either::Right(n)
                     };
                     vis.is_public().then_some((fname, (ns, sig)))
                 })
             })
             .into_grouping_map()
-            .reduce(|(mut acc, sig1), name, (new, sig2)| {
-                assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
-                let (Either::Right((_, decls)), Either::Right((ndecl, ndecls))) = (&mut acc, &new)
-                else {
-                    let err = if acc.is_left() && new.is_left() {
-                        "Multiple FuncDefns"
-                    } else {
-                        "FuncDefn and FuncDecl(s)"
+            .fold_with(
+                |_, (ns, sig)| (ns.map_right(|n| (n, vec![])), *sig),
+                |(mut acc, sig1), name, (new, sig2)| {
+                    assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
+                    let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
+                        let err = match acc.is_left() && new.is_left() {
+                            true => "Multiple FuncDefns",
+                            false => "FuncDefn and FuncDecl(s)",
+                        };
+                        panic!("Invalid Hugr: {err} for {name}");
                     };
-                    panic!("Invalid Hugr: {err} for {name}");
-                };
-                assert!(ndecls.is_empty()); // from filter_map above
-                decls.push(*ndecl);
-                (acc, sig1)
-            });
+                    decls.push(*ndecl);
+                    (acc, sig1)
+                },
+            );
         let mut res = NodeLinkingPolicy::new();
 
         for n in source.children(source.module_root()) {
