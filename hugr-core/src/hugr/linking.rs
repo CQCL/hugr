@@ -73,7 +73,6 @@ impl<TN> NodeLinkingDirective<TN> {
 }
 
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
-/// Note SN = Source Node, TN=Target Node
 pub enum NameLinkingPolicy {
     /// Do not use linking - just insert all functions from source Hugr into target.
     /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
