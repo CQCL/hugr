@@ -53,6 +53,7 @@ BitChar = Literal["0", "1"]
 class QsysShot:
     """Results from a single shot execution."""
 
+    #: List of tagged results, where each result is a tuple of tag and data value.
     entries: list[TaggedResult] = field(default_factory=list)
 
     def __init__(self, entries: Iterable[TaggedResult] | None = None):
@@ -136,6 +137,7 @@ def _cast_primitive_bit(data: DataValue) -> BitChar:
 class QsysResult:
     """Results accumulated over multiple shots."""
 
+    #: List of QsysShot objects, each representing a single shot's results.
     results: list[QsysShot]
 
     def __init__(
