@@ -790,7 +790,10 @@ fn insert_hugr_internal<H: HugrView>(
     for (ch, m) in children {
         match m {
             NodeLinkingDirective::UseExisting(replace_with) => {
-                replace_static_src(hugr, node_map.remove(&ch).unwrap(), replace_with)
+                let copy = node_map.remove(&ch).unwrap();
+                // Because of `UseExisting` we avoided adding `ch`s descendants above
+                debug_assert_eq!(hugr.children(copy).next(), None);
+                replace_static_src(hugr, copy, replace_with);
             }
             NodeLinkingDirective::Add {
                 replace: Some(replace),
@@ -809,7 +812,7 @@ fn replace_static_src(hugr: &mut Hugr, old_src: Node, new_src: Node) {
         hugr.disconnect(target, inport);
         hugr.connect(new_src, outport, target, inport);
     }
-    hugr.remove_node(old_src);
+    hugr.remove_subtree(old_src);
 }
 
 /// Internal implementation of `insert_hugr`, `insert_view`, and
