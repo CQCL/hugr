@@ -90,7 +90,7 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
-use crate::hugr::hugrmut::InsertDefnError;
+use crate::hugr::linking::NodeLinkingError;
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
 use crate::types::Type;
@@ -178,12 +178,12 @@ pub enum BuildError {
         node: Node,
     },
 
-    /// From [Dataflow::add_hugr_with_wires_defns]
+    /// From [Dataflow::add_hugr_with_wires_link_nodes]
     #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(#[from] InsertDefnError<Node>),
+    HugrInsertionError(#[from] NodeLinkingError<Node>),
 
-    /// From [Dataflow::add_hugr_view_with_wires_defns].
-    /// Note that because the type of node in the [InsertDefnError] depends
+    /// From [Dataflow::add_hugr_view_with_wires_link_nodes].
+    /// Note that because the type of node in the [NodeLinkingError] depends
     /// upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
     HugrViewInsertionError(String),

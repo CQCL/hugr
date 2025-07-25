@@ -27,7 +27,9 @@ use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
     TypeRV, TypeRow,
 };
-use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
+use crate::{
+    Direction, Hugr, IncomingPort, Node, Visibility, const_extension_ids, test_file, type_row,
+};
 
 /// Creates a hugr with a single, public, function definition that copies a bit `copies` times.
 ///
