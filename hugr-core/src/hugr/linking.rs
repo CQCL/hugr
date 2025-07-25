@@ -211,21 +211,21 @@ impl NameLinkingPolicy {
                 })
             })
             .into_grouping_map()
-            .fold_with(
-                |_, (ns, sig)| (ns.map_right(|n| (n, vec![])), *sig),
-                |(mut acc, sig1), name, (new, sig2)| {
-                    assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
-                    let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
-                        let err = match acc.is_left() && new.is_left() {
-                            true => "Multiple FuncDefns",
-                            false => "FuncDefn and FuncDecl(s)",
-                        };
-                        panic!("Invalid Hugr: {err} for {name}");
+            .aggregate(|acc: Option<PubFuncs<T::Node>>, name, (new, sig2)| {
+                let Some((mut acc, sig1)) = acc else {
+                    return Some((new.map_right(|n| (n, vec![])), sig2));
+                };
+                assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
+                let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
+                    let err = match acc.is_left() && new.is_left() {
+                        true => "Multiple FuncDefns",
+                        false => "FuncDefn and FuncDecl(s)",
                     };
-                    decls.push(*ndecl);
-                    (acc, sig1)
-                },
-            );
+                    panic!("Invalid Hugr: {err} for {name}");
+                };
+                decls.push(*ndecl);
+                Some((acc, sig2))
+            });
         let mut res = NodeLinkingPolicy::new();
 
         for n in source.children(source.module_root()) {
