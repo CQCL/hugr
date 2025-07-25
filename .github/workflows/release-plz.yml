@@ -7,16 +7,45 @@ on:
       - main
 
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.github.event_name }}
-  cancel-in-progress: true
-
 env:
   LLVM_VERSION: "14.0"
 
 jobs:
+  release-plz-pr:
+    name: Create release-plz PR
+    runs-on: ubuntu-latest
+
+    # Ensure only one release-plz tries to create a PR at a time.
+    #
+    # If two instances update the PR simultaneously, one will see an outdated git ref
+    # and end up recreating the PR unnecessarily.
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}-pr
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.HUGRBOT_PAT }}
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Create release PR
+        uses: MarcoIeni/release-plz-action@v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
+        with:
+          command: release-pr
+
+  # This job triggers the release to crates.io if the current crate version is higher than the
+  # ones in the registry.
+  #
+  # Release-plz will only run on commits originating from a PR whose source branch started with
+  # `release-plz-` (see `release-always=false` in the config).
   release-plz:
-    name: Release-plz
+    name: Release the crates
     runs-on: ubuntu-latest
     environment: crate-release
     permissions:
@@ -48,3 +77,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+        with:
+          command: release
