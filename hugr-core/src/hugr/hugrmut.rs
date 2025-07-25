@@ -799,7 +799,7 @@ fn insert_hugr_internal<H: HugrView>(
                 let new_node = *node_map.get(&ch).unwrap();
                 for replace in replace {
                     replace_static_src(hugr, replace, new_node);
-                    panic!("ALAN NO TEST COVERAGE"); // when there is, following line will break, remove:
+                    assert_eq!("ALAN", "NO TEST COVERAGE"); // when there is, following line will break, remove:
                     hugr.remove_subtree(replace);
                 }
             }
