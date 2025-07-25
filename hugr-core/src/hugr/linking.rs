@@ -65,9 +65,9 @@ impl<TN> NodeLinkingDirective<TN> {
     /// The new node should replace the specified node (already existing)
     /// in the target. (Could lead to an invalid Hugr if they have
     /// different signatures.)
-    pub fn replace(node: TN) -> Self {
+    pub fn replace(nodes: impl IntoIterator<Item = TN>) -> Self {
         Self::Add {
-            replace: vec![node],
+            replace: nodes.into_iter().collect(),
         }
     }
 }
@@ -263,36 +263,30 @@ impl NameLinkingPolicy {
         }
 
         if let Some((ex_ns, ex_sig)) = existing.get(name) {
-            let ex_n = ex_ns.as_ref().either(|n| *n, |(n, _)| *n);
             if new_sig == *ex_sig {
-                return Ok(Some(if new_defn {
-                    match (ex_ns, multi_impls) {
-                        (Either::Left(defn), MultipleImplHandling::UseExisting) => {
-                            NodeLinkingDirective::UseExisting(*defn)
-                        }
-                        (Either::Right((decl, decls)), _) => NodeLinkingDirective::Add {
-                            replace: std::iter::once(decl).chain(decls).cloned().collect(),
-                        },
-                        (Either::Left(defn), MultipleImplHandling::UseNew) => {
-                            NodeLinkingDirective::replace(*defn)
-                        }
-                        (_, MultipleImplHandling::ErrorDontInsert) => {
-                            return Err(NameLinkingError::MultipleImpls(name.clone(), new_n, ex_n));
-                        }
-                        (_, MultipleImplHandling::UseBoth) => NodeLinkingDirective::add(),
+                return Ok(Some(match (new_defn, ex_ns) {
+                    (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
+                    (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
+                    (true, Either::Right((decl, decls))) => {
+                        NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
                     }
-                } else {
-                    match ex_ns {
-                        Either::Right(_) => NodeLinkingDirective::add(), // another alias
-                        Either::Left(defn) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
-                    }
+                    (true, &Either::Left(defn)) => match multi_impls {
+                        MultipleImplHandling::UseExisting => {
+                            NodeLinkingDirective::UseExisting(defn)
+                        }
+                        MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
+                        MultipleImplHandling::ErrorDontInsert => {
+                            return Err(NameLinkingError::MultipleImpls(name.clone(), new_n, defn));
+                        }
+                        MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
+                    },
                 }));
             } else if err_conflict {
                 return Err(NameLinkingError::Signatures {
                     name: name.clone(),
                     src_node: new_n,
                     src_sig: Box::new(new_sig.clone()),
-                    tgt_node: ex_n,
+                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
                     tgt_sig: Box::new((*ex_sig).clone()),
                 });
             }
