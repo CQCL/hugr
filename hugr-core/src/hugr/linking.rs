@@ -202,70 +202,64 @@ impl NameLinkingPolicy {
         let mut res = NodeLinkingPolicy::new();
 
         for n in source.children(source.module_root()) {
-            let Some((name, is_defn, vis, sig)) = link_sig(source, n) else {
-                continue;
-            };
-            if let Some(dirv) = self.directive(name, vis, n, is_defn, sig, &existing)? {
+            if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
+                let mut dirv = NodeLinkingDirective::add();
+                match self {
+                    NameLinkingPolicy::AddAll => (),
+                    NameLinkingPolicy::AddNone => continue,
+                    NameLinkingPolicy::LinkByName {
+                        copy_private_funcs,
+                        error_on_conflicting_sig,
+                        multi_impls,
+                    } => {
+                        if !vis.is_public() {
+                            if !copy_private_funcs {
+                                continue;
+                            };
+                        } else if let Some((ex_ns, ex_sig)) = existing.get(name) {
+                            if sig == *ex_sig {
+                                dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
+                            } else if *error_on_conflicting_sig {
+                                return Err(NameLinkingError::Signatures {
+                                    name: name.clone(),
+                                    src_node: n,
+                                    src_sig: Box::new(sig.clone()),
+                                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
+                                    tgt_sig: Box::new((*ex_sig).clone()),
+                                });
+                            }
+                        };
+                    }
+                };
                 res.insert(n, dirv);
             }
         }
         Ok(res)
     }
+}
 
-    fn directive<SN: Display, TN: HugrNode>(
-        &self,
-        name: &String,
-        new_vis: &Visibility,
-        new_n: SN,
-        new_defn: bool,
-        new_sig: &PolyFuncType,
-        existing: &HashMap<&String, PubFuncs<TN>>,
-    ) -> Result<Option<NodeLinkingDirective<TN>>, NameLinkingError<SN, TN>> {
-        let (copy_private, err_conflict, multi_impls) = match self {
-            NameLinkingPolicy::AddAll => return Ok(Some(NodeLinkingDirective::add())),
-            NameLinkingPolicy::AddNone => return Ok(None),
-            NameLinkingPolicy::LinkByName {
-                copy_private_funcs,
-                error_on_conflicting_sig,
-                multi_impls,
-            } => (*copy_private_funcs, *error_on_conflicting_sig, multi_impls),
-        };
-
-        if !new_vis.is_public() {
-            return Ok(copy_private.then(NodeLinkingDirective::add));
+fn directive<SN: Display, TN: HugrNode>(
+    name: &str,
+    new_n: SN,
+    new_defn: bool,
+    ex_ns: &Either<TN, (TN, Vec<TN>)>,
+    multi_impls: &MultipleImplHandling,
+) -> Result<NodeLinkingDirective<TN>, NameLinkingError<SN, TN>> {
+    Ok(match (new_defn, ex_ns) {
+        (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
+        (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
+        (true, Either::Right((decl, decls))) => {
+            NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
         }
-
-        if let Some((ex_ns, ex_sig)) = existing.get(name) {
-            if new_sig == *ex_sig {
-                return Ok(Some(match (new_defn, ex_ns) {
-                    (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
-                    (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
-                    (true, Either::Right((decl, decls))) => {
-                        NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
-                    }
-                    (true, &Either::Left(defn)) => match multi_impls {
-                        MultipleImplHandling::UseExisting => {
-                            NodeLinkingDirective::UseExisting(defn)
-                        }
-                        MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
-                        MultipleImplHandling::ErrorDontInsert => {
-                            return Err(NameLinkingError::MultipleImpls(name.clone(), new_n, defn));
-                        }
-                        MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
-                    },
-                }));
-            } else if err_conflict {
-                return Err(NameLinkingError::Signatures {
-                    name: name.clone(),
-                    src_node: new_n,
-                    src_sig: Box::new(new_sig.clone()),
-                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
-                    tgt_sig: Box::new((*ex_sig).clone()),
-                });
+        (true, &Either::Left(defn)) => match multi_impls {
+            MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(defn),
+            MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
+            MultipleImplHandling::ErrorDontInsert => {
+                return Err(NameLinkingError::MultipleImpls(name.to_owned(), new_n, defn));
             }
-        }
-        Ok(Some(NodeLinkingDirective::add()))
-    }
+            MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
+        },
+    })
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
