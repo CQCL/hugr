@@ -5,12 +5,14 @@ use hugr_core::builder::{
     HugrBuilder, inout_sig,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
-use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
+use super::handlers::{copy_discard_array, linearize_value_array};
+use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
 /// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
@@ -124,6 +126,7 @@ impl Default for DelegatingLinearizer {
     fn default() -> Self {
         let mut res = Self::new_empty();
         res.register_callback(value_array_type_def(), linearize_value_array);
+        res.register_callback(array_type_def(), copy_discard_array);
         res
     }
 }
