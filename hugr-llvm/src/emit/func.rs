@@ -109,6 +109,11 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         self.todo.insert(node.node());
     }
 
+    /// Returns the current [FunctionValue] being emitted.
+    pub fn func(&self) -> FunctionValue<'c> {
+        self.func
+    }
+
     /// Returns the internal [Builder]. Callers must ensure that it is
     /// positioned at the end of a basic block. This invariant is not checked(it
     /// doesn't seem possible to check it).
