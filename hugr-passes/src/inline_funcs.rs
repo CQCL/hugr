@@ -13,16 +13,16 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 #[non_exhaustive]
 pub enum InlineAllError {}
 
-/// Inline all [Call]s to the specified `target_funcs` subject to a filter function
-/// that is given the [Call] node and the target [FuncDefn] node. (Note the [Call]
-/// may be created as a result of inlining and so may not have existed in the input
-/// Hugr).
+/// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
+/// graph. The function `call_predicate` is passed each such [Call] node and can return
+/// `false` to prevent that Call from being inlined. (Note the [Call] may be created as
+/// a result of previous inlinings so may not have existed in the original Hugr).
 ///
 /// [Call]: hugr_core::ops::Call
 /// [FuncDefn]: hugr_core::ops::FuncDefn
 pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
-    filt_func: impl Fn(&H, H::Node, H::Node) -> bool,
+    call_predicate: impl Fn(&H, H::Node) -> bool,
 ) -> Result<(), InlineAllError> {
     let cg = CallGraph::new(&*h);
     let g = cg.graph();
@@ -50,13 +50,13 @@ pub fn inline_acyclic<H: HugrMut>(
     while let Some(n) = q.pop_front() {
         if h.get_optype(n).is_call() {
             if let Some(t) = h.static_source(n) {
-                if target_funcs.contains(&t) && filt_func(h, n, t) {
+                if target_funcs.contains(&t) && call_predicate(h, n) {
                     // We've already checked all error conditions
                     h.apply_patch(InlineCall::new(n)).unwrap();
                 }
             }
         }
-        // If that was a call, `n` is now a DFG containing the function body, so explore inside
+        // Traverse children - including any resulting from turning Call into DFG
         q.extend(h.children(n));
     }
     Ok(())
