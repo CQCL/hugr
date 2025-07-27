@@ -26,29 +26,25 @@ pub fn inline_acyclic<H: HugrMut>(
 ) -> Result<(), InlineAllError> {
     let cg = CallGraph::new(&*h);
     let g = cg.graph();
-    let sccs = tarjan_scc(g)
+    let all_funcs_in_cycles = tarjan_scc(g)
         .into_iter()
-        .filter_map(|ns| {
+        .flat_map(|mut ns| {
             if let Ok(n) = ns.iter().exactly_one() {
-                // Keep single-node SCCs with self-edges, discard those without
-                g.edges_connecting(*n, *n).next()?;
+                if g.edges_connecting(*n, *n).next().is_none() {
+                    ns.clear(); // Single-node SCC has no self edge, so discard
+                }
             }
-            Some(
-                ns.into_iter()
-                    .map(|n| {
-                        let CallGraphNode::FuncDefn(fd) = g.node_weight(n).unwrap() else {
-                            panic!("Expected only FuncDefns in sccs")
-                        };
-                        *fd
-                    })
-                    .collect::<Vec<_>>(),
-            )
+            ns.into_iter().map(|n| {
+                let CallGraphNode::FuncDefn(fd) = g.node_weight(n).unwrap() else {
+                    panic!("Expected only FuncDefns in sccs")
+                };
+                *fd
+            })
         })
-        .collect::<Vec<_>>();
-    let all_sccs: HashSet<_> = sccs.iter().flatten().cloned().collect();
+        .collect::<HashSet<_>>();
     let target_funcs: HashSet<H::Node> = h
         .children(h.module_root())
-        .filter(|n| h.get_optype(*n).is_func_defn() && !all_sccs.contains(n))
+        .filter(|n| h.get_optype(*n).is_func_defn() && !all_funcs_in_cycles.contains(n))
         .collect();
     let mut q = VecDeque::from([h.entrypoint()]);
     while let Some(n) = q.pop_front() {
