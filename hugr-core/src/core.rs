@@ -277,7 +277,8 @@ impl<N: HugrNode> std::fmt::Display for Wire<N> {
 }
 
 /// Marks [FuncDefn](crate::ops::FuncDefn)s and [FuncDecl](crate::ops::FuncDecl)s as
-/// to whether they should be considered for linking.
+/// to whether they should be considered for linking, and as reachable (starting points)
+/// for optimization/analysis.
 #[derive(
     Clone,
     Debug,
