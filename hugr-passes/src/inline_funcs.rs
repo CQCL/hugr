@@ -14,7 +14,9 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 pub enum InlineAllError {}
 
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
-/// graph. The function `call_predicate` is passed each such [Call] node and can return
+/// graph.
+///
+/// The function `call_predicate` is passed each such [Call] node and can return
 /// `false` to prevent that Call from being inlined. (Note the [Call] may be created as
 /// a result of previous inlinings so may not have existed in the original Hugr).
 ///
