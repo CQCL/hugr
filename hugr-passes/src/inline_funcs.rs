@@ -11,7 +11,7 @@ use crate::call_graph::{CallGraph, CallGraphNode};
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
 #[non_exhaustive]
-pub enum InlineAllError {}
+pub enum InlineFuncsError {}
 
 /// Inline (a subset of) [Call]s whose target [FuncDefn]s are not in cycles of the call
 /// graph.
@@ -25,7 +25,7 @@ pub enum InlineAllError {}
 pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
     call_predicate: impl Fn(&H, H::Node) -> bool,
-) -> Result<(), InlineAllError> {
+) -> Result<(), InlineFuncsError> {
     let cg = CallGraph::new(&*h);
     let g = cg.graph();
     let all_funcs_in_cycles = tarjan_scc(g)
