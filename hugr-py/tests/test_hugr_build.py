@@ -311,6 +311,24 @@ def test_mono_function(direct_call: bool) -> None:
     validate(mod.hugr)
 
 
+def test_static_output() -> None:
+    mod = Module()
+
+    mod.declare_function(
+        "declared",
+        tys.PolyFuncType(
+            [],
+            tys.FunctionType.endo([]),
+        ),
+    )
+
+    func = mod.define_function("defined", [], [])
+    func.declare_outputs([])
+    func.set_outputs()
+
+    validate(mod.hugr)
+
+
 def test_function_dfg() -> None:
     d = Dfg(tys.Qubit)
 
