@@ -292,6 +292,20 @@ def test_literals() -> None:
     validate(mod.hugr)
 
 
+def test_const_type() -> None:
+    mod = Module()
+
+    mod.declare_function(
+        "const_type",
+        tys.PolyFuncType(
+            [tys.ConstParam(tys.Qubit)],
+            tys.FunctionType([], [tys.Qubit]),
+        ),
+    )
+
+    validate(mod.hugr)
+
+
 @pytest.mark.parametrize("direct_call", [True, False])
 def test_mono_function(direct_call: bool) -> None:
     mod = Module()
