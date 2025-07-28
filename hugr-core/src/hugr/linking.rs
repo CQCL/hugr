@@ -254,7 +254,11 @@ fn directive<SN: Display, TN: HugrNode>(
             MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(defn),
             MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
             MultipleImplHandling::ErrorDontInsert => {
-                return Err(NameLinkingError::MultipleImpls(name.to_owned(), new_n, defn));
+                return Err(NameLinkingError::MultipleImpls(
+                    name.to_owned(),
+                    new_n,
+                    defn,
+                ));
             }
             MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
         },
