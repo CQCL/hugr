@@ -73,6 +73,7 @@ impl<TN> NodeLinkingDirective<TN> {
 }
 
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NameLinkingPolicy {
     /// Do not use linking - just insert all functions from source Hugr into target.
     /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
@@ -312,3 +313,215 @@ fn gather_existing<H: HugrView + ?Sized>(h: &H) -> HashMap<&String, PubFuncs<H::
 /// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
 /// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
 pub type NodeLinkingPolicy<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
+
+#[cfg(test)]
+mod test {
+    use std::collections::HashMap;
+
+    use itertools::Itertools as _;
+    use rstest::rstest;
+
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder};
+    use crate::extension::prelude::{ConstUsize,usize_t};
+    use crate::hugr::linking::{MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective};
+    use crate::hugr::{ValidationError, hugrmut::HugrMut};
+    use crate::ops::handle::NodeHandle;
+    use crate::ops::OpType;
+    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
+    use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
+    use crate::types::Signature;
+    use crate::{Hugr, HugrView, Visibility};
+
+    fn list_decls_defns<H: HugrView>(h: &H) -> (HashMap<H::Node, &str>, HashMap<H::Node, &str>) {
+        let mut decls = HashMap::new();
+        let mut defns = HashMap::new();
+        for n in h.children(h.module_root()) {
+            match h.get_optype(n) {
+                OpType::FuncDecl(fd) => decls.insert(n, fd.func_name().as_str()),
+                OpType::FuncDefn(fd) => defns.insert(n, fd.func_name().as_str()),
+                _ => None
+            };
+        }
+        (decls, defns)
+    }
+
+    fn call_targets<H: HugrView>(h: &H) -> HashMap<H::Node, H::Node> {
+        h.nodes().filter(|n| h.get_optype(*n).is_call())
+            .map(|n| {
+                let tgt = h.static_source(n).expect(format!("For node {n}").as_str());
+                (n, tgt)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn combines_decls_defn() {
+        let i64_t = || INT_TYPES[6].to_owned();
+        let foo_sig = Signature::new_endo(i64_t());
+        let bar_sig  = Signature::new(vec![i64_t();2], i64_t());
+        let orig_target = {
+            let mut fb = FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
+            let mut mb = fb.module_root_builder();
+            let bar1= mb.declare("bar", bar_sig.clone().into()).unwrap();
+            let bar2= mb.declare("bar", bar_sig.clone().into()).unwrap(); // alias
+            let [i] = fb.input_wires_arr();
+            let [c] = fb.call(&bar1, &[], [i,i]).unwrap().outputs_arr();
+            let r = fb.call(&bar2, &[], [i,c]).unwrap();
+            let h = fb.finish_hugr_with_outputs(r.outputs()).unwrap();
+            assert_eq!(list_decls_defns(&h), (HashMap::from([(bar1.node(), "bar"), (bar2.node(), "bar")]), HashMap::from([(h.entrypoint(), "foo")])));
+            h
+        };
+        
+
+        let inserted= {
+            let mut dfb = DFGBuilder::new(Signature::new(vec![], i64_t())).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
+            let foo2  = mb.declare("foo", foo_sig.clone().into()).unwrap();
+            let mut bar = mb.define_function_vis("bar", bar_sig.clone(), Visibility::Public).unwrap();
+            let res = bar.add_dataflow_op(IntOpDef::iadd.with_log_width(6), bar.input_wires()).unwrap();
+            let bar = bar.finish_with_outputs(res.outputs()).unwrap();
+            let i = dfb.add_load_value(ConstInt::new_u(6, 257).unwrap());
+            let c = dfb.call(&foo1, &[], [i]).unwrap();
+            let r = dfb.call(&foo2, &[], c.outputs()).unwrap();
+            let h = dfb.finish_hugr_with_outputs(r.outputs()).unwrap();
+            assert_eq!(list_decls_defns(&h), (HashMap::from([(foo1.node(), "foo"), (foo2.node(), "foo")]), HashMap::from([(h.get_parent(h.entrypoint()).unwrap(), "main"), (bar.node(), "bar")])));
+            h
+        };
+
+        // AddNone: inserted DFG has all calls disconnected
+        let mut target = orig_target.clone();
+        target.insert_from_view_link_names(Some(target.entrypoint()), &inserted, NameLinkingPolicy::AddNone).unwrap();
+        assert_eq!(list_decls_defns(&target), list_decls_defns(&orig_target)); // no new Funcs
+        assert!(matches!(target.validate(), Err(ValidationError::UnconnectedPort {..})));
+        let dfg = target.entry_descendants().filter(|n| target.get_optype(*n).is_dfg()).exactly_one().ok().unwrap();
+        for c in target.nodes().filter(|n| target.get_optype(*n).is_call()) {
+            assert_eq!(target.static_source(c).is_none(), target.get_parent(c) == Some(dfg));
+        }
+        target.remove_subtree(dfg);
+        target.validate().unwrap(); // ALAN assert_eq!(target, orig_target) fails...??
+
+        // AddAll (w/out entrypoint): conflicting FuncDecls / FuncDefns.
+        let mut target = orig_target.clone();
+        // Do not add entrypoint subtree - it is contained in an added subtree. (Hence, AddAll + Some useless for any non-module entrypoint....TODO what about AddAll+Some w/module entrypoint?)
+        // TODO - allow adding only public, w/out linking ??
+        // Or, make AddAll exclude the entrypoint-container ?? (Like current insert_hugr)
+        target.insert_from_view_link_names(None, &inserted, NameLinkingPolicy::AddAll).unwrap();
+        assert!(matches!(target.validate(), Err(ValidationError::DuplicateExport { .. })));
+        let (decls, defns) = list_decls_defns(&target);
+        assert_eq!(decls.values().copied().sorted().collect_vec(), ["bar", "bar", "foo", "foo"]);
+        assert_eq!(defns.values().copied().sorted().collect_vec(), ["bar", "foo", "main"]);
+        let call_tgts = call_targets(&target);
+        for decl in decls.keys() { // Decls (still) have one call each
+            assert_eq!(call_tgts.values().filter(|tgt| *tgt == decl).count(), 1);
+        }
+        for defn in defns.keys() { // Defns (still) have no calls
+            assert_eq!(call_tgts.values().find(|tgt| *tgt == defn), None);
+        }
+        
+        // Linking by name...neither of the looped-over params should make any difference:
+        for error_on_conflicting_sig in [false, true] {
+            for multi_impls in [MultipleImplHandling::ErrorDontInsert, MultipleImplHandling::UseNew, MultipleImplHandling::UseExisting, MultipleImplHandling::UseBoth] {
+                let policy = NameLinkingPolicy::LinkByName {
+                    copy_private_funcs: true, error_on_conflicting_sig, multi_impls
+                };
+                let mut target = orig_target.clone();
+                let res = target.insert_from_view_link_names(Some(target.entrypoint()), &inserted, policy);
+                assert_eq!(res.err().unwrap(), NameLinkingError::AddFunctionContainingEntrypoint(inserted.get_parent(inserted.entrypoint()).unwrap(), NodeLinkingDirective::add()));
+                assert_eq!(target, orig_target);
+
+                let policy = NameLinkingPolicy::LinkByName {
+                    copy_private_funcs: false, error_on_conflicting_sig, multi_impls
+                };
+                target.insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), policy).unwrap();
+                target.validate().unwrap();
+                let (decls, defns) = list_decls_defns(&target);
+                assert_eq!(decls, HashMap::new());
+                assert_eq!(defns.values().copied().sorted().collect_vec(), ["bar", "foo"]);
+                let call_tgts = call_targets(&target);
+                for defn in defns.keys() { // Defns now have two calls each (was one to each alias)
+                    assert_eq!(call_tgts.values().filter(|tgt| *tgt == defn).count(), 2);
+                }
+            }
+        }
+    }
+
+    // TODO test copy_private_funcs; absence of parent
+    /*#[test]
+    fn sig_conflict() {
+        // Hugr with
+        // a public funcdecl "foo"; or a funcDefn
+
+        // Hugr with
+        // a public funcdecl "foo", different sig; or a funcDefn (4 ways)
+
+        AddAll/AddNone would leave invalid exactly as previous
+        ....so whichever doesn't do AddXYZ, can try parentless?? Not really, still want another (added) func to check edges
+        ....so one does parentless w/private func using public ones, another uses entrypoint
+
+        LinkByName {
+            copy-private may/not do anything??
+            error-on-conflicting-sig => error, or invalid hugr
+            multi_impls: use MultipleImplHandling::ErrorDontInsert, or check makes no difference
+        }
+    }*/
+
+    #[rstest]
+    #[case(MultipleImplHandling::UseNew, vec![11])]
+    #[case(MultipleImplHandling::UseExisting, vec![5])]
+    #[case(MultipleImplHandling::UseBoth, vec![5, 11])]
+    #[case(MultipleImplHandling::ErrorDontInsert, vec![])]
+    fn impl_conflict(#[case] multi_impls: MultipleImplHandling, #[case] expected: Vec<u64>) {
+        fn build_hugr(cst: u64) -> Hugr {
+            let mut mb = ModuleBuilder::new();
+            let mut fb = mb
+                .define_function_vis("foo", Signature::new(vec![], usize_t()), Visibility::Public)
+                .unwrap();
+            let c = fb.add_load_value(ConstUsize::new(cst));
+            fb.finish_with_outputs([c]).unwrap();
+            mb.finish_hugr().unwrap()
+        }
+        let backup = build_hugr(5);
+        let mut host = backup.clone();
+        let inserted = build_hugr(11);
+
+        let res = host.insert_hugr_link_names(
+            None,
+            inserted,
+            NameLinkingPolicy::LinkByName {
+                copy_private_funcs: true,
+                error_on_conflicting_sig: false,
+                multi_impls,
+            },
+        );
+        if multi_impls == MultipleImplHandling::ErrorDontInsert {
+            assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
+            assert_eq!(host, backup);
+            return;
+        }
+        res.unwrap();
+        let res = host.validate();
+        if multi_impls == MultipleImplHandling::UseBoth {
+            assert!(
+                matches!(res, Err(ValidationError::DuplicateExport { link_name, .. }) if link_name == "foo")
+            );
+        } else {
+            res.unwrap();
+        }
+        let func_consts = host
+            .children(host.module_root())
+            .filter(|n| host.get_optype(*n).is_func_defn())
+            .map(|n| {
+                host.children(n)
+                    .filter_map(|ch| host.get_optype(ch).as_const())
+                    .exactly_one()
+                    .ok()
+                    .unwrap()
+                    .get_custom_value::<ConstUsize>()
+                    .unwrap()
+                    .value()
+            })
+            .collect_vec();
+        assert_eq!(func_consts, expected);
+    }
+}
