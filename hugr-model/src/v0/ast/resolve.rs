@@ -289,11 +289,13 @@ impl<'a> Context<'a> {
 
     fn resolve_symbol(&mut self, symbol: &'a Symbol) -> BuildResult<&'a table::Symbol<'a>> {
         let name = symbol.name.as_ref();
+        let visibility = &symbol.visibility;
         let params = self.resolve_params(&symbol.params)?;
         let constraints = self.resolve_terms(&symbol.constraints)?;
         let signature = self.resolve_term(&symbol.signature)?;
 
         Ok(self.bump.alloc(table::Symbol {
+            visibility,
             name,
             params,
             constraints,
@@ -363,6 +365,7 @@ impl<'a> Context<'a> {
 /// Error that may occur in [`Module::resolve`].
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
+#[error("Error resolving model module")]
 pub enum ResolveError {
     /// Unknown variable.
     #[error("unknown var: {0}")]
@@ -387,4 +390,19 @@ fn try_alloc_slice<T, E>(
         vec.push(item?);
     }
     Ok(vec.into_bump_slice())
+}
+
+#[cfg(test)]
+mod test {
+    use crate::v0::ast;
+    use bumpalo::Bump;
+    use std::str::FromStr as _;
+
+    #[test]
+    fn vars_in_root_scope() {
+        let text = "(hugr 0) (mod) (meta ?x)";
+        let ast = ast::Package::from_str(text).unwrap();
+        let bump = Bump::new();
+        assert!(ast.resolve(&bump).is_err());
+    }
 }

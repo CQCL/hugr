@@ -189,7 +189,7 @@ pub enum BuildError {
     #[error("Found an error while setting the outputs of a {} container, {container_node}. {error}", .container_op.name())]
     #[allow(missing_docs)]
     OutputWiring {
-        container_op: OpType,
+        container_op: Box<OpType>,
         container_node: Node,
         #[source]
         error: BuilderWiringError,
@@ -201,7 +201,7 @@ pub enum BuildError {
     #[error("Got an input wire while adding a {} to the circuit. {error}", .op.name())]
     #[allow(missing_docs)]
     OperationWiring {
-        op: OpType,
+        op: Box<OpType>,
         #[source]
         error: BuilderWiringError,
     },
@@ -219,7 +219,7 @@ pub enum BuilderWiringError {
     #[error("Cannot copy linear type {typ} from output {src_offset} of node {src}")]
     #[allow(missing_docs)]
     NoCopyLinear {
-        typ: Type,
+        typ: Box<Type>,
         src: Node,
         src_offset: Port,
     },
@@ -244,7 +244,7 @@ pub enum BuilderWiringError {
         src_offset: Port,
         dst: Node,
         dst_offset: Port,
-        typ: Type,
+        typ: Box<Type>,
     },
 }
 
@@ -261,8 +261,8 @@ pub(crate) mod test {
 
     use super::handle::BuildHandle;
     use super::{
-        BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, FuncID,
-        FunctionBuilder, ModuleBuilder,
+        BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, FuncID, FunctionBuilder,
+        ModuleBuilder,
     };
     use super::{DataflowSubContainer, HugrBuilder};
 

@@ -102,7 +102,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                     VALUE_ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
+                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
                     "Fixed-length value array".into(),
                     // Value arrays are copyable iff their elements are
                     TypeDefBound::from_params(vec![1]),

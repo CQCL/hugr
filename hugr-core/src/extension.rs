@@ -22,7 +22,7 @@ use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
 use crate::types::RowVariable;
-use crate::types::type_param::{TypeArg, TypeArgError, TypeParam};
+use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
@@ -36,7 +36,7 @@ mod type_def;
 pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
-    ValidateJustArgs, ValidateTypeArgs,
+    ValidateJustArgs, ValidateTypeArgs, deserialize_lower_funcs,
 };
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub use type_def::{TypeDef, TypeDefBound};
@@ -136,8 +136,8 @@ impl ExtensionRegistry {
         match self.exts.entry(extension.name().clone()) {
             btree_map::Entry::Occupied(prev) => Err(ExtensionRegistryError::AlreadyRegistered(
                 extension.name().clone(),
-                prev.get().version().clone(),
-                extension.version().clone(),
+                Box::new(prev.get().version().clone()),
+                Box::new(extension.version().clone()),
             )),
             btree_map::Entry::Vacant(ve) => {
                 ve.insert(extension);
@@ -387,7 +387,7 @@ pub enum SignatureError {
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
-    TypeArgMismatch(#[from] TypeArgError),
+    TypeArgMismatch(#[from] TermTypeError),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
@@ -408,8 +408,8 @@ pub enum SignatureError {
     /// A Type Variable's cache of its declared kind is incorrect
     #[error("Type Variable claims to be {cached} but actual declaration {actual}")]
     TypeVarDoesNotMatchDeclaration {
-        actual: TypeParam,
-        cached: TypeParam,
+        actual: Box<TypeParam>,
+        cached: Box<TypeParam>,
     },
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
@@ -425,8 +425,8 @@ pub enum SignatureError {
         "Incorrect result of type application in Call - cached {cached} but expected {expected}"
     )]
     CallIncorrectlyAppliesType {
-        cached: Signature,
-        expected: Signature,
+        cached: Box<Signature>,
+        expected: Box<Signature>,
     },
     /// The result of the type application stored in a [`LoadFunction`]
     /// is not what we get by applying the type-args to the polymorphic function
@@ -436,8 +436,8 @@ pub enum SignatureError {
         "Incorrect result of type application in LoadFunction - cached {cached} but expected {expected}"
     )]
     LoadFunctionIncorrectlyAppliesType {
-        cached: Signature,
-        expected: Signature,
+        cached: Box<Signature>,
+        expected: Box<Signature>,
     },
 
     /// Extension declaration specifies a binary compute signature function, but none
@@ -697,7 +697,7 @@ pub enum ExtensionRegistryError {
     #[error(
         "The registry already contains an extension with id {0} and version {1}. New extension has version {2}."
     )]
-    AlreadyRegistered(ExtensionId, Version, Version),
+    AlreadyRegistered(ExtensionId, Box<Version>, Box<Version>),
     /// A registered extension has invalid signatures.
     #[error("The extension {0} contains an invalid signature, {1}.")]
     InvalidSignature(ExtensionId, #[source] SignatureError),
@@ -706,13 +706,20 @@ pub enum ExtensionRegistryError {
 /// An error that can occur while loading an extension registry.
 #[derive(Debug, Error)]
 #[non_exhaustive]
+#[error("Extension registry load error")]
 pub enum ExtensionRegistryLoadError {
     /// Deserialization error.
     #[error(transparent)]
     SerdeError(#[from] serde_json::Error),
     /// Error when resolving internal extension references.
     #[error(transparent)]
-    ExtensionResolutionError(#[from] ExtensionResolutionError),
+    ExtensionResolutionError(Box<ExtensionResolutionError>),
+}
+
+impl From<ExtensionResolutionError> for ExtensionRegistryLoadError {
+    fn from(error: ExtensionResolutionError) -> Self {
+        Self::ExtensionResolutionError(Box::new(error))
+    }
 }
 
 /// An error that can occur in building a new extension.
@@ -889,8 +896,8 @@ pub mod test {
             reg.register(ext1_1.clone()),
             Err(ExtensionRegistryError::AlreadyRegistered(
                 ext_1_id.clone(),
-                Version::new(1, 0, 0),
-                Version::new(1, 1, 0)
+                Box::new(Version::new(1, 0, 0)),
+                Box::new(Version::new(1, 1, 0))
             ))
         );
 

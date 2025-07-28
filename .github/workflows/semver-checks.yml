@@ -6,38 +6,19 @@ on:
 
 jobs:
   # Check if changes were made to the relevant files.
-  # Always returns true if running on the default branch, to ensure all changes are throughly checked.
+  # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
   changes:
     name: Check for changes
     runs-on: ubuntu-latest
-    # Required permissions
     permissions:
       pull-requests: read
-    # Set job outputs to values from filter step
-    # These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
     outputs:
-      rust: ${{ steps.filter.outputs.rust == 'true' || steps.override.outputs.out == 'true' }}
-      python: ${{ steps.filter.outputs.python == 'true' || steps.override.outputs.out == 'true' }}
+      rust: ${{ steps.filter.outputs.rust }}
+      python: ${{ steps.filter.outputs.python }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Override label
-      id: override
-      run: |
-        echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
-        if [ "$OVERRIDE_LABEL" == "true" ]; then
-          echo "Overriding due to label 'run-ci-checks'"
-          echo "out=true" >> $GITHUB_OUTPUT
-        elif [ "$DEFAULT_BRANCH" == "true" ]; then
-          echo "Overriding due to running on the default branch"
-          echo "out=true" >> $GITHUB_OUTPUT
-        fi
-      env:
-        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
-        DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
-    - uses: dorny/paths-filter@v3
-      id: filter
-      with:
-        filters: .github/change-filters.yml
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/check-changes
+        id: filter
 
   rs-semver-checks:
     needs: [changes]

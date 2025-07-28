@@ -1,0 +1,52 @@
+HUGRiHJv?@{
+    "modules": [
+        {
+            "version": "live",
+            "nodes": [
+                {
+                    "parent": 0,
+                    "op": "Module"
+                },
+                {
+                    "name":"polyfunc1",
+                    "op":"FuncDecl",
+                    "parent":0,
+                    "signature":{
+                        "body":{
+                            "input":[],
+                            "output":[]
+                        },
+                        "params":[
+                        ]
+                    }
+                },
+                {
+                    "name":"polyfunc2",
+                    "op":"FuncDefn",
+                    "parent":0,
+                    "signature":{
+                        "body":{
+                            "input":[],
+                            "output":[]
+                        },
+                        "params":[
+                        ]
+                    }
+                },
+                {
+                    "op": "Input",
+                    "parent": 2,
+                    "types": []
+                },
+                {
+                    "op": "Output",
+                    "parent": 2,
+                    "types": []
+                }
+            ],
+            "edges": [],
+            "encoder": null
+        }
+    ],
+    "extensions": []
+}

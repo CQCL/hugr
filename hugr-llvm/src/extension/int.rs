@@ -668,7 +668,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             ])
         }),
         IntOpDef::inarrow_s => {
-            let Some(TypeArg::BoundedNat { n: out_log_width }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_s wasn't a Nat");
             };
@@ -686,7 +686,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
             })
         }
         IntOpDef::inarrow_u => {
-            let Some(TypeArg::BoundedNat { n: out_log_width }) = args.node().args().last().cloned()
+            let Some(TypeArg::BoundedNat(out_log_width)) = args.node().args().last().cloned()
             else {
                 bail!("Type arg to inarrow_u wasn't a Nat");
             };
@@ -756,7 +756,7 @@ pub(crate) fn get_width_arg<H: HugrView<Node = Node>>(
     args: &EmitOpArgs<'_, '_, ExtensionOp, H>,
     op: &impl MakeExtensionOp,
 ) -> Result<u64> {
-    let [TypeArg::BoundedNat { n: log_width }] = args.node.args() else {
+    let [TypeArg::BoundedNat(log_width)] = args.node.args() else {
         bail!(
             "Expected exactly one BoundedNat parameter to {}",
             op.op_id()
@@ -1094,7 +1094,7 @@ fn llvm_type<'c>(
     context: TypingSession<'c, '_>,
     hugr_type: &CustomType,
 ) -> Result<BasicTypeEnum<'c>> {
-    if let [TypeArg::BoundedNat { n }] = hugr_type.args() {
+    if let [TypeArg::BoundedNat(n)] = hugr_type.args() {
         let m = *n as usize;
         if m < int_types::INT_TYPES.len() && int_types::INT_TYPES[m] == hugr_type.clone().into() {
             return Ok(match m {
@@ -1141,6 +1141,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
+    use hugr_core::builder::DataflowHugr;
     use hugr_core::extension::prelude::{ConstError, UnwrapBuilder, error_type};
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::{
@@ -1242,7 +1243,9 @@ mod test {
                     .unwrap()
                     .outputs();
                 let processed_outputs = process(&mut hugr_builder, outputs).unwrap();
-                hugr_builder.finish_with_outputs(processed_outputs).unwrap()
+                hugr_builder
+                    .finish_hugr_with_outputs(processed_outputs)
+                    .unwrap()
             })
     }
 
@@ -1578,7 +1581,7 @@ mod test {
                     .add_dataflow_op(iu_to_s, [unsigned])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_with_outputs([signed]).unwrap()
+                hugr_builder.finish_hugr_with_outputs([signed]).unwrap()
             });
         let act = int_exec_ctx.exec_hugr_i64(hugr, "main");
         assert_eq!(act, val as i64);
@@ -1605,7 +1608,7 @@ mod test {
                     .add_dataflow_op(make_int_op("iadd", log_width), [unsigned, num])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_with_outputs([res]).unwrap()
+                hugr_builder.finish_hugr_with_outputs([res]).unwrap()
             });
         let act = int_exec_ctx.exec_hugr_u64(hugr, "main");
         assert_eq!(act, (val as u64) + 42);

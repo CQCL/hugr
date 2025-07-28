@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! Pass for removing statically-unreachable functions from a Hugr
 
 use std::collections::HashSet;
@@ -142,9 +141,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{
-        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder,
-    };
+    use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
@@ -176,12 +173,15 @@ mod test {
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp)?;
         let mut m = hb.define_function("main", Signature::new_endo(usize_t()))?;
-        let mc = m.call(fm.handle(), &[], m.input_wires())?;
-        let m = m.finish_with_outputs(mc.outputs())?;
+        let m_in = m.input_wires();
+        let mut dfg = m.dfg_builder(Signature::new_endo(usize_t()), m_in)?;
+        let c = dfg.call(fm.handle(), &[], dfg.input_wires())?;
+        let dfg = dfg.finish_with_outputs(c.outputs()).unwrap();
+        m.finish_with_outputs(dfg.outputs())?;
 
         let mut hugr = hb.finish_hugr()?;
         if use_hugr_entrypoint {
-            hugr.set_entrypoint(m.node());
+            hugr.set_entrypoint(dfg.node());
         }
 
         let avail_funcs = hugr

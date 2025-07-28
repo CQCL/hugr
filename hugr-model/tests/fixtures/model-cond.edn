@@ -2,16 +2,29 @@
 
 (mod)
 
-(define-func example.cond
-  (core.fn [(core.adt [[] []]) arithmetic.int.types.int]
-           [arithmetic.int.types.int])
+(define-func public
+  example.cond
+  (core.fn
+    [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+    [(arithmetic.int.types.int 6)])
   (dfg [%0 %1] [%2]
-       (signature (core.fn [(core.adt [[] []]) arithmetic.int.types.int] [arithmetic.int.types.int]))
-       (cond [%0 %1] [%2]
-             (signature (core.fn [(core.adt [[] []]) arithmetic.int.types.int] [arithmetic.int.types.int]))
-             (dfg [%3] [%3]
-                  (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))
-             (dfg [%4] [%5]
-                  (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
-                  (arithmetic.int.ineg [%4] [%5]
-                                       (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))))))
+    (signature
+      (core.fn
+        [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+        [(arithmetic.int.types.int 6)]))
+    (cond [%0 %1] [%2]
+      (signature
+        (core.fn
+          [(core.adt [[] []]) (arithmetic.int.types.int 6)]
+          [(arithmetic.int.types.int 6)]))
+      (dfg [%3] [%3]
+        (signature
+          (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)])))
+      (dfg [%4] [%5]
+        (signature
+          (core.fn [(arithmetic.int.types.int 6)] [(arithmetic.int.types.int 6)]))
+        ((arithmetic.int.ineg 6) [%4] [%5]
+          (signature
+            (core.fn
+              [(arithmetic.int.types.int 6)]
+              [(arithmetic.int.types.int 6)])))))))

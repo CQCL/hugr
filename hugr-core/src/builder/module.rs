@@ -4,25 +4,24 @@ use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
 };
 
-use crate::hugr::ValidationError;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::views::HugrView;
 use crate::ops;
-use crate::types::{PolyFuncType, Type, TypeBound};
-
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
+use crate::types::{PolyFuncType, Type, TypeBound};
+use crate::{Hugr, Node, Visibility};
+use crate::{hugr::ValidationError, ops::FuncDefn};
 
-use crate::{Hugr, Node};
 use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> Container for ModuleBuilder<T> {
     #[inline]
     fn container_node(&self) -> Node {
-        self.0.as_ref().entrypoint()
+        self.0.as_ref().module_root()
     }
 
     #[inline]
@@ -39,13 +38,7 @@ impl ModuleBuilder<Hugr> {
     /// Begin building a new module.
     #[must_use]
     pub fn new() -> Self {
-        Self(Default::default())
-    }
-}
-
-impl Default for ModuleBuilder<Hugr> {
-    fn default() -> Self {
-        Self::new()
+        Self::default()
     }
 }
 
@@ -75,25 +68,61 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         f_id: &FuncID<false>,
     ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
         let f_node = f_id.node();
-        let decl =
-            self.hugr()
-                .get_optype(f_node)
-                .as_func_decl()
-                .ok_or(BuildError::UnexpectedType {
-                    node: f_node,
-                    op_desc: "crate::ops::OpType::FuncDecl",
-                })?;
-        let name = decl.func_name().clone();
-        let sig = decl.signature().clone();
-        let body = sig.body().clone();
-        self.hugr_mut()
-            .replace_op(f_node, ops::FuncDefn::new(name, sig));
+        let opty = self.hugr_mut().optype_mut(f_node);
+        let ops::OpType::FuncDecl(decl) = opty else {
+            return Err(BuildError::UnexpectedType {
+                node: f_node,
+                op_desc: "crate::ops::OpType::FuncDecl",
+            });
+        };
+
+        let body = decl.signature().body().clone();
+        *opty = ops::FuncDefn::new_vis(
+            decl.func_name(),
+            decl.signature().clone(),
+            decl.visibility().clone(),
+        )
+        .into();
 
         let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
         Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Declare a function with `signature` and return a handle to the declaration.
+    /// Add a [`ops::FuncDefn`] node of the specified visibility.
+    /// Returns a builder to define the function body graph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    pub fn define_function_vis(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+        visibility: Visibility,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        self.define_function_op(FuncDefn::new_vis(name, signature, visibility))
+    }
+
+    fn define_function_op(
+        &mut self,
+        op: FuncDefn,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let body = op.signature().body().clone();
+        let f_node = self.add_child_node(op);
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
+    }
+
+    /// Declare a [Visibility::Public] function with `signature` and return a handle to the declaration.
     ///
     /// # Errors
     ///
@@ -104,9 +133,25 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         name: impl Into<String>,
         signature: PolyFuncType,
     ) -> Result<FuncID<false>, BuildError> {
+        self.declare_vis(name, signature, Visibility::Public)
+    }
+
+    /// Declare a function with the specified `signature` and [Visibility],
+    /// and return a handle to the declaration.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`crate::ops::OpType::FuncDecl`] node.
+    pub fn declare_vis(
+        &mut self,
+        name: impl Into<String>,
+        signature: PolyFuncType,
+        visibility: Visibility,
+    ) -> Result<FuncID<false>, BuildError> {
         let body = signature.body().clone();
         // TODO add param names to metadata
-        let declare_n = self.add_child_node(ops::FuncDecl::new(name, signature));
+        let declare_n = self.add_child_node(ops::FuncDecl::new_vis(name, signature, visibility));
 
         // Add the extensions used by the function types.
         self.use_extensions(
@@ -116,6 +161,21 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         );
 
         Ok(declare_n.into())
+    }
+
+    /// Adds a [`ops::FuncDefn`] node and returns a builder to define the function
+    /// body graph. The function will be private. (See [Self::define_function_vis].)
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    pub fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        self.define_function_op(FuncDefn::new(name, signature))
     }
 
     /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
@@ -199,7 +259,7 @@ mod test {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Any)?;
+                module_builder.add_alias_declare("qubit_state", TypeBound::Linear)?;
 
             let f_build = module_builder.define_function(
                 "main",
@@ -209,31 +269,6 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
-
-    #[test]
-    fn local_def() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let mut f_build = module_builder.define_function(
-                "main",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let local_build = f_build.define_function(
-                "local",
-                Signature::new(vec![usize_t()], vec![usize_t(), usize_t()]),
-            )?;
-            let [wire] = local_build.input_wires_arr();
-            let f_id = local_build.finish_with_outputs([wire, wire])?;
-
-            let call = f_build.call(f_id.handle(), &[], f_build.input_wires())?;
-
-            f_build.finish_with_outputs(call.outputs())?;
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));

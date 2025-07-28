@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import inspect
 import sys
 from abc import ABC, abstractmethod
@@ -94,6 +95,20 @@ class StringParam(BaseTypeParam):
         return tys.StringParam()
 
 
+class BytesParam(BaseTypeParam):
+    tp: Literal["Bytes"] = "Bytes"
+
+    def deserialize(self) -> tys.BytesParam:
+        return tys.BytesParam()
+
+
+class FloatParam(BaseTypeParam):
+    tp: Literal["Float"] = "Float"
+
+    def deserialize(self) -> tys.FloatParam:
+        return tys.FloatParam()
+
+
 class ListParam(BaseTypeParam):
     tp: Literal["List"] = "List"
     param: TypeParam
@@ -114,7 +129,13 @@ class TypeParam(RootModel):
     """A type parameter."""
 
     root: Annotated[
-        TypeTypeParam | BoundedNatParam | StringParam | ListParam | TupleParam,
+        TypeTypeParam
+        | BoundedNatParam
+        | StringParam
+        | FloatParam
+        | BytesParam
+        | ListParam
+        | TupleParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
@@ -158,12 +179,56 @@ class StringArg(BaseTypeArg):
         return tys.StringArg(value=self.arg)
 
 
-class SequenceArg(BaseTypeArg):
-    tya: Literal["Sequence"] = "Sequence"
+class FloatArg(BaseTypeArg):
+    tya: Literal["Float"] = "Float"
+    value: float
+
+    def deserialize(self) -> tys.FloatArg:
+        return tys.FloatArg(value=self.value)
+
+
+class BytesArg(BaseTypeArg):
+    tya: Literal["Bytes"] = "Bytes"
+    value: str = Field(
+        description="Base64-encoded byte string",
+        json_schema_extra={"contentEncoding": "base64"},
+    )
+
+    def deserialize(self) -> tys.BytesArg:
+        value = base64.b64decode(self.value)
+        return tys.BytesArg(value=value)
+
+
+class ListArg(BaseTypeArg):
+    tya: Literal["List"] = "List"
     elems: list[TypeArg]
 
-    def deserialize(self) -> tys.SequenceArg:
-        return tys.SequenceArg(elems=deser_it(self.elems))
+    def deserialize(self) -> tys.ListArg:
+        return tys.ListArg(elems=deser_it(self.elems))
+
+
+class ListConcatArg(BaseTypeArg):
+    tya: Literal["ListConcat"] = "ListConcat"
+    lists: list[TypeArg]
+
+    def deserialize(self) -> tys.ListConcatArg:
+        return tys.ListConcatArg(lists=deser_it(self.lists))
+
+
+class TupleArg(BaseTypeArg):
+    tya: Literal["Tuple"] = "Tuple"
+    elems: list[TypeArg]
+
+    def deserialize(self) -> tys.TupleArg:
+        return tys.TupleArg(elems=deser_it(self.elems))
+
+
+class TupleConcatArg(BaseTypeArg):
+    tya: Literal["TupleConcat"] = "TupleConcat"
+    tuples: list[TypeArg]
+
+    def deserialize(self) -> tys.TupleConcatArg:
+        return tys.TupleConcatArg(tuples=deser_it(self.tuples))
 
 
 class VariableArg(BaseTypeArg):
@@ -179,7 +244,14 @@ class TypeArg(RootModel):
     """A type argument."""
 
     root: Annotated[
-        TypeTypeArg | BoundedNatArg | StringArg | SequenceArg | VariableArg,
+        TypeTypeArg
+        | BoundedNatArg
+        | StringArg
+        | BytesArg
+        | FloatArg
+        | ListArg
+        | TupleArg
+        | VariableArg,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tya")
 
@@ -340,15 +412,15 @@ class PolyFuncType(BaseType):
 
 class TypeBound(Enum):
     Copyable = "C"
-    Any = "A"
+    Linear = "A"
 
     @staticmethod
     def join(*bs: TypeBound) -> TypeBound:
         """Computes the least upper bound for a sequence of bounds."""
         res = TypeBound.Copyable
         for b in bs:
-            if b == TypeBound.Any:
-                return TypeBound.Any
+            if b == TypeBound.Linear:
+                return TypeBound.Linear
             if res == TypeBound.Copyable:
                 res = b
         return res
@@ -357,8 +429,8 @@ class TypeBound(Enum):
         match self:
             case TypeBound.Copyable:
                 return "Copyable"
-            case TypeBound.Any:
-                return "Any"
+            case TypeBound.Linear:
+                return "Linear"
 
 
 class Opaque(BaseType):

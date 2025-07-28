@@ -24,7 +24,7 @@ use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
-use crate::{OutgoingPort, type_row};
+use crate::{OutgoingPort, Visibility, type_row};
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
@@ -62,26 +62,29 @@ impl NamedSchema {
         Self { name, schema }
     }
 
-    pub fn check(&self, val: &serde_json::Value) {
+    pub fn check(&self, val: &serde_json::Value) -> Result<(), String> {
         let mut errors = self.schema.iter_errors(val).peekable();
-        if errors.peek().is_some() {
-            // errors don't necessarily implement Debug
-            eprintln!("Schema failed to validate: {}", self.name);
-            for error in errors {
-                eprintln!("Validation error: {error}");
-                eprintln!("Instance path: {}", error.instance_path);
-            }
-            panic!("Serialization test failed.");
+        if errors.peek().is_none() {
+            return Ok(());
         }
+
+        // errors don't necessarily implement Debug
+        let mut strs = vec![format!("Schema failed to validate: {}", self.name)];
+        strs.extend(errors.flat_map(|error| {
+            [
+                format!("Validation error: {error}"),
+                format!("Instance path: {}", error.instance_path),
+            ]
+        }));
+        strs.push("Serialization test failed.".to_string());
+        Err(strs.join("\n"))
     }
 
     pub fn check_schemas(
         val: &serde_json::Value,
         schemas: impl IntoIterator<Item = &'static Self>,
-    ) {
-        for schema in schemas {
-            schema.check(val);
-        }
+    ) -> Result<(), String> {
+        schemas.into_iter().try_for_each(|schema| schema.check(val))
     }
 }
 
@@ -89,7 +92,7 @@ macro_rules! include_schema {
     ($name:ident, $path:literal) => {
         lazy_static! {
             static ref $name: NamedSchema =
-                NamedSchema::new("$name", {
+                NamedSchema::new(stringify!($name), {
                     let schema_val: serde_json::Value = serde_json::from_str(include_str!(
                         concat!("../../../../specification/schema/", $path, "_live.json")
                     ))
@@ -161,7 +164,7 @@ fn ser_deserialize_check_schema<T: serde::de::DeserializeOwned>(
     val: serde_json::Value,
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> T {
-    NamedSchema::check_schemas(&val, schemas);
+    NamedSchema::check_schemas(&val, schemas).unwrap();
     serde_json::from_value(val).unwrap()
 }
 
@@ -171,8 +174,22 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
     schemas: impl IntoIterator<Item = &'static NamedSchema>,
 ) -> TDeser {
     let val = serde_json::to_value(g).unwrap();
-    NamedSchema::check_schemas(&val, schemas);
-    serde_json::from_value(val).unwrap()
+    match NamedSchema::check_schemas(&val, schemas) {
+        Ok(()) => serde_json::from_value(val).unwrap(),
+        Err(msg) => panic!("ser_roundtrip_check_schema failed with {msg}, input was {val}"),
+    }
+}
+
+/// Serialize a Hugr and check that it is valid against the schema.
+///
+/// # Panics
+///
+/// Panics if the serialization fails or if the schema validation fails.
+pub(crate) fn check_hugr_serialization_schema(hugr: &Hugr) {
+    let schemas = get_schemas(true);
+    let hugr_ser = HugrSer(hugr);
+    let val = serde_json::to_value(hugr_ser).unwrap();
+    NamedSchema::check_schemas(&val, schemas).unwrap();
 }
 
 /// Serialize and deserialize a HUGR, and check that the result is the same as the original.
@@ -210,8 +227,80 @@ fn check_testing_roundtrip(t: impl Into<SerTestingLatest>) {
     assert_eq!(before, after);
 }
 
+fn test_schema_val() -> serde_json::Value {
+    serde_json::json!({
+        "op_def":null,
+        "optype":{
+            "name":"polyfunc1",
+            "op":"FuncDefn",
+            "visibility": "Public",
+            "parent":0,
+            "signature":{
+                "body":{
+                    "input":[],
+                    "output":[]
+                },
+                "params":[
+                    {"bound":null,"tp":"BoundedNat"}
+                ]
+            }
+        },
+        "poly_func_type":null,
+        "sum_type":null,
+        "typ":null,
+        "value":null,
+        "version":"live"
+    })
+}
+
+fn schema_val() -> serde_json::Value {
+    serde_json::json!({"nodes": [], "edges": [], "version": "live"})
+}
+
+#[rstest]
+#[case(&TESTING_SCHEMA, &TESTING_SCHEMA_STRICT, test_schema_val(), Some("optype"))]
+#[case(&SCHEMA, &SCHEMA_STRICT, schema_val(), None)]
+fn wrong_fields(
+    #[case] lax_schema: &'static NamedSchema,
+    #[case] strict_schema: &'static NamedSchema,
+    #[case] mut val: serde_json::Value,
+    #[case] target_loc: impl IntoIterator<Item = &'static str> + Clone,
+) {
+    use serde_json::Value;
+    fn get_fields(
+        val: &mut Value,
+        mut path: impl Iterator<Item = &'static str>,
+    ) -> &mut serde_json::Map<String, Value> {
+        let Value::Object(fields) = val else { panic!() };
+        match path.next() {
+            Some(n) => get_fields(fields.get_mut(n).unwrap(), path),
+            None => fields,
+        }
+    }
+    // First, some "known good" JSON
+    NamedSchema::check_schemas(&val, [lax_schema, strict_schema]).unwrap();
+
+    // Now try adding an extra field
+    let fields = get_fields(&mut val, target_loc.clone().into_iter());
+    fields.insert(
+        "extra_field".to_string(),
+        Value::String("not in schema".to_string()),
+    );
+    strict_schema.check(&val).unwrap_err();
+    lax_schema.check(&val).unwrap();
+
+    // And removing one
+    let fields = get_fields(&mut val, target_loc.into_iter());
+    fields.remove("extra_field").unwrap();
+    let key = fields.keys().next().unwrap().clone();
+    fields.remove(&key).unwrap();
+
+    lax_schema.check(&val).unwrap_err();
+    strict_schema.check(&val).unwrap_err();
+}
+
 /// Generate an optype for a node with a matching amount of inputs and outputs.
-fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
+fn gen_optype(g: &MultiPortGraph<u32, u32, u32>, node: portgraph::NodeIndex) -> OpType {
     let inputs = g.num_inputs(node);
     let outputs = g.num_outputs(node);
     match (inputs == 0, outputs == 0) {
@@ -428,7 +517,7 @@ fn serialize_types_roundtrip() {
 #[case(bool_t())]
 #[case(usize_t())]
 #[case(INT_TYPES[2].clone())]
-#[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Any)))]
+#[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Linear)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
 #[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
@@ -458,13 +547,13 @@ fn roundtrip_value(#[case] value: Value) {
 
 fn polyfunctype1() -> PolyFuncType {
     let function_type = Signature::new_endo(type_row![]);
-    PolyFuncType::new([TypeParam::max_nat()], function_type)
+    PolyFuncType::new([TypeParam::max_nat_type()], function_type)
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
-    let tv0 = TypeRV::new_row_var_use(0, TypeBound::Any);
+    let tv0 = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
-    let params = [TypeBound::Any, TypeBound::Copyable].map(TypeParam::new_list);
+    let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
     let inputs = vec![
         TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
         tv0,
@@ -479,26 +568,26 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::String], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeParam::new_list(TypeBound::Any)], Signature::new_endo(type_row![])))]
-#[case(PolyFuncType::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_list_type(TypeBound::Linear)], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
-    [TypeParam::new_list(TypeBound::Any)],
-    Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Any)))))]
+    [TypeParam::new_list_type(TypeBound::Linear)],
+    Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Linear)))))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::String], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_list(TypeBound::Any)], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new([TypeParam::Tuple { params: [TypeBound::Any.into(), TypeParam::bounded_nat(2.try_into().unwrap())].into() }], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_list_type(TypeBound::Linear)], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
-    [TypeParam::new_list(TypeBound::Any)],
-    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Any))))]
+    [TypeParam::new_list_type(TypeBound::Linear)],
+    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type);
@@ -506,15 +595,15 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 
 #[rstest]
 #[case(ops::Module::new())]
-#[case(ops::FuncDefn::new("polyfunc1", polyfunctype1()))]
-#[case(ops::FuncDecl::new("polyfunc2", polyfunctype1()))]
+#[case(ops::FuncDefn::new_vis("polyfunc1", polyfunctype1(), Visibility::Private))]
+#[case(ops::FuncDefn::new_vis("pubfunc1", polyfunctype1(), Visibility::Public))]
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
-#[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Any})]
+#[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Linear})]
 #[case(ops::Const::new(Value::false_val()))]
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
-#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat{n: 1}]).unwrap())]
+#[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat(1)]).unwrap())]
 #[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
@@ -529,7 +618,7 @@ fn std_extensions_valid() {
     let std_reg = crate::std_extensions::std_reg();
     for ext in std_reg {
         let val = serde_json::to_value(ext).unwrap();
-        NamedSchema::check_schemas(&val, get_schemas(true));
+        NamedSchema::check_schemas(&val, get_schemas(true)).unwrap();
         // check deserialises correctly, can't check equality because of custom binaries.
         let deser: crate::extension::Extension = serde_json::from_value(val.clone()).unwrap();
         assert_eq!(serde_json::to_value(deser).unwrap(), val);

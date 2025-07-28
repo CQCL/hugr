@@ -100,7 +100,7 @@ impl From<TypeDefBoundDeclaration> for TypeDefBound {
                 bound: TypeBound::Copyable,
             },
             TypeDefBoundDeclaration::Any => Self::Explicit {
-                bound: TypeBound::Any,
+                bound: TypeBound::Linear,
             },
         }
     }
@@ -129,6 +129,6 @@ impl TypeParamDeclaration {
         _extension: &Extension,
         _ctx: DeclarationContext<'_>,
     ) -> Result<TypeParam, ExtensionDeclarationError> {
-        Ok(TypeParam::String)
+        Ok(TypeParam::StringType)
     }
 }

@@ -203,7 +203,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
     op: ListOp,
 ) -> Result<()> {
     let hugr_elem_ty = match args.node().args() {
-        [TypeArg::Type { ty }] => ty.clone(),
+        [TypeArg::Runtime(ty)] => ty.clone(),
         _ => {
             bail!("Collections: invalid type args for list op");
         }
@@ -366,7 +366,7 @@ fn build_load_i8_ptr<'c, H: HugrView<Node = Node>>(
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{Dataflow, DataflowSubContainer},
+        builder::{Dataflow, DataflowHugr},
         extension::{
             ExtensionRegistry,
             prelude::{self, ConstUsize, qb_t, usize_t},
@@ -407,7 +407,7 @@ mod test {
                     .add_dataflow_op(ext_op, hugr_builder.input_wires())
                     .unwrap()
                     .outputs();
-                hugr_builder.finish_with_outputs(outputs).unwrap()
+                hugr_builder.finish_hugr_with_outputs(outputs).unwrap()
             });
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_list_extensions);
@@ -427,7 +427,7 @@ mod test {
             .with_extensions(es)
             .finish(|mut hugr_builder| {
                 let list = hugr_builder.add_load_value(ListValue::new(elem_ty, contents));
-                hugr_builder.finish_with_outputs(vec![list]).unwrap()
+                hugr_builder.finish_hugr_with_outputs(vec![list]).unwrap()
             });
 
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);

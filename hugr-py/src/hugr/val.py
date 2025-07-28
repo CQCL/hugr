@@ -45,8 +45,8 @@ class Sum(Value):
     """Sum-of-product value.
 
     Example:
-        >>> Sum(0, tys.Sum([[tys.Bool], [tys.Unit]]), [TRUE])
-        Sum(tag=0, typ=Sum([[Bool], [Unit]]), vals=[TRUE])
+        >>> Sum(0, tys.Sum([[tys.Bool], [tys.Unit], [tys.Bool]]), [TRUE])
+        Sum(tag=0, typ=Sum([[Bool], [Unit], [Bool]]), vals=[TRUE])
     """
 
     #: Tag identifying the variant.
@@ -69,6 +69,59 @@ class Sum(Value):
             typ=stys.SumType(root=self.type_()._to_serial()),
             vs=ser_it(self.vals),
         )
+
+    def __repr__(self) -> str:
+        if self == TRUE:
+            return "TRUE"
+        elif self == FALSE:
+            return "FALSE"
+        elif self == Unit:
+            return "Unit"
+        elif all(len(row) == 0 for row in self.typ.variant_rows):
+            return f"UnitSum({self.tag}, {self.n_variants})"
+        elif len(self.typ.variant_rows) == 1:
+            return f"Tuple({comma_sep_repr(self.vals)})"
+        elif len(self.typ.variant_rows) == 2 and len(self.typ.variant_rows[0]) == 0:
+            # Option
+            if self.tag == 0:
+                return f"None({comma_sep_str(self.typ.variant_rows[1])})"
+            else:
+                return f"Some({comma_sep_repr(self.vals)})"
+        elif len(self.typ.variant_rows) == 2:
+            # Either
+            left_typ, right_typ = self.typ.variant_rows
+            if self.tag == 0:
+                return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
+            else:
+                return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
+        else:
+            return f"Sum(tag={self.tag}, typ={self.typ}, vals={self.vals})"
+
+    def __str__(self) -> str:
+        if self == TRUE:
+            return "TRUE"
+        elif self == FALSE:
+            return "FALSE"
+        elif self == Unit:
+            return "Unit"
+        elif all(len(row) == 0 for row in self.typ.variant_rows):
+            return f"UnitSum({self.tag}, {self.n_variants})"
+        elif len(self.typ.variant_rows) == 1:
+            return f"Tuple({comma_sep_str(self.vals)})"
+        elif len(self.typ.variant_rows) == 2 and len(self.typ.variant_rows[0]) == 0:
+            # Option
+            if self.tag == 0:
+                return "None"
+            else:
+                return f"Some({comma_sep_str(self.vals)})"
+        elif len(self.typ.variant_rows) == 2:
+            # Either
+            if self.tag == 0:
+                return f"Left({comma_sep_str(self.vals)})"
+            else:
+                return f"Right({comma_sep_str(self.vals)})"
+        else:
+            return f"Sum({self.tag}, {self.typ}, {self.vals})"
 
     def __eq__(self, other: object) -> bool:
         return (
@@ -100,6 +153,7 @@ class Sum(Value):
         )
 
 
+@dataclass(eq=False, repr=False)
 class UnitSum(Sum):
     """Simple :class:`Sum` with each variant being an empty row.
 
@@ -118,15 +172,6 @@ class UnitSum(Sum):
             typ=tys.UnitSum(size),
             vals=[],
         )
-
-    def __repr__(self) -> str:
-        if self == TRUE:
-            return "TRUE"
-        if self == FALSE:
-            return "FALSE"
-        if self == Unit:
-            return "Unit"
-        return f"UnitSum({self.tag}, {self.n_variants})"
 
 
 def bool_value(b: bool) -> UnitSum:
@@ -149,7 +194,7 @@ TRUE = bool_value(True)
 FALSE = bool_value(False)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Tuple(Sum):
     """Tuple or product value, defined by a list of values.
     Internally a :class:`Sum` with a single variant row.
@@ -169,18 +214,18 @@ class Tuple(Sum):
             tag=0, typ=tys.Tuple(*(v.type_() for v in val_list)), vals=val_list
         )
 
-    # sops.TupleValue isn't an instance of sops.SumValue
-    # so mypy doesn't like the override of Sum._to_serial
-    def _to_serial(self) -> sops.TupleValue:  # type: ignore[override]
-        return sops.TupleValue(
+    def _to_serial(self) -> sops.SumValue:
+        return sops.SumValue(
+            tag=0,
+            typ=stys.SumType(root=self.type_()._to_serial()),
             vs=ser_it(self.vals),
         )
 
     def __repr__(self) -> str:
-        return f"Tuple({comma_sep_repr(self.vals)})"
+        return super().__repr__()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Some(Sum):
     """Optional tuple of value, containing a list of values.
 
@@ -199,11 +244,8 @@ class Some(Sum):
             tag=1, typ=tys.Option(*(v.type_() for v in val_list)), vals=val_list
         )
 
-    def __repr__(self) -> str:
-        return f"Some({comma_sep_repr(self.vals)})"
 
-
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class None_(Sum):
     """Optional tuple of value, containing no values.
 
@@ -219,14 +261,8 @@ class None_(Sum):
     def __init__(self, *types: tys.Type):
         super().__init__(tag=0, typ=tys.Option(*types), vals=[])
 
-    def __repr__(self) -> str:
-        return f"None({comma_sep_str(self.typ.variant_rows[1])})"
 
-    def __str__(self) -> str:
-        return "None"
-
-
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Left(Sum):
     """Left variant of a :class:`tys.Either` type, containing a list of values.
 
@@ -248,15 +284,8 @@ class Left(Sum):
             vals=val_list,
         )
 
-    def __repr__(self) -> str:
-        _, right_typ = self.typ.variant_rows
-        return f"Left(vals={self.vals}, right_typ={list(right_typ)})"
 
-    def __str__(self) -> str:
-        return f"Left({comma_sep_str(self.vals)})"
-
-
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Right(Sum):
     """Right variant of a :class:`tys.Either` type, containing a list of values.
 
@@ -280,13 +309,6 @@ class Right(Sum):
             vals=val_list,
         )
 
-    def __repr__(self) -> str:
-        left_typ, _ = self.typ.variant_rows
-        return f"Right(left_typ={list(left_typ)}, vals={self.vals})"
-
-    def __str__(self) -> str:
-        return f"Right({comma_sep_str(self.vals)})"
-
 
 @dataclass
 class Function(Value):
@@ -298,9 +320,7 @@ class Function(Value):
         return self.body.entrypoint_op().inner_signature()
 
     def _to_serial(self) -> sops.FunctionValue:
-        return sops.FunctionValue(
-            hugr=self.body._to_serial(),
-        )
+        return sops.FunctionValue(hugr=self.body.to_str())
 
     def to_model(self) -> model.Term:
         module = self.body.to_model()

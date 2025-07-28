@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entrypoint.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -10,8 +10,9 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entr
 
 (import core.entrypoint)
 
-(define-func main (core.fn [] [])
-  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+(define-func public main (core.fn [] [])
+  (meta core.entrypoint)
+  (dfg (signature (core.fn [] []))))
 
 (mod)
 
@@ -19,8 +20,9 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entr
 
 (import core.entrypoint)
 
-(define-func wrapper_dfg (core.fn [] [])
-  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+(define-func public wrapper_dfg (core.fn [] [])
+  (meta core.entrypoint)
+  (dfg (signature (core.fn [] []))))
 
 (mod)
 
@@ -34,16 +36,17 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-entr
 
 (import core.adt)
 
-(define-func wrapper_cfg (core.fn [] [])
+(define-func public wrapper_cfg (core.fn [] [])
   (dfg
     (signature (core.fn [] []))
     (cfg
       (signature (core.fn [] []))
+      (meta core.entrypoint)
       (cfg [%0] [%1]
-        (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+        (signature (core.ctrl [[]] [[]]))
         (meta core.entrypoint)
         (block [%0] [%1]
-          (signature (core.fn [(core.ctrl [])] [(core.ctrl [])]))
+          (signature (core.ctrl [[]] [[]]))
           (dfg [] [%2]
             (signature (core.fn [] [(core.adt [[]])]))
             ((core.make_adt 0) [] [%2]

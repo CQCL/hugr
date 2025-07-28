@@ -96,7 +96,7 @@ lazy_static! {
         Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
             extension.add_type(
                     ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat(), TypeBound::Any.into()],
+                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
                     "Fixed-length array".into(),
                     // Default array is linear, even if the elements are copyable
                     TypeDefBound::any(),
@@ -223,7 +223,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
         self.add_generic_array_unpack::<Array>(elem_ty, size, input)
     }
     /// Adds an array clone operation to the dataflow graph and return the wires
-    /// representing the originala and cloned array.
+    /// representing the original and cloned array.
     ///
     /// # Arguments
     ///

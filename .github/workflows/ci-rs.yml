@@ -19,6 +19,7 @@ env:
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
   RUSTC_WRAPPER: "sccache"
+  HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
   LLVM_VERSION: "14.0"
@@ -30,36 +31,16 @@ jobs:
   changes:
     name: Check for changes
     runs-on: ubuntu-latest
-    # Required permissions
     permissions:
       pull-requests: read
-    # Set job outputs to values from filter step
-    # These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
     outputs:
-      rust: ${{ steps.filter.outputs.rust == 'true' || steps.override.outputs.out == 'true' }}
-      python: ${{ steps.filter.outputs.python == 'true' || steps.override.outputs.out == 'true' }}
-      model: ${{ steps.filter.outputs.model == 'true' || steps.override.outputs.out == 'true' }}
-      llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
+      rust: ${{ steps.filter.outputs.rust }}
+      llvm: ${{ steps.filter.outputs.llvm }}
+      model: ${{ steps.filter.outputs.model }}
     steps:
       - uses: actions/checkout@v4
-      - name: Override label
-        id: override
-        run: |
-          echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
-          if [ "$OVERRIDE_LABEL" == "true" ]; then
-            echo "Overriding due to label 'run-ci-checks'"
-            echo "out=true" >> $GITHUB_OUTPUT
-          elif [ "$DEFAULT_BRANCH" == "true" ]; then
-            echo "Overriding due to running on the default branch"
-            echo "out=true" >> $GITHUB_OUTPUT
-          fi
-        env:
-          OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
-          DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
-      - uses: dorny/paths-filter@v3
+      - uses: ./.github/actions/check-changes
         id: filter
-        with:
-          filters: .github/change-filters.yml
 
   check:
     needs: changes
@@ -170,6 +151,12 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: Build hugr-persistent
+        if: ${{ needs.changes.outputs.rust == 'true'}}
+        run: cargo test -p hugr-persistent --verbose --no-run
+      - name: Tests hugr-persistent
+        if: ${{ needs.changes.outputs.rust == 'true'}}
+        run: cargo test -p hugr-persistent --verbose
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -355,6 +342,7 @@ jobs:
           cargo llvm-cov --no-report  --no-default-features --doctests
           cargo llvm-cov --no-report  --all-features --doctests
           cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
+          cargo llvm-cov --no-report  -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io

@@ -12,9 +12,9 @@ use super::{
 };
 
 use crate::Hugr;
-use crate::envelope::serde_with::AsStringEnvelope;
+use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TypeArg, TypeParam, check_type_args};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
@@ -239,7 +239,7 @@ impl SignatureFunc {
                 let static_params = func.static_params();
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
 
-                check_type_args(static_args, static_params)?;
+                check_term_types(static_args, static_params)?;
                 temp = func.compute_signature(static_args, def)?;
                 (&temp, other_args)
             }
@@ -268,8 +268,12 @@ impl Debug for SignatureFunc {
 
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other extensions.
+///
+/// Does not implement [`serde::Deserialize`] directly since the serde error for
+/// untagged enums is unhelpful. Use [`deserialize_lower_funcs`] with
+/// [`serde(deserialize_with = "deserialize_lower_funcs")] instead.
 #[serde_as]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Serialize)]
 #[serde(untagged)]
 pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
@@ -281,13 +285,41 @@ pub enum LowerFunc {
         /// [OpDef]
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
-        #[serde_as(as = "AsStringEnvelope")]
-        hugr: Hugr,
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
+        hugr: Box<Hugr>,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available extensions.
     #[serde(skip)]
     CustomFunc(Box<dyn CustomLowerFunc>),
+}
+
+/// A function for deserializing sequences of [`LowerFunc::FixedHugr`].
+///
+/// We could let serde deserialize [`LowerFunc`] as-is, but if the LowerFunc
+/// deserialization fails it just returns an opaque "data did not match any
+/// variant of untagged enum LowerFunc" error. This function will return the
+/// internal errors instead.
+pub fn deserialize_lower_funcs<'de, D>(deserializer: D) -> Result<Vec<LowerFunc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[serde_as]
+    #[derive(serde::Deserialize)]
+    struct FixedHugrDeserializer {
+        pub extensions: ExtensionSet,
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
+        pub hugr: Box<Hugr>,
+    }
+
+    let funcs: Vec<FixedHugrDeserializer> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(funcs
+        .into_iter()
+        .map(|f| LowerFunc::FixedHugr {
+            extensions: f.extensions,
+            hugr: f.hugr,
+        })
+        .collect())
 }
 
 impl Debug for LowerFunc {
@@ -322,7 +354,11 @@ pub struct OpDef {
     signature_func: SignatureFunc,
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_lower_funcs"
+    )]
     pub(crate) lower_funcs: Vec<LowerFunc>,
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.
@@ -347,7 +383,7 @@ impl OpDef {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
                 static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
-                check_type_args(static_args, custom.static_params())?;
+                check_term_types(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self)?;
                 (&temp, other_args)
             }
@@ -357,7 +393,7 @@ impl OpDef {
             }
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
-        check_type_args(args, pf.params())?;
+        check_term_types(args, pf.params())?;
         Ok(())
     }
 
@@ -377,7 +413,7 @@ impl OpDef {
             .filter_map(|f| match f {
                 LowerFunc::FixedHugr { extensions, hugr } => {
                     if available_extensions.is_superset(extensions) {
-                        Some(hugr.clone())
+                        Some(hugr.as_ref().clone())
                     } else {
                         None
                     }
@@ -553,7 +589,7 @@ pub(super) mod test {
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::ops::OpName;
     use crate::std_extensions::collections::list;
-    use crate::types::type_param::{TypeArgError, TypeParam};
+    use crate::types::type_param::{TermTypeError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
     use crate::{Extension, const_extension_ids};
 
@@ -656,7 +692,7 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
+            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
@@ -664,7 +700,7 @@ pub(super) mod test {
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
                 extensions: ExtensionSet::new(),
-                hugr: crate::builder::test::simple_dfg_hugr(), // this is nonsense, but we are not testing the actual lowering here
+                hugr: Box::new(crate::builder::test::simple_dfg_hugr()), // this is nonsense, but we are not testing the actual lowering here
             });
             def.add_misc("key", Default::default());
             assert_eq!(def.description(), "desc");
@@ -678,11 +714,10 @@ pub(super) mod test {
         reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
-        let list_usize =
-            Type::new_extension(list_def.instantiate(vec![TypeArg::Type { ty: usize_t() }])?);
+        let list_usize = Type::new_extension(list_def.instantiate(vec![usize_t().into()])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![TypeArg::Type { ty: usize_t() }])
+            e.instantiate_extension_op(&OP_NAME, vec![usize_t().into()])
                 .unwrap(),
             dfg.input_wires(),
         )?;
@@ -703,13 +738,13 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::Type { b: TypeBound::Any };
-                let [TypeArg::BoundedNat { n }] = arg_values else {
+                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+                let [TypeArg::BoundedNat(n)] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
                 let n = *n as usize;
                 let tvs: Vec<Type> = (0..n)
-                    .map(|_| Type::new_var_use(0, TypeBound::Any))
+                    .map(|_| Type::new_var_use(0, TypeBound::Linear))
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.clone()],
@@ -718,7 +753,7 @@ pub(super) mod test {
             }
 
             fn static_params(&self) -> &[TypeParam] {
-                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat()];
+                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
                 MAX_NAT
             }
         }
@@ -727,7 +762,7 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat { n: 3 }, usize_t().into()];
+            let args = [TypeArg::BoundedNat(3), usize_t().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -740,7 +775,7 @@ pub(super) mod test {
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-            let args = [TypeArg::BoundedNat { n: 3 }, tyvar.clone().into()];
+            let args = [TypeArg::BoundedNat(3), tyvar.clone().into()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -753,15 +788,15 @@ pub(super) mod test {
 
             // quick sanity check that we are validating the args - note changed bound:
             assert_eq!(
-                def.validate_args(&args, &[TypeBound::Any.into()]),
+                def.validate_args(&args, &[TypeBound::Linear.into()]),
                 Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    actual: TypeBound::Any.into(),
-                    cached: TypeBound::Copyable.into()
+                    actual: Box::new(TypeBound::Linear.into()),
+                    cached: Box::new(TypeBound::Copyable.into())
                 })
             );
 
             // First arg must be concrete, not a variable
-            let kind = TypeParam::bounded_nat(NonZeroU64::new(5).unwrap());
+            let kind = TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap());
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
@@ -792,13 +827,13 @@ pub(super) mod test {
                 "SimpleOp".into(),
                 String::new(),
                 PolyFuncTypeRV::new(
-                    vec![TypeBound::Any.into()],
-                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+                    vec![TypeBound::Linear.into()],
+                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
                 ),
                 extension_ref,
             )?;
             let tv = Type::new_var_use(0, TypeBound::Copyable);
-            let args = [TypeArg::Type { ty: tv.clone() }];
+            let args = [tv.clone().into()];
             let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo(tv)));
@@ -807,9 +842,9 @@ pub(super) mod test {
             assert_eq!(
                 def.compute_signature(&[arg.clone()]),
                 Err(SignatureError::TypeArgMismatch(
-                    TypeArgError::TypeMismatch {
-                        param: TypeBound::Any.into(),
-                        arg
+                    TermTypeError::TypeMismatch {
+                        type_: Box::new(TypeBound::Linear.into()),
+                        term: Box::new(arg),
                     }
                 ))
             );
@@ -852,7 +887,7 @@ pub(super) mod test {
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
                         extensions,
-                        hugr: simple_dfg_hugr(),
+                        hugr: Box::new(simple_dfg_hugr()),
                     })
                     .boxed()
             }

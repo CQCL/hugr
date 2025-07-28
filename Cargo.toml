@@ -11,6 +11,7 @@ members = [
     "hugr-model",
     "hugr-llvm",
     "hugr-py",
+    "hugr-persistent",
 ]
 default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 
@@ -37,18 +38,14 @@ missing_docs = "warn"
 # https://github.com/rust-lang/rust-clippy/issues/5112
 debug_assert_with_mut_call = "warn"
 
-# TODO: Reduce the size of error types.
-result_large_err = "allow"
-large_enum_variant = "allow"
-
 [workspace.dependencies]
 anyhow = "1.0.98"
 insta = { version = "1.43.1" }
 bitvec = "1.0.1"
-capnp = "0.20.6"
+capnp = "0.21.3"
 cgmath = "0.18.0"
 cool_asserts = "2.0.3"
-delegate = "0.13.3"
+delegate = "0.13.4"
 derive_more = "1.0.0"
 downcast-rs = "2.0.1"
 enum_dispatch = "0.3.11"
@@ -66,7 +63,7 @@ rstest = "0.24.0"
 semver = "1.0.26"
 serde = "1.0.219"
 serde_json = "1.0.140"
-serde_with = "3.13.0"
+serde_with = "3.14.0"
 serde_yaml = "0.9.34"
 smol_str = "0.3.1"
 static_assertions = "1.1.0"
@@ -74,15 +71,15 @@ strum = "0.27.0"
 tempfile = "3.20"
 thiserror = "2.0.12"
 typetag = "0.2.20"
-clap = { version = "4.5.40" }
+clap = { version = "4.5.41" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.3"
 assert_cmd = "2.0.17"
 assert_fs = "1.1.3"
 predicates = "3.1.0"
-indexmap = "2.9.0"
+indexmap = "2.10.0"
 fxhash = "0.2.1"
-bumpalo = "3.18.1"
+bumpalo = "3.19.0"
 pathsearch = "0.2.0"
 base64 = "0.22.1"
 ordered-float = "5.0.0"
@@ -92,11 +89,12 @@ pretty = "0.12.4"
 pretty_assertions = "1.4.1"
 zstd = "0.13.2"
 relrc = "0.4.6"
+wyhash = "0.6.0"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
 pyo3 = ">= 0.23.4, < 0.25"
-portgraph = { version = "0.14.1" }
+portgraph = { version = "0.15.1" }
 petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
 [profile.dev.package]

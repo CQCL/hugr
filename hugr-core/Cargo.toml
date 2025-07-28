@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.20.2"
+version = "0.22.1"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -19,6 +19,7 @@ workspace = true
 [features]
 declarative = ["serde_yaml"]
 zstd = ["dep:zstd"]
+default = []
 
 [lib]
 bench = false
@@ -26,11 +27,8 @@ bench = false
 [[test]]
 name = "model"
 
-[[test]]
-name = "persistent_walker_example"
-
 [dependencies]
-hugr-model = { version = "0.20.2", path = "../hugr-model" }
+hugr-model = { version = "0.22.1", path = "../hugr-model" }
 
 cgmath = { workspace = true, features = ["serde"] }
 delegate = { workspace = true }
@@ -63,7 +61,11 @@ thiserror = { workspace = true }
 typetag = { workspace = true }
 semver = { workspace = true, features = ["serde"] }
 zstd = { workspace = true, optional = true }
+ordered-float = { workspace = true, features = ["serde"] }
+base64.workspace = true
 relrc = { workspace = true, features = ["petgraph", "serde"] }
+smallvec = "1.15.0"
+tracing = "0.1.41"
 
 [dev-dependencies]
 rstest = { workspace = true }
@@ -77,3 +79,4 @@ proptest-derive = { workspace = true }
 # Required for documentation examples
 hugr = { path = "../hugr" }
 serde_yaml = "0.9.34"
+anyhow = { workspace = true }

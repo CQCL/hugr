@@ -1,5 +1,108 @@
 # Changelog
 
+## [0.13.0rc1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.5...hugr-py-v0.13.0rc1) (2025-07-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* Lowering functions in extension operations are now encoded as binary envelopes. Older hugr versions will error out when trying to load them.
+* **py:** `EnvelopeConfig::BINARY` now uses the model binary encoding. `EnvelopeFormat.MODULE` is now `EnvelopeFormat.MODEL`. `EnvelopeFormat.MODULE_WITH_EXTS` is now `EnvelopeFormat.MODEL_WITH_EXTS`
+* hugr-model: Symbol has an extra field
+* Renamed the `Any` type bound to `Linear`
+* The model CFG signature types were changed.
+* Added `TypeParam`s and `TypeArg`s corresponding to floats and bytes.
+* `TypeArg::Sequence` needs to be replaced with
+* FuncDefns must be moved to beneath Module. `Container::define_function` is gone, use `HugrBuilder::module_root_builder`; similarly in hugr-py `DefinitionBuilder` (`define_function` -> `module_root_builder().define_function`). In hugr-llvm, some uses of
+
+### Features
+
+* Add `BorrowArray` extension ([#2395](https://github.com/CQCL/hugr/issues/2395)) ([782687e](https://github.com/CQCL/hugr/commit/782687ed917c3e4295c2c3c59a17d784fc6f932d))
+* Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/issues/2377)) ([909a794](https://github.com/CQCL/hugr/commit/909a7948c1465aab5528895bdee0e49958a416b6)), closes [#1863](https://github.com/CQCL/hugr/issues/1863)
+* add toposort to HUGR-py ([#2367](https://github.com/CQCL/hugr/issues/2367)) ([34eed34](https://github.com/CQCL/hugr/commit/34eed3422c9aa34bd6b8ad868dcbab733eb5d14c))
+* Add Visibility to FuncDefn/FuncDecl. ([#2143](https://github.com/CQCL/hugr/issues/2143)) ([5bbe0cd](https://github.com/CQCL/hugr/commit/5bbe0cdc60625b4047f0cddc9598d6652ed6f736))
+* Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/issues/2289)) ([e9c5e91](https://github.com/CQCL/hugr/commit/e9c5e914d4fd9ee270dee8e43875d8a413b02926))
+* **core, llvm:** add array unpack operations ([#2339](https://github.com/CQCL/hugr/issues/2339)) ([a1a70f1](https://github.com/CQCL/hugr/commit/a1a70f1afb5d8d57082269d167816c7a90497dcf)), closes [#1947](https://github.com/CQCL/hugr/issues/1947)
+* Detect and fail on unrecognised envelope flags ([#2453](https://github.com/CQCL/hugr/issues/2453)) ([5e36770](https://github.com/CQCL/hugr/commit/5e36770895b79e878c1bbdf22e67e8cbff6513b6))
+* Export entrypoint metadata in Python and fix bug in import ([#2434](https://github.com/CQCL/hugr/issues/2434)) ([d17b245](https://github.com/CQCL/hugr/commit/d17b245c41d943da1c338094c31a75b55efe4061))
+* Expose `BorrowArray` in `hugr-py` ([#2425](https://github.com/CQCL/hugr/issues/2425)) ([fdb675f](https://github.com/CQCL/hugr/commit/fdb675f1473a9bf349fce0824c56539e239c11f3)), closes [#2406](https://github.com/CQCL/hugr/issues/2406)
+* include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/issues/2452)) ([f7cedb4](https://github.com/CQCL/hugr/commit/f7cedb4f39b67a77b4c6a55ec00b624b54668eaa))
+* Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/issues/2448)) ([4bc7f65](https://github.com/CQCL/hugr/commit/4bc7f65338d9a8b37d3a5625aeaf093970d97926))
+* No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/issues/2256)) ([214b8df](https://github.com/CQCL/hugr/commit/214b8df837537b8ac15c3b60845350c3818a6ac7))
+* Non-region entrypoints in `hugr-model`. ([#2467](https://github.com/CQCL/hugr/issues/2467)) ([7b42da6](https://github.com/CQCL/hugr/commit/7b42da6f62de9fe36187512dba428fe3db8d6120))
+* Open lists and tuples in `Term` ([#2360](https://github.com/CQCL/hugr/issues/2360)) ([292af80](https://github.com/CQCL/hugr/commit/292af8010dba6b4c2ea5bb69edae31cbf1e0cb6a))
+* **py:** enable Model as default BINARY envelope format ([#2317](https://github.com/CQCL/hugr/issues/2317)) ([f089931](https://github.com/CQCL/hugr/commit/f08993124e48093c2328096a93cec8a9ad67a41c))
+* **py:** Helper methods to get the neighbours of a node ([#2370](https://github.com/CQCL/hugr/issues/2370)) ([bb6fa50](https://github.com/CQCL/hugr/commit/bb6fa50957ac5121bebc78a06335262a6559e695))
+* **py:** Use SumValue serialization for tuples ([#2466](https://github.com/CQCL/hugr/issues/2466)) ([f615037](https://github.com/CQCL/hugr/commit/f615037621aa0eeb37de8f1126fa9020705cb565))
+* Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/issues/2421)) ([c2f8b30](https://github.com/CQCL/hugr/commit/c2f8b30afd3a1b75f6babe77a90b13211e45e3a7))
+* Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/issues/2140)) ([cc4997f](https://github.com/CQCL/hugr/commit/cc4997f12dad4dfecc37be564712cae18dfce159))
+* Standarize the string formating of sum types and values ([#2432](https://github.com/CQCL/hugr/issues/2432)) ([ec207e7](https://github.com/CQCL/hugr/commit/ec207e7dbe6dbaa9f40421eb0836c9de7e3ea240))
+* Use binary envelopes for operation lower_func encoding  ([#2447](https://github.com/CQCL/hugr/issues/2447)) ([2c16a77](https://github.com/CQCL/hugr/commit/2c16a7797a3b5800c5540d1e6a767dd38ad8ca6b))
+
+
+### Bug Fixes
+
+* Ensure SumTypes have the same json encoding in -rs and -py ([#2465](https://github.com/CQCL/hugr/issues/2465)) ([7f97e6f](https://github.com/CQCL/hugr/commit/7f97e6f84f0bb2b441fe3e2589e91f19de50198e))
+* Escape html-like labels in DotRenderer ([#2383](https://github.com/CQCL/hugr/issues/2383)) ([eaa7dfe](https://github.com/CQCL/hugr/commit/eaa7dfe35eb08dbd20d5f5353e92b58850e0f31f))
+* Export metadata in Python ([#2342](https://github.com/CQCL/hugr/issues/2342)) ([7be52db](https://github.com/CQCL/hugr/commit/7be52db4f63d7ce8556a5ba0d8d245ebb567e7ed))
+* Fix model export of `Opaque` types. ([#2446](https://github.com/CQCL/hugr/issues/2446)) ([3943499](https://github.com/CQCL/hugr/commit/39434996ba18db83a50455fda90c60aea11a8387))
+* Fixed bug in python model export name mangling. ([#2323](https://github.com/CQCL/hugr/issues/2323)) ([041342f](https://github.com/CQCL/hugr/commit/041342f58a3dcd9f73dbbaab102221c5d9ff5f61))
+* Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/issues/2334)) ([ccd2eb2](https://github.com/CQCL/hugr/commit/ccd2eb226358b44aede7dd9e9217448c7e6c0f3a))
+* Fixed export of `Call` and `LoadConst` nodes in `hugr-py`. ([#2429](https://github.com/CQCL/hugr/issues/2429)) ([6a0e270](https://github.com/CQCL/hugr/commit/6a0e270e7edbea4cc08e2948d3f8a16b9e763af7))
+* Fixed invalid extension name in test. ([#2319](https://github.com/CQCL/hugr/issues/2319)) ([c58ddbf](https://github.com/CQCL/hugr/commit/c58ddbfcc0a557a1644fc8094370e6c62a7ce129))
+* Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/issues/2324)) ([1ad450f](https://github.com/CQCL/hugr/commit/1ad450f807485f7ef6083270aaa4523cb95b2490))
+* map IntValue to unsigned repr when serializing ([#2413](https://github.com/CQCL/hugr/issues/2413)) ([26d426e](https://github.com/CQCL/hugr/commit/26d426ee7ffdc38063a337e66458b8d797131bca)), closes [#2409](https://github.com/CQCL/hugr/issues/2409)
+* Order hints on input and output nodes. ([#2422](https://github.com/CQCL/hugr/issues/2422)) ([a31ccbc](https://github.com/CQCL/hugr/commit/a31ccbcaaa7561f8d221269262cd9ca9e89ad67b))
+* **py:** correct ConstString JSON encoding ([#2325](https://github.com/CQCL/hugr/issues/2325)) ([9649a48](https://github.com/CQCL/hugr/commit/9649a48d376aff27e475c70072aecd55ae7a4ccb))
+* StaticArrayVal payload encoding, improve roundtrip checker ([#2444](https://github.com/CQCL/hugr/issues/2444)) ([1a301eb](https://github.com/CQCL/hugr/commit/1a301eb818401c314d4d7bac40698ec2e73babe7))
+* stringify metadata before escaping in renderer ([#2405](https://github.com/CQCL/hugr/issues/2405)) ([8d67420](https://github.com/CQCL/hugr/commit/8d67420e8fd2e979256ff64bcf0b2813ed19ac00))
+
+## [0.12.5](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.4...hugr-py-v0.12.5) (2025-07-08)
+
+
+### Bug Fixes
+
+* map IntValue to unsigned repr when serializing ([#2413](https://github.com/CQCL/hugr/issues/2413)) ([4ad1d4e](https://github.com/CQCL/hugr/commit/4ad1d4e010eca07207306320b3cf74396f1f8181)), closes [#2409](https://github.com/CQCL/hugr/issues/2409)
+
+## [0.12.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.3...hugr-py-v0.12.4) (2025-07-03)
+
+
+### Bug Fixes
+
+* stringify metadata before escaping in renderer ([#2405](https://github.com/CQCL/hugr/issues/2405)) ([1f01e97](https://github.com/CQCL/hugr/commit/1f01e97696afe02b46eedb2c6e3e2f2369a4ac7b))
+
+## [0.12.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.2...hugr-py-v0.12.3) (2025-07-03)
+
+
+### Features
+
+* add toposort to HUGR-py ([#2367](https://github.com/CQCL/hugr/issues/2367)) ([ba8988e](https://github.com/CQCL/hugr/commit/ba8988e87c2a3d64953838e9a1cff4989740cf05))
+* **core, llvm:** add array unpack operations ([#2339](https://github.com/CQCL/hugr/issues/2339)) ([74b25aa](https://github.com/CQCL/hugr/commit/74b25aa3a704c082f84a0c34fad2654e3392ff50)), closes [#1947](https://github.com/CQCL/hugr/issues/1947)
+* **py:** Helper methods to get the neighbours of a node ([#2370](https://github.com/CQCL/hugr/issues/2370)) ([1ed6440](https://github.com/CQCL/hugr/commit/1ed64409aaf7e8f26fb5928051245e560881a621))
+
+
+### Bug Fixes
+
+* Escape html-like labels in DotRenderer ([#2383](https://github.com/CQCL/hugr/issues/2383)) ([c7a43a6](https://github.com/CQCL/hugr/commit/c7a43a69878e1271251b570070f192ebf57aaadd))
+* Fixed invalid extension name in test. ([#2319](https://github.com/CQCL/hugr/issues/2319)) ([fbe1d9c](https://github.com/CQCL/hugr/commit/fbe1d9c061768360144f5463dcf357fb59ac736f))
+* **py:** correct ConstString JSON encoding ([#2325](https://github.com/CQCL/hugr/issues/2325)) ([325168b](https://github.com/CQCL/hugr/commit/325168b50b5e40e884127ad89d7acb5ab3a412f8))
+
+## [0.12.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.1...hugr-py-v0.12.2) (2025-06-03)
+
+
+### Bug Fixes
+
+* use envelopes for `FixedHugr` encoding ([#2283](https://github.com/CQCL/hugr/issues/2283)) ([2c8cbb9](https://github.com/CQCL/hugr/commit/2c8cbb99bc74d5d43956b5f75c89f17748b5ee39)), closes [#2282](https://github.com/CQCL/hugr/issues/2282)
+
+
+### Performance Improvements
+
+* **py:** mutable `Node` to avoid linear update cost ([#2288](https://github.com/CQCL/hugr/issues/2288)) ([84fb200](https://github.com/CQCL/hugr/commit/84fb2002dc835f6b98ceb95bd80a7bcff9eecdd8))
+
+
+### Documentation
+
+* **py:** fix `TypeDef` example ([#2268](https://github.com/CQCL/hugr/issues/2268)) ([ede8e7b](https://github.com/CQCL/hugr/commit/ede8e7b087591303038ecc5b449bb85bf39c948b))
+
 ## [0.12.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.0...hugr-py-v0.12.1) (2025-05-20)
 
 

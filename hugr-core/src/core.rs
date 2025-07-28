@@ -7,7 +7,7 @@ pub use itertools::Either;
 use derive_more::From;
 use itertools::Either::{Left, Right};
 
-use crate::hugr::HugrError;
+use crate::{HugrView, hugr::HugrError};
 
 /// A handle to a node in the HUGR.
 #[derive(
@@ -34,7 +34,7 @@ pub struct Node {
 )]
 #[serde(transparent)]
 pub struct Port {
-    offset: portgraph::PortOffset,
+    offset: portgraph::PortOffset<u32>,
 }
 
 /// A trait for getting the undirected index of a port.
@@ -139,7 +139,7 @@ impl Port {
 
     /// Returns the port as a portgraph `PortOffset`.
     #[inline]
-    pub(crate) fn pg_offset(self) -> portgraph::PortOffset {
+    pub(crate) fn pg_offset(self) -> portgraph::PortOffset<u32> {
         self.offset
     }
 }
@@ -219,22 +219,100 @@ impl<N: HugrNode> Wire<N> {
         Self(node, port.into())
     }
 
-    /// The node that this wire is connected to.
+    /// Create a new wire from a node and a port that is connected to the wire.
+    ///
+    /// If `port` is an incoming port, the wire is traversed to find the unique
+    /// outgoing port that is connected to the wire. Otherwise, this is
+    /// equivalent to constructing a wire using [`Wire::new`].
+    ///
+    /// ## Panics
+    ///
+    /// This will panic if the wire is not connected to a unique outgoing port.
+    #[inline]
+    pub fn from_connected_port(
+        node: N,
+        port: impl Into<Port>,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Self {
+        let (node, outgoing) = match port.into().as_directed() {
+            Either::Left(incoming) => hugr
+                .single_linked_output(node, incoming)
+                .expect("invalid dfg port"),
+            Either::Right(outgoing) => (node, outgoing),
+        };
+        Self::new(node, outgoing)
+    }
+
+    /// The node of the unique outgoing port that the wire is connected to.
     #[inline]
     pub fn node(&self) -> N {
         self.0
     }
 
-    /// The output port that this wire is connected to.
+    /// The unique outgoing port that the wire is connected to.
     #[inline]
     pub fn source(&self) -> OutgoingPort {
         self.1
+    }
+
+    /// Get all ports connected to the wire.
+    ///
+    /// Return a chained iterator of the unique outgoing port, followed by all
+    /// incoming ports connected to the wire.
+    pub fn all_connected_ports<'h, H: HugrView<Node = N>>(
+        &self,
+        hugr: &'h H,
+    ) -> impl Iterator<Item = (N, Port)> + use<'h, N, H> {
+        let node = self.node();
+        let out_port = self.source();
+
+        std::iter::once((node, out_port.into())).chain(hugr.linked_ports(node, out_port))
     }
 }
 
 impl<N: HugrNode> std::fmt::Display for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Wire({}, {})", self.0, self.1.index)
+    }
+}
+
+/// Marks [FuncDefn](crate::ops::FuncDefn)s and [FuncDecl](crate::ops::FuncDecl)s as
+/// to whether they should be considered for linking.
+#[derive(
+    Clone,
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub enum Visibility {
+    /// Function is visible or exported
+    Public,
+    /// Function is hidden, for use within the hugr only
+    Private,
+}
+
+impl From<hugr_model::v0::Visibility> for Visibility {
+    fn from(value: hugr_model::v0::Visibility) -> Self {
+        match value {
+            hugr_model::v0::Visibility::Private => Self::Private,
+            hugr_model::v0::Visibility::Public => Self::Public,
+        }
+    }
+}
+
+impl From<Visibility> for hugr_model::v0::Visibility {
+    fn from(value: Visibility) -> Self {
+        match value {
+            Visibility::Public => hugr_model::v0::Visibility::Public,
+            Visibility::Private => hugr_model::v0::Visibility::Private,
+        }
     }
 }
 

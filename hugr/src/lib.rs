@@ -140,6 +140,10 @@ pub use hugr_passes as algorithms;
 #[doc(inline)]
 pub use hugr_llvm as llvm;
 
+#[cfg(feature = "persistent_unstable")]
+#[doc(hidden)] // TODO: remove when stable
+pub use hugr_persistent as persistent;
+
 // Modules with hand-picked re-exports.
 pub mod hugr;
 

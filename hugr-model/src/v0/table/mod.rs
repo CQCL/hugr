@@ -29,7 +29,7 @@ use smol_str::SmolStr;
 use thiserror::Error;
 
 mod view;
-use super::{Literal, RegionKind, ast};
+use super::{Literal, RegionKind, Visibility, ast};
 pub use view::View;
 
 /// A package consisting of a sequence of [`Module`]s.
@@ -303,6 +303,8 @@ pub struct RegionScope {
 /// [`ast::Symbol`]: crate::v0::ast::Symbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol<'a> {
+    /// The visibility of the symbol.
+    pub visibility: &'a Option<Visibility>,
     /// The name of the symbol.
     pub name: &'a str,
     /// The static parameters.

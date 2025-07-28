@@ -27,10 +27,10 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
 #[non_exhaustive]
 pub enum CircuitBuildError {
     /// Invalid index for stored wires.
-    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(NamedOp::name).unwrap_or_default())]
+    #[error("Invalid wire index {invalid_index} while attempting to add operation {}.", .op.as_ref().map(|op| op.name()).unwrap_or_default())]
     InvalidWireIndex {
         /// The operation.
-        op: Option<OpType>,
+        op: Option<Box<OpType>>,
         /// The invalid indices.
         invalid_index: usize,
     },
@@ -38,7 +38,7 @@ pub enum CircuitBuildError {
     #[error("The linear inputs {:?} had no corresponding output wire in operation {}.", .index.as_slice(), .op.name())]
     MismatchedLinearInputs {
         /// The operation.
-        op: OpType,
+        op: Box<OpType>,
         /// The index of the input that had no corresponding output wire.
         index: Vec<usize>,
     },
@@ -143,7 +143,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         let input_wires =
             input_wires.map_err(|invalid_index| CircuitBuildError::InvalidWireIndex {
-                op: Some(op.clone()),
+                op: Some(Box::new(op.clone())),
                 invalid_index,
             })?;
 
@@ -169,7 +169,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
         if !linear_inputs.is_empty() {
             return Err(CircuitBuildError::MismatchedLinearInputs {
-                op,
+                op: Box::new(op),
                 index: linear_inputs.values().copied().collect(),
             }
             .into());
@@ -245,7 +245,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::Extension;
-    use crate::builder::{Container, HugrBuilder, ModuleBuilder};
+    use crate::builder::{HugrBuilder, ModuleBuilder};
     use crate::extension::ExtensionId;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::ConstF64;
@@ -389,7 +389,7 @@ mod test {
                 assert_matches!(
                     circ.append(cx_gate(), [q0, invalid_index]),
                     Err(BuildError::CircuitError(CircuitBuildError::InvalidWireIndex { op, invalid_index: idx }))
-                    if op == Some(cx_gate().into()) && idx == invalid_index,
+                    if op == Some(Box::new(cx_gate().into())) && idx == invalid_index,
                 );
 
                 // Untracking an invalid index returns an error
@@ -403,7 +403,7 @@ mod test {
                 assert_matches!(
                     circ.append(q_discard(), [q1]),
                     Err(BuildError::CircuitError(CircuitBuildError::MismatchedLinearInputs { op, index }))
-                    if op == q_discard().into() && index == [q1],
+                    if *op == q_discard().into() && index == [q1],
                 );
 
                 let outs = circ.finish();

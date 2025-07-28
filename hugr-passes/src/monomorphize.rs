@@ -133,25 +133,7 @@ fn instantiate(
     mono_sig: Signature,
     cache: &mut Instantiations,
 ) -> Node {
-    let for_func = cache.entry(poly_func).or_insert_with(|| {
-        // First time we've instantiated poly_func. Lift any nested FuncDefn's out to the same level.
-        let outer_name = h
-            .get_optype(poly_func)
-            .as_func_defn()
-            .unwrap()
-            .func_name()
-            .clone();
-        let mut to_scan = Vec::from_iter(h.children(poly_func));
-        while let Some(n) = to_scan.pop() {
-            if let OpType::FuncDefn(fd) = h.optype_mut(n) {
-                *fd.func_name_mut() = mangle_inner_func(&outer_name, fd.func_name());
-                h.move_after_sibling(n, poly_func);
-            } else {
-                to_scan.extend(h.children(n));
-            }
-        }
-        HashMap::new()
-    });
+    let for_func = cache.entry(poly_func).or_default();
 
     let ve = match for_func.entry(type_args.clone()) {
         Entry::Occupied(n) => return *n.get(),
@@ -231,9 +213,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     }
 }
 
-struct TypeArgsList<'a>(&'a [TypeArg]);
+/// Helper to create mangled representations of lists of [TypeArg]s.
+struct TypeArgsSeq<'a>(&'a [TypeArg]);
 
-impl std::fmt::Display for TypeArgsList<'_> {
+impl std::fmt::Display for TypeArgsSeq<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for arg in self.0 {
             f.write_char('$')?;
@@ -249,13 +232,14 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Type { ty } => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
-        TypeArg::BoundedNat { n } => f.write_fmt(format_args!("n({n})")),
-        TypeArg::String { arg } => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
-        TypeArg::Sequence { elems } => f.write_fmt(format_args!("seq({})", TypeArgsList(elems))),
+        TypeArg::Runtime(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
+        TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
+        TypeArg::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
+        TypeArg::List(elems) => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
+        TypeArg::Tuple(elems) => f.write_fmt(format_args!("tuple({})", TypeArgsSeq(elems))),
         // We are monomorphizing. We will never monomorphize to a signature
         // containing a variable.
-        TypeArg::Variable { .. } => panic!("type_arg_str variable: {arg}"),
+        TypeArg::Variable(_) => panic!("type_arg_str variable: {arg}"),
         _ => panic!("unknown type arg: {arg}"),
     }
 }
@@ -275,11 +259,7 @@ fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fm
 ///    is used as "t({arg})" for the string representation of that arg.
 pub fn mangle_name(name: &str, type_args: impl AsRef<[TypeArg]>) -> String {
     let name = escape_dollar(name);
-    format!("${name}${}", TypeArgsList(type_args.as_ref()))
-}
-
-fn mangle_inner_func(outer_name: &str, inner_name: &str) -> String {
-    format!("${outer_name}${inner_name}")
+    format!("${name}${}", TypeArgsSeq(type_args.as_ref()))
 }
 
 #[cfg(test)]
@@ -288,6 +268,7 @@ mod test {
     use std::iter;
 
     use hugr_core::extension::simple_op::MakeRegisteredOp as _;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::ArrayKind;
@@ -308,7 +289,7 @@ mod test {
 
     use crate::{monomorphize, remove_dead_funcs};
 
-    use super::{is_polymorphic, mangle_inner_func, mangle_name};
+    use super::{is_polymorphic, mangle_name};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -425,13 +406,12 @@ mod test {
     }
 
     #[test]
-    fn test_flattening_multiargs_nats() {
+    fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
         let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
-        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat());
-        let sa = |n| TypeArg::BoundedNat { n };
-
+        let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
+        let sa = |n| TypeArg::BoundedNat(n);
         let n: u64 = 5;
         let mut outer = FunctionBuilder::new(
             "mainish",
@@ -447,32 +427,23 @@ mod test {
         .unwrap();
 
         let arr2u = || ValueArray::ty_parametric(sa(2), usize_t()).unwrap();
-        let pf1t = PolyFuncType::new(
-            [TypeParam::max_nat()],
-            Signature::new(
-                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
-                usize_t(),
-            ),
-        );
-        let mut pf1 = outer.define_function("pf1", pf1t).unwrap();
 
-        let pf2t = PolyFuncType::new(
-            [TypeParam::max_nat(), TypeBound::Copyable.into()],
-            Signature::new(
-                vec![ValueArray::ty_parametric(sv(0), tv(1)).unwrap()],
-                tv(1),
-            ),
-        );
-        let mut pf2 = pf1.define_function("pf2", pf2t).unwrap();
+        let mut mb = outer.module_root_builder();
 
         let mono_func = {
-            let mut fb = pf2
+            let mut fb = mb
                 .define_function("get_usz", Signature::new(vec![], usize_t()))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
         };
+
         let pf2 = {
+            let pf2t = PolyFuncType::new(
+                [TypeParam::max_nat_type(), TypeBound::Copyable.into()],
+                Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
+            );
+            let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
             let [inw] = pf2.input_wires_arr();
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
             let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
@@ -484,6 +455,16 @@ mod test {
                 .unwrap();
             pf2.finish_with_outputs([got]).unwrap()
         };
+
+        let pf1t = PolyFuncType::new(
+            [TypeParam::max_nat_type()],
+            Signature::new(
+                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
+                usize_t(),
+            ),
+        );
+        let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
+
         // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
         let inner = pf1
             .call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())
@@ -491,11 +472,12 @@ mod test {
         let elem = pf1
             .call(
                 pf2.handle(),
-                &[TypeArg::BoundedNat { n: 2 }, usize_t().into()],
+                &[TypeArg::BoundedNat(2), usize_t().into()],
                 inner.outputs(),
             )
             .unwrap();
         let pf1 = pf1.finish_with_outputs(elem.outputs()).unwrap();
+
         // Outer: two calls to pf1 with different TypeArgs
         let [e1] = outer
             .call(pf1.handle(), &[sa(n)], outer.input_wires())
@@ -516,23 +498,24 @@ mod test {
             .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
             .unwrap()
             .outputs_arr();
+        let outer_func = outer.container_node();
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
+        hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
         monomorphize(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
-        let pf2_name = mangle_inner_func("pf1", "pf2");
         assert_eq!(
             funcs.keys().copied().sorted().collect_vec(),
             vec![
-                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 5 }]),
-                &mangle_name("pf1", &[TypeArg::BoundedNat { n: 4 }]),
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 5 }, arr2u().into()]), // from pf1<5>
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 4 }, arr2u().into()]), // from pf1<4>
-                &mangle_name(&pf2_name, &[TypeArg::BoundedNat { n: 2 }, usize_t().into()]), // from both pf1<4> and <5>
-                &mangle_inner_func(&pf2_name, "get_usz"),
-                &pf2_name,
+                &mangle_name("pf1", &[TypeArg::BoundedNat(5)]),
+                &mangle_name("pf1", &[TypeArg::BoundedNat(4)]),
+                &mangle_name("pf2", &[TypeArg::BoundedNat(5), arr2u().into()]), // from pf1<5>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(4), arr2u().into()]), // from pf1<4>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(2), usize_t().into()]), // from both pf1<4> and <5>
+                "get_usz",
+                "pf2",
                 "mainish",
                 "pf1"
             ]
@@ -540,13 +523,10 @@ mod test {
             .sorted()
             .collect_vec()
         );
-        for (n, fd) in funcs.into_values() {
-            if n == mono_hugr.entrypoint() {
-                assert_eq!(fd.func_name(), "mainish");
-            } else {
-                assert_ne!(fd.func_name(), "mainish");
-            }
-        }
+        #[allow(clippy::unnecessary_to_owned)] // it is necessary
+        let (n, fd) = *funcs.get(&"mainish".to_string()).unwrap();
+        assert_eq!(n, outer_func);
+        assert_eq!(fd.func_name(), "mainish"); // just a sanity check on list_funcs
     }
 
     fn list_funcs(h: &Hugr) -> HashMap<&String, (Node, &FuncDefn)> {
@@ -560,50 +540,6 @@ mod test {
     }
 
     #[test]
-    fn test_no_flatten_out_of_mono_func() -> Result<(), Box<dyn std::error::Error>> {
-        let ity = || INT_TYPES[4].clone();
-        let sig = Signature::new_endo(vec![usize_t(), ity()]);
-        let mut dfg = DFGBuilder::new(sig.clone()).unwrap();
-        let mut mono = dfg.define_function("id2", sig).unwrap();
-        let pf = mono
-            .define_function(
-                "id",
-                PolyFuncType::new(
-                    [TypeBound::Any.into()],
-                    Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
-                ),
-            )
-            .unwrap();
-        let outs = pf.input_wires();
-        let pf = pf.finish_with_outputs(outs).unwrap();
-        let [a, b] = mono.input_wires_arr();
-        let [a] = mono
-            .call(pf.handle(), &[usize_t().into()], [a])
-            .unwrap()
-            .outputs_arr();
-        let [b] = mono
-            .call(pf.handle(), &[ity().into()], [b])
-            .unwrap()
-            .outputs_arr();
-        let mono = mono.finish_with_outputs([a, b]).unwrap();
-        let c = dfg.call(mono.handle(), &[], dfg.input_wires()).unwrap();
-        let mut hugr = dfg.finish_hugr_with_outputs(c.outputs()).unwrap();
-        monomorphize(&mut hugr)?;
-        let mono_hugr = hugr;
-
-        let mut funcs = list_funcs(&mono_hugr);
-        #[allow(clippy::unnecessary_to_owned)] // It is necessary
-        let (m, _) = funcs.remove(&"id2".to_string()).unwrap();
-        assert_eq!(m, mono.handle().node());
-        assert_eq!(mono_hugr.get_parent(m), Some(mono_hugr.entrypoint()));
-        for t in [usize_t(), ity()] {
-            let (n, _) = funcs.remove(&mangle_name("id", &[t.into()])).unwrap();
-            assert_eq!(mono_hugr.get_parent(n), Some(m)); // Not lifted to top
-        }
-        Ok(())
-    }
-
-    #[test]
     fn load_function() {
         let mut hugr = {
             let mut module_builder = ModuleBuilder::new();
@@ -612,8 +548,8 @@ mod test {
                     .define_function(
                         "foo",
                         PolyFuncType::new(
-                            [TypeBound::Any.into()],
-                            Signature::new_endo(Type::new_var_use(0, TypeBound::Any)),
+                            [TypeBound::Linear.into()],
+                            Signature::new_endo(Type::new_var_use(0, TypeBound::Linear)),
                         ),
                     )
                     .unwrap();
@@ -657,9 +593,10 @@ mod test {
     #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$t(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
-    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$seq($n(0)$t(Unit))")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
+    #[case::sequence(vec![TypeArg::Tuple(vec![0.into(),Type::UNIT.into()])], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
-    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::String)],
+    #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringType)],
                             "$foo$$v(1)")]
     #[case::multiple(vec![0.into(), "arg".into()], "$foo$$n(0)$s(arg)")]
     fn test_mangle_name(#[case] args: Vec<TypeArg>, #[case] expected: String) {

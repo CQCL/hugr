@@ -1,12 +1,13 @@
 //! The `validate` subcommand.
 
+use anyhow::Result;
 use clap::Parser;
-use clap_verbosity_flag::log::Level;
+use hugr::HugrView;
 use hugr::package::PackageValidationError;
-use hugr::{Hugr, HugrView};
+use tracing::info;
 
+use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
-use crate::{CliError, OtherArgs};
 
 /// Validate and visualise a HUGR file.
 #[derive(Parser, Debug)]
@@ -18,10 +19,6 @@ pub struct ValArgs {
     /// Hugr input.
     #[command(flatten)]
     pub input_args: HugrInputArgs,
-
-    /// Additional arguments
-    #[command(flatten)]
-    pub other_args: OtherArgs,
 }
 
 /// String to print when validation is successful.
@@ -29,28 +26,35 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
-    pub fn run(&mut self) -> Result<Vec<Hugr>, CliError> {
-        let result = if self.input_args.hugr_json {
+    pub fn run(&mut self) -> Result<()> {
+        if self.input_args.hugr_json {
             let hugr = self.input_args.get_hugr()?;
+            let generator = hugr::envelope::get_generator(&[&hugr]);
+
             hugr.validate()
-                .map_err(PackageValidationError::Validation)?;
-            vec![hugr]
+                .map_err(PackageValidationError::Validation)
+                .map_err(|val_err| wrap_generator(generator, val_err))?;
         } else {
             let package = self.input_args.get_package()?;
-            package.validate()?;
-            package.modules
+            let generator = hugr::envelope::get_generator(&package.modules);
+            package
+                .validate()
+                .map_err(|val_err| wrap_generator(generator, val_err))?;
         };
 
-        if self.verbosity(Level::Info) {
-            eprintln!("{VALID_PRINT}");
-        }
+        info!("{VALID_PRINT}");
 
-        Ok(result)
+        Ok(())
     }
+}
 
-    /// Test whether a `level` message should be output.
-    #[must_use]
-    pub fn verbosity(&self, level: Level) -> bool {
-        self.other_args.verbosity(level)
+fn wrap_generator(generator: Option<String>, val_err: PackageValidationError) -> CliError {
+    if let Some(g) = generator {
+        CliError::ValidateKnownGenerator {
+            inner: val_err,
+            generator: Box::new(g.to_string()),
+        }
+    } else {
+        CliError::Validate(val_err)
     }
 }

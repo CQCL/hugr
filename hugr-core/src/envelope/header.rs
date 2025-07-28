@@ -3,6 +3,8 @@
 use std::io::{Read, Write};
 use std::num::NonZeroU8;
 
+use itertools::Itertools;
+
 use super::EnvelopeError;
 
 /// Magic number identifying the start of an envelope.
@@ -10,6 +12,12 @@ use super::EnvelopeError;
 /// In ascii, this is "`HUGRiHJv`". The second half is a randomly generated string
 /// to avoid accidental collisions with other file formats.
 pub const MAGIC_NUMBERS: &[u8] = "HUGRiHJv".as_bytes();
+
+/// The all-unset header flags configuration.
+/// Bit 7 is always set to ensure we have a printable ASCII character.
+const DEFAULT_FLAGS: u8 = 0b0100_0000u8;
+/// The ZSTD flag bit in the header's flags.
+const ZSTD_FLAG: u8 = 0b0000_0001;
 
 /// Header at the start of a binary envelope file.
 ///
@@ -224,8 +232,10 @@ impl EnvelopeHeader {
         let format_bytes = [self.format as u8];
         writer.write_all(&format_bytes)?;
         // Next is the flags byte.
-        let mut flags = 0b01000000u8;
-        flags |= u8::from(self.zstd);
+        let mut flags = DEFAULT_FLAGS;
+        if self.zstd {
+            flags |= ZSTD_FLAG;
+        }
         writer.write_all(&[flags])?;
 
         Ok(())
@@ -259,7 +269,16 @@ impl EnvelopeHeader {
         // Next is the flags byte.
         let mut flags_bytes = [0; 1];
         reader.read_exact(&mut flags_bytes)?;
-        let zstd = flags_bytes[0] & 0x1 != 0;
+        let flags: u8 = flags_bytes[0];
+
+        let zstd = flags & ZSTD_FLAG != 0;
+
+        // Check if there's any unrecognized flags.
+        let other_flags = (flags ^ DEFAULT_FLAGS) & !ZSTD_FLAG;
+        if other_flags != 0 {
+            let flag_ids = (0..8).filter(|i| other_flags & (1 << i) != 0).collect_vec();
+            return Err(EnvelopeError::FlagUnsupported { flag_ids });
+        }
 
         Ok(Self { format, zstd })
     }
@@ -268,6 +287,7 @@ impl EnvelopeHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cool_asserts::assert_matches;
     use rstest::rstest;
 
     #[rstest]
@@ -295,5 +315,36 @@ mod tests {
         header.write(&mut buffer).unwrap();
         let read_header = EnvelopeHeader::read(&mut buffer.as_slice()).unwrap();
         assert_eq!(header, read_header);
+    }
+
+    #[rstest]
+    fn header_errors() {
+        let header = EnvelopeHeader {
+            format: EnvelopeFormat::Model,
+            zstd: false,
+        };
+        let mut buffer = Vec::new();
+        header.write(&mut buffer).unwrap();
+
+        assert_eq!(buffer.len(), 10);
+        let flags = buffer[9];
+        assert_eq!(flags, DEFAULT_FLAGS);
+
+        // Invalid magic
+        let mut invalid_magic = buffer.clone();
+        invalid_magic[7] = 0xFF;
+        assert_matches!(
+            EnvelopeHeader::read(&mut invalid_magic.as_slice()),
+            Err(EnvelopeError::MagicNumber { .. })
+        );
+
+        // Unrecognised flags
+        let mut unrecognised_flags = buffer.clone();
+        unrecognised_flags[9] |= 0b0001_0010;
+        assert_matches!(
+            EnvelopeHeader::read(&mut unrecognised_flags.as_slice()),
+            Err(EnvelopeError::FlagUnsupported { flag_ids })
+            => assert_eq!(flag_ids, vec![1, 4])
+        );
     }
 }
