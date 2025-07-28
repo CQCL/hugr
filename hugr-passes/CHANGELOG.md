@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.0...hugr-passes-v0.22.1) - 2025-07-28
+
+### New Features
+
+- Include copy_discard_array in DelegatingLinearizer::default ([#2479](https://github.com/CQCL/hugr/pull/2479))
+- Inline calls to functions not on cycles in the call graph ([#2450](https://github.com/CQCL/hugr/pull/2450))
+
 ## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.21.0...hugr-passes-v0.22.0) - 2025-07-24
 
 ### New Features
