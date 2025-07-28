@@ -312,7 +312,7 @@ requires-dist = [
     { name = "pyzstd", specifier = ">=0.16.2,<0.18.0" },
     { name = "semver", specifier = ">=3.0.2" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.1.3,<9.0.0" },
-    { name = "typing-extensions", specifier = "~=4.12" },
+    { name = "typing-extensions", specifier = ">=4" },
 ]
 provides-extras = ["docs", "pytket"]
 
