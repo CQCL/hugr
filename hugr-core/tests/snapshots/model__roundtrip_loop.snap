@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: ast
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-loop.edn\"))"
 ---
 (hugr 0)
 
@@ -14,10 +14,7 @@ expression: ast
 
 (import core.adt)
 
-(import core.title)
-
-(define-func private _1 (param ?0 core.type) (core.fn [?0] [?0])
-  (meta (core.title "example.loop"))
+(define-func example.loop (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]
     (signature (core.fn [?0] [?0]))
     (tail-loop [%0] [%1]

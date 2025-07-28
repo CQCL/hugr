@@ -1,0 +1,38 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define i1 @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"4_0" = alloca i1, align 1
+  %"12_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call i1 @_hl.scoped_func.8()
+  store i1 %0, i1* %"12_0", align 1
+  %"12_01" = load i1, i1* %"12_0", align 1
+  store i1 %"12_01", i1* %"4_0", align 1
+  %"4_02" = load i1, i1* %"4_0", align 1
+  store i1 %"4_02", i1* %"0", align 1
+  %"03" = load i1, i1* %"0", align 1
+  ret i1 %"03"
+}
+
+define i1 @_hl.scoped_func.8() {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"11_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i1 false, i1* %"11_0", align 1
+  %"11_01" = load i1, i1* %"11_0", align 1
+  store i1 %"11_01", i1* %"0", align 1
+  %"02" = load i1, i1* %"0", align 1
+  ret i1 %"02"
+}

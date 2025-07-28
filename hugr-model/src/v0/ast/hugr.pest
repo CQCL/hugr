@@ -16,8 +16,6 @@ reserved = @{
   | "list"
   | "meta"
   | "signature"
-  | "public"
-  | "private"
   | "dfg"
   | "cfg"
   | "block"
@@ -81,9 +79,7 @@ node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ reg
 node_import            = { "(" ~ "import" ~ symbol_name ~ meta* ~ ")" }
 node_custom            = { "(" ~ term ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
-visibility = { "public" | "private" }
-
-symbol = { visibility? ~ symbol_name ~ param* ~ where_clause* ~ term }
+symbol = { symbol_name ~ param* ~ where_clause* ~ term }
 
 signature    = { "(" ~ "signature" ~ term ~ ")" }
 param        = { "(" ~ "param" ~ term_var ~ term ~ ")" }

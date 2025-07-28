@@ -29,15 +29,7 @@ from hugr.ops import (
     Tag,
     TailLoop,
 )
-from hugr.tys import (
-    ConstKind,
-    FunctionKind,
-    Type,
-    TypeBound,
-    TypeParam,
-    TypeTypeParam,
-    Visibility,
-)
+from hugr.tys import ConstKind, FunctionKind, Type, TypeBound, TypeParam, TypeTypeParam
 
 
 class ModelExport:
@@ -47,7 +39,8 @@ class ModelExport:
         self.hugr = hugr
         self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
         self.link_names: dict[InPort | OutPort, str] = {}
-        self.link_next = 0
+
+        # TODO: Store the hugr entrypoint
 
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
@@ -59,26 +52,20 @@ class ModelExport:
         if root in self.link_names:
             return self.link_names[root]
         else:
-            index = str(self.link_next)
-            self.link_next += 1
+            index = str(len(self.link_names))
             self.link_names[root] = index
             return index
 
-    def export_node(
-        self, node: Node, virtual_input_links: Sequence[str] = []
-    ) -> model.Node | None:
+    def export_node(self, node: Node) -> model.Node | None:
         """Export the node with the given node id."""
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
-        inputs = [*inputs, *virtual_input_links]
-
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = self.export_json_meta(node)
-        meta += self.export_entrypoint_meta(node)
 
         # Add an order hint key to the node if necessary
-        if _has_order_links(self.hugr, node):
+        if _needs_order_key(self.hugr, node):
             meta.append(model.Apply("core.order_hint.key", [model.Literal(node.idx)]))
 
         match node_data.op:
@@ -124,8 +111,7 @@ class ModelExport:
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(child, entrypoint_meta=True)
-                    for child in node_data.children
+                    self.export_region_dfg(child) for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
@@ -152,45 +138,30 @@ class ModelExport:
                 )
 
             case FuncDefn() as op:
-                name = _mangle_name(node, op.f_name, op.visibility)
+                name = _mangle_name(node, op.f_name)
                 symbol = self.export_symbol(
-                    name, op.visibility, op.signature.params, op.signature.body
+                    name, op.signature.params, op.signature.body
                 )
                 region = self.export_region_dfg(node)
-
-                if op.visibility == "Private":
-                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
                 )
 
             case FuncDecl() as op:
-                name = _mangle_name(node, op.f_name, op.visibility)
+                name = _mangle_name(node, op.f_name)
                 symbol = self.export_symbol(
-                    name, op.visibility, op.signature.params, op.signature.body
+                    name, op.signature.params, op.signature.body
                 )
-
-                if op.visibility == "Private":
-                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
-
                 return model.Node(operation=model.DeclareFunc(symbol), meta=meta)
 
             case AliasDecl() as op:
-                symbol = model.Symbol(
-                    name=op.alias,
-                    visibility="Public",
-                    signature=model.Apply("core.type"),
-                )
+                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
                 return model.Node(operation=model.DeclareAlias(symbol), meta=meta)
 
             case AliasDefn() as op:
-                symbol = model.Symbol(
-                    name=op.alias,
-                    visibility="Public",
-                    signature=model.Apply("core.type"),
-                )
+                symbol = model.Symbol(name=op.alias, signature=model.Apply("core.type"))
 
                 alias_value = cast(model.Term, op.definition.to_model())
 
@@ -210,11 +181,6 @@ class ModelExport:
                 if func_name is None:
                     error = f"Call node {node} is not connected to a function."
                     raise ValueError(error)
-
-                # We ignore the static input edge since the function is passed
-                # as an argument instead.
-                assert len(inputs) == len(input_types) + 1
-                inputs = inputs[0 : len(inputs) - 1]
 
                 func = model.Apply(func_name, func_args)
 
@@ -236,8 +202,7 @@ class ModelExport:
                 )
 
             case LoadFunc() as op:
-                signature = op.outer_signature().to_model()
-                instantiation = op.instantiation.to_model()
+                signature = op.instantiation.to_model()
                 func_args = cast(
                     list[model.Term], [type.to_model() for type in op.type_args]
                 )
@@ -251,10 +216,10 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", [instantiation, func])
+                        model.Apply("core.load_const", [signature, func])
                     ),
                     signature=signature,
-                    inputs=[],
+                    inputs=inputs,
                     outputs=outputs,
                     meta=meta,
                 )
@@ -307,7 +272,7 @@ class ModelExport:
                         model.Apply("core.load_const", [type, value])
                     ),
                     signature=signature,
-                    inputs=[],
+                    inputs=inputs,
                     outputs=outputs,
                     meta=meta,
                 )
@@ -331,21 +296,31 @@ class ModelExport:
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
-                input_types = [model.List([type.to_model() for type in op.inputs])]
+                input_types = [
+                    model.Apply(
+                        "core.ctrl",
+                        [model.List([type.to_model() for type in op.inputs])],
+                    )
+                ]
 
                 other_output_types = [type.to_model() for type in op.other_outputs]
                 output_types = [
-                    model.List(
+                    model.Apply(
+                        "core.ctrl",
                         [
-                            *[type.to_model() for type in row],
-                            *other_output_types,
-                        ]
+                            model.List(
+                                [
+                                    *[type.to_model() for type in row],
+                                    *other_output_types,
+                                ]
+                            )
+                        ],
                     )
                     for row in op.sum_ty.variant_rows
                 ]
 
                 signature = model.Apply(
-                    "core.ctrl",
+                    "core.fn",
                     [model.List(input_types), model.List(output_types)],
                 )
 
@@ -404,18 +379,10 @@ class ModelExport:
 
         return meta
 
-    def export_entrypoint_meta(self, node: Node) -> list[model.Term]:
-        """Export entrypoint metadata if the node is the module entrypoint."""
-        if self.hugr.entrypoint == node:
-            return [model.Apply("core.entrypoint")]
-        else:
-            return []
-
     def export_region_module(self, node: Node) -> model.Region:
         """Export a module node as a module region."""
         node_data = self.hugr[node]
         meta = self.export_json_meta(node)
-        meta += self.export_entrypoint_meta(node)
         children = []
 
         for child in node_data.children:
@@ -426,7 +393,7 @@ class ModelExport:
 
         return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
-    def export_region_dfg(self, node: Node, entrypoint_meta=False) -> model.Region:
+    def export_region_dfg(self, node: Node) -> model.Region:
         """Export the children of a node as a dataflow region."""
         node_data = self.hugr[node]
         children: list[model.Node] = []
@@ -435,9 +402,6 @@ class ModelExport:
         sources = []
         targets = []
         meta = []
-
-        if entrypoint_meta:
-            meta += self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -450,26 +414,12 @@ class ModelExport:
                         for i in range(child_data._num_outs)
                     ]
 
-                    if _has_order_links(self.hugr, child):
-                        meta.append(
-                            model.Apply(
-                                "core.order_hint.input_key", [model.Literal(child.idx)]
-                            )
-                        )
-
                 case Output() as op:
                     target_types = model.List([type.to_model() for type in op.types])
                     targets = [
                         self.link_name(InPort(child, i))
                         for i in range(child_data._num_inps)
                     ]
-
-                    if _has_order_links(self.hugr, child):
-                        meta.append(
-                            model.Apply(
-                                "core.order_hint.output_key", [model.Literal(child.idx)]
-                            )
-                        )
 
                 case _:
                     child_node = self.export_node(child)
@@ -479,13 +429,14 @@ class ModelExport:
 
                     children.append(child_node)
 
-            meta += [
-                model.Apply(
-                    "core.order_hint.order",
-                    [model.Literal(child.idx), model.Literal(successor.idx)],
-                )
-                for successor in self.hugr.outgoing_order_links(child)
-            ]
+                    meta += [
+                        model.Apply(
+                            "core.order_hint.order",
+                            [model.Literal(child.idx), model.Literal(successor.idx)],
+                        )
+                        for successor in self.hugr.outgoing_order_links(child)
+                        if not isinstance(self.hugr[successor].op, Output)
+                    ]
 
         signature = model.Apply("core.fn", [source_types, target_types])
 
@@ -507,7 +458,6 @@ class ModelExport:
         source_types: model.Term = model.Wildcard()
         target_types: model.Term = model.Wildcard()
         children = []
-        meta = self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -526,14 +476,9 @@ class ModelExport:
                         source_types = model.List(
                             [type.to_model() for type in op.inputs]
                         )
-                        source = str(self.link_next)
-                        self.link_next += 1
+                        source = self.link_name(OutPort(child, 0))
 
-                        child_node = self.export_node(
-                            child, virtual_input_links=[source]
-                        )
-                    else:
-                        child_node = self.export_node(child)
+                    child_node = self.export_node(child)
 
                     if child_node is not None:
                         children.append(child_node)
@@ -545,13 +490,7 @@ class ModelExport:
             error = f"CFG {node} has no entry block."
             raise ValueError(error)
 
-        signature = model.Apply(
-            "core.ctrl",
-            [
-                model.List([source_types]),
-                model.List([target_types]),
-            ],
-        )
+        signature = model.Apply("core.fn", [source_types, target_types])
 
         return model.Region(
             kind=model.RegionKind.CONTROL_FLOW,
@@ -559,15 +498,10 @@ class ModelExport:
             sources=[source],
             signature=signature,
             children=children,
-            meta=meta,
         )
 
     def export_symbol(
-        self,
-        name: str,
-        visibility: Visibility,
-        param_types: Sequence[TypeParam],
-        body: Type,
+        self, name: str, param_types: Sequence[TypeParam], body: Type
     ) -> model.Symbol:
         """Export a symbol."""
         constraints = []
@@ -588,14 +522,13 @@ class ModelExport:
 
         return model.Symbol(
             name=name,
-            visibility=visibility,
             params=params,
             constraints=constraints,
             signature=cast(model.Term, body.to_model()),
         )
 
     def find_func_input(self, node: Node) -> str | None:
-        """Find the symbol name of the function that a node is connected to, if any."""
+        """Find the name of the function that a node is connected to, if any."""
         try:
             func_node = next(
                 out_port.node
@@ -609,14 +542,12 @@ class ModelExport:
         match self.hugr[func_node].op:
             case FuncDecl() as func_op:
                 name = func_op.f_name
-                visibility = func_op.visibility
             case FuncDefn() as func_op:
                 name = func_op.f_name
-                visibility = func_op.visibility
             case _:
                 return None
 
-        return _mangle_name(func_node, name, visibility)
+        return _mangle_name(func_node, name)
 
     def find_const_input(self, node: Node) -> model.Term | None:
         """Find and export the constant that a node is connected to, if any."""
@@ -637,17 +568,10 @@ class ModelExport:
                 return None
 
 
-def _mangle_name(node: Node, name: str, visibility: Visibility) -> str:
-    match visibility:
-        case "Private":
-            # Until we come to an agreement on the uniqueness of names,
-            # we mangle the names by replacing id with the node id.
-            return f"_{node.idx}"
-        case "Public":
-            return name
-        case _:
-            error = f"Unexpected visibility {visibility}"
-            raise ValueError(error)
+def _mangle_name(node: Node, name: str) -> str:
+    # Until we come to an agreement on the uniqueness of names, we mangle the names
+    # by adding the node id.
+    return f"_{name}_{node.idx}"
 
 
 T = TypeVar("T")
@@ -686,12 +610,19 @@ class _UnionFind(Generic[T]):
         self.sizes[a] += self.sizes[b]
 
 
-def _has_order_links(hugr: Hugr, node: Node) -> bool:
-    """Checks whether the node has any order links."""
-    for _succ in hugr.outgoing_order_links(node):
-        return True
+def _needs_order_key(hugr: Hugr, node: Node) -> bool:
+    """Checks whether the node has any order links for the purposes of
+    exporting order hint metadata. Order links to `Input` or `Output`
+    operations are ignored, since they are not present in the model format.
+    """
+    for succ in hugr.outgoing_order_links(node):
+        succ_op = hugr[succ].op
+        if not isinstance(succ_op, Output):
+            return True
 
-    for _pred in hugr.incoming_order_links(node):
-        return True
+    for pred in hugr.incoming_order_links(node):
+        pred_op = hugr[pred].op
+        if not isinstance(pred_op, Input):
+            return True
 
     return False

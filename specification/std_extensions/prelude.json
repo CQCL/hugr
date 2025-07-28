@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.0",
   "name": "prelude",
   "types": {
     "error": {
@@ -71,38 +71,6 @@
               "t": "R",
               "i": 0,
               "b": "A"
-            }
-          ]
-        }
-      },
-      "binary": false
-    },
-    "MakeError": {
-      "extension": "prelude",
-      "name": "MakeError",
-      "description": "Create an error value",
-      "signature": {
-        "params": [],
-        "body": {
-          "input": [
-            {
-              "t": "I"
-            },
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "string",
-              "args": [],
-              "bound": "C"
-            }
-          ],
-          "output": [
-            {
-              "t": "Opaque",
-              "extension": "prelude",
-              "id": "error",
-              "args": [],
-              "bound": "C"
             }
           ]
         }

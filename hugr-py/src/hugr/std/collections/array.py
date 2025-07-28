@@ -54,7 +54,7 @@ class Array(tys.ExtType):
         return None
 
     def type_bound(self) -> tys.TypeBound:
-        return tys.TypeBound.Linear
+        return tys.TypeBound.Any
 
 
 @dataclass

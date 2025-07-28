@@ -428,7 +428,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         if !OpTag::DataflowParent.is_superset(dfg_optype.tag()) {
             return Err(InvalidReplacement::InvalidDataflowGraph {
                 node: rep_root,
-                op: Box::new(dfg_optype.clone()),
+                op: dfg_optype.clone(),
             });
         }
         let [rep_input, rep_output] = replacement
@@ -575,7 +575,7 @@ fn pick_parent<'a, N: HugrNode>(
 }
 
 fn make_boundary<'a, H: HugrView>(
-    region: &impl LinkView<PortOffsetBase = u32>,
+    region: &impl LinkView,
     node_map: &H::RegionPortgraphNodes,
     inputs: &'a IncomingPorts<H::Node>,
     outputs: &'a OutgoingPorts<H::Node>,
@@ -881,7 +881,7 @@ pub enum InvalidReplacement {
         /// The node ID of the root node.
         node: Node,
         /// The op type of the root node.
-        op: Box<OpType>,
+        op: OpType,
     },
     /// Replacement graph type mismatch.
     #[error(
@@ -890,9 +890,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: Box<Signature>,
+        expected: Signature,
         /// The actual signature.
-        actual: Option<Box<Signature>>,
+        actual: Option<Signature>,
     },
     /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]

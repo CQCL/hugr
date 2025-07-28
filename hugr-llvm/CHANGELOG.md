@@ -1,21 +1,9 @@
 # Changelog
-
-# Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
-## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.2...hugr-llvm-v0.21.0) - 2025-07-09
-
-### New Features
-
-- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
-- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
-- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
-- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
-- Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
 
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.1...hugr-llvm-v0.20.2) - 2025-06-25
 

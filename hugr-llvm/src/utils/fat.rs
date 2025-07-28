@@ -8,7 +8,7 @@ use hugr_core::hugr::views::Rerooted;
 use hugr_core::{
     Hugr, HugrView, IncomingPort, Node, NodeIndex, OutgoingPort,
     core::HugrNode,
-    ops::{CFG, DataflowBlock, ExitBlock, Input, Module, OpType, Output},
+    ops::{CFG, DataflowBlock, ExitBlock, Input, OpType, Output},
     types::Type,
 };
 use itertools::Itertools as _;
@@ -373,12 +373,7 @@ pub trait FatExt: HugrView {
     }
 
     /// Try to create a specific [`FatNode`] for the root of a [`HugrView`].
-    fn fat_root(&self) -> Option<FatNode<Module, Self, Self::Node>> {
-        self.try_fat(self.module_root())
-    }
-
-    /// Try to create a specific [`FatNode`] for the entrypoint of a [`HugrView`].
-    fn fat_entrypoint<OT>(&self) -> Option<FatNode<OT, Self, Self::Node>>
+    fn fat_root<OT>(&self) -> Option<FatNode<OT, Self, Self::Node>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {

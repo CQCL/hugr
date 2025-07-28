@@ -14,6 +14,7 @@ from hugr.val import (
     Sum,
     Tuple,
     UnitSum,
+    Value,
     bool_value,
 )
 
@@ -43,9 +44,9 @@ def test_sums():
     ("value", "string", "repr_str"),
     [
         (
-            Sum(0, tys.Sum([[tys.Bool], [tys.Qubit], [tys.Bool]]), [TRUE]),
-            "Sum(0, Sum([[Bool], [Qubit], [Bool]]), [TRUE])",
-            "Sum(tag=0, typ=Sum([[Bool], [Qubit], [Bool]]), vals=[TRUE])",
+            Sum(0, tys.Sum([[tys.Bool], [tys.Qubit]]), [TRUE, FALSE]),
+            "Sum(tag=0, typ=Sum([[Bool], [Qubit]]), vals=[TRUE, FALSE])",
+            "Sum(tag=0, typ=Sum([[Bool], [Qubit]]), vals=[TRUE, FALSE])",
         ),
         (UnitSum(0, size=1), "Unit", "Unit"),
         (UnitSum(0, size=2), "FALSE", "FALSE"),
@@ -66,14 +67,9 @@ def test_sums():
         ),
     ],
 )
-def test_val_sum_str(value: Sum, string: str, repr_str: str):
+def test_val_sum_str(value: Value, string: str, repr_str: str):
     assert str(value) == string
     assert repr(value) == repr_str
-
-    # Make sure the corresponding `Sum` also renders the same
-    sum_val = Sum(value.tag, value.typ, value.vals)
-    assert str(sum_val) == string
-    assert repr(sum_val) == repr_str
 
 
 def test_val_static_array():

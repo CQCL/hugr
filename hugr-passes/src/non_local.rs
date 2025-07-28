@@ -1,5 +1,6 @@
 //! This module provides functions for finding non-local edges
 //! in a Hugr and converting them to local edges.
+#![warn(missing_docs)]
 use itertools::Itertools as _;
 
 use hugr_core::{

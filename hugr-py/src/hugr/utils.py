@@ -215,27 +215,3 @@ def comma_sep_str(items: Iterable[T]) -> str:
 def comma_sep_repr(items: Iterable[T]) -> str:
     """Join items with commas and repr."""
     return ", ".join(map(repr, items))
-
-
-def comma_sep_str_paren(items: Iterable[T]) -> str:
-    """Join items with commas and str, wrapping them in parentheses if more than one."""
-    items = list(items)
-    if len(items) == 0:
-        return "()"
-    elif len(items) == 1:
-        return f"{items[0]}"
-    else:
-        return f"({comma_sep_str(items)})"
-
-
-def comma_sep_repr_paren(items: Iterable[T]) -> str:
-    """Join items with commas and repr, wrapping them in parentheses if more
-    than one.
-    """
-    items = list(items)
-    if len(items) == 0:
-        return "()"
-    elif len(items) == 1:
-        return f"{items[0]}"
-    else:
-        return f"({comma_sep_repr(items)})"

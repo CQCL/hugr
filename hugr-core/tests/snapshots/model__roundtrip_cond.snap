@@ -1,14 +1,10 @@
 ---
 source: hugr-core/tests/model.rs
-expression: ast
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cond.edn\"))"
 ---
 (hugr 0)
 
 (mod)
-
-(import core.meta.description)
-
-(import core.nat)
 
 (import core.fn)
 
@@ -16,42 +12,31 @@ expression: ast
 
 (import arithmetic.int.types.int)
 
-(declare-operation
-  arithmetic.int.ineg
-  (param ?0 core.nat)
-  (core.fn [(arithmetic.int.types.int ?0)] [(arithmetic.int.types.int ?0)])
-  (meta
-    (core.meta.description
-      "negation modulo 2^N (signed and unsigned versions are the same op)")))
+(import arithmetic.int.ineg)
 
 (define-func
-  public
   example.cond
   (core.fn
-    [(core.adt [[] []]) (arithmetic.int.types.int 6)]
-    [(arithmetic.int.types.int 6)])
+    [(core.adt [[] []]) arithmetic.int.types.int]
+    [arithmetic.int.types.int])
   (dfg [%0 %1] [%2]
     (signature
       (core.fn
-        [(core.adt [[] []]) (arithmetic.int.types.int 6)]
-        [(arithmetic.int.types.int 6)]))
+        [(core.adt [[] []]) arithmetic.int.types.int]
+        [arithmetic.int.types.int]))
     (cond [%0 %1] [%2]
       (signature
         (core.fn
-          [(core.adt [[] []]) (arithmetic.int.types.int 6)]
-          [(arithmetic.int.types.int 6)]))
+          [(core.adt [[] []]) arithmetic.int.types.int]
+          [arithmetic.int.types.int]))
       (dfg [%3] [%3]
         (signature
-          (core.fn
-            [(arithmetic.int.types.int 6)]
-            [(arithmetic.int.types.int 6)])))
+          (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))
       (dfg [%4] [%5]
         (signature
-          (core.fn
-            [(arithmetic.int.types.int 6)]
-            [(arithmetic.int.types.int 6)]))
-        ((arithmetic.int.ineg 6) [%4] [%5]
+          (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+        (arithmetic.int.ineg [%4] [%5]
           (signature
             (core.fn
-              [(arithmetic.int.types.int 6)]
-              [(arithmetic.int.types.int 6)])))))))
+              [arithmetic.int.types.int]
+              [arithmetic.int.types.int])))))))

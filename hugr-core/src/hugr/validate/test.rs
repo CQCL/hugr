@@ -1,44 +1,38 @@
-use std::borrow::Cow;
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::Arc;
 
 use cool_asserts::assert_matches;
-use rstest::rstest;
 
 use super::*;
 use crate::builder::test::closed_dfg_root_hugr;
 use crate::builder::{
     BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-    FunctionBuilder, HugrBuilder, ModuleBuilder, inout_sig,
+    FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, inout_sig,
 };
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
 use crate::extension::{Extension, ExtensionRegistry, PRELUDE, TypeDefBound};
 use crate::hugr::HugrMut;
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::dataflow::{DataflowParent, IOTrait};
+use crate::ops::dataflow::IOTrait;
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, FuncDecl, FuncDefn, OpType, Value};
+use crate::ops::{self, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
-use crate::types::type_param::{TermTypeError, TypeArg};
+use crate::types::type_param::{TypeArg, TypeArgError};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
-    TypeRV, TypeRow,
+    CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeRV,
+    TypeRow,
 };
 use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
-/// Creates a hugr with a single, public, function definition that copies a bit `copies` times.
+/// Creates a hugr with a single function definition that copies a bit `copies` times.
 ///
 /// Returns the hugr and the node index of the definition.
 fn make_simple_hugr(copies: usize) -> (Hugr, Node) {
-    let def_op: OpType = FuncDefn::new_vis(
-        "main",
-        Signature::new(bool_t(), vec![bool_t(); copies]),
-        Visibility::Public,
-    )
-    .into();
+    let def_op: OpType =
+        ops::FuncDefn::new("main", Signature::new(bool_t(), vec![bool_t(); copies])).into();
 
     let mut b = Hugr::default();
     let root = b.entrypoint();
@@ -132,7 +126,7 @@ fn children_restrictions() {
 
     // Add a definition without children
     let def_sig = Signature::new(vec![bool_t()], vec![bool_t(), bool_t()]);
-    let new_def = b.add_node_with_parent(root, FuncDefn::new("main", def_sig));
+    let new_def = b.add_node_with_parent(root, ops::FuncDefn::new("main", def_sig));
     assert_matches!(
         b.validate(),
         Err(ValidationError::ContainerWithoutChildren { node, .. }) => assert_eq!(node, new_def)
@@ -232,6 +226,35 @@ fn test_ext_edge() {
 }
 
 #[test]
+fn no_ext_edge_into_func() -> Result<(), Box<dyn std::error::Error>> {
+    let b2b = Signature::new_endo(bool_t());
+    let mut h = DFGBuilder::new(Signature::new(bool_t(), Type::new_function(b2b.clone())))?;
+    let [input] = h.input_wires_arr();
+
+    let mut dfg = h.dfg_builder(Signature::new(vec![], Type::new_function(b2b.clone())), [])?;
+    let mut func = dfg.define_function("AndWithOuter", b2b.clone())?;
+    let [fn_input] = func.input_wires_arr();
+    let and_op = func.add_dataflow_op(and_op(), [fn_input, input])?; // 'ext' edge
+    let func = func.finish_with_outputs(and_op.outputs())?;
+    let loadfn = dfg.load_func(func.handle(), &[])?;
+    let dfg = dfg.finish_with_outputs([loadfn])?;
+    let res = h.finish_hugr_with_outputs(dfg.outputs());
+    assert_eq!(
+        res,
+        Err(BuildError::InvalidHUGR(
+            ValidationError::InterGraphEdgeError(InterGraphEdgeError::ValueEdgeIntoFunc {
+                from: input.node(),
+                from_offset: input.source().into(),
+                to: and_op.node(),
+                to_offset: IncomingPort::from(1).into(),
+                func: func.node()
+            })
+        ))
+    );
+    Ok(())
+}
+
+#[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(Signature::new_endo(bool_t()));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
@@ -243,7 +266,7 @@ fn test_local_const() {
         Err(ValidationError::UnconnectedPort {
             node: and,
             port: IncomingPort::from(1).into(),
-            port_kind: Box::new(EdgeKind::Value(bool_t()))
+            port_kind: EdgeKind::Value(bool_t())
         })
     );
     let const_op: ops::Const = ops::Value::from_bool(true).into();
@@ -282,7 +305,7 @@ fn identity_hugr_with_type(t: Type) -> (Hugr, Node) {
 
     let def = b.add_node_with_parent(
         b.entrypoint(),
-        FuncDefn::new("main", Signature::new_endo(row.clone())),
+        ops::FuncDefn::new("main", Signature::new_endo(row.clone())),
     );
 
     let input = b.add_node_with_parent(def, ops::Input::new(row.clone()));
@@ -324,9 +347,9 @@ fn invalid_types() {
 
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![TypeArg::Type { ty: usize_t() }],
         EXT_ID,
-        TypeBound::Linear,
+        TypeBound::Any,
         &Arc::downgrade(&ext),
     ));
     let mut hugr = identity_hugr_with_type(valid.clone()).0;
@@ -336,22 +359,22 @@ fn invalid_types() {
     // valid is Any, so is not allowed as an element of an outer MyContainer.
     let element_outside_bound = CustomType::new(
         "MyContainer",
-        vec![valid.clone().into()],
+        vec![TypeArg::Type { ty: valid.clone() }],
         EXT_ID,
-        TypeBound::Linear,
+        TypeBound::Any,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
-        SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: Box::new(TypeBound::Copyable.into()),
-            term: Box::new(valid.into())
+        SignatureError::TypeArgMismatch(TypeArgError::TypeMismatch {
+            param: TypeBound::Copyable.into(),
+            arg: TypeArg::Type { ty: valid }
         })
     );
 
     let bad_bound = CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![TypeArg::Type { ty: usize_t() }],
         EXT_ID,
         TypeBound::Copyable,
         &Arc::downgrade(&ext),
@@ -360,36 +383,41 @@ fn invalid_types() {
         validate_to_sig_error(bad_bound.clone()),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Linear
+            expected: TypeBound::Any
         }
     );
 
     // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
     let nested = CustomType::new(
         "MyContainer",
-        vec![Type::new_extension(bad_bound).into()],
+        vec![TypeArg::Type {
+            ty: Type::new_extension(bad_bound),
+        }],
         EXT_ID,
-        TypeBound::Linear,
+        TypeBound::Any,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(nested),
         SignatureError::WrongBound {
             actual: TypeBound::Copyable,
-            expected: TypeBound::Linear
+            expected: TypeBound::Any
         }
     );
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![usize_t().into(), 3u64.into()],
+        vec![
+            TypeArg::Type { ty: usize_t() },
+            TypeArg::BoundedNat { n: 3 },
+        ],
         EXT_ID,
-        TypeBound::Linear,
+        TypeBound::Any,
         &Arc::downgrade(&ext),
     );
     assert_eq!(
         validate_to_sig_error(too_many_type_args),
-        SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+        SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(2, 1))
     );
 }
 
@@ -399,8 +427,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Linear.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
+            [TypeBound::Any.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -409,8 +437,8 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Linear.into()],
-            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Linear)]),
+            [TypeBound::Any.into()],
+            Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Any)]),
         ),
     )?;
     let [w] = f.input_wires_arr();
@@ -419,7 +447,7 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     let f = FunctionBuilder::new(
         "myfunc",
         PolyFuncType::new(
-            [TypeBound::Linear.into()],
+            [TypeBound::Any.into()],
             Signature::new_endo(vec![Type::new_var_use(1, TypeBound::Copyable)]),
         ),
     )?;
@@ -428,39 +456,51 @@ fn typevars_declared() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test that `FuncDefns` cannot be nested.
+/// Test that nested `FuncDefns` cannot use Type Variables declared by enclosing `FuncDefns`
 #[test]
-fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
-    let mut outer = FunctionBuilder::new("outer", Signature::new_endo(usize_t()))?;
-    let inner = outer
-        .add_hugr({
-            let inner = FunctionBuilder::new("inner", Signature::new_endo(bool_t()))?;
-            let [w] = inner.input_wires_arr();
-            inner.finish_hugr_with_outputs([w])?
-        })
-        .inserted_entrypoint;
-    let [w] = outer.input_wires_arr();
-    let outer_node = outer.container_node();
-    let hugr = outer.finish_hugr_with_outputs([w]);
+fn nested_typevars() -> Result<(), Box<dyn std::error::Error>> {
+    const OUTER_BOUND: TypeBound = TypeBound::Any;
+    const INNER_BOUND: TypeBound = TypeBound::Copyable;
+    fn build(t: Type) -> Result<Hugr, BuildError> {
+        let mut outer = FunctionBuilder::new(
+            "outer",
+            PolyFuncType::new(
+                [OUTER_BOUND.into()],
+                Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
+            ),
+        )?;
+        let inner = outer.define_function(
+            "inner",
+            PolyFuncType::new([INNER_BOUND.into()], Signature::new_endo(vec![t])),
+        )?;
+        let [w] = inner.input_wires_arr();
+        inner.finish_with_outputs([w])?;
+        let [w] = outer.input_wires_arr();
+        outer.finish_hugr_with_outputs([w])
+    }
+    assert!(build(Type::new_var_use(0, INNER_BOUND)).is_ok());
     assert_matches!(
-        hugr.unwrap_err(),
-        BuildError::InvalidHUGR(ValidationError::InvalidParentOp {
-            child_optype,
-            allowed_children: OpTag::DataflowChild,
-            parent_optype,
-            child, parent
-        }) if matches!(*child_optype, OpType::FuncDefn(_)) && matches!(*parent_optype, OpType::FuncDefn(_)) => {
-            assert_eq!(child, inner);
-            assert_eq!(parent, outer_node);
-        }
+        build(Type::new_var_use(1, OUTER_BOUND)).unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError {
+            cause: SignatureError::FreeTypeVar {
+                idx: 1,
+                num_decls: 1
+            },
+            ..
+        })
     );
+    assert_matches!(build(Type::new_var_use(0, OUTER_BOUND)).unwrap_err(),
+        BuildError::InvalidHUGR(ValidationError::SignatureError { cause: SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached }, .. }) =>
+        {assert_eq!(actual, INNER_BOUND.into()); assert_eq!(cached, OUTER_BOUND.into())});
     Ok(())
 }
 
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
-    const BOUND: TypeParam = TypeParam::RuntimeType(TypeBound::Copyable);
+    const BOUND: TypeParam = TypeParam::Type {
+        b: TypeBound::Copyable,
+    };
     let list_of_var = Type::new_extension(
         list::EXTENSION
             .get_type(&list::LIST_TYPENAME)
@@ -493,10 +533,10 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list_type(TypeBound::Linear);
+    let rowp = TypeParam::new_list(TypeBound::Any);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
+        let inputs = TypeRV::new_row_var_use(0, TypeBound::Any);
+        let outputs = TypeRV::new_row_var_use(1, TypeBound::Any);
         let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
@@ -505,7 +545,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Linear);
+        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Any);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
@@ -523,8 +563,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
-    fn uint_seq(i: usize) -> Term {
-        vec![usize_t().into(); i].into()
+    fn uint_seq(i: usize) -> TypeArg {
+        vec![TypeArg::Type { ty: usize_t() }; i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -548,38 +588,113 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn list1ty(t: TypeRV) -> Term {
-    Term::new_list([t.into()])
+fn seq1ty(t: TypeRV) -> TypeArg {
+    TypeArg::Sequence {
+        elems: vec![t.into()],
+    }
 }
 
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
+    let tv = TypeRV::new_row_var_use(0, TypeBound::Any);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(vec![tv.clone(), usize_t().into()]));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list_type(TypeBound::Linear)],
+            [TypeParam::new_list(TypeBound::Any)],
             Signature::new(inner_ft.clone(), ft_usz),
         ),
     )?;
     // All the wires here are carrying higher-order Function values
     let [func_arg] = fb.input_wires_arr();
     let id_usz = {
-        let mut mb = fb.module_root_builder();
-        let bldr = mb.define_function("id_usz", Signature::new_endo(usize_t()))?;
+        let bldr = fb.define_function("id_usz", Signature::new_endo(usize_t()))?;
         let vals = bldr.input_wires();
-        let helper_def = bldr.finish_with_outputs(vals)?;
-        fb.load_func(helper_def.handle(), &[])?
+        let inner_def = bldr.finish_with_outputs(vals)?;
+        fb.load_func(inner_def.handle(), &[])?
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
+        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(seq1ty),
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_call() -> Result<(), Box<dyn std::error::Error>> {
+    // TODO: This tests a function call that is polymorphic in an extension set.
+    // Should this be rewritten to be polymorphic in something else or removed?
+
+    let e = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+        let params: Vec<TypeParam> = vec![TypeBound::Any.into(), TypeBound::Any.into()];
+        let evaled_fn = Type::new_function(Signature::new(
+            Type::new_var_use(0, TypeBound::Any),
+            Type::new_var_use(1, TypeBound::Any),
+        ));
+        // Single-input/output version of the higher-order "eval" operation, with extension param.
+        // Note the extension-delta of the eval node includes that of the input function.
+        ext.add_op(
+            "eval".into(),
+            String::new(),
+            PolyFuncTypeRV::new(
+                params.clone(),
+                Signature::new(
+                    vec![evaled_fn, Type::new_var_use(0, TypeBound::Any)],
+                    Type::new_var_use(1, TypeBound::Any),
+                ),
+            ),
+            extension_ref,
+        )?;
+
+        Ok(())
+    })?;
+
+    fn utou() -> Type {
+        Type::new_function(Signature::new_endo(usize_t()))
+    }
+
+    let int_pair = Type::new_tuple(vec![usize_t(); 2]);
+    // Root DFG: applies a function int-->int to each element of a pair of two ints
+    let mut d = DFGBuilder::new(inout_sig(
+        vec![utou(), int_pair.clone()],
+        vec![int_pair.clone()],
+    ))?;
+    // ....by calling a function (int-->int, int_pair) -> int_pair
+    let f = {
+        let mut f = d.define_function(
+            "two_ints",
+            PolyFuncType::new(
+                vec![],
+                Signature::new(vec![utou(), int_pair.clone()], int_pair.clone()),
+            ),
+        )?;
+        let [func, tup] = f.input_wires_arr();
+        let mut c = f.conditional_builder(
+            (vec![vec![usize_t(); 2].into()], tup),
+            vec![],
+            vec![usize_t(); 2].into(),
+        )?;
+        let mut cc = c.case_builder(0)?;
+        let [i1, i2] = cc.input_wires_arr();
+        let op = e.instantiate_extension_op("eval", vec![usize_t().into(), usize_t().into()])?;
+        let [f1] = cc.add_dataflow_op(op.clone(), [func, i1])?.outputs_arr();
+        let [f2] = cc.add_dataflow_op(op, [func, i2])?.outputs_arr();
+        cc.finish_with_outputs([f1, f2])?;
+        let res = c.finish_sub_container()?.outputs();
+        let tup = f.make_tuple(res)?;
+        f.finish_with_outputs([tup])?
+    };
+
+    let [func, tup] = d.input_wires_arr();
+    let call = d.call(f.handle(), &[], [func, tup])?;
+    let h = d.finish_hugr_with_outputs(call.outputs())?;
+    let call_ty = h.get_optype(call.node()).dataflow_signature().unwrap();
+    let exp_fun_ty = Signature::new(vec![utou(), int_pair.clone()], int_pair);
+    assert_eq!(call_ty.as_ref(), &exp_fun_ty);
     Ok(())
 }
 
@@ -589,8 +704,8 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
     let id = m.declare(
         "id",
         PolyFuncType::new(
-            vec![TypeBound::Linear.into()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
+            vec![TypeBound::Any.into()],
+            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Any)]),
         ),
     )?;
     let sig = Signature::new(
@@ -737,7 +852,7 @@ fn cfg_connections() -> Result<(), Box<dyn std::error::Error>> {
         Err(ValidationError::TooManyConnections {
             node: middle.node(),
             port: Port::new(Direction::Outgoing, 0),
-            port_kind: Box::new(EdgeKind::ControlFlow)
+            port_kind: EdgeKind::ControlFlow
         })
     );
     Ok(())
@@ -760,75 +875,4 @@ fn cfg_entry_io_bug() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     Ok(())
-}
-
-fn sig1() -> Signature {
-    Signature::new_endo(bool_t())
-}
-
-fn sig2() -> Signature {
-    Signature::new_endo(usize_t())
-}
-
-#[rstest]
-// Private FuncDefns never conflict even if different sig
-#[case(
-    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
-    FuncDefn::new("foo", sig2()),
-    None
-)]
-#[case(FuncDefn::new("foo", sig1()), FuncDecl::new("foo", sig2()), None)]
-// Public FuncDefn conflicts with anything Public even if same sig
-#[case(
-    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
-    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
-    Some("foo")
-)]
-#[case(
-    FuncDefn::new_vis("foo", sig1(), Visibility::Public),
-    FuncDecl::new("foo", sig1()),
-    Some("foo")
-)]
-// Two public FuncDecls are ok with same sig
-#[case(FuncDecl::new("foo", sig1()), FuncDecl::new("foo", sig1()), None)]
-// But two public FuncDecls not ok if different sigs
-#[case(
-    FuncDecl::new("foo", sig1()),
-    FuncDecl::new("foo", sig2()),
-    Some("foo")
-)]
-fn validate_linkage(
-    #[case] f1: impl Into<OpType>,
-    #[case] f2: impl Into<OpType>,
-    #[case] err: Option<&str>,
-) {
-    let mut h = Hugr::new();
-    let [n1, n2] = [f1.into(), f2.into()].map(|f| {
-        let def_sig = f
-            .as_func_defn()
-            .map(FuncDefn::inner_signature)
-            .map(Cow::into_owned);
-        let n = h.add_node_with_parent(h.module_root(), f);
-        if let Some(Signature { input, output }) = def_sig {
-            let i = h.add_node_with_parent(n, ops::Input::new(input));
-            let o = h.add_node_with_parent(n, ops::Output::new(output));
-            h.connect(i, 0, o, 0); // Assume all sig's used in test are 1-ary endomorphic
-        }
-        n
-    });
-    let r = h.validate();
-    match err {
-        None => r.unwrap(),
-        Some(name) => {
-            let Err(ValidationError::DuplicateExport {
-                link_name,
-                children,
-            }) = r
-            else {
-                panic!("validate() should have produced DuplicateExport error not {r:?}")
-            };
-            assert_eq!(link_name, name);
-            assert!(children == [n1, n2] || children == [n2, n1]);
-        }
-    }
 }

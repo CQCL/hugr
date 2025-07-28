@@ -421,7 +421,7 @@ pub trait HugrView: HugrInternals {
         let config = match RenderConfig::try_from(formatter) {
             Ok(config) => config,
             Err(e) => {
-                panic!("Unsupported format option: {e}");
+                panic!("Unsupported format option: {}", e);
             }
         };
         #[allow(deprecated)]

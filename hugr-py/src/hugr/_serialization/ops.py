@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
 
-from hugr import tys
 from hugr.hugr.node_port import (
     NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
 )
@@ -76,16 +75,11 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
-    visibility: tys.Visibility = Field(default="Private")
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
         return ops.FuncDefn(
-            self.name,
-            params=poly_func.params,
-            inputs=poly_func.body.input,
-            _outputs=poly_func.body.output,
-            visibility=self.visibility,
+            self.name, inputs=poly_func.body.input, _outputs=poly_func.body.output
         )
 
 
@@ -95,12 +89,9 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
-    visibility: tys.Visibility = Field(default="Public")
 
     def deserialize(self) -> ops.FuncDecl:
-        return ops.FuncDecl(
-            self.name, self.signature.deserialize(), visibility=self.visibility
-        )
+        return ops.FuncDecl(self.name, self.signature.deserialize())
 
 
 class CustomConst(ConfiguredBaseModel):
@@ -132,13 +123,24 @@ class FunctionValue(BaseValue):
     """A higher-order function value."""
 
     v: Literal["Function"] = Field(default="Function", title="ValueTag")
-    hugr: str
+    hugr: Any
 
     def deserialize(self) -> val.Value:
+        from hugr._serialization.serial_hugr import SerialHugr
         from hugr.hugr import Hugr
 
         # pydantic stores the serialized dictionary because of the "Any" annotation
-        return val.Function(Hugr.from_str(self.hugr))
+        return val.Function(Hugr._from_serial(SerialHugr(**self.hugr)))
+
+
+class TupleValue(BaseValue):
+    """A constant tuple value."""
+
+    v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
+    vs: list[Value]
+
+    def deserialize(self) -> val.Value:
+        return val.Tuple(*deser_it(v.root for v in self.vs))
 
 
 class SumValue(BaseValue):
@@ -147,9 +149,9 @@ class SumValue(BaseValue):
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    v: Literal["Sum", "Tuple"] = Field(default="Sum", title="ValueTag")
-    tag: int = Field(default=0, title="VariantTag")
-    typ: SumType | None = Field(default=None, title="SumType")
+    v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
+    tag: int
+    typ: SumType
     vs: list[Value]
     model_config = ConfigDict(
         json_schema_extra={
@@ -161,22 +163,15 @@ class SumValue(BaseValue):
     )
 
     def deserialize(self) -> val.Value:
-        if self.typ is None:
-            # Backwards compatibility of "Tuple" values
-            assert self.tag == 0, "Sum type must be provided if tag is not 0"
-            vs = deser_it(v.root for v in self.vs)
-            typ = tys.Sum(variant_rows=[[v.type_() for v in vs]])
-            return val.Sum(0, typ, vs)
-        else:
-            return val.Sum(
-                self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
-            )
+        return val.Sum(
+            self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
+        )
 
 
 class Value(RootModel):
     """A constant Value."""
 
-    root: CustomValue | FunctionValue | SumValue = Field(discriminator="v")
+    root: CustomValue | FunctionValue | TupleValue | SumValue = Field(discriminator="v")
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
@@ -603,5 +598,6 @@ tys_model_rebuild(dict(classes))
 
 from hugr import (  # noqa: E402 # needed to avoid circular imports
     ops,
+    tys,
     val,
 )

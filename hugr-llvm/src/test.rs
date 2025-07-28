@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use hugr_core::{
     Hugr,
-    builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+    builder::{Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
     ops::{OpTrait, OpType},
     types::PolyFuncType,
 };

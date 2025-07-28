@@ -1,6 +1,6 @@
 [package]
 name = "hugr-model"
-version = "0.22.1"
+version = "0.20.2"
 readme = "README.md"
 documentation = "https://docs.rs/hugr-model/"
 description = "Data model for Quantinuum's HUGR intermediate representation"
@@ -27,7 +27,6 @@ ordered-float = { workspace = true }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 pretty = { workspace = true }
-semver = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 pyo3 = { workspace = true, optional = true, features = ["extension-module"] }

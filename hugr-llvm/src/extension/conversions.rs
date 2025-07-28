@@ -275,7 +275,7 @@ mod test {
     use crate::check_emission;
     use crate::emit::test::{DFGW, SimpleHugrConfig};
     use crate::test::{TestContext, exec_ctx, llvm_ctx};
-    use hugr_core::builder::{DataflowHugr, SubContainer};
+    use hugr_core::builder::SubContainer;
     use hugr_core::std_extensions::STD_REG;
     use hugr_core::std_extensions::arithmetic::float_types::ConstF64;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
@@ -311,7 +311,7 @@ mod test {
                     .add_dataflow_op(ext_op, [in1])
                     .unwrap()
                     .outputs();
-                hugr_builder.finish_hugr_with_outputs(outputs).unwrap()
+                hugr_builder.finish_with_outputs(outputs).unwrap()
             })
     }
 
@@ -381,7 +381,7 @@ mod test {
                     .add_dataflow_op(ext_op, [in1])
                     .unwrap()
                     .outputs_arr();
-                hugr_builder.finish_hugr_with_outputs([out1]).unwrap()
+                hugr_builder.finish_with_outputs([out1]).unwrap()
             });
         check_emission!(op_name, hugr, llvm_ctx);
     }
@@ -393,7 +393,7 @@ mod test {
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));
-                builder.finish_hugr_with_outputs([konst]).unwrap()
+                builder.finish_with_outputs([konst]).unwrap()
             });
         exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -417,7 +417,7 @@ mod test {
                     .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [int])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_hugr_with_outputs([usize_]).unwrap()
+                builder.finish_with_outputs([usize_]).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
             builder
@@ -481,7 +481,7 @@ mod test {
                     .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [cond_result])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_hugr_with_outputs([usize_]).unwrap()
+                builder.finish_with_outputs([usize_]).unwrap()
             })
     }
 
@@ -613,7 +613,7 @@ mod test {
                 let true_result = case_true.add_load_value(ConstUsize::new(6));
                 case_true.finish_with_outputs([true_result]).unwrap();
                 let res = cond.finish_sub_container().unwrap();
-                builder.finish_hugr_with_outputs(res.outputs()).unwrap()
+                builder.finish_with_outputs(res.outputs()).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
             builder
@@ -635,7 +635,7 @@ mod test {
                 let [b] = builder.add_dataflow_op(i2b, [i]).unwrap().outputs_arr();
                 let b2i = EXTENSION.instantiate_extension_op("ifrombool", []).unwrap();
                 let [i] = builder.add_dataflow_op(b2i, [b]).unwrap().outputs_arr();
-                builder.finish_hugr_with_outputs([i]).unwrap()
+                builder.finish_with_outputs([i]).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
             builder
@@ -663,7 +663,7 @@ mod test {
                     .instantiate_extension_op("bytecast_int64_to_float64", [])
                     .unwrap();
                 let [f] = builder.add_dataflow_op(i2f, [i]).unwrap().outputs_arr();
-                builder.finish_hugr_with_outputs([f]).unwrap()
+                builder.finish_with_outputs([f]).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
             builder
@@ -690,7 +690,7 @@ mod test {
                     .instantiate_extension_op("bytecast_float64_to_int64", [])
                     .unwrap();
                 let [i] = builder.add_dataflow_op(f2i, [f]).unwrap().outputs_arr();
-                builder.finish_hugr_with_outputs([i]).unwrap()
+                builder.finish_with_outputs([i]).unwrap()
             });
         exec_ctx.add_extensions(|builder| {
             builder

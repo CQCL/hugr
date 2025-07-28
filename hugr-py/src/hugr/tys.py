@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
 import hugr.model as model
-from hugr.utils import comma_sep_repr, comma_sep_str, comma_sep_str_paren, ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
 TypeBound = stys.TypeBound
-Visibility = Literal["Public", "Private"]
 
 
 @runtime_checkable
@@ -69,7 +67,7 @@ class Type(Protocol):
             >>> Tuple(Bool, Bool).type_bound()
             <TypeBound.Copyable: 'C'>
             >>> Tuple(Qubit, Bool).type_bound()
-            <TypeBound.Linear: 'A'>
+            <TypeBound.Any: 'A'>
         """
         ...  # pragma: no cover
 
@@ -154,34 +152,6 @@ class StringParam(TypeParam):
 
     def to_model(self) -> model.Term:
         return model.Apply("core.str")
-
-
-@dataclass(frozen=True)
-class FloatParam(TypeParam):
-    """Float type parameter."""
-
-    def _to_serial(self) -> stys.FloatParam:
-        return stys.FloatParam()
-
-    def __str__(self) -> str:
-        return "Float"
-
-    def to_model(self) -> model.Term:
-        return model.Apply("core.float")
-
-
-@dataclass(frozen=True)
-class BytesParam(TypeParam):
-    """Bytes type parameter."""
-
-    def _to_serial(self) -> stys.BytesParam:
-        return stys.BytesParam()
-
-    def __str__(self) -> str:
-        return "Bytes"
-
-    def to_model(self) -> model.Term:
-        return model.Apply("core.bytes")
 
 
 @dataclass(frozen=True)
@@ -275,118 +245,24 @@ class StringArg(TypeArg):
 
 
 @dataclass(frozen=True)
-class FloatArg(TypeArg):
-    """A floating point type argument."""
-
-    value: float
-
-    def _to_serial(self) -> stys.FloatArg:
-        return stys.FloatArg(value=self.value)
-
-    def __str__(self) -> str:
-        return f"{self.value}"
-
-    def to_model(self) -> model.Term:
-        return model.Literal(self.value)
-
-
-@dataclass(frozen=True)
-class BytesArg(TypeArg):
-    """A bytes type argument."""
-
-    value: bytes
-
-    def _to_serial(self) -> stys.BytesArg:
-        value = base64.b64encode(self.value).decode()
-        return stys.BytesArg(value=value)
-
-    def __str__(self) -> str:
-        return "bytes"
-
-    def to_model(self) -> model.Term:
-        return model.Literal(self.value)
-
-
-@dataclass(frozen=True)
-class ListArg(TypeArg):
-    """Sequence of type arguments for a :class:`ListParam`."""
+class SequenceArg(TypeArg):
+    """Sequence of type arguments, for a :class:`ListParam` or :class:`TupleParam`."""
 
     elems: list[TypeArg]
 
-    def _to_serial(self) -> stys.ListArg:
-        return stys.ListArg(elems=ser_it(self.elems))
+    def _to_serial(self) -> stys.SequenceArg:
+        return stys.SequenceArg(elems=ser_it(self.elems))
 
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
-        return ListArg([arg.resolve(registry) for arg in self.elems])
-
-    def __str__(self) -> str:
-        return f"[{comma_sep_str(self.elems)}]"
-
-    def to_model(self) -> model.Term:
-        return model.List([elem.to_model() for elem in self.elems])
-
-
-@dataclass(frozen=True)
-class ListConcatArg(TypeArg):
-    """Sequence of lists to concatenate for a :class:`ListParam`."""
-
-    lists: list[TypeArg]
-
-    def _to_serial(self) -> stys.ListConcatArg:
-        return stys.ListConcatArg(lists=ser_it(self.lists))
-
-    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
-        return ListConcatArg([arg.resolve(registry) for arg in self.lists])
-
-    def __str__(self) -> str:
-        lists = comma_sep_str(f"... {list}" for list in self.lists)
-        return f"[{lists}]"
-
-    def to_model(self) -> model.Term:
-        return model.List(
-            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
-        )
-
-
-@dataclass(frozen=True)
-class TupleArg(TypeArg):
-    """Sequence of type arguments for a :class:`TupleParam`."""
-
-    elems: list[TypeArg]
-
-    def _to_serial(self) -> stys.TupleArg:
-        return stys.TupleArg(elems=ser_it(self.elems))
-
-    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
-        return TupleArg([arg.resolve(registry) for arg in self.elems])
+        return SequenceArg([arg.resolve(registry) for arg in self.elems])
 
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
 
     def to_model(self) -> model.Term:
-        return model.Tuple([elem.to_model() for elem in self.elems])
-
-
-@dataclass(frozen=True)
-class TupleConcatArg(TypeArg):
-    """Sequence of tuples to concatenate for a :class:`TupleParam`."""
-
-    tuples: list[TypeArg]
-
-    def _to_serial(self) -> stys.TupleConcatArg:
-        return stys.TupleConcatArg(tuples=ser_it(self.tuples))
-
-    def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
-        return TupleConcatArg([arg.resolve(registry) for arg in self.tuples])
-
-    def __str__(self) -> str:
-        tuples = comma_sep_str(f"... {tuple}" for tuple in self.tuples)
-        return f"({tuples})"
-
-    def to_model(self) -> model.Term:
-        return model.Tuple(
-            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
-        )
+        # TODO: We should separate lists and tuples.
+        # For now we assume that this is a list.
+        return model.List([elem.to_model() for elem in self.elems])
 
 
 @dataclass(frozen=True)
@@ -430,38 +306,7 @@ class Sum(Type):
         return Tuple(*self.variant_rows[0])
 
     def __repr__(self) -> str:
-        if self == Bool:
-            return "Bool"
-        elif self == Unit:
-            return "Unit"
-        elif all(len(row) == 0 for row in self.variant_rows):
-            return f"UnitSum({len(self.variant_rows)})"
-        elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
-        elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
-            return f"Option({comma_sep_repr(self.variant_rows[1])})"
-        elif len(self.variant_rows) == 2:
-            left, right = self.variant_rows
-            return f"Either(left={left}, right={right})"
-        else:
-            return f"Sum({self.variant_rows})"
-
-    def __str__(self) -> str:
-        if self == Bool:
-            return "Bool"
-        elif self == Unit:
-            return "Unit"
-        elif all(len(row) == 0 for row in self.variant_rows):
-            return f"UnitSum({len(self.variant_rows)})"
-        elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
-        elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
-            return f"Option({comma_sep_str(self.variant_rows[1])})"
-        elif len(self.variant_rows) == 2:
-            left, right = self.variant_rows
-            return f"Either({comma_sep_str_paren(left)}, {comma_sep_str_paren(right)})"
-        else:
-            return f"Sum({self.variant_rows})"
+        return f"Sum({self.variant_rows})"
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Sum) and self.variant_rows == other.variant_rows
@@ -480,7 +325,7 @@ class Sum(Type):
         return model.Apply("core.adt", [variants])
 
 
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False)
 class UnitSum(Sum):
     """Simple :class:`Sum` type with `size` variants of empty rows."""
 
@@ -493,14 +338,18 @@ class UnitSum(Sum):
     def _to_serial(self) -> stys.UnitSum:  # type: ignore[override]
         return stys.UnitSum(size=self.size)
 
+    def __repr__(self) -> str:
+        if self == Bool:
+            return "Bool"
+        elif self == Unit:
+            return "Unit"
+        return f"UnitSum({self.size})"
+
     def resolve(self, registry: ext.ExtensionRegistry) -> UnitSum:
         return self
 
-    def __str__(self) -> str:
-        return self.__repr__()
 
-
-@dataclass(eq=False, repr=False)
+@dataclass(eq=False)
 class Tuple(Sum):
     """Product type with `tys` elements. Instances of this type correspond to
     :class:`Sum` with a single variant.
@@ -509,8 +358,11 @@ class Tuple(Sum):
     def __init__(self, *tys: Type):
         self.variant_rows = [list(tys)]
 
+    def __repr__(self) -> str:
+        return f"Tuple{tuple(self.variant_rows[0])}"
 
-@dataclass(eq=False, repr=False)
+
+@dataclass(eq=False)
 class Option(Sum):
     """Optional tuple of elements.
 
@@ -521,8 +373,11 @@ class Option(Sum):
     def __init__(self, *tys: Type):
         self.variant_rows = [[], list(tys)]
 
+    def __repr__(self) -> str:
+        return f"Option({comma_sep_repr(self.variant_rows[1])})"
 
-@dataclass(eq=False, repr=False)
+
+@dataclass(eq=False)
 class Either(Sum):
     """Two-variant tuple of elements.
 
@@ -534,6 +389,16 @@ class Either(Sum):
 
     def __init__(self, left: Iterable[Type], right: Iterable[Type]):
         self.variant_rows = [list(left), list(right)]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        left, right = self.variant_rows
+        return f"Either(left={left}, right={right})"
+
+    def __str__(self) -> str:
+        left, right = self.variant_rows
+        left_str = left[0] if len(left) == 1 else tuple(left)
+        right_str = right[0] if len(right) == 1 else tuple(right)
+        return f"Either({left_str}, {right_str})"
 
 
 @dataclass(frozen=True)
@@ -767,7 +632,15 @@ class ExtType(Type):
         return super().__eq__(value)
 
     def to_model(self) -> model.Term:
-        return self._to_opaque().to_model()
+        # This cast is only neccessary because `Type` can both be an
+        # actual type or a row variable.
+        args = [cast(model.Term, arg.to_model()) for arg in self.args]
+
+        extension_name = self.type_def.get_extension().name
+        type_name = self.type_def.name
+        name = f"{extension_name}.{type_name}"
+
+        return model.Apply(name, args)
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
@@ -814,17 +687,17 @@ class Opaque(Type):
         return _type_str(self.id, self.args)
 
     def to_model(self) -> model.Term:
-        # This cast is only necessary because `Type` can both be an
+        # This cast is only neccessary because `Type` can both be an
         # actual type or a row variable.
         args = [cast(model.Term, arg.to_model()) for arg in self.args]
 
-        return model.Apply(f"{self.extension}.{self.id}", args)
+        return model.Apply(self.id, args)
 
 
 @dataclass
 class _QubitDef(Type):
     def type_bound(self) -> TypeBound:
-        return TypeBound.Linear
+        return TypeBound.Any
 
     def _to_serial(self) -> stys.Qubit:
         return stys.Qubit()

@@ -8,9 +8,14 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
-use crate::ops::{self, DataflowParent, FuncDefn, Input, OpParent, Output};
+use crate::ops::{self, OpParent};
+use crate::ops::{DataflowParent, Input, Output};
+use crate::{Direction, IncomingPort, OutgoingPort, Wire};
+
 use crate::types::{PolyFuncType, Signature, Type};
-use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
+
+use crate::Node;
+use crate::{Hugr, hugr::HugrMut};
 
 /// Builder for a [`ops::DFG`] node.
 #[derive(Debug, Clone, PartialEq)]
@@ -147,9 +152,7 @@ impl<B, T> DFGWrapper<B, T> {
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR;
-    /// the function will be private. (See also [Self::new_vis].)
-    ///
+    /// Initialize a builder for a `FuncDefn` rooted HUGR
     /// # Errors
     ///
     /// Error in adding DFG child nodes.
@@ -157,55 +160,14 @@ impl FunctionBuilder<Hugr> {
         name: impl Into<String>,
         signature: impl Into<PolyFuncType>,
     ) -> Result<Self, BuildError> {
-        Self::new_with_op(FuncDefn::new(name, signature))
-    }
-
-    /// Initialize a builder for a FuncDefn-rooted HUGR, with the specified
-    /// [Visibility].
-    ///
-    /// # Errors
-    ///
-    /// Error in adding DFG child nodes.
-    pub fn new_vis(
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-        visibility: Visibility,
-    ) -> Result<Self, BuildError> {
-        Self::new_with_op(FuncDefn::new_vis(name, signature, visibility))
-    }
-
-    fn new_with_op(op: FuncDefn) -> Result<Self, BuildError> {
-        let body = op.signature().body().clone();
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let op = ops::FuncDefn::new(name, signature);
 
         let base = Hugr::new_with_entrypoint(op).expect("FuncDefn entrypoint should be valid");
         let root = base.entrypoint();
 
         let db = DFGBuilder::create_with_io(base, root, body)?;
-        Ok(Self::from_dfg_builder(db))
-    }
-}
-
-impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
-    /// Initialize a new function definition on the root module of an existing HUGR.
-    ///
-    /// The HUGR's entrypoint will **not** be modified.
-    ///
-    /// # Errors
-    ///
-    /// Error in adding DFG child nodes.
-    pub fn with_hugr(
-        mut hugr: B,
-        name: impl Into<String>,
-        signature: impl Into<PolyFuncType>,
-    ) -> Result<Self, BuildError> {
-        let signature: PolyFuncType = signature.into();
-        let body = signature.body().clone();
-        let op = ops::FuncDefn::new(name, signature);
-
-        let module = hugr.as_ref().module_root();
-        let func = hugr.as_mut().add_node_with_parent(module, op);
-
-        let db = DFGBuilder::create_with_io(hugr, func, body)?;
         Ok(Self::from_dfg_builder(db))
     }
 
@@ -294,6 +256,31 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
         };
         *fd.signature_mut() = f(fd.inner_signature().into_owned()).into();
         &*fd
+    }
+}
+
+impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
+    /// Initialize a new function definition on the root module of an existing HUGR.
+    ///
+    /// The HUGR's entrypoint will **not** be modified.
+    ///
+    /// # Errors
+    ///
+    /// Error in adding DFG child nodes.
+    pub fn with_hugr(
+        mut hugr: B,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<Self, BuildError> {
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let op = ops::FuncDefn::new(name, signature);
+
+        let module = hugr.as_ref().module_root();
+        let func = hugr.as_mut().add_node_with_parent(module, op);
+
+        let db = DFGBuilder::create_with_io(hugr, func, body)?;
+        Ok(Self::from_dfg_builder(db))
     }
 }
 
@@ -450,7 +437,7 @@ pub(crate) mod test {
                 error: BuilderWiringError::NoCopyLinear { typ, .. },
                 ..
             })
-            if *typ == qb_t()
+            if typ == qb_t()
         );
     }
 
@@ -665,7 +652,7 @@ pub(crate) mod test {
         FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
-                [TypeParam::new_list_type(TypeBound::Copyable)],
+                [TypeParam::new_list(TypeBound::Copyable)],
                 Signature::new(
                     Type::new_function(FuncValueType::new(usize_t(), tv.clone())),
                     vec![],

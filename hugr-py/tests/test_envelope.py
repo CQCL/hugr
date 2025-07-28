@@ -1,17 +1,10 @@
-from pathlib import Path
-
-import pytest
-import semver
-
-from hugr import ops, tys
+from hugr import tys
 from hugr.build.function import Module
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
-from hugr.hugr.node_port import Node
 from hugr.package import Package
 
 
-@pytest.fixture
-def package() -> Package:
+def test_envelope():
     mod = Module()
     f_id = mod.define_function("id", [tys.Qubit])
     f_id.set_outputs(f_id.input_node[0])
@@ -24,10 +17,8 @@ def package() -> Package:
     q = f_main.input_node[0]
     call = f_main.call(f_id_decl, q)
     f_main.set_outputs(call)
-    return Package([mod.hugr, mod2.hugr])
+    package = Package([mod.hugr, mod2.hugr])
 
-
-def test_envelope(package: Package):
     # Binary compression roundtrip
     for format in [EnvelopeFormat.JSON]:
         for compression in [None, 0]:
@@ -36,30 +27,6 @@ def test_envelope(package: Package):
             assert decoded == package
 
     # String roundtrip
-    encoded_str = package.to_str(EnvelopeConfig.TEXT)
-    decoded = Package.from_str(encoded_str)
+    encoded = package.to_str(EnvelopeConfig.TEXT)
+    decoded = Package.from_str(encoded)
     assert decoded == package
-
-
-def test_model(package: Package):
-    model_pkg = package.to_model()
-
-    # This value is statically defined in the rust bindings.
-    assert model_pkg.version >= semver.Version(major=1, minor=0, patch=0)
-
-
-def test_legacy_funcdefn():
-    p = Path(__file__).parents[2] / "resources" / "test" / "hugr-no-visibility.hugr"
-    try:
-        with p.open("rb") as f:
-            pkg_bytes = f.read()
-    except FileNotFoundError:
-        pytest.skip("Missing test file")
-    decoded = Package.from_bytes(pkg_bytes)
-    h = decoded.modules[0]
-    op1 = h[Node(1)].op
-    assert isinstance(op1, ops.FuncDecl)
-    assert op1.visibility == "Public"
-    op2 = h[Node(2)].op
-    assert isinstance(op2, ops.FuncDefn)
-    assert op2.visibility == "Private"

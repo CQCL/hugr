@@ -22,7 +22,7 @@ jobs:
     if: needs.coverage-trend.outputs.should_notify == 'true'
     steps:
       - name: Send notification
-        uses: slackapi/slack-github-action@v2.1.1
+        uses: slackapi/slack-github-action@v2.1.0
         with:
           method: chat.postMessage
           token: ${{ secrets.SLACK_BOT_TOKEN }}

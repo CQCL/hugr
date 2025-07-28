@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Data structure for call graphs of a Hugr
 use std::collections::HashMap;
 
@@ -5,7 +6,6 @@ use hugr_core::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::Graph;
 
 /// Weight for an edge in a [`CallGraph`]
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallGraphEdge<N = Node> {
     /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
     Call(N),
@@ -48,20 +48,19 @@ impl<N: HugrNode> CallGraph<N> {
     /// Makes a new `CallGraph` for a Hugr.
     pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
         let mut g = Graph::default();
-        let mut node_to_g = hugr
+        let non_func_root =
+            (!hugr.get_optype(hugr.entrypoint()).is_module()).then_some(hugr.entrypoint());
+        let node_to_g = hugr
             .children(hugr.module_root())
             .filter_map(|n| {
                 let weight = match hugr.get_optype(n) {
                     OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),
                     OpType::FuncDefn(_) => CallGraphNode::FuncDefn(n),
-                    _ => return None,
+                    _ => (Some(n) == non_func_root).then_some(CallGraphNode::NonFuncRoot)?,
                 };
                 Some((n, g.add_node(weight)))
             })
             .collect::<HashMap<_, _>>();
-        if !hugr.entrypoint_optype().is_module() && !node_to_g.contains_key(&hugr.entrypoint()) {
-            node_to_g.insert(hugr.entrypoint(), g.add_node(CallGraphNode::NonFuncRoot));
-        }
         for (func, cg_node) in &node_to_g {
             traverse(hugr, *cg_node, *func, &mut g, &node_to_g);
         }

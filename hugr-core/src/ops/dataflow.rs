@@ -10,7 +10,7 @@ use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeAr
 use crate::{IncomingPort, type_row};
 
 #[cfg(test)]
-use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
+use proptest_derive::Arbitrary;
 
 /// Trait implemented by all dataflow operations.
 pub trait DataflowOpTrait: Sized {
@@ -191,7 +191,6 @@ pub struct Call {
     /// Signature of function being called.
     pub func_sig: PolyFuncType,
     /// The type arguments that instantiate `func_sig`.
-    #[cfg_attr(test, proptest(strategy = "any_serde_type_arg_vec()"))]
     pub type_args: Vec<TypeArg>,
     /// The instantiation of `func_sig`.
     pub instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
@@ -285,8 +284,8 @@ impl Call {
             Ok(())
         } else {
             Err(SignatureError::CallIncorrectlyAppliesType {
-                cached: Box::new(self.instantiation.clone()),
-                expected: Box::new(other.instantiation.clone()),
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
             })
         }
     }
@@ -392,7 +391,6 @@ pub struct LoadFunction {
     /// Signature of the function
     pub func_sig: PolyFuncType,
     /// The type arguments that instantiate `func_sig`.
-    #[cfg_attr(test, proptest(strategy = "any_serde_type_arg_vec()"))]
     pub type_args: Vec<TypeArg>,
     /// The instantiation of `func_sig`.
     pub instantiation: Signature, // Cache, so we can fail in try_new() not in signature()
@@ -476,8 +474,8 @@ impl LoadFunction {
             Ok(())
         } else {
             Err(SignatureError::LoadFunctionIncorrectlyAppliesType {
-                cached: Box::new(self.instantiation.clone()),
-                expected: Box::new(other.instantiation.clone()),
+                cached: self.instantiation.clone(),
+                expected: other.instantiation.clone(),
             })
         }
     }

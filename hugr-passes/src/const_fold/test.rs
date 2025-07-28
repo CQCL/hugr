@@ -1591,7 +1591,7 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     // Define a top-level constant, (only) the second of which can be removed
     let c7 = mb.add_constant(Value::from(ConstInt::new_u(5, 7)?));
     let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
-    let ad1 = mb.add_alias_declare("unused", TypeBound::Linear)?;
+    let ad1 = mb.add_alias_declare("unused", TypeBound::Any)?;
     let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
     let mut main = mb.define_function(
         "main",

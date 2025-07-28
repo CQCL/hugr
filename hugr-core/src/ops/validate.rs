@@ -103,7 +103,7 @@ impl ValidateOp for super::Conditional {
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
-                    optype: Box::new(optype.clone()),
+                    optype: optype.clone(),
                 });
             }
         }
@@ -177,7 +177,7 @@ pub enum ChildrenValidationError<N: HugrNode> {
     #[error("A {optype} operation is only allowed as a {expected_position} child")]
     InternalIOChildren {
         child: N,
-        optype: Box<OpType>,
+        optype: OpType,
         expected_position: &'static str,
     },
     /// The signature of the contained dataflow graph does not match the one of the container.
@@ -193,7 +193,7 @@ pub enum ChildrenValidationError<N: HugrNode> {
     },
     /// The signature of a child case in a conditional operation does not match the container's signature.
     #[error("A conditional case has optype {sig}, which differs from the signature of Conditional container", sig=optype.dataflow_signature().unwrap_or_default())]
-    ConditionalCaseSignature { child: N, optype: Box<OpType> },
+    ConditionalCaseSignature { child: N, optype: OpType },
     /// The conditional container's branching value does not match the number of children.
     #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
         actual_sum_rows.len())]
@@ -227,9 +227,9 @@ pub enum EdgeValidationError<N: HugrNode> {
         source_ty = source_types.clone().unwrap_or_default(),
     )]
     CFGEdgeSignatureMismatch {
-        edge: Box<ChildrenEdgeData<N>>,
-        source_types: Option<Box<TypeRow>>,
-        target_types: Box<TypeRow>,
+        edge: ChildrenEdgeData<N>,
+        source_types: Option<TypeRow>,
+        target_types: TypeRow,
     },
 }
 
@@ -323,14 +323,14 @@ fn validate_io_nodes<'a, N: HugrNode>(
             OpTag::Input => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
-                    optype: Box::new(optype.clone()),
+                    optype: optype.clone(),
                     expected_position: "first",
                 });
             }
             OpTag::Output => {
                 return Err(ChildrenValidationError::InternalIOChildren {
                     child,
-                    optype: Box::new(optype.clone()),
+                    optype: optype.clone(),
                     expected_position: "second",
                 });
             }
@@ -357,9 +357,9 @@ fn validate_cfg_edge<N: HugrNode>(edge: ChildrenEdgeData<N>) -> Result<(), EdgeV
     if source_types.as_ref() != Some(target_input) {
         let target_types = target_input.clone();
         return Err(EdgeValidationError::CFGEdgeSignatureMismatch {
-            edge: Box::new(edge),
-            source_types: source_types.map(Box::new),
-            target_types: Box::new(target_types),
+            edge,
+            source_types,
+            target_types,
         });
     }
 

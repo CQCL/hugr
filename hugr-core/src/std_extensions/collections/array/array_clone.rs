@@ -51,8 +51,8 @@ impl<AK: ArrayKind> FromStr for GenericArrayCloneDef<AK> {
 impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()];
-        let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
+        let params = vec![TypeParam::max_nat(), TypeBound::Copyable.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat());
         let element_ty = Type::new_var_use(1, TypeBound::Copyable);
         let array_ty = AK::instantiate_ty(array_def, size, element_ty)
             .expect("Array type instantiation failed");
@@ -157,7 +157,10 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayClone<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.size.into(), self.elem_ty.clone().into()]
+        vec![
+            TypeArg::BoundedNat { n: self.size },
+            self.elem_ty.clone().into(),
+        ]
     }
 }
 
@@ -180,7 +183,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayCloneDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] if ty.copyable() => {
                 Ok(GenericArrayClone::new(ty.clone(), *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
@@ -194,7 +197,6 @@ mod tests {
 
     use crate::extension::prelude::bool_t;
     use crate::std_extensions::collections::array::Array;
-    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},
@@ -204,7 +206,6 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
-    #[case(BorrowArray)]
     fn test_clone_def<AK: ArrayKind>(#[case] _kind: AK) {
         let op = GenericArrayClone::<AK>::new(bool_t(), 2).unwrap();
         let optype: OpType = op.clone().into();
@@ -219,7 +220,6 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
-    #[case(BorrowArray)]
     fn test_clone<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = bool_t();

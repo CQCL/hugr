@@ -25,7 +25,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 
 use super::table::{self};
-use super::{LinkName, Literal, RegionKind, SymbolName, VarName, Visibility};
+use super::{LinkName, Literal, RegionKind, SymbolName, VarName};
 
 mod parse;
 mod print;
@@ -194,8 +194,6 @@ impl Operation {
 /// [`table::Symbol`]: crate::v0::table::Symbol
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
-    /// The visibility of the symbol.
-    pub visibility: Option<Visibility>,
     /// The name of the symbol.
     pub name: SymbolName,
     /// The parameters of the symbol.

@@ -74,7 +74,7 @@ impl MakeOpDef for LoadNatDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let usize_t: Type = usize_custom_t(_extension_ref).into();
-        let params = vec![TypeParam::max_nat_type()];
+        let params = vec![TypeParam::max_nat()];
         PolyFuncTypeRV::new(params, FuncValueType::new(type_row![], vec![usize_t])).into()
     }
 
@@ -166,7 +166,7 @@ mod tests {
         extension::prelude::{ConstUsize, usize_t},
         ops::{OpType, constant},
         type_row,
-        types::Term,
+        types::TypeArg,
     };
 
     use super::LoadNat;
@@ -175,7 +175,7 @@ mod tests {
     fn test_load_nat() {
         let mut b = DFGBuilder::new(inout_sig(type_row![], vec![usize_t()])).unwrap();
 
-        let arg = Term::from(4u64);
+        let arg = TypeArg::BoundedNat { n: 4 };
         let op = LoadNat::new(arg);
 
         let out = b.add_dataflow_op(op.clone(), []).unwrap();
@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_load_nat_fold() {
-        let arg = Term::from(5u64);
+        let arg = TypeArg::BoundedNat { n: 5 };
         let op = LoadNat::new(arg);
 
         let optype: OpType = op.into();

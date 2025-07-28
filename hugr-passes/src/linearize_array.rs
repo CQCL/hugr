@@ -10,7 +10,7 @@ use hugr_core::{
     std_extensions::collections::{
         array::{
             ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
-            ArrayScanDef, ArrayValue, array_type_parametric,
+            ArrayScanDef, ArrayValue, array_type_def, array_type_parametric,
         },
         value_array::{self, VArrayFromArrayDef, VArrayToArrayDef, VArrayValue, ValueArray},
     },
@@ -21,7 +21,9 @@ use strum::IntoEnumIterator;
 
 use crate::{
     ComposablePass, ReplaceTypes,
-    replace_types::{DelegatingLinearizer, NodeTemplate, ReplaceTypesError},
+    replace_types::{
+        DelegatingLinearizer, NodeTemplate, ReplaceTypesError, handlers::copy_discard_array,
+    },
 };
 
 /// A HUGR -> HUGR pass that turns 'value_array`s into regular linear `array`s.
@@ -64,7 +66,7 @@ impl Default for LinearizeArrayPass {
                     // error out and make sure we're not emitting `get`s for nested value
                     // arrays.
                     assert!(
-                        op_def != ArrayOpDef::get || args[1].as_runtime().unwrap().copyable(),
+                        op_def != ArrayOpDef::get || args[1].as_type().unwrap().copyable(),
                         "Cannot linearise arrays in this Hugr: \
                             Contains a `get` operation on nested value arrays"
                     );
@@ -112,6 +114,8 @@ impl Default for LinearizeArrayPass {
                 ))
             },
         );
+        pass.linearizer()
+            .register_callback(array_type_def(), copy_discard_array);
         Self(pass)
     }
 }

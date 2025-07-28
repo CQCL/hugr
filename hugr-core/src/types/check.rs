@@ -17,9 +17,9 @@ pub enum SumTypeError {
         /// The element in the tuple that was wrong.
         index: usize,
         /// The expected type.
-        expected: Box<Type>,
+        expected: Type,
         /// The value that was found.
-        found: Box<Value>,
+        found: Value,
     },
     /// The type of the variant we were trying to convert into contained type variables
     #[error("Sum variant #{tag} contained a variable #{varidx}")]
@@ -88,8 +88,8 @@ impl super::SumType {
                 Err(SumTypeError::InvalidValueType {
                     tag,
                     index,
-                    expected: Box::new(t.clone()),
-                    found: Box::new(v.clone()),
+                    expected: t.clone(),
+                    found: v.clone(),
                 })?;
             }
         }

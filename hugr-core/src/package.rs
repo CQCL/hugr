@@ -1,5 +1,6 @@
 //! Bundles of hugr modules along with the extension required to load them.
 
+use derive_more::{Display, Error, From};
 use std::io;
 
 use crate::envelope::{EnvelopeConfig, EnvelopeError, read_envelope, write_envelope};
@@ -7,7 +8,6 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
 use crate::std_extensions::STD_REG;
 use crate::{Hugr, Node};
-use thiserror::Error;
 
 #[derive(Debug, Default, Clone, PartialEq)]
 /// Package of module HUGRs.
@@ -131,12 +131,11 @@ impl AsRef<[Hugr]> for Package {
 }
 
 /// Error raised while validating a package.
-#[derive(Debug, Error)]
+#[derive(Debug, Display, From, Error)]
 #[non_exhaustive]
-#[error("Package validation error.")]
 pub enum PackageValidationError {
     /// Error raised while validating the package hugrs.
-    Validation(#[from] ValidationError<Node>),
+    Validation(ValidationError<Node>),
 }
 
 #[cfg(test)]

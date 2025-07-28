@@ -6,6 +6,7 @@ use std::io;
 use super::{ExtensionBreakingError, WithGenerator, check_breaking_extensions};
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
+use crate::hugr::ExtensionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
 
@@ -56,20 +57,6 @@ pub(super) fn to_json_writer<'h>(
         modules: hugrs.into_iter().map(HugrSer).collect(),
         extensions: extensions.iter().map(std::convert::AsRef::as_ref).collect(),
     };
-
-    // Validate the hugr serializations against the schema.
-    //
-    // NOTE: The schema definition is currently broken, so this check always succeeds.
-    // See <https://github.com/CQCL/hugr/issues/2401>
-    #[cfg(all(test, not(miri)))]
-    if std::env::var("HUGR_TEST_SCHEMA").is_ok_and(|x| !x.is_empty()) {
-        use crate::hugr::serialize::test::check_hugr_serialization_schema;
-
-        for hugr in &pkg_ser.modules {
-            check_hugr_serialization_schema(hugr.0);
-        }
-    }
-
     serde_json::to_writer(writer, &pkg_ser)?;
     Ok(())
 }
@@ -77,16 +64,17 @@ pub(super) fn to_json_writer<'h>(
 /// Error raised while loading a package.
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
-#[display("Error reading or writing a package in JSON format.")]
 pub enum PackageEncodingError {
     /// Error raised while parsing the package json.
-    JsonEncoding(#[from] serde_json::Error),
+    JsonEncoding(serde_json::Error),
     /// Error raised while reading from a file.
-    IOError(#[from] io::Error),
+    IOError(io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
+    ExtensionResolution(WithGenerator<ExtensionResolutionError>),
     /// Error raised while checking for breaking extension version mismatch.
-    ExtensionVersion(#[from] WithGenerator<ExtensionBreakingError>),
+    ExtensionVersion(WithGenerator<ExtensionBreakingError>),
+    /// Could not resolve the runtime extensions for the hugr.
+    RuntimeExtensionResolution(ExtensionError),
 }
 
 /// A private package structure implementing the serde traits.

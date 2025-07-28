@@ -117,37 +117,6 @@ pub trait PreludeCodegen: Clone {
         Ok(err.into())
     }
 
-    /// Emit instructions to construct an error value from a signal and message.
-    ///
-    /// The type of the returned value must match [`Self::error_type`].
-    ///
-    /// The default implementation constructs a struct with the given signal and message.
-    fn emit_make_error<'c, H: HugrView<Node = Node>>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        signal: BasicValueEnum<'c>,
-        message: BasicValueEnum<'c>,
-    ) -> Result<BasicValueEnum<'c>> {
-        let builder = ctx.builder();
-
-        // The usize signal is an i64 but error struct stores an i32.
-        let i32_type = ctx.typing_session().iw_context().i32_type();
-        let signal_int = signal.into_int_value();
-        let signal_truncated = builder.build_int_truncate(signal_int, i32_type, "")?;
-
-        // Construct the error struct as runtime value.
-        let err_ty = ctx.llvm_type(&error_type())?.into_struct_type();
-        let undef = err_ty.get_undef();
-        let err_with_sig = builder
-            .build_insert_value(undef, signal_truncated, 0, "")?
-            .into_struct_value();
-        let err_complete = builder
-            .build_insert_value(err_with_sig, message, 1, "")?
-            .into_struct_value();
-
-        Ok(err_complete.into())
-    }
-
     /// Emit instructions to halt execution with the error `err`.
     ///
     /// The type of `err` must match that returned from [`Self::error_type`].
@@ -376,22 +345,6 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
             args.outputs.finish(context.builder(), [])
         }
     })
-    .extension_op(prelude::PRELUDE_ID, prelude::MAKE_ERROR_OP_ID, {
-        let pcg = pcg.clone();
-        move |context, args| {
-            let signal = args.inputs[0];
-            let message = args.inputs[1];
-            ensure!(
-                message.get_type()
-                    == pcg
-                        .string_type(&context.typing_session())?
-                        .as_basic_type_enum(),
-                signal.get_type() == pcg.usize_type(&context.typing_session()).into()
-            );
-            let err = pcg.emit_make_error(context, signal, message)?;
-            args.outputs.finish(context.builder(), [err])
-        }
-    })
     .extension_op(prelude::PRELUDE_ID, prelude::PANIC_OP_ID, {
         let pcg = pcg.clone();
         move |context, args| {
@@ -436,7 +389,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
         move |context, args| {
             let load_nat = LoadNat::from_extension_op(args.node().as_ref())?;
             let v = match load_nat.get_nat() {
-                TypeArg::BoundedNat(n) => pcg
+                TypeArg::BoundedNat { n } => pcg
                     .usize_type(&context.typing_session())
                     .const_int(n, false),
                 arg => bail!("Unexpected type arg for LoadNat: {}", arg),
@@ -452,10 +405,10 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
 
 #[cfg(test)]
 mod test {
-    use hugr_core::builder::{Dataflow, DataflowHugr};
+    use hugr_core::builder::{Dataflow, DataflowSubContainer};
     use hugr_core::extension::PRELUDE;
-    use hugr_core::extension::prelude::{EXIT_OP_ID, MAKE_ERROR_OP_ID, Noop};
-    use hugr_core::types::{Term, Type};
+    use hugr_core::extension::prelude::{EXIT_OP_ID, Noop};
+    use hugr_core::types::{Type, TypeArg};
     use hugr_core::{Hugr, type_row};
     use prelude::{PANIC_OP_ID, PRINT_OP_ID, bool_t, qb_t, usize_t};
     use rstest::{fixture, rstest};
@@ -526,7 +479,7 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
-                builder.finish_hugr_with_outputs([k]).unwrap()
+                builder.finish_with_outputs([k]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -549,7 +502,7 @@ mod test {
             .finish(|mut builder| {
                 let k1 = builder.add_load_value(konst1);
                 let k2 = builder.add_load_value(konst2);
-                builder.finish_hugr_with_outputs([k1, k2]).unwrap()
+                builder.finish_with_outputs([k1, k2]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -566,7 +519,7 @@ mod test {
                     .add_dataflow_op(Noop::new(usize_t()), in_wires)
                     .unwrap()
                     .outputs();
-                builder.finish_hugr_with_outputs(r).unwrap()
+                builder.finish_with_outputs(r).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -580,7 +533,7 @@ mod test {
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
                 let r = builder.make_tuple(in_wires).unwrap();
-                builder.finish_hugr_with_outputs([r]).unwrap()
+                builder.finish_with_outputs([r]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -598,7 +551,7 @@ mod test {
                         builder.input_wires(),
                     )
                     .unwrap();
-                builder.finish_hugr_with_outputs(unpack.outputs()).unwrap()
+                builder.finish_with_outputs(unpack.outputs()).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -606,8 +559,10 @@ mod test {
     #[rstest]
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: Term = qb_t().into();
-        let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![type_arg_q.clone(), type_arg_q],
+        };
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
@@ -623,7 +578,7 @@ mod test {
                     .add_dataflow_op(panic_op, [err, q0, q1])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_hugr_with_outputs([q0, q1]).unwrap()
+                builder.finish_with_outputs([q0, q1]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -632,8 +587,10 @@ mod test {
     #[rstest]
     fn prelude_exit(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "EXIT");
-        let type_arg_q: Term = qb_t().into();
-        let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
+        let type_arg_q: TypeArg = TypeArg::Type { ty: qb_t() };
+        let type_arg_2q: TypeArg = TypeArg::Sequence {
+            elems: vec![type_arg_q.clone(), type_arg_q],
+        };
         let exit_op = PRELUDE
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
@@ -649,7 +606,7 @@ mod test {
                     .add_dataflow_op(exit_op, [err, q0, q1])
                     .unwrap()
                     .outputs_arr();
-                builder.finish_hugr_with_outputs([q0, q1]).unwrap()
+                builder.finish_with_outputs([q0, q1]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -665,61 +622,7 @@ mod test {
             .finish(|mut builder| {
                 let greeting_out = builder.add_load_value(greeting);
                 builder.add_dataflow_op(print_op, [greeting_out]).unwrap();
-                builder.finish_hugr_with_outputs([]).unwrap()
-            });
-
-        check_emission!(hugr, prelude_llvm_ctx);
-    }
-
-    #[rstest]
-    fn prelude_make_error(prelude_llvm_ctx: TestContext) {
-        let sig: ConstUsize = ConstUsize::new(100);
-        let msg: ConstString = ConstString::new("Error!".into());
-
-        let make_error_op = PRELUDE
-            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
-            .unwrap();
-
-        let hugr = SimpleHugrConfig::new()
-            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
-            .with_outs(error_type())
-            .finish(|mut builder| {
-                let sig_out = builder.add_load_value(sig);
-                let msg_out = builder.add_load_value(msg);
-                let [err] = builder
-                    .add_dataflow_op(make_error_op, [sig_out, msg_out])
-                    .unwrap()
-                    .outputs_arr();
-                builder.finish_hugr_with_outputs([err]).unwrap()
-            });
-
-        check_emission!(hugr, prelude_llvm_ctx);
-    }
-
-    #[rstest]
-    fn prelude_make_error_and_panic(prelude_llvm_ctx: TestContext) {
-        let sig: ConstUsize = ConstUsize::new(100);
-        let msg: ConstString = ConstString::new("Error!".into());
-
-        let make_error_op = PRELUDE
-            .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
-            .unwrap();
-
-        let panic_op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [Term::new_list([]), Term::new_list([])])
-            .unwrap();
-
-        let hugr = SimpleHugrConfig::new()
-            .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
-            .finish(|mut builder| {
-                let sig_out = builder.add_load_value(sig);
-                let msg_out = builder.add_load_value(msg);
-                let [err] = builder
-                    .add_dataflow_op(make_error_op, [sig_out, msg_out])
-                    .unwrap()
-                    .outputs_arr();
-                builder.add_dataflow_op(panic_op, [err]).unwrap();
-                builder.finish_hugr_with_outputs([]).unwrap()
+                builder.finish_with_outputs([]).unwrap()
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
@@ -732,10 +635,10 @@ mod test {
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
-                    .add_dataflow_op(LoadNat::new(42u64.into()), vec![])
+                    .add_dataflow_op(LoadNat::new(TypeArg::BoundedNat { n: 42 }), vec![])
                     .unwrap()
                     .out_wire(0);
-                builder.finish_hugr_with_outputs([v]).unwrap()
+                builder.finish_with_outputs([v]).unwrap()
             });
         check_emission!(hugr, prelude_llvm_ctx);
     }
@@ -748,7 +651,7 @@ mod test {
             .finish(|mut builder| {
                 let i = builder.add_load_value(ConstUsize::new(42));
                 let [w1, _w2] = builder.add_barrier([i, i]).unwrap().outputs_arr();
-                builder.finish_hugr_with_outputs([w1]).unwrap()
+                builder.finish_with_outputs([w1]).unwrap()
             })
     }
 

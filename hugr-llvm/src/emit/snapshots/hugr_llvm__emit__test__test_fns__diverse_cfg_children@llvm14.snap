@@ -13,12 +13,21 @@ entry_block:                                      ; preds = %alloca_block
   br label %0
 
 0:                                                ; preds = %entry_block
-  switch i1 false, label %1 [
+  %1 = call i1 @_hl.scoped_func.7()
+  switch i1 false, label %2 [
   ]
 
-1:                                                ; preds = %0
-  br label %2
+2:                                                ; preds = %0
+  br label %3
 
-2:                                                ; preds = %1
+3:                                                ; preds = %2
+  ret i1 %1
+}
+
+define i1 @_hl.scoped_func.7() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
   ret i1 false
 }

@@ -3,8 +3,8 @@
 use std::sync::{Arc, LazyLock};
 
 use hugr::builder::{
-    BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-    ModuleBuilder,
+    BuildError, CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::ExtensionRegistry;
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};

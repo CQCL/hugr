@@ -139,7 +139,7 @@ _LIST_T = STRINGLY_EXT.add_type_def(
     ext.TypeDef(
         "List",
         description="A list of elements.",
-        params=[tys.TypeTypeParam(tys.TypeBound.Linear)],
+        params=[tys.TypeTypeParam(tys.TypeBound.Any)],
         bound=ext.FromParamsBound([0]),
     )
 )

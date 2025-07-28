@@ -66,26 +66,12 @@ class TypeDef(ConfiguredBaseModel):
 
 
 class FixedHugr(ConfiguredBaseModel):
-    """Fixed HUGR used to define the lowering of an operation.
-
-    Args:
-        extensions: Extensions used in the HUGR.
-        hugr: Base64-encoded HUGR envelope.
-    """
-
     extensions: ExtensionSet
     hugr: str
 
     def deserialize(self) -> ext.FixedHugr:
-        # Loading fixed HUGRs requires reading hugr-model envelopes,
-        # which is not currently supported in Python.
-        # TODO: Add support for loading fixed HUGRs in Python.
-        # https://github.com/CQCL/hugr/issues/2287
-        msg = (
-            "Loading extensions with operation lowering functions is not "
-            + "supported in Python"
-        )
-        raise NotImplementedError(msg)
+        hugr = Hugr.from_str(self.hugr)
+        return ext.FixedHugr(extensions=self.extensions, hugr=hugr)
 
 
 class OpDef(ConfiguredBaseModel, populate_by_name=True):
@@ -105,21 +91,13 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
             self.binary,
         )
 
-        # Loading fixed HUGRs requires reading hugr-model envelopes,
-        # which is not currently supported in Python.
-        # We currently ignore any lower functions instead of raising an error.
-        #
-        # TODO: Add support for loading fixed HUGRs in Python.
-        # https://github.com/CQCL/hugr/issues/2287
-        lower_funcs: list[ext.FixedHugr] = []
-
         return extension.add_op_def(
             ext.OpDef(
                 name=self.name,
                 description=self.description,
                 misc=self.misc or {},
                 signature=signature,
-                lower_funcs=lower_funcs,
+                lower_funcs=[f.deserialize() for f in self.lower_funcs],
             )
         )
 

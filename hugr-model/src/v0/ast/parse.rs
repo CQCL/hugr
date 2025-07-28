@@ -28,7 +28,7 @@ use thiserror::Error;
 use crate::v0::ast::{LinkName, Module, Operation, SeqPart};
 use crate::v0::{Literal, RegionKind};
 
-use super::{Node, Package, Param, Region, Symbol, VarName, Visibility};
+use super::{Node, Package, Param, Region, Symbol, VarName};
 use super::{SymbolName, Term};
 
 mod pest_parser {
@@ -292,23 +292,13 @@ fn parse_param(pair: Pair<Rule>) -> ParseResult<Param> {
 
 fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     debug_assert_eq!(Rule::symbol, pair.as_rule());
-
     let mut pairs = pair.into_inner();
-    let visibility = take_rule(&mut pairs, Rule::visibility)
-        .next()
-        .map(|pair| match pair.as_str() {
-            "public" => Ok(Visibility::Public),
-            "private" => Ok(Visibility::Private),
-            _ => unreachable!("Expected 'public' or 'private', got {}", pair.as_str()),
-        })
-        .transpose()?;
     let name = parse_symbol_name(pairs.next().unwrap())?;
     let params = parse_params(&mut pairs)?;
     let constraints = parse_constraints(&mut pairs)?;
     let signature = parse_term(pairs.next().unwrap())?;
 
     Ok(Symbol {
-        visibility,
         name,
         params,
         constraints,

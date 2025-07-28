@@ -8,7 +8,7 @@ from .conftest import validate
 def build_basic_cfg(cfg: Cfg) -> None:
     with cfg.add_entry() as entry:
         entry.set_single_succ_outputs(*entry.inputs())
-    cfg.branch_exit(entry[0])
+    cfg.branch(entry[0], cfg.exit)
 
 
 def test_basic_cfg() -> None:

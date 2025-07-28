@@ -24,8 +24,7 @@ pub mod types;
 pub mod utils;
 
 pub use crate::core::{
-    CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex,
-    Visibility, Wire,
+    CircuitUnit, Direction, IncomingPort, Node, NodeIndex, OutgoingPort, Port, PortIndex, Wire,
 };
 pub use crate::extension::Extension;
 pub use crate::hugr::{Hugr, HugrView, SimpleReplacement};

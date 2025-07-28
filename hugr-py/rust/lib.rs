@@ -50,16 +50,6 @@ fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
     Ok(package)
 }
 
-/// Returns the current version of the HUGR model format as a tuple of (major, minor, patch).
-#[pyfunction]
-fn current_model_version() -> (u64, u64, u64) {
-    (
-        hugr_model::CURRENT_VERSION.major,
-        hugr_model::CURRENT_VERSION.minor,
-        hugr_model::CURRENT_VERSION.patch,
-    )
-}
-
 #[pymodule]
 fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(term_to_string, m)?)?;
@@ -78,6 +68,5 @@ fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(string_to_param, m)?)?;
     m.add_function(wrap_pyfunction!(symbol_to_string, m)?)?;
     m.add_function(wrap_pyfunction!(string_to_symbol, m)?)?;
-    m.add_function(wrap_pyfunction!(current_model_version, m)?)?;
     Ok(())
 }

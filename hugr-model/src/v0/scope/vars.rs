@@ -78,23 +78,28 @@ impl<'a> VarTable<'a> {
     /// # Errors
     ///
     /// Returns an error if the variable is not defined in the current scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no open scopes.
     pub fn resolve(&self, name: &'a str) -> Result<VarId, UnknownVarError<'a>> {
-        let scope = self.scopes.last().ok_or(UnknownVarError::Root(name))?;
+        let scope = self.scopes.last().unwrap();
         let set_index = self
             .vars
             .get_index_of(&(scope.node, name))
-            .ok_or(UnknownVarError::WithinNode(scope.node, name))?;
+            .ok_or(UnknownVarError(scope.node, name))?;
         let var_index = (set_index - scope.var_stack) as u16;
         Ok(VarId(scope.node, var_index))
     }
 
     /// Check if a variable is visible in the current scope.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there are no open scopes.
     #[must_use]
     pub fn is_visible(&self, var: VarId) -> bool {
-        let Some(scope) = self.scopes.last() else {
-            return false;
-        };
-
+        let scope = self.scopes.last().unwrap();
         scope.node == var.0 && var.1 < scope.var_count
     }
 
@@ -144,11 +149,5 @@ pub struct DuplicateVarError<'a>(NodeId, &'a str);
 
 /// Error that occurs when a variable is not defined in the current scope.
 #[derive(Debug, Clone, Error)]
-pub enum UnknownVarError<'a> {
-    /// Failed to resolve a variable when in scope of a node.
-    #[error("can not resolve variable `{1}` in node {0}")]
-    WithinNode(NodeId, &'a str),
-    /// Failed to resolve a variable when in the root scope.
-    #[error("can not resolve variable `{0}` in the root scope")]
-    Root(&'a str),
-}
+#[error("can not resolve variable `{1}` in node {0}")]
+pub struct UnknownVarError<'a>(NodeId, &'a str);

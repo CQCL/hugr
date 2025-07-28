@@ -76,7 +76,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 mod test {
     use hugr_core::{
         Hugr,
-        builder::{Dataflow, DataflowHugr},
+        builder::{Dataflow, DataflowSubContainer},
         extension::{ExtensionRegistry, prelude::bool_t},
         std_extensions::logic::{self, LogicOp},
     };
@@ -99,7 +99,7 @@ mod test {
                     .add_dataflow_op(op, builder.input_wires())
                     .unwrap()
                     .outputs();
-                builder.finish_hugr_with_outputs(outputs).unwrap()
+                builder.finish_with_outputs(outputs).unwrap()
             })
     }
 

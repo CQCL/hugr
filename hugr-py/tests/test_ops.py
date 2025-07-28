@@ -1,6 +1,5 @@
 import pytest
 
-from hugr import tys
 from hugr.hugr.node_port import InPort, Node, OutPort
 from hugr.ops import (
     CFG,
@@ -43,8 +42,7 @@ from hugr.val import TRUE
         (DivMod, "arithmetic.int.idivmod_u<5>"),
         (MakeTuple(), "MakeTuple"),
         (UnpackTuple(), "UnpackTuple"),
-        (Tag(0, Bool), "Left"),
-        (Tag(0, tys.Sum([[Bool, Bool, Bool]])), "Tag(0)"),
+        (Tag(0, Bool), "Tag(0)"),
         (CFG([]), "CFG"),
         (DFG([]), "DFG"),
         (DataflowBlock([]), "DataflowBlock"),
@@ -61,7 +59,7 @@ from hugr.val import TRUE
         (FuncDecl("bar", PolyFuncType.empty()), "FuncDecl(bar)"),
         (Const(TRUE), "Const(TRUE)"),
         (Noop(), "Noop"),
-        (AliasDecl("baz", TypeBound.Linear), "AliasDecl(baz)"),
+        (AliasDecl("baz", TypeBound.Any), "AliasDecl(baz)"),
         (AliasDefn("baz", Bool), "AliasDefn(baz)"),
     ],
 )

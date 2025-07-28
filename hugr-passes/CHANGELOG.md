@@ -1,37 +1,6 @@
 # Changelog
 
 
-## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.0...hugr-passes-v0.22.1) - 2025-07-28
-
-### New Features
-
-- Include copy_discard_array in DelegatingLinearizer::default ([#2479](https://github.com/CQCL/hugr/pull/2479))
-- Inline calls to functions not on cycles in the call graph ([#2450](https://github.com/CQCL/hugr/pull/2450))
-
-## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.21.0...hugr-passes-v0.22.0) - 2025-07-24
-
-### New Features
-
-- ReplaceTypes allows linearizing inside Op replacements ([#2435](https://github.com/CQCL/hugr/pull/2435))
-- Add pass for DFG inlining ([#2460](https://github.com/CQCL/hugr/pull/2460))
-
-## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.2...hugr-passes-v0.21.0) - 2025-07-09
-
-### Bug Fixes
-
-- DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
-
-### New Features
-
-- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
-- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
-- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
-- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
-
-### Refactor
-
-- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
-
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.20.2) - 2025-06-25
 
 ### Bug Fixes

@@ -340,8 +340,8 @@ pub(in crate::hugr) fn edge_style<'a>(
     config: MermaidFormatter<'_>,
 ) -> Box<
     dyn FnMut(
-            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
-            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
+            <MultiPortGraph as LinkView>::LinkEndpoint,
+            <MultiPortGraph as LinkView>::LinkEndpoint,
         ) -> EdgeStyle
         + 'a,
 > {
@@ -417,5 +417,15 @@ mod tests {
         {
             assert!(RenderConfig::try_from(config).is_err());
         }
+
+        #[allow(deprecated)]
+        let config = RenderConfig {
+            entrypoint: Some(h.entrypoint()),
+            ..Default::default()
+        };
+        assert_eq!(
+            MermaidFormatter::from_render_config(config, &h),
+            h.mermaid_format()
+        )
     }
 }

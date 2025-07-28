@@ -1,7 +1,6 @@
 //! HUGR invariant checks.
 
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::iter;
 
 use itertools::Itertools;
@@ -20,8 +19,9 @@ use crate::ops::validate::{
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
 use crate::types::type_param::TypeParam;
-use crate::{Direction, Port, Visibility};
+use crate::{Direction, Port};
 
+use super::ExtensionError;
 use super::internal::PortgraphNodeMap;
 use super::views::HugrView;
 
@@ -60,7 +60,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // Hierarchy and children. No type variables declared outside the root.
         self.validate_subtree(self.hugr.entrypoint(), &[])?;
 
-        self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
         // serialization round-trips. We verify the schema of the serialization
         // format only when an environment variable is set. This allows
@@ -79,44 +78,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::text());
         }
 
-        Ok(())
-    }
-
-    fn validate_linkage(&self) -> Result<(), ValidationError<H::Node>> {
-        // Map from func_name, for visible funcs only, to *tuple of*
-        //    Node with that func_name,
-        //    Signature,
-        //    bool - true for FuncDefn
-        let mut node_sig_defn = HashMap::new();
-
-        for c in self.hugr.children(self.hugr.module_root()) {
-            let (func_name, sig, is_defn) = match self.hugr.get_optype(c) {
-                OpType::FuncDecl(fd) if fd.visibility() == &Visibility::Public => {
-                    (fd.func_name(), fd.signature(), false)
-                }
-                OpType::FuncDefn(fd) if fd.visibility() == &Visibility::Public => {
-                    (fd.func_name(), fd.signature(), true)
-                }
-                _ => continue,
-            };
-            match node_sig_defn.entry(func_name) {
-                Entry::Vacant(ve) => {
-                    ve.insert((c, sig, is_defn));
-                }
-                Entry::Occupied(oe) => {
-                    // Allow two decls of the same sig (aliasing - we are allowing some laziness here).
-                    // Reject if at least one Defn - either two conflicting impls,
-                    //                               or Decl+Defn which should have been linked
-                    let (prev_c, prev_sig, prev_defn) = oe.get();
-                    if prev_sig != &sig || is_defn || *prev_defn {
-                        return Err(ValidationError::DuplicateExport {
-                            link_name: func_name.clone(),
-                            children: [*prev_c, c],
-                        });
-                    };
-                }
-            }
-        }
         Ok(())
     }
 
@@ -158,7 +119,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if num_ports != op_type.port_count(dir) {
                 return Err(ValidationError::WrongNumberOfPorts {
                     node,
-                    optype: Box::new(op_type.clone()),
+                    optype: op_type.clone(),
                     actual: num_ports,
                     expected: op_type.port_count(dir),
                     dir,
@@ -176,9 +137,9 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if !allowed_children.is_superset(op_type.tag()) {
                 return Err(ValidationError::InvalidParentOp {
                     child: node,
-                    child_optype: Box::new(op_type.clone()),
+                    child_optype: op_type.clone(),
                     parent,
-                    parent_optype: Box::new(parent_optype.clone()),
+                    parent_optype: parent_optype.clone(),
                     allowed_children,
                 });
             }
@@ -190,7 +151,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if validity_flags.allowed_children == OpTag::None {
                 return Err(ValidationError::EntrypointNotContainer {
                     node,
-                    optype: Box::new(op_type.clone()),
+                    optype: op_type.clone(),
                 });
             }
         }
@@ -239,7 +200,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Err(ValidationError::UnconnectedPort {
                 node,
                 port,
-                port_kind: Box::new(port_kind),
+                port_kind,
             });
         }
 
@@ -249,7 +210,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
-                    port_kind: Box::new(port_kind),
+                    port_kind,
                 });
             }
             return Ok(());
@@ -269,7 +230,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::TooManyConnections {
                     node,
                     port,
-                    port_kind: Box::new(port_kind),
+                    port_kind,
                 });
             }
 
@@ -283,10 +244,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 return Err(ValidationError::IncompatiblePorts {
                     from: node,
                     from_port: port,
-                    from_kind: Box::new(port_kind),
+                    from_kind: port_kind,
                     to: other_node,
                     to_port: other_offset,
-                    to_kind: Box::new(other_kind),
+                    to_kind: other_kind,
                 });
             }
 
@@ -325,7 +286,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if flags.allowed_children.is_empty() {
                 return Err(ValidationError::NonContainerWithChildren {
                     node,
-                    optype: Box::new(op_type.clone()),
+                    optype: op_type.clone(),
                 });
             }
 
@@ -335,8 +296,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if !flags.allowed_first_child.is_superset(first_child.tag()) {
                 return Err(ValidationError::InvalidInitialChild {
                     parent: node,
-                    parent_optype: Box::new(op_type.clone()),
-                    optype: Box::new(first_child.clone()),
+                    parent_optype: op_type.clone(),
+                    optype: first_child.clone(),
                     expected: flags.allowed_first_child,
                     position: "first",
                 });
@@ -349,8 +310,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 if !flags.allowed_second_child.is_superset(second_child.tag()) {
                     return Err(ValidationError::InvalidInitialChild {
                         parent: node,
-                        parent_optype: Box::new(op_type.clone()),
-                        optype: Box::new(second_child.clone()),
+                        parent_optype: op_type.clone(),
+                        optype: second_child.clone(),
                         expected: flags.allowed_second_child,
                         position: "second",
                     });
@@ -361,7 +322,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if let Err(source) = op_type.validate_op_children(children_optypes) {
                 return Err(ValidationError::InvalidChildren {
                     parent: node,
-                    parent_optype: Box::new(op_type.clone()),
+                    parent_optype: op_type.clone(),
                     source,
                 });
             }
@@ -388,7 +349,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                             if let Err(source) = edge_check(edge_data) {
                                 return Err(ValidationError::InvalidEdges {
                                     parent: node,
-                                    parent_optype: Box::new(op_type.clone()),
+                                    parent_optype: op_type.clone(),
                                     source,
                                 });
                             }
@@ -403,7 +364,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         } else if flags.requires_children {
             return Err(ValidationError::ContainerWithoutChildren {
                 node,
-                optype: Box::new(op_type.clone()),
+                optype: op_type.clone(),
             });
         }
 
@@ -434,7 +395,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         if nodes_visited != node_count {
             return Err(ValidationError::NotADag {
                 node: parent,
-                optype: Box::new(op_type.clone()),
+                optype: op_type.clone(),
             });
         }
 
@@ -472,7 +433,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                 from_offset,
                 to,
                 to_offset,
-                ty: Box::new(edge_kind),
+                ty: edge_kind,
             });
         }
 
@@ -482,12 +443,28 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         //
         // This search could be sped-up with a pre-computed LCA structure, but
         // for valid Hugrs this search should be very short.
+        //
+        // For Value edges only, we record any FuncDefn we went through; if there is
+        // any such, then that is an error, but we report that only if the dom/ext
+        // relation was otherwise ok (an error about an edge "entering" some ancestor
+        // node could be misleading if the source isn't where it's expected)
+        let mut err_entered_func = None;
         let from_parent_parent = self.hugr.get_parent(from_parent);
         for (ancestor, ancestor_parent) in
             iter::successors(to_parent, |&p| self.hugr.get_parent(p)).tuple_windows()
         {
+            if !is_static && self.hugr.get_optype(ancestor).is_func_defn() {
+                err_entered_func.get_or_insert(InterGraphEdgeError::ValueEdgeIntoFunc {
+                    to,
+                    to_offset,
+                    from,
+                    from_offset,
+                    func: ancestor,
+                });
+            }
             if ancestor_parent == from_parent {
                 // External edge.
+                err_entered_func.map_or(Ok(()), Err)?;
                 if !is_static {
                     // Must have an order edge.
                     self.hugr
@@ -511,10 +488,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
                         from_offset,
                         to,
                         to_offset,
-                        ancestor_parent_op: Box::new(ancestor_parent_op.clone()),
+                        ancestor_parent_op: ancestor_parent_op.clone(),
                     });
                 }
-
+                err_entered_func.map_or(Ok(()), Err)?;
                 // Check domination
                 let (dominator_tree, node_map) =
                     if let Some(tree) = self.dominators.get(&ancestor_parent) {
@@ -640,7 +617,7 @@ pub enum ValidationError<N: HugrNode> {
     )]
     WrongNumberOfPorts {
         node: N,
-        optype: Box<OpType>,
+        optype: OpType,
         actual: usize,
         expected: usize,
         dir: Direction,
@@ -650,14 +627,14 @@ pub enum ValidationError<N: HugrNode> {
     UnconnectedPort {
         node: N,
         port: Port,
-        port_kind: Box<EdgeKind>,
+        port_kind: EdgeKind,
     },
     /// A linear port is connected to more than one thing.
     #[error("{node} has a port {port} of type {port_kind} with more than one connection.")]
     TooManyConnections {
         node: N,
         port: Port,
-        port_kind: Box<EdgeKind>,
+        port_kind: EdgeKind,
     },
     /// Connected ports have different types, or non-unifiable types.
     #[error(
@@ -666,10 +643,10 @@ pub enum ValidationError<N: HugrNode> {
     IncompatiblePorts {
         from: N,
         from_port: Port,
-        from_kind: Box<EdgeKind>,
+        from_kind: EdgeKind,
         to: N,
         to_port: Port,
-        to_kind: Box<EdgeKind>,
+        to_kind: EdgeKind,
     },
     /// The non-root node has no parent.
     #[error("{node} has no parent.")]
@@ -678,9 +655,9 @@ pub enum ValidationError<N: HugrNode> {
     #[error("The operation {parent_optype} cannot contain a {child_optype} as a child. Allowed children: {}. In {child} with parent {parent}.", allowed_children.description())]
     InvalidParentOp {
         child: N,
-        child_optype: Box<OpType>,
+        child_optype: OpType,
         parent: N,
-        parent_optype: Box<OpType>,
+        parent_optype: OpType,
         allowed_children: OpTag,
     },
     /// Invalid first/second child.
@@ -689,8 +666,8 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidInitialChild {
         parent: N,
-        parent_optype: Box<OpType>,
-        optype: Box<OpType>,
+        parent_optype: OpType,
+        optype: OpType,
         expected: OpTag,
         position: &'static str,
     },
@@ -701,18 +678,8 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidChildren {
         parent: N,
-        parent_optype: Box<OpType>,
+        parent_optype: OpType,
         source: ChildrenValidationError<N>,
-    },
-    /// Multiple, incompatible, nodes with [Visibility::Public] use the same `func_name`
-    /// in a [Module](super::Module). (Multiple [`FuncDecl`](crate::ops::FuncDecl)s with
-    /// the same signature are allowed)
-    #[error("FuncDefn/Decl {} is exported under same name {link_name} as earlier node {}", children[0], children[1])]
-    DuplicateExport {
-        /// The `func_name` of a public `FuncDecl` or `FuncDefn`
-        link_name: String,
-        /// Two nodes using that name
-        children: [N; 2],
     },
     /// The children graph has invalid edges.
     #[error(
@@ -724,23 +691,27 @@ pub enum ValidationError<N: HugrNode> {
     )]
     InvalidEdges {
         parent: N,
-        parent_optype: Box<OpType>,
+        parent_optype: OpType,
         source: EdgeValidationError<N>,
     },
     /// The node operation is not a container, but has children.
     #[error("{node} with optype {optype} is not a container, but has children.")]
-    NonContainerWithChildren { node: N, optype: Box<OpType> },
+    NonContainerWithChildren { node: N, optype: OpType },
     /// The node must have children, but has none.
     #[error("{node} with optype {optype} must have children, but has none.")]
-    ContainerWithoutChildren { node: N, optype: Box<OpType> },
+    ContainerWithoutChildren { node: N, optype: OpType },
     /// The children of a node do not form a DAG.
     #[error(
         "The children of an operation {optype} must form a DAG. Loops are not allowed. In {node}."
     )]
-    NotADag { node: N, optype: Box<OpType> },
+    NotADag { node: N, optype: OpType },
     /// There are invalid inter-graph edges.
     #[error(transparent)]
     InterGraphEdgeError(#[from] InterGraphEdgeError<N>),
+    /// There are errors in the extension deltas.
+    #[deprecated(note = "Never returned since hugr-core-v0.20.0")]
+    #[error(transparent)]
+    ExtensionError(#[from] ExtensionError),
     /// A node claims to still be awaiting extension inference. Perhaps it is not acted upon by inference.
     #[error(
         "{node} needs a concrete ExtensionSet - inference will provide this for Case/CFG/Conditional/DataflowBlock/DFG/TailLoop only"
@@ -769,7 +740,7 @@ pub enum ValidationError<N: HugrNode> {
     ConstTypeError(#[from] ConstTypeError),
     /// The HUGR entrypoint must be a region container.
     #[error("The HUGR entrypoint ({node}) must be a region container, but '{}' does not accept children.", optype.name())]
-    EntrypointNotContainer { node: N, optype: Box<OpType> },
+    EntrypointNotContainer { node: N, optype: OpType },
 }
 
 /// Errors related to the inter-graph edge validations.
@@ -786,7 +757,18 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         from_offset: Port,
         to: N,
         to_offset: Port,
-        ty: Box<EdgeKind>,
+        ty: EdgeKind,
+    },
+    /// Inter-Graph edges may not enter into `FuncDefns` unless they are static
+    #[error(
+        "Inter-graph Value edges cannot enter into FuncDefns. Inter-graph edge from {from} ({from_offset}) to {to} ({to_offset} enters FuncDefn {func}"
+    )]
+    ValueEdgeIntoFunc {
+        from: N,
+        from_offset: Port,
+        to: N,
+        to_offset: Port,
+        func: N,
     },
     /// The grandparent of a dominator inter-graph edge must be a CFG container.
     #[error(
@@ -797,7 +779,7 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         from_offset: Port,
         to: N,
         to_offset: Port,
-        ancestor_parent_op: Box<OpType>,
+        ancestor_parent_op: OpType,
     },
     /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
     #[error(

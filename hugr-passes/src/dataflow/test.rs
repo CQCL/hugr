@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use ascent::{Lattice, lattice::BoundedLattice};
 
-use hugr_core::builder::{CFGBuilder, DataflowHugr, ModuleBuilder, inout_sig};
+use hugr_core::builder::{CFGBuilder, Container, DataflowHugr, ModuleBuilder, inout_sig};
 use hugr_core::ops::{CallIndirect, TailLoop};
 use hugr_core::types::{ConstTypeError, TypeRow};
 use hugr_core::{Hugr, Node, Wire};
@@ -409,14 +409,11 @@ fn test_call(
     #[case] out: PartialValue<Void>,
 ) {
     let mut builder = DFGBuilder::new(Signature::new_endo(vec![bool_t(); 2])).unwrap();
-    let func_defn = {
-        let mut mb = builder.module_root_builder();
-        let func_bldr = mb
-            .define_function("id", Signature::new_endo(bool_t()))
-            .unwrap();
-        let [v] = func_bldr.input_wires_arr();
-        func_bldr.finish_with_outputs([v]).unwrap()
-    };
+    let func_bldr = builder
+        .define_function("id", Signature::new_endo(bool_t()))
+        .unwrap();
+    let [v] = func_bldr.input_wires_arr();
+    let func_defn = func_bldr.finish_with_outputs([v]).unwrap();
     let [a, b] = builder.input_wires_arr();
     let [a2] = builder
         .call(func_defn.handle(), &[], [a])
@@ -557,8 +554,7 @@ fn call_indirect(#[case] inp1: PartialValue<Void>, #[case] inp2: PartialValue<Vo
     let mut dfb = DFGBuilder::new(inout_sig(vec![bool_t(); 3], vec![bool_t(); 2])).unwrap();
 
     let [id1, id2] = ["id1", "[id2]"].map(|name| {
-        let mut mb = dfb.module_root_builder();
-        let fb = mb.define_function(name, b2b()).unwrap();
+        let fb = dfb.define_function(name, b2b()).unwrap();
         let [inp] = fb.input_wires_arr();
         fb.finish_with_outputs([inp]).unwrap()
     });

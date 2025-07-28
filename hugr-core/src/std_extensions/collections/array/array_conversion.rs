@@ -76,9 +76,9 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
 {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
-        let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let element_ty = Type::new_var_use(1, TypeBound::Linear);
+        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let element_ty = Type::new_var_use(1, TypeBound::Any);
 
         let this_ty = AK::instantiate_ty(array_def, size.clone(), element_ty.clone())
             .expect("Array type instantiation failed");
@@ -202,7 +202,10 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeExtensionOp
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone().into()]
+        vec![
+            TypeArg::BoundedNat { n: self.size },
+            self.elem_ty.clone().into(),
+        ]
     }
 }
 
@@ -231,7 +234,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> HasConcrete
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
                 Ok(GenericArrayConvert::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
@@ -246,14 +249,12 @@ mod tests {
     use crate::extension::prelude::bool_t;
     use crate::ops::{OpTrait, OpType};
     use crate::std_extensions::collections::array::Array;
-    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
 
     use super::*;
 
     #[rstest]
     #[case(ValueArray, Array)]
-    #[case(BorrowArray, Array)]
     fn test_convert_from_def<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -266,7 +267,6 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
-    #[case(BorrowArray, Array)]
     fn test_convert_into_def<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -279,7 +279,6 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
-    #[case(BorrowArray, Array)]
     fn test_convert_from<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,
@@ -300,7 +299,6 @@ mod tests {
 
     #[rstest]
     #[case(ValueArray, Array)]
-    #[case(BorrowArray, Array)]
     fn test_convert_into<AK: ArrayKind, OtherAK: ArrayKind>(
         #[case] _kind: AK,
         #[case] _other_kind: OtherAK,

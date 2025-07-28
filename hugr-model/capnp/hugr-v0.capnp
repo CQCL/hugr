@@ -20,12 +20,6 @@ using LinkIndex = UInt32;
 
 struct Package {
     modules @0 :List(Module);
-    version @1 :Version;
-}
-
-struct Version {
-    major @0 :UInt32;
-    minor @1 :UInt32;
 }
 
 struct Module {
@@ -67,7 +61,6 @@ struct Operation {
 }
 
 struct Symbol {
-    visibility @4 :Visibility;
     name @0 :Text;
     params @1 :List(Param);
     constraints @2 :List(TermId);
@@ -126,10 +119,4 @@ struct Term {
 struct Param {
     name @0 :Text;
     type @1 :TermId;
-}
-
-enum Visibility {
-    unspecified @0;
-    private @1;
-    public @2;
 }

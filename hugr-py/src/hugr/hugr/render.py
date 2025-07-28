@@ -1,6 +1,5 @@
 """Visualise HUGR using graphviz."""
 
-import html
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 
@@ -102,9 +101,7 @@ class DotRenderer:
             "margin": "0",
             "bgcolor": self.config.palette.background,
         }
-        if name := hugr[hugr.module_root].metadata.get("name", None):
-            name = html.escape(str(name))
-        else:
+        if not (name := hugr[hugr.module_root].metadata.get("name", None)):
             name = ""
 
         graph = gv.Digraph(name, strict=False)
@@ -218,8 +215,7 @@ class DotRenderer:
         meta = hugr[node].metadata
         if len(meta) > 0:
             data = "<BR/><BR/>" + "<BR/>".join(
-                html.escape(key) + ": " + html.escape(str(value))
-                for key, value in meta.items()
+                f"{key}: {value}" for key, value in meta.items()
             )
         else:
             data = ""
@@ -240,7 +236,6 @@ class DotRenderer:
             op_name = op.op_def().name
         else:
             op_name = op.name()
-        op_name = html.escape(op_name)
 
         label_config = {
             "node_back_color": self.config.palette.node,
@@ -291,7 +286,7 @@ class DotRenderer:
         label = ""
         match kind:
             case ValueKind(ty):
-                label = html.escape(str(ty))
+                label = str(ty)
                 color = self.config.palette.edge
             case OrderKind():
                 color = self.config.palette.dark

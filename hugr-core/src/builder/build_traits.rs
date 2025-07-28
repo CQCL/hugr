@@ -9,7 +9,7 @@ use crate::{Extension, IncomingPort, Node, OutgoingPort};
 use std::iter;
 use std::sync::Arc;
 
-use super::{BuilderWiringError, ModuleBuilder};
+use super::{BuilderWiringError, FunctionBuilder};
 use super::{
     CircuitBuilder,
     handle::{BuildHandle, Outputs},
@@ -21,7 +21,7 @@ use crate::{
 };
 
 use crate::extension::ExtensionRegistry;
-use crate::types::{Signature, Type, TypeArg, TypeRow};
+use crate::types::{PolyFuncType, Signature, Type, TypeArg, TypeRow};
 
 use itertools::Itertools;
 
@@ -82,20 +82,37 @@ pub trait Container {
         self.add_child_node(constant.into()).into()
     }
 
-    /// Insert a HUGR's entrypoint region as a child of the container.
+    /// Add a [`ops::FuncDefn`] node and returns a builder to define the function
+    /// body graph.
     ///
-    /// To insert an arbitrary region of a HUGR, use [`Container::add_hugr_region`].
-    fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
-        let region = child.entrypoint();
-        self.add_hugr_region(child, region)
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error in adding the
+    /// [`ops::FuncDefn`] node.
+    fn define_function(
+        &mut self,
+        name: impl Into<String>,
+        signature: impl Into<PolyFuncType>,
+    ) -> Result<FunctionBuilder<&mut Hugr>, BuildError> {
+        let signature: PolyFuncType = signature.into();
+        let body = signature.body().clone();
+        let f_node = self.add_child_node(ops::FuncDefn::new(name, signature));
+
+        // Add the extensions used by the function types.
+        self.use_extensions(
+            body.used_extensions().unwrap_or_else(|e| {
+                panic!("Build-time signatures should have valid extensions. {e}")
+            }),
+        );
+
+        let db = DFGBuilder::create_with_io(self.hugr_mut(), f_node, body)?;
+        Ok(FunctionBuilder::from_dfg_builder(db))
     }
 
-    /// Insert a HUGR region as a child of the container.
-    ///
-    /// To insert the entrypoint region of a HUGR, use [`Container::add_hugr`].
-    fn add_hugr_region(&mut self, child: Hugr, region: Node) -> InsertionResult {
+    /// Insert a HUGR as a child of the container.
+    fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
         let parent = self.container_node();
-        self.hugr_mut().insert_region(parent, child, region)
+        self.hugr_mut().insert_hugr(parent, child)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
@@ -138,19 +155,8 @@ pub trait Container {
 }
 
 /// Types implementing this trait can be used to build complete HUGRs
-/// (with varying entrypoint node types)
+/// (with varying root node types)
 pub trait HugrBuilder: Container {
-    /// Allows adding definitions to the module root of which
-    /// this builder is building a part
-    fn module_root_builder(&mut self) -> ModuleBuilder<&mut Hugr> {
-        debug_assert!(
-            self.hugr()
-                .get_optype(self.hugr().module_root())
-                .is_module()
-        );
-        ModuleBuilder(self.hugr_mut())
-    }
-
     /// Finish building the HUGR, perform any validation checks and return it.
     fn finish_hugr(self) -> Result<Hugr, ValidationError<Node>>;
 }
@@ -210,10 +216,6 @@ pub trait Dataflow: Container {
     /// Insert a hugr-defined op to the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the resulting root node.
     ///
-    /// Inserts everything from the entrypoint region of the HUGR.
-    /// See [`Dataflow::add_hugr_region_with_wires`] for a generic version that allows
-    /// inserting a region other than the entrypoint.
-    ///
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the
@@ -223,34 +225,12 @@ pub trait Dataflow: Container {
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let region = hugr.entrypoint();
-        self.add_hugr_region_with_wires(hugr, region, input_wires)
-    }
-
-    /// Insert a hugr-defined op to the sibling graph, wiring up the
-    /// `input_wires` to the incoming ports of the resulting root node.
-    ///
-    /// `region` must be a node in the `hugr`. See [`Dataflow::add_hugr_with_wires`]
-    /// for a helper that inserts the entrypoint region to the HUGR.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error when adding the
-    /// node.
-    fn add_hugr_region_with_wires(
-        &mut self,
-        hugr: Hugr,
-        region: Node,
-        input_wires: impl IntoIterator<Item = Wire>,
-    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let optype = hugr.get_optype(region).clone();
+        let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
-        let node = self.add_hugr_region(hugr, region).inserted_entrypoint;
+        let node = self.add_hugr(hugr).inserted_entrypoint;
 
-        wire_up_inputs(input_wires, node, self).map_err(|error| BuildError::OperationWiring {
-            op: Box::new(optype),
-            error,
-        })?;
+        wire_up_inputs(input_wires, node, self)
+            .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
 
         Ok((node, num_outputs).into())
     }
@@ -271,10 +251,8 @@ pub trait Dataflow: Container {
         let optype = hugr.get_optype(hugr.entrypoint()).clone();
         let num_outputs = optype.value_output_count();
 
-        wire_up_inputs(input_wires, node, self).map_err(|error| BuildError::OperationWiring {
-            op: Box::new(optype),
-            error,
-        })?;
+        wire_up_inputs(input_wires, node, self)
+            .map_err(|error| BuildError::OperationWiring { op: optype, error })?;
 
         Ok((node, num_outputs).into())
     }
@@ -291,7 +269,7 @@ pub trait Dataflow: Container {
         let [_, out] = self.io();
         wire_up_inputs(output_wires.into_iter().collect_vec(), out, self).map_err(|error| {
             BuildError::OutputWiring {
-                container_op: Box::new(self.hugr().get_optype(self.container_node()).clone()),
+                container_op: self.hugr().get_optype(self.container_node()).clone(),
                 container_node: self.container_node(),
                 error,
             }
@@ -700,10 +678,8 @@ fn add_node_with_wires<T: Dataflow + ?Sized>(
     let num_outputs = op.value_output_count();
     let op_node = data_builder.add_child_node(op.clone());
 
-    wire_up_inputs(inputs, op_node, data_builder).map_err(|error| BuildError::OperationWiring {
-        op: Box::new(op),
-        error,
-    })?;
+    wire_up_inputs(inputs, op_node, data_builder)
+        .map_err(|error| BuildError::OperationWiring { op, error })?;
 
     Ok((op_node, num_outputs))
 }
@@ -755,7 +731,7 @@ fn wire_up<T: Dataflow + ?Sized>(
                     src_offset: src_port.into(),
                     dst,
                     dst_offset: dst_port.into(),
-                    typ: Box::new(typ),
+                    typ,
                 });
             }
 
@@ -786,7 +762,7 @@ fn wire_up<T: Dataflow + ?Sized>(
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuilderWiringError::NoCopyLinear {
-                typ: Box::new(typ),
+                typ,
                 src,
                 src_offset: src_port.into(),
             });

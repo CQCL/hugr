@@ -38,7 +38,7 @@ use crate::{
     types::{
         ConstTypeError, CustomCheckFailure, CustomType, PolyFuncType, Signature, Type, TypeArg,
         TypeBound, TypeName,
-        type_param::{TermTypeError, TypeParam},
+        type_param::{TypeArgError, TypeParam},
     },
 };
 
@@ -309,12 +309,12 @@ impl HasConcrete for StaticArrayOpDef {
         match type_args {
             [arg] => {
                 let elem_ty = arg
-                    .as_runtime()
+                    .as_type()
                     .filter(|t| Copyable.contains(t.least_upper_bound()))
                     .ok_or(SignatureError::TypeArgMismatch(
-                        TermTypeError::TypeMismatch {
-                            type_: Box::new(Copyable.into()),
-                            term: Box::new(arg.clone()),
+                        TypeArgError::TypeMismatch {
+                            param: Copyable.into(),
+                            arg: arg.clone(),
                         },
                     ))?;
 
@@ -324,7 +324,7 @@ impl HasConcrete for StaticArrayOpDef {
                 })
             }
             _ => Err(
-                SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(type_args.len(), 1))
+                SignatureError::TypeArgMismatch(TypeArgError::WrongNumberArgs(type_args.len(), 1))
                     .into(),
             ),
         }

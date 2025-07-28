@@ -52,9 +52,9 @@ impl<AK: ArrayKind> FromStr for GenericArrayRepeatDef<AK> {
 impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
-        let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let t = Type::new_var_use(1, TypeBound::Linear);
+        let params = vec![TypeParam::max_nat(), TypeBound::Any.into()];
+        let n = TypeArg::new_var_use(0, TypeParam::max_nat());
+        let t = Type::new_var_use(1, TypeBound::Any);
         let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
         let array_ty =
             AK::instantiate_ty(array_def, n, t).expect("Array type instantiation failed");
@@ -147,7 +147,10 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayRepeat<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.size.into(), self.elem_ty.clone().into()]
+        vec![
+            TypeArg::BoundedNat { n: self.size },
+            self.elem_ty.clone().into(),
+        ]
     }
 }
 
@@ -170,7 +173,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
+            [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] => {
                 Ok(GenericArrayRepeat::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
@@ -183,7 +186,6 @@ mod tests {
     use rstest::rstest;
 
     use crate::std_extensions::collections::array::Array;
-    use crate::std_extensions::collections::borrow_array::BorrowArray;
     use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::qb_t,
@@ -196,7 +198,6 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
-    #[case(BorrowArray)]
     fn test_repeat_def<AK: ArrayKind>(#[case] _kind: AK) {
         let op = GenericArrayRepeat::<AK>::new(qb_t(), 2);
         let optype: OpType = op.clone().into();
@@ -207,7 +208,6 @@ mod tests {
     #[rstest]
     #[case(Array)]
     #[case(ValueArray)]
-    #[case(BorrowArray)]
     fn test_repeat<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;
         let element_ty = qb_t();

@@ -1,4 +1,5 @@
 //! Compilation passes acting on the HUGR program representation.
+#![expect(missing_docs)] // TODO: Fix...
 
 pub mod call_graph;
 pub mod composable;
@@ -11,9 +12,6 @@ mod dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
-pub mod inline_dfgs;
-pub mod inline_funcs;
-pub use inline_funcs::inline_acyclic;
 pub mod linearize_array;
 pub use linearize_array::LinearizeArrayPass;
 pub mod lower;

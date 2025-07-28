@@ -1,5 +1,3 @@
-//! Passes to lower operations in a HUGR.
-
 use hugr_core::{
     Hugr, Node,
     hugr::{hugrmut::HugrMut, views::SiblingSubgraph},

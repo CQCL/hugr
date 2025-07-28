@@ -1,7 +1,0 @@
-
-
-[profile.default-miri]
-# Fail if tests take more than 5 mins.
-# Those tests should be skipped in `.github/workflows/unsondness.yml`.
-slow-timeout = { period = "60s", terminate-after = 5 }
-fail-fast = false

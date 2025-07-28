@@ -8,8 +8,8 @@ use std::{
 };
 
 use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Term, Transformable, Type, TypeArg, TypeBase, TypeRV,
-    TypeTransformer, type_param::TypeParam,
+    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeTransformer,
+    type_param::TypeParam,
 };
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
@@ -28,8 +28,7 @@ pub struct TypeRowBase<ROWVARS: MaybeRV> {
 /// Row of single types i.e. of known length, for node inputs/outputs
 pub type TypeRow = TypeRowBase<NoRV>;
 
-/// Row of types and/or row variables, the number of actual types is thus
-/// unknown
+/// Row of types and/or row variables, the number of actual types is thus unknown
 pub type TypeRowRV = TypeRowBase<RowVariable>;
 
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeRowBase<RV1>> for TypeRowBase<RV2> {
@@ -196,81 +195,6 @@ impl From<Type> for TypeRow {
     }
 }
 
-// Fallibly convert a [Term] to a [TypeRV].
-//
-// This will fail if `arg` is of non-type kind (e.g. String).
-impl TryFrom<Term> for TypeRV {
-    type Error = SignatureError;
-
-    fn try_from(value: Term) -> Result<Self, Self::Error> {
-        match value {
-            TypeArg::Runtime(ty) => Ok(ty.into()),
-            TypeArg::Variable(v) => Ok(TypeRV::new_row_var_use(
-                v.index(),
-                v.bound_if_row_var()
-                    .ok_or(SignatureError::InvalidTypeArgs)?,
-            )),
-            _ => Err(SignatureError::InvalidTypeArgs),
-        }
-    }
-}
-
-// Fallibly convert a [Term] to a [TypeRow].
-//
-// This will fail if `arg` is of non-sequence kind (e.g. Type)
-// or if the sequence contains row variables.
-impl TryFrom<Term> for TypeRow {
-    type Error = SignatureError;
-
-    fn try_from(value: TypeArg) -> Result<Self, Self::Error> {
-        match value {
-            TypeArg::List(elems) => elems
-                .into_iter()
-                .map(|ta| ta.as_runtime())
-                .collect::<Option<Vec<_>>>()
-                .map(|x| x.into())
-                .ok_or(SignatureError::InvalidTypeArgs),
-            _ => Err(SignatureError::InvalidTypeArgs),
-        }
-    }
-}
-
-// Fallibly convert a [TypeArg] to a [TypeRowRV].
-//
-// This will fail if `arg` is of non-sequence kind (e.g. Type).
-impl TryFrom<Term> for TypeRowRV {
-    type Error = SignatureError;
-
-    fn try_from(value: Term) -> Result<Self, Self::Error> {
-        match value {
-            TypeArg::List(elems) => elems
-                .into_iter()
-                .map(TypeRV::try_from)
-                .collect::<Result<Vec<_>, _>>()
-                .map(|vec| vec.into()),
-            TypeArg::Variable(v) => Ok(vec![TypeRV::new_row_var_use(
-                v.index(),
-                v.bound_if_row_var()
-                    .ok_or(SignatureError::InvalidTypeArgs)?,
-            )]
-            .into()),
-            _ => Err(SignatureError::InvalidTypeArgs),
-        }
-    }
-}
-
-impl From<TypeRow> for Term {
-    fn from(value: TypeRow) -> Self {
-        Term::List(value.into_owned().into_iter().map_into().collect())
-    }
-}
-
-impl From<TypeRowRV> for Term {
-    fn from(value: TypeRowRV) -> Self {
-        Term::List(value.into_owned().into_iter().map_into().collect())
-    }
-}
-
 impl<RV: MaybeRV> Deref for TypeRowBase<RV> {
     type Target = [TypeBase<RV>];
 
@@ -287,12 +211,6 @@ impl<RV: MaybeRV> DerefMut for TypeRowBase<RV> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::{
-        extension::prelude::bool_t,
-        types::{Type, TypeArg, TypeRV},
-    };
-
     mod proptest {
         use crate::proptest::RecursionDepth;
         use crate::types::{MaybeRV, TypeBase, TypeRowBase};
@@ -311,80 +229,6 @@ mod test {
                         .boxed()
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_try_from_term_to_typerv() {
-        // Test successful conversion with Runtime type
-        let runtime_type = Type::UNIT;
-        let term = TypeArg::Runtime(runtime_type.clone());
-        let result = TypeRV::try_from(term);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TypeRV::from(runtime_type));
-
-        // Test failure with non-type kind
-        let term = Term::String("test".to_string());
-        let result = TypeRV::try_from(term);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_try_from_term_to_typerow() {
-        // Test successful conversion with List
-        let types = vec![Type::new_unit_sum(1), bool_t()];
-        let type_args = types.iter().map(|t| TypeArg::Runtime(t.clone())).collect();
-        let term = TypeArg::List(type_args);
-        let result = TypeRow::try_from(term);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TypeRow::from(types));
-
-        // Test failure with non-list
-        let term = TypeArg::Runtime(Type::UNIT);
-        let result = TypeRow::try_from(term);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_try_from_term_to_typerowrv() {
-        // Test successful conversion with List
-        let types = [TypeRV::from(Type::UNIT), TypeRV::from(bool_t())];
-        let type_args = types.iter().map(|t| t.clone().into()).collect();
-        let term = TypeArg::List(type_args);
-        let result = TypeRowRV::try_from(term);
-        assert!(result.is_ok());
-
-        // Test failure with non-sequence kind
-        let term = Term::String("test".to_string());
-        let result = TypeRowRV::try_from(term);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_from_typerow_to_term() {
-        let types = vec![Type::UNIT, bool_t()];
-        let type_row = TypeRow::from(types);
-        let term = Term::from(type_row);
-
-        match term {
-            Term::List(elems) => {
-                assert_eq!(elems.len(), 2);
-            }
-            _ => panic!("Expected Term::List"),
-        }
-    }
-
-    #[test]
-    fn test_from_typerowrv_to_term() {
-        let types = vec![TypeRV::from(Type::UNIT), TypeRV::from(bool_t())];
-        let type_row_rv = TypeRowRV::from(types);
-        let term = Term::from(type_row_rv);
-
-        match term {
-            TypeArg::List(elems) => {
-                assert_eq!(elems.len(), 2);
-            }
-            _ => panic!("Expected Term::List"),
         }
     }
 }

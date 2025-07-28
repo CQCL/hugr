@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: ast
+expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-alias.edn\"))"
 ---
 (hugr 0)
 

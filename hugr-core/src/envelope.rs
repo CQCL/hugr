@@ -73,42 +73,17 @@ pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 /// If multiple modules have different generators, a comma-separated list is returned in
 /// module order.
 /// If no generator is found, `None` is returned.
-pub fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
+fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
     let generators: Vec<String> = modules
         .iter()
         .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
-        .map(format_generator)
+        .map(|v| v.to_string())
         .collect();
     if generators.is_empty() {
         return None;
     }
 
     Some(generators.join(", "))
-}
-
-/// Format a generator value from the metadata.
-pub fn format_generator(json_val: &serde_json::Value) -> String {
-    match json_val {
-        serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Object(obj) => {
-            if let (Some(name), version) = (
-                obj.get("name").and_then(|v| v.as_str()),
-                obj.get("version").and_then(|v| v.as_str()),
-            ) {
-                if let Some(version) = version {
-                    // Expected format: {"name": "generator", "version": "1.0.0"}
-                    format!("{name}-v{version}")
-                } else {
-                    name.to_string()
-                }
-            } else {
-                // just print the whole object as a string
-                json_val.to_string()
-            }
-        }
-        // Raw JSON string fallback
-        _ => json_val.to_string(),
-    }
 }
 
 fn gen_str(generator: &Option<String>) -> String {
@@ -122,7 +97,7 @@ fn gen_str(generator: &Option<String>) -> String {
 #[derive(Error, Debug)]
 #[error("{inner}{}", gen_str(&self.generator))]
 pub struct WithGenerator<E: std::fmt::Display> {
-    inner: Box<E>,
+    inner: E,
     /// The name of the generator that produced the envelope, if any.
     generator: Option<String>,
 }
@@ -130,7 +105,7 @@ pub struct WithGenerator<E: std::fmt::Display> {
 impl<E: std::fmt::Display> WithGenerator<E> {
     fn new(err: E, modules: &[impl HugrView]) -> Self {
         Self {
-            inner: Box::new(err),
+            inner: err,
             generator: get_generator(modules),
         }
     }
@@ -204,15 +179,16 @@ pub(crate) fn write_envelope_impl<'h>(
 }
 
 /// Error type for envelope operations.
-#[derive(Debug, Error)]
+#[derive(derive_more::Display, derive_more::Error, Debug, derive_more::From)]
 #[non_exhaustive]
 pub enum EnvelopeError {
     /// Bad magic number.
-    #[error(
+    #[display(
         "Bad magic number. expected 0x{:X} found 0x{:X}",
         u64::from_be_bytes(*expected),
         u64::from_be_bytes(*found)
     )]
+    #[from(ignore)]
     MagicNumber {
         /// The expected magic number.
         ///
@@ -222,18 +198,20 @@ pub enum EnvelopeError {
         found: [u8; 8],
     },
     /// The specified payload format is invalid.
-    #[error("Format descriptor {descriptor} is invalid.")]
+    #[display("Format descriptor {descriptor} is invalid.")]
+    #[from(ignore)]
     InvalidFormatDescriptor {
         /// The unsupported format.
         descriptor: usize,
     },
     /// The specified payload format is not supported.
-    #[error("Payload format {format} is not supported.{}",
+    #[display("Payload format {format} is not supported.{}",
         match feature {
             Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
             None => String::new()
         },
     )]
+    #[from(ignore)]
     FormatUnsupported {
         /// The unsupported format.
         format: EnvelopeFormat,
@@ -243,96 +221,67 @@ pub enum EnvelopeError {
     /// Not all envelope formats can be represented as ASCII.
     ///
     /// This error is used when trying to store the envelope into a string.
-    #[error("Envelope format {format} cannot be represented as ASCII.")]
+    #[display("Envelope format {format} cannot be represented as ASCII.")]
+    #[from(ignore)]
     NonASCIIFormat {
         /// The unsupported format.
         format: EnvelopeFormat,
     },
     /// Envelope encoding required zstd compression, but the feature is not enabled.
-    #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
+    #[display("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
+    #[from(ignore)]
     ZstdUnsupported,
     /// Expected the envelope to contain a single HUGR.
-    #[error("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
+    #[display("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
         "none".to_string()
     } else {
         count.to_string()
     })]
+    #[from(ignore)]
     ExpectedSingleHugr {
         /// The number of HUGRs in the package.
         count: usize,
     },
     /// JSON serialization error.
-    #[error(transparent)]
     SerdeError {
         /// The source error.
-        #[from]
         source: serde_json::Error,
     },
     /// IO read/write error.
-    #[error(transparent)]
     IO {
         /// The source error.
-        #[from]
         source: std::io::Error,
     },
     /// Error writing a json package to the payload.
-    #[error(transparent)]
     PackageEncoding {
         /// The source error.
-        #[from]
         source: PackageEncodingError,
     },
     /// Error importing a HUGR from a hugr-model payload.
-    #[error(transparent)]
     ModelImport {
         /// The source error.
-        #[from]
         source: ImportError,
         // TODO add generator to model import errors
     },
     /// Error reading a HUGR model payload.
-    #[error(transparent)]
     ModelRead {
         /// The source error.
-        #[from]
         source: hugr_model::v0::binary::ReadError,
     },
     /// Error writing a HUGR model payload.
-    #[error(transparent)]
     ModelWrite {
         /// The source error.
-        #[from]
         source: hugr_model::v0::binary::WriteError,
     },
     /// Error reading a HUGR model payload.
-    #[error("Model text parsing error")]
     ModelTextRead {
         /// The source error.
-        #[from]
         source: hugr_model::v0::ast::ParseError,
     },
     /// Error reading a HUGR model payload.
-    #[error(transparent)]
     ModelTextResolve {
         /// The source error.
-        #[from]
         source: hugr_model::v0::ast::ResolveError,
-    },
-    /// Error reading a list of extensions from the envelope.
-    #[error(transparent)]
-    ExtensionLoad {
-        /// The source error.
-        #[from]
-        source: crate::extension::ExtensionRegistryLoadError,
-    },
-    /// The specified payload format is not supported.
-    #[error(
-        "The envelope configuration has unknown {}. Please update your HUGR version.",
-        if flag_ids.len() == 1 {format!("flag #{}", flag_ids[0])} else {format!("flags {}", flag_ids.iter().join(", "))}
-    )]
-    FlagUnsupported {
-        /// The unrecognized flag bits.
-        flag_ids: Vec<usize>,
     },
 }
 
@@ -380,8 +329,11 @@ fn decode_model(
 
     let mut extension_registry = extension_registry.clone();
     if format == EnvelopeFormat::ModelWithExtensions {
-        let extra_extensions = ExtensionRegistry::load_json(stream, &extension_registry)?;
-        extension_registry.extend(extra_extensions);
+        let extra_extensions: Vec<Extension> =
+            serde_json::from_reader::<_, Vec<Extension>>(stream)?;
+        for ext in extra_extensions {
+            extension_registry.register_updated(ext);
+        }
     }
 
     Ok(import_package(&model_package, &extension_registry)?)
@@ -851,6 +803,6 @@ pub(crate) mod test {
 
         let err_msg = with_gen.to_string();
         assert!(err_msg.contains("Extension 'test' version mismatch"));
-        assert!(err_msg.contains("TestGenerator-v1.2.3"));
+        assert!(err_msg.contains(generator_name.to_string().as_str()));
     }
 }

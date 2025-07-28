@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 
 use itertools::{Either, Itertools};
+use portgraph::render::MermaidFormat;
 
-use hugr_core::{
+use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    extension::ExtensionRegistry,
     hugr::{
-        self, Patch, SimpleReplacementError,
+        Patch, SimpleReplacementError,
         internal::HugrInternals,
         views::{
             ExtractionResult,
             render::{self, MermaidFormatter, NodeLabel},
         },
     },
-    ops::OpType,
 };
 
 use super::{
@@ -37,9 +36,9 @@ impl Patch<PersistentHugr> for PersistentReplacement {
     }
 }
 
-impl<R> HugrInternals for PersistentHugr<R> {
+impl HugrInternals for PersistentHugr {
     type RegionPortgraph<'p>
-        = portgraph::MultiPortGraph<u32, u32, u32>
+        = portgraph::MultiPortGraph
     where
         Self: 'p;
 
@@ -58,10 +57,15 @@ impl<R> HugrInternals for PersistentHugr<R> {
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
 
-        (hugr.into_region_portgraph(parent), node_map)
+        let region = portgraph::view::FlatRegion::new_without_root(
+            hugr.graph,
+            hugr.hierarchy,
+            parent.into_portgraph(),
+        );
+        (region, node_map)
     }
 
-    fn node_metadata_map(&self, node: Self::Node) -> &hugr::NodeMetadataMap {
+    fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap {
         self.as_state_space().node_metadata_map(node)
     }
 }
@@ -71,7 +75,7 @@ impl<R> HugrInternals for PersistentHugr<R> {
 // the whole extracted HUGR in memory. We are currently prioritizing correctness
 // and clarity over performance and will optimise some of these operations in
 // the future as bottlenecks are encountered. (see #2248)
-impl<R> HugrView for PersistentHugr<R> {
+impl HugrView for PersistentHugr {
     fn entrypoint(&self) -> Self::Node {
         // The entrypoint remains unchanged throughout the patch history, and is
         // found in the base hugr.
@@ -107,7 +111,7 @@ impl<R> HugrView for PersistentHugr<R> {
         Some(parent_inv)
     }
 
-    fn get_optype(&self, node: Self::Node) -> &OpType {
+    fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType {
         self.as_state_space().get_optype(node)
     }
 
@@ -175,11 +179,11 @@ impl<R> HugrView for PersistentHugr<R> {
         } else {
             match port.as_directed() {
                 Either::Left(incoming) => {
-                    let (out_node, out_port) = self.single_outgoing_port(node, incoming);
+                    let (out_node, out_port) = self.get_single_outgoing_port(node, incoming);
                     ret_ports.push((out_node, out_port.into()))
                 }
                 Either::Right(outgoing) => ret_ports.extend(
-                    self.all_incoming_ports(node, outgoing)
+                    self.get_all_incoming_ports(node, outgoing)
                         .map(|(node, port)| (node, port.into())),
                 ),
             }
@@ -256,7 +260,7 @@ impl<R> HugrView for PersistentHugr<R> {
                 // replace node labels with patch node IDs
                 let node_labels_map: HashMap<_, _> = node_map
                     .into_iter()
-                    .map(|(k, v)| (v, format!("{k:?}")))
+                    .map(|(k, v)| (v, format!("{:?}", k)))
                     .collect();
                 NodeLabel::Custom(node_labels_map)
             }
@@ -277,7 +281,12 @@ impl<R> HugrView for PersistentHugr<R> {
             .with_port_offsets(formatter.port_offsets())
             .with_type_labels(formatter.type_labels());
 
-        config.finish()
+        hugr.graph
+            .mermaid_format()
+            .with_hierarchy(&hugr.hierarchy)
+            .with_node_style(render::node_style(&hugr, config.clone()))
+            .with_edge_style(render::edge_style(&hugr, config))
+            .finish()
     }
 
     fn dot_string(&self) -> String
@@ -287,8 +296,8 @@ impl<R> HugrView for PersistentHugr<R> {
         unimplemented!("use mermaid_string instead")
     }
 
-    fn extensions(&self) -> &ExtensionRegistry {
-        self.base_hugr().extensions()
+    fn extensions(&self) -> &crate::extension::ExtensionRegistry {
+        &self.base_hugr().extensions
     }
 
     fn extract_hugr(
@@ -296,7 +305,7 @@ impl<R> HugrView for PersistentHugr<R> {
         parent: Self::Node,
     ) -> (
         Hugr,
-        impl hugr::views::ExtractionResult<Self::Node> + 'static,
+        impl crate::hugr::views::ExtractionResult<Self::Node> + 'static,
     ) {
         let (hugr, apply_node_map) = self.apply_all();
         let (extracted_hugr, extracted_node_map) = hugr.extract_hugr(apply_node_map[&parent]);
@@ -321,7 +330,7 @@ impl<R> HugrView for PersistentHugr<R> {
 mod tests {
     use std::collections::HashSet;
 
-    use crate::{CommitStateSpace, state_space::CommitId};
+    use crate::hugr::persistent::{CommitStateSpace, state_space::CommitId};
 
     use super::super::tests::test_state_space;
     use super::*;

@@ -1,29 +1,19 @@
-//! Store of commit histories for a [`PersistentHugr`].
-
 use std::collections::{BTreeSet, VecDeque};
 
 use delegate::delegate;
 use derive_more::From;
-use hugr_core::{
-    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
-    hugr::{
-        self,
-        internal::HugrInternals,
-        patch::{
-            BoundaryPort,
-            simple_replace::{BoundaryMode, InvalidReplacement},
-        },
-        views::InvalidSignature,
-    },
-    ops::OpType,
-};
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use relrc::{HistoryGraph, RelRc};
 use thiserror::Error;
 
+use super::{
+    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, find_conflicting_node,
+    parents_view::ParentsView,
+};
 use crate::{
-    Commit, PersistentHugr, PersistentReplacement, PointerEqResolver, Resolver,
-    find_conflicting_node, parents_view::ParentsView, subgraph::InvalidPinnedSubgraph,
+    Direction, Hugr, HugrView, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement,
+    hugr::{internal::HugrInternals, patch::BoundaryPort},
+    ops::OpType,
 };
 
 pub mod serial;
@@ -33,46 +23,23 @@ pub type CommitId = relrc::NodeId;
 
 /// A HUGR node within a commit of the commit state space
 #[derive(
-    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize,
+    Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub struct PatchNode(pub CommitId, pub Node);
 
-impl PatchNode {
-    /// Get the commit ID of the commit that owns this node.
-    pub fn owner(&self) -> CommitId {
-        self.0
-    }
-}
-
-// Print out PatchNodes as `Node(x)@commit_hex`
-impl std::fmt::Debug for PatchNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}@{}", self.1, self.0)
-    }
-}
-
 impl std::fmt::Display for PatchNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
+        write!(f, "{:?}", self)
     }
 }
 
-mod hidden {
-    use super::*;
-
-    /// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
-    /// other commits apply), or a [`PersistentReplacement`]
-    ///
-    /// This is a "unnamable" type: we do not expose this struct publicly in our
-    /// API, but we can still use it in public trait bounds (see
-    /// [`Resolver`](crate::resolver::Resolver)).
-    #[derive(Debug, Clone, From)]
-    pub enum CommitData {
-        Base(Hugr),
-        Replacement(PersistentReplacement),
-    }
+/// The data stored in a [`Commit`], either the base [`Hugr`] (on which all
+/// other commits apply), or a [`PersistentReplacement`]
+#[derive(Debug, Clone, From)]
+pub(super) enum CommitData {
+    Base(Hugr),
+    Replacement(PersistentReplacement),
 }
-pub(crate) use hidden::CommitData;
 
 /// A set of commits with directed (acyclic) dependencies between them.
 ///
@@ -94,24 +61,24 @@ pub(crate) use hidden::CommitData;
 /// same subgraph. Use [`Self::try_extract_hugr`] to get a [`PersistentHugr`]
 /// with a set of compatible commits.
 #[derive(Clone, Debug)]
-pub struct CommitStateSpace<R = PointerEqResolver> {
+pub struct CommitStateSpace {
     /// A set of commits with directed (acyclic) dependencies between them.
     ///
     /// Each commit is stored as a [`RelRc`].
-    pub(super) graph: HistoryGraph<CommitData, (), R>,
+    graph: HistoryGraph<CommitData, (), PointerEqResolver>,
     /// The unique root of the commit graph.
     ///
     /// The only commit in the graph with variant [`CommitData::Base`]. All
     /// other commits are [`CommitData::Replacement`]s, and are descendants
     /// of this.
-    pub(super) base_commit: CommitId,
+    base_commit: CommitId,
 }
 
-impl<R: Resolver> CommitStateSpace<R> {
+impl CommitStateSpace {
     /// Create a new commit state space with a single base commit.
     pub fn with_base(hugr: Hugr) -> Self {
         let commit = RelRc::new(CommitData::Base(hugr));
-        let graph = HistoryGraph::new([commit.clone()], R::default());
+        let graph = HistoryGraph::new([commit.clone()], PointerEqResolver);
         let base_commit = graph
             .all_node_ids()
             .exactly_one()
@@ -127,7 +94,7 @@ impl<R: Resolver> CommitStateSpace<R> {
     pub fn try_from_commits(
         commits: impl IntoIterator<Item = Commit>,
     ) -> Result<Self, InvalidCommit> {
-        let graph = HistoryGraph::new(commits.into_iter().map_into(), R::default());
+        let graph = HistoryGraph::new(commits.into_iter().map_into(), PointerEqResolver);
         let base_commits = graph
             .all_node_ids()
             .filter(|&id| matches!(graph.get_node(id).value(), CommitData::Base(_)))
@@ -151,19 +118,6 @@ impl<R: Resolver> CommitStateSpace<R> {
         self.try_add_commit(commit)
     }
 
-    /// Add a commit (and all its ancestors) to the state space.
-    ///
-    /// Returns an [`InvalidCommit::NonUniqueBase`] error if the commit is a
-    /// base commit and does not coincide with the existing base commit.
-    pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
-        let is_base = commit.as_relrc().ptr_eq(self.base_commit().as_relrc());
-        if !is_base && matches!(commit.value(), CommitData::Base(_)) {
-            return Err(InvalidCommit::NonUniqueBase(2));
-        }
-        let commit = commit.into();
-        Ok(self.graph.insert_node(commit))
-    }
-
     /// Add a set of commits to the state space.
     ///
     /// Commits must be valid replacement commits or coincide with the existing
@@ -174,6 +128,29 @@ impl<R: Resolver> CommitStateSpace<R> {
             self.try_add_commit(commit)
                 .expect("invalid commit in extend");
         }
+    }
+
+    /// Add a commit (and all its ancestors) to the state space.
+    ///
+    /// Returns an [`InvalidCommit::NonUniqueBase`] error if the commit is a
+    /// base commit and does not coincide with the existing base commit.
+    pub fn try_add_commit(&mut self, commit: Commit) -> Result<CommitId, InvalidCommit> {
+        if matches!(commit.value(), CommitData::Base(_) if !commit.0.ptr_eq(&self.base_commit().0))
+        {
+            return Err(InvalidCommit::NonUniqueBase(2));
+        }
+        let commit = commit.into();
+        Ok(self.graph.insert_node(commit))
+    }
+
+    /// Check if `commit` is in the commit state space.
+    pub fn contains(&self, commit: &Commit) -> bool {
+        self.graph.contains(commit.as_relrc())
+    }
+
+    /// Check if `commit_id` is in the commit state space.
+    pub fn contains_id(&self, commit_id: CommitId) -> bool {
+        self.graph.contains_id(commit_id)
     }
 
     /// Extract a `PersistentHugr` from this state space, consisting of
@@ -187,7 +164,7 @@ impl<R: Resolver> CommitStateSpace<R> {
     pub fn try_extract_hugr(
         &self,
         commits: impl IntoIterator<Item = CommitId>,
-    ) -> Result<PersistentHugr<R>, InvalidCommit> {
+    ) -> Result<PersistentHugr, InvalidCommit> {
         // Define commits as the set of all ancestors of the given commits
         let all_commit_ids = get_all_ancestors(&self.graph, commits);
 
@@ -210,24 +187,12 @@ impl<R: Resolver> CommitStateSpace<R> {
         let commits = all_commit_ids
             .into_iter()
             .map(|id| self.get_commit(id).as_relrc().clone());
-        let subgraph = HistoryGraph::new(commits, R::default());
+        let subgraph = HistoryGraph::new(commits, PointerEqResolver);
 
         Ok(PersistentHugr::from_state_space_unsafe(Self {
             graph: subgraph,
             base_commit: self.base_commit,
         }))
-    }
-}
-
-impl<R> CommitStateSpace<R> {
-    /// Check if `commit` is in the commit state space.
-    pub fn contains(&self, commit: &Commit) -> bool {
-        self.graph.contains(commit.as_relrc())
-    }
-
-    /// Check if `commit_id` is in the commit state space.
-    pub fn contains_id(&self, commit_id: CommitId) -> bool {
-        self.graph.contains_id(commit_id)
     }
 
     /// Get the base commit ID.
@@ -251,12 +216,6 @@ impl<R> CommitStateSpace<R> {
     /// Get the commit with ID `commit_id`.
     pub fn get_commit(&self, commit_id: CommitId) -> &Commit {
         self.graph.get_node(commit_id).into()
-    }
-
-    /// Check whether `commit_id` exists and return it.
-    pub fn try_get_commit(&self, commit_id: CommitId) -> Option<&Commit> {
-        self.contains_id(commit_id)
-            .then(|| self.get_commit(commit_id))
     }
 
     /// Get an iterator over all commit IDs in the state space.
@@ -297,7 +256,7 @@ impl<R> CommitStateSpace<R> {
         }
     }
 
-    pub(crate) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), R> {
+    pub(super) fn as_history_graph(&self) -> &HistoryGraph<CommitData, (), PointerEqResolver> {
         &self.graph
     }
 
@@ -305,7 +264,7 @@ impl<R> CommitStateSpace<R> {
     ///
     /// This is either the replacement Hugr of a [`CommitData::Replacement`] or
     /// the base Hugr of a [`CommitData::Base`].
-    pub(crate) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr {
+    pub(super) fn commit_hugr(&self, commit_id: CommitId) -> &Hugr {
         let commit = self.get_commit(commit_id);
         match commit.value() {
             CommitData::Base(base) => base,
@@ -336,23 +295,15 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the boundary inputs linked to `(node, port)` in `child`.
     ///
-    /// The returned ports will be ports on successors of the input node in the
-    /// `child` commit, unless (node, port) is connected to a passthrough wire
-    /// in `child` (i.e. a wire from input node to output node), in which
-    /// case they will be in one of the parents of `child`.
-    ///
-    /// `child` should be a child commit of the owner of `node`.
-    ///
     /// ## Panics
     ///
-    /// Panics if `(node, port)` is not a boundary edge, if `child` is not
-    /// a valid commit ID or if it is the base commit.
-    pub(crate) fn linked_child_inputs(
+    /// Panics if `(node, port)` is not a boundary edge, or if `child` is not
+    /// a valid commit ID.
+    pub(super) fn linked_child_inputs(
         &self,
         node: PatchNode,
         port: OutgoingPort,
         child: CommitId,
-        return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
         assert!(
             self.is_boundary_edge(node, port, child),
@@ -361,7 +312,7 @@ impl<R> CommitStateSpace<R> {
 
         let parent_hugrs = ParentsView::from_commit(child, self);
         let repl = self.replacement(child).expect("valid child commit");
-        repl.linked_replacement_inputs((node, port), &parent_hugrs, return_invalid)
+        repl.linked_replacement_inputs((node, port), &parent_hugrs)
             .collect_vec()
             .into_iter()
             .map(move |np| match np {
@@ -372,70 +323,32 @@ impl<R> CommitStateSpace<R> {
 
     /// Get the single boundary output linked to `(node, port)` in `child`.
     ///
-    /// The returned port will be a port on a predecessor of the output node in
-    /// the `child` commit, unless (node, port) is connected to a passthrough
-    /// wire in `child` (i.e. a wire from input node to output node), in
-    /// which case it will be in one of the parents of `child`.
-    ///
-    /// `child` should be a child commit of the owner of `node` (or `None` will
-    /// be returned).
-    ///
     /// ## Panics
     ///
     /// Panics if `child` is not a valid commit ID.
-    pub(crate) fn linked_child_output(
+    pub(super) fn linked_child_output(
         &self,
         node: PatchNode,
         port: IncomingPort,
         child: CommitId,
-        return_invalid: BoundaryMode,
     ) -> Option<(PatchNode, OutgoingPort)> {
         let parent_hugrs = ParentsView::from_commit(child, self);
-        let repl = self.replacement(child)?;
-        match repl.linked_replacement_output((node, port), &parent_hugrs, return_invalid)? {
+        let repl = self.replacement(child).expect("valid child commit");
+        match repl.linked_replacement_output((node, port), &parent_hugrs)? {
             BoundaryPort::Host(patch_node, port) => (patch_node, port),
             BoundaryPort::Replacement(node, port) => (PatchNode(child, node), port),
         }
         .into()
     }
 
-    /// Get the boundary ports linked to `(node, port)` in `child`.
-    ///
-    /// `child` should be a child commit of the owner of `node`.
-    ///
-    /// See [`Self::linked_child_inputs`] and [`Self::linked_child_output`] for
-    /// more details.
-    pub(crate) fn linked_child_ports(
-        &self,
-        node: PatchNode,
-        port: impl Into<Port>,
-        child: CommitId,
-        return_invalid: BoundaryMode,
-    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
-        match port.into().as_directed() {
-            Either::Left(incoming) => Either::Left(
-                self.linked_child_output(node, incoming, child, return_invalid)
-                    .into_iter()
-                    .map(|(node, port)| (node, port.into())),
-            ),
-            Either::Right(outgoing) => Either::Right(
-                self.linked_child_inputs(node, outgoing, child, return_invalid)
-                    .map(|(node, port)| (node, port.into())),
-            ),
-        }
-    }
-
-    /// Get the single output port linked to `(node, port)` in a parent of the
-    /// commit of `node`.
-    ///
-    /// The returned port belongs to the input boundary of the subgraph in
-    /// parent.
+    /// Get the single output boundary port linked to `(node, port)` in a
+    /// parent of the commit of `node`.
     ///
     /// ## Panics
     ///
     /// Panics if `(node, port)` is not connected to the input node in the
     /// commit of `node`, or if the node is not valid.
-    pub fn linked_parent_input(
+    pub(super) fn linked_parent_input(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: IncomingPort,
@@ -453,17 +366,7 @@ impl<R> CommitStateSpace<R> {
         repl.linked_host_input((node, port), &parent_hugrs).into()
     }
 
-    /// Get the input ports linked to `(node, port)` in a parent of the commit
-    /// of `node`.
-    ///
-    /// The returned ports belong to the output boundary of the subgraph in
-    /// parent.
-    ///
-    /// ## Panics
-    ///
-    /// Panics if `(node, port)` is not connected to the output node in the
-    /// commit of `node`, or if the node is not valid.
-    pub fn linked_parent_outputs(
+    pub(super) fn linked_parent_outputs(
         &self,
         PatchNode(commit_id, node): PatchNode,
         port: OutgoingPort,
@@ -484,35 +387,8 @@ impl<R> CommitStateSpace<R> {
             .into_iter()
     }
 
-    /// Get the ports linked to `(node, port)` in a parent of the commit of
-    /// `node`.
-    ///
-    /// See [`Self::linked_parent_input`] and [`Self::linked_parent_outputs`]
-    /// for more details.
-    ///
-    /// ## Panics
-    ///
-    /// Panics if `(node, port)` is not connected to an IO node in the commit
-    /// of `node`, or if the node is not valid.
-    pub fn linked_parent_ports(
-        &self,
-        node: PatchNode,
-        port: impl Into<Port>,
-    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
-        match port.into().as_directed() {
-            Either::Left(incoming) => {
-                let (node, port) = self.linked_parent_input(node, incoming);
-                Either::Left(std::iter::once((node, port.into())))
-            }
-            Either::Right(outgoing) => Either::Right(
-                self.linked_parent_outputs(node, outgoing)
-                    .map(|(node, port)| (node, port.into())),
-            ),
-        }
-    }
-
     /// Get the replacement for `commit_id`.
-    pub(crate) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
+    pub(super) fn replacement(&self, commit_id: CommitId) -> Option<&SimpleReplacement<PatchNode>> {
         let commit = self.get_commit(commit_id);
         commit.replacement()
     }
@@ -520,7 +396,7 @@ impl<R> CommitStateSpace<R> {
 
 // The subset of HugrView methods that can be implemented on CommitStateSpace
 // by simplify delegating to the patches' respective HUGRs
-impl<R> CommitStateSpace<R> {
+impl CommitStateSpace {
     /// Get the type of the operation at `node`.
     pub fn get_optype(&self, PatchNode(commit_id, node): PatchNode) -> &OpType {
         let hugr = self.commit_hugr(commit_id);
@@ -571,7 +447,7 @@ impl<R> CommitStateSpace<R> {
     pub fn node_metadata_map(
         &self,
         PatchNode(commit_id, node): PatchNode,
-    ) -> &hugr::NodeMetadataMap {
+    ) -> &crate::hugr::NodeMetadataMap {
         self.commit_hugr(commit_id).node_metadata_map(node)
     }
 }
@@ -615,20 +491,4 @@ pub enum InvalidCommit {
     /// The commit is an empty replacement.
     #[error("Not allowed: empty replacement")]
     EmptyReplacement,
-
-    #[error("Invalid subgraph: {0}")]
-    /// The subgraph of the replacement is not convex.
-    InvalidSubgraph(#[from] InvalidPinnedSubgraph),
-
-    /// The replacement of the commit is invalid.
-    #[error("Invalid replacement: {0}")]
-    InvalidReplacement(#[from] InvalidReplacement),
-
-    /// The signature of the replacement is invalid.
-    #[error("Invalid signature: {0}")]
-    InvalidSignature(#[from] InvalidSignature),
-
-    /// A wire has an unpinned port.
-    #[error("Incomplete wire: {0} is unpinned")]
-    IncompleteWire(PatchNode, Port),
 }

@@ -1,3 +1,4 @@
+#![warn(missing_docs)]
 //! Dataflow analysis of Hugrs.
 
 mod datalog;

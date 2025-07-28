@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![warn(missing_docs)]
 //! Replace types with other types across the Hugr. See [`ReplaceTypes`] and [Linearizer].
 //!
 use std::borrow::Cow;
@@ -107,9 +108,9 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
+    fn replace(&self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
-        let new_optype = match self {
+        let new_optype = match self.clone() {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(new_h) => {
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
@@ -171,23 +172,6 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
-/// Options for how the replacement for an op is processed. May be specified by
-/// [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
-/// Otherwise (the default), replacements are inserted as is (without further processing).
-#[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
-pub struct ReplacementOptions {
-    linearize: bool,
-}
-
-impl ReplacementOptions {
-    /// Specifies that all operations within the replacement should have their
-    /// output ports linearized.
-    pub fn with_linearization(mut self, lin: bool) -> Self {
-        self.linearize = lin;
-        self
-    }
-}
-
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [`Self::run`].
 ///
@@ -220,14 +204,8 @@ pub struct ReplaceTypes {
     type_map: HashMap<CustomType, Type>,
     param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
     linearize: DelegatingLinearizer,
-    op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
-    param_ops: HashMap<
-        ParametricOp,
-        (
-            Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>,
-            ReplacementOptions,
-        ),
-    >,
+    op_map: HashMap<OpHashWrapper, NodeTemplate>,
+    param_ops: HashMap<ParametricOp, Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>>,
     consts: HashMap<
         CustomType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Value, ReplaceTypesError>>,
@@ -281,7 +259,7 @@ pub enum ReplaceTypesError {
     #[error(transparent)]
     LinearizeError(#[from] LinearizeError),
     #[error("Replacement op for {0} could not be added because {1}")]
-    AddTemplateError(Node, Box<BuildError>),
+    AddTemplateError(Node, BuildError),
 }
 
 impl ReplaceTypes {
@@ -360,36 +338,13 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Equivalent to [Self::replace_op_with] with default [ReplacementOptions].
-    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
-        self.replace_op_with(src, dest, ReplacementOptions::default())
-    }
-
-    /// Configures this instance to change occurrences of `src` to `dest`.
-    ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
     /// precedence over [`Self::replace_parametrized_op`] where the `src`s overlap. Thus,
     /// this should only be used on already-*[monomorphize](super::monomorphize())d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
-    pub fn replace_op_with(
-        &mut self,
-        src: &ExtensionOp,
-        dest: NodeTemplate,
-        opts: ReplacementOptions,
-    ) {
-        self.op_map.insert(OpHashWrapper::from(src), (dest, opts));
-    }
-
-    /// Configures this instance to change occurrences of a parametrized op `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    /// Equivalent to [Self::replace_parametrized_op_with] with default [ReplacementOptions].
-    pub fn replace_parametrized_op(
-        &mut self,
-        src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-    ) {
-        self.replace_parametrized_op_with(src, dest_fn, ReplacementOptions::default())
+    pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        self.op_map.insert(OpHashWrapper::from(src), dest);
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
@@ -398,13 +353,12 @@ impl ReplaceTypes {
     /// fit the bounds of the original op).
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
-    pub fn replace_parametrized_op_with(
+    pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
-        opts: ReplacementOptions,
     ) {
-        self.param_ops.insert(src.into(), (Arc::new(dest_fn), opts));
+        self.param_ops.insert(src.into(), Arc::new(dest_fn));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -494,40 +448,34 @@ impl ReplaceTypes {
                 | rest.transform(self)?),
 
             OpType::Const(Const { value, .. }) => self.change_value(value),
-            OpType::ExtensionOp(ext_op) => Ok({
-                let def = ext_op.def_arc();
-                let mut changed = false;
-                let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                    r @ Some(_) => r.cloned(),
-                    None => {
-                        let mut args = ext_op.args().to_vec();
-                        changed = args.transform(self)?;
-                        let r2 = self
-                            .param_ops
-                            .get(&def.as_ref().into())
-                            .and_then(|(rep_fn, opts)| rep_fn(&args).map(|nt| (nt, opts.clone())));
-                        if r2.is_none() && changed {
-                            *ext_op = ExtensionOp::new(def.clone(), args)?;
-                        }
-                        r2
-                    }
-                };
-                if let Some((replacement, opts)) = replacement {
+            OpType::ExtensionOp(ext_op) => Ok(
+                // Copy/discard insertion done by caller
+                if let Some(replacement) = self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
                     replacement
                         .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if opts.linearize {
-                        for d in hugr.descendants(n).collect::<Vec<_>>() {
-                            if d != n {
-                                self.linearize_outputs(hugr, d)?;
-                            }
-                        }
-                    }
+                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
                     true
                 } else {
-                    changed
-                }
-            }),
+                    let def = ext_op.def_arc();
+                    let mut args = ext_op.args().to_vec();
+                    let ch = args.transform(self)?;
+                    if let Some(replacement) = self
+                        .param_ops
+                        .get(&def.as_ref().into())
+                        .and_then(|rep_fn| rep_fn(&args))
+                    {
+                        replacement
+                            .replace(hugr, n)
+                            .map_err(|e| ReplaceTypesError::AddTemplateError(n, e))?;
+                        true
+                    } else {
+                        if ch {
+                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                        }
+                        ch
+                    }
+                },
+            ),
 
             OpType::OpaqueOp(_) => panic!("OpaqueOp should not be in a Hugr"),
 
@@ -571,27 +519,6 @@ impl ReplaceTypes {
             Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
-
-    fn linearize_outputs<H: HugrMut<Node = Node>>(
-        &self,
-        hugr: &mut H,
-        n: H::Node,
-    ) -> Result<(), LinearizeError> {
-        if let Some(new_sig) = hugr.get_optype(n).dataflow_signature() {
-            let new_sig = new_sig.into_owned();
-            for outp in new_sig.output_ports() {
-                if !new_sig.out_port_type(outp).unwrap().copyable() {
-                    let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
-                    if targets.len() != 1 {
-                        hugr.disconnect(n, outp);
-                        let src = Wire::new(n, outp);
-                        self.linearize.insert_copy_discard(hugr, src, &targets)?;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
@@ -602,8 +529,21 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
         let mut changed = false;
         for n in hugr.entry_descendants().collect::<Vec<_>>() {
             changed |= self.change_node(hugr, n)?;
-            if n != hugr.entrypoint() && changed {
-                self.linearize_outputs(hugr, n)?;
+            let new_dfsig = hugr.get_optype(n).dataflow_signature();
+            if let Some(new_sig) = new_dfsig
+                .filter(|_| changed && n != hugr.entrypoint())
+                .map(Cow::into_owned)
+            {
+                for outp in new_sig.output_ports() {
+                    if !new_sig.out_port_type(outp).unwrap().copyable() {
+                        let targets = hugr.linked_inputs(n, outp).collect::<Vec<_>>();
+                        if targets.len() != 1 {
+                            hugr.disconnect(n, outp);
+                            let src = Wire::new(n, outp);
+                            self.linearize.insert_copy_discard(hugr, src, &targets)?;
+                        }
+                    }
+                }
             }
         }
         Ok(changed)
@@ -701,7 +641,7 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
+        let [TypeArg::Type { ty }] = args else {
             panic!("Expected just elem type")
         };
         ty
@@ -715,7 +655,7 @@ mod test {
                 let pv_of_var = ext
                     .add_type(
                         PACKED_VEC.into(),
-                        vec![TypeBound::Linear.into()],
+                        vec![TypeBound::Any.into()],
                         String::new(),
                         TypeDefBound::from_params(vec![0]),
                         w,
@@ -730,7 +670,7 @@ mod test {
                         vec![TypeBound::Copyable.into()],
                         Signature::new(
                             vec![pv_of_var.into(), i64_t()],
-                            Type::new_var_use(0, TypeBound::Linear),
+                            Type::new_var_use(0, TypeBound::Any),
                         ),
                     ),
                     w,
@@ -808,9 +748,9 @@ mod test {
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Linear));
+        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Any));
         let fb = mb
-            .define_function("id", PolyFuncType::new([TypeBound::Linear.into()], sig))
+            .define_function("id", PolyFuncType::new([TypeBound::Any.into()], sig))
             .unwrap();
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
@@ -1027,8 +967,8 @@ mod test {
             IdentList::new_unchecked("NoBoundsCheck"),
             Version::new(0, 0, 0),
             |e, w| {
-                let params = vec![TypeBound::Linear.into()];
-                let tv = Type::new_var_use(0, TypeBound::Linear);
+                let params = vec![TypeBound::Any.into()];
+                let tv = Type::new_var_use(0, TypeBound::Any);
                 let list_of_var = list_type(tv.clone());
                 e.add_op(
                     READ.into(),

@@ -106,7 +106,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
@@ -116,9 +116,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             let [to_discard] = dfb.input_wires_arr();
             lin.copy_discard_op(ty, 0)?
                 .add(&mut dfb, [to_discard])
-                .map_err(|e| {
-                    LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e))
-                })?;
+                .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?;
             let ret = dfb.add_load_value(Value::unary_unit_sum());
             dfb.finish_hugr_with_outputs([ret]).unwrap()
         };
@@ -191,7 +189,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut copies = lin
             .copy_discard_op(ty, num_outports)?
             .add(&mut dfb, [elem])
-            .map_err(|e| LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e)))?
+            .map_err(|e| LinearizeError::NestedTemplateError(ty.clone(), e))?
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
 
@@ -309,7 +307,7 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat { n }, TypeArg::Type { ty }] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if ty.copyable() {

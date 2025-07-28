@@ -1,7 +1,6 @@
 //! Constant value definitions.
 
 mod custom;
-mod serialize;
 
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
@@ -12,7 +11,6 @@ use super::{OpTag, OpType};
 use crate::envelope::serde_with::AsStringEnvelope;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
-use serialize::SerialSum;
 
 use delegate::delegate;
 use itertools::Itertools;
@@ -110,6 +108,16 @@ impl AsRef<Value> for Const {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+struct SerialSum {
+    #[serde(default)]
+    tag: usize,
+    #[serde(rename = "vs")]
+    values: Vec<Value>,
+    #[serde(default, rename = "typ")]
+    sum_type: Option<SumType>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "SerialSum")]
 #[serde(into = "SerialSum")]
 /// A Sum variant, with a tag indicating the index of the variant and its
@@ -149,6 +157,43 @@ pub(crate) fn maybe_hash_values<H: Hasher>(vals: &[Value], st: &mut H) -> bool {
     vals.iter().all(|e| e.try_hash(&mut hasher)) && {
         st.write_u64(hasher.finish());
         true
+    }
+}
+
+impl TryFrom<SerialSum> for Sum {
+    type Error = &'static str;
+
+    fn try_from(value: SerialSum) -> Result<Self, Self::Error> {
+        let SerialSum {
+            tag,
+            values,
+            sum_type,
+        } = value;
+
+        let sum_type = if let Some(sum_type) = sum_type {
+            sum_type
+        } else {
+            if tag != 0 {
+                return Err("Sum type must be provided if tag is not 0");
+            }
+            SumType::new_tuple(values.iter().map(Value::get_type).collect_vec())
+        };
+
+        Ok(Self {
+            tag,
+            values,
+            sum_type,
+        })
+    }
+}
+
+impl From<Sum> for SerialSum {
+    fn from(value: Sum) -> Self {
+        Self {
+            tag: value.tag,
+            values: value.values,
+            sum_type: Some(value.sum_type),
+        }
     }
 }
 
@@ -282,9 +327,9 @@ pub enum CustomCheckFailure {
     #[error("Expected type: {expected} but value was of type: {found}")]
     TypeMismatch {
         /// The expected custom type.
-        expected: Box<CustomType>,
+        expected: CustomType,
         /// The custom type found when checking.
-        found: Box<Type>,
+        found: Type,
     },
     /// Any other message
     #[error("{0}")]
@@ -304,11 +349,11 @@ pub enum ConstTypeError {
     )]
     NotMonomorphicFunction {
         /// The root node type of the Hugr that (claims to) define the function constant.
-        hugr_root_type: Box<OpType>,
+        hugr_root_type: OpType,
     },
     /// A mismatch between the type expected and the value.
     #[error("Value {1:?} does not match expected type {0}")]
-    ConstCheckFail(Box<Type>, Value),
+    ConstCheckFail(Type, Value),
     /// Error when checking a custom value.
     #[error("Error when checking custom type: {0}")]
     CustomCheckFail(#[from] CustomCheckFailure),
@@ -317,7 +362,7 @@ pub enum ConstTypeError {
 /// Hugrs (even functions) inside Consts must be monomorphic
 fn mono_fn_type(h: &Hugr) -> Result<Cow<'_, Signature>, ConstTypeError> {
     let err = || ConstTypeError::NotMonomorphicFunction {
-        hugr_root_type: Box::new(h.entrypoint_optype().clone()),
+        hugr_root_type: h.entrypoint_optype().clone(),
     };
     if let Some(pf) = h.poly_func_type() {
         match pf.try_into() {
@@ -683,7 +728,7 @@ pub(crate) mod test {
                 index: 1,
                 expected,
                 found,
-            })) if *expected == float64_type() && *found == const_usize()
+            })) if expected == float64_type() && found == const_usize()
         );
     }
 
@@ -815,7 +860,7 @@ pub(crate) mod test {
         let ex_id: ExtensionId = "my_extension".try_into().unwrap();
         let typ_int = CustomType::new(
             "my_type",
-            vec![TypeArg::BoundedNat(8)],
+            vec![TypeArg::BoundedNat { n: 8 }],
             ex_id.clone(),
             TypeBound::Copyable,
             // Dummy extension reference.
