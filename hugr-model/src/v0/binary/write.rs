@@ -1,13 +1,15 @@
 use std::io::Write;
 
+use crate::CURRENT_VERSION;
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
-use crate::v0 as model;
-use crate::v0::table;
+use crate::v0::{self as model, table};
 
 /// An error encounter while serializing a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
+#[display("Error encoding a package in HUGR model format.")]
 pub enum WriteError {
+    #[from(forward)]
     /// An error encountered while encoding a `capnproto` buffer.
     EncodingError(capnp::Error),
 }
@@ -45,6 +47,12 @@ pub fn write_to_vec(package: &table::Package) -> Vec<u8> {
 
 fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Package) {
     write_list!(builder, init_modules, write_module, package.modules);
+    write_version(builder.init_version(), &CURRENT_VERSION);
+}
+
+fn write_version(mut builder: hugr_capnp::version::Builder, version: &semver::Version) {
+    builder.set_major(version.major as u32);
+    builder.set_minor(version.minor as u32);
 }
 
 fn write_module(mut builder: hugr_capnp::module::Builder, module: &table::Module) {

@@ -11,6 +11,7 @@ mod dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
+pub mod inline_dfgs;
 pub mod inline_funcs;
 pub mod linearize_array;
 pub use linearize_array::LinearizeArrayPass;

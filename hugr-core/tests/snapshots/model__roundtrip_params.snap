@@ -6,19 +6,21 @@ expression: ast
 
 (mod)
 
-(import core.bytes)
-
-(import core.nat)
-
 (import core.call)
 
 (import core.type)
+
+(import core.bytes)
+
+(import core.nat)
 
 (import core.fn)
 
 (import core.str)
 
 (import core.float)
+
+(import core.title)
 
 (define-func
   public
@@ -37,7 +39,8 @@ expression: ast
   (param ?3 core.float)
   (core.fn [] []))
 
-(define-func private example.call_literals (core.fn [] [])
+(define-func private _5 (core.fn [] [])
+  (meta (core.title "example.call_literals"))
   (dfg
     (signature (core.fn [] []))
     ((core.call

@@ -10,19 +10,22 @@ expression: ast
 
 (import core.nat)
 
-(import core.type)
-
 (import core.nonlinear)
+
+(import core.type)
 
 (import core.fn)
 
+(import core.title)
+
 (declare-func
   private
-  array.replicate
+  _1
   (param ?0 core.nat)
   (param ?1 core.type)
   (where (core.nonlinear ?1))
-  (core.fn [?1] [(collections.array.array ?0 ?1)]))
+  (core.fn [?1] [(collections.array.array ?0 ?1)])
+  (meta (core.title "array.replicate")))
 
 (declare-func
   public

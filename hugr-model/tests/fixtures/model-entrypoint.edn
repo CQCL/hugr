@@ -10,7 +10,7 @@
 
 (mod)
 
-(define-func private wrapper_dfg
+(define-func public wrapper_dfg
   (core.fn [] [])
   (dfg [] []
     (signature (core.fn [] []))

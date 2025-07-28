@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.21.0...hugr-passes-v0.22.0) - 2025-07-24
+
+### New Features
+
+- ReplaceTypes allows linearizing inside Op replacements ([#2435](https://github.com/CQCL/hugr/pull/2435))
+- Add pass for DFG inlining ([#2460](https://github.com/CQCL/hugr/pull/2460))
+
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.2...hugr-passes-v0.21.0) - 2025-07-09
 
 ### Bug Fixes

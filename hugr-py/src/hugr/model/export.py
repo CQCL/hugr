@@ -75,6 +75,7 @@ class ModelExport:
 
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = self.export_json_meta(node)
+        meta += self.export_entrypoint_meta(node)
 
         # Add an order hint key to the node if necessary
         if _has_order_links(self.hugr, node):
@@ -123,7 +124,8 @@ class ModelExport:
 
             case Conditional() as op:
                 regions = [
-                    self.export_region_dfg(child) for child in node_data.children
+                    self.export_region_dfg(child, entrypoint_meta=True)
+                    for child in node_data.children
                 ]
 
                 signature = op.outer_signature().to_model()
@@ -150,21 +152,28 @@ class ModelExport:
                 )
 
             case FuncDefn() as op:
-                name = _mangle_name(node, op.f_name)
+                name = _mangle_name(node, op.f_name, op.visibility)
                 symbol = self.export_symbol(
                     name, op.visibility, op.signature.params, op.signature.body
                 )
                 region = self.export_region_dfg(node)
+
+                if op.visibility == "Private":
+                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
                 )
 
             case FuncDecl() as op:
-                name = _mangle_name(node, op.f_name)
+                name = _mangle_name(node, op.f_name, op.visibility)
                 symbol = self.export_symbol(
                     name, op.visibility, op.signature.params, op.signature.body
                 )
+
+                if op.visibility == "Private":
+                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
+
                 return model.Node(operation=model.DeclareFunc(symbol), meta=meta)
 
             case AliasDecl() as op:
@@ -417,7 +426,7 @@ class ModelExport:
 
         return model.Region(kind=model.RegionKind.MODULE, children=children, meta=meta)
 
-    def export_region_dfg(self, node: Node) -> model.Region:
+    def export_region_dfg(self, node: Node, entrypoint_meta=False) -> model.Region:
         """Export the children of a node as a dataflow region."""
         node_data = self.hugr[node]
         children: list[model.Node] = []
@@ -425,8 +434,10 @@ class ModelExport:
         target_types: model.Term = model.Wildcard()
         sources = []
         targets = []
+        meta = []
 
-        meta = self.export_entrypoint_meta(node)
+        if entrypoint_meta:
+            meta += self.export_entrypoint_meta(node)
 
         for child in node_data.children:
             child_data = self.hugr[child]
@@ -584,7 +595,7 @@ class ModelExport:
         )
 
     def find_func_input(self, node: Node) -> str | None:
-        """Find the name of the function that a node is connected to, if any."""
+        """Find the symbol name of the function that a node is connected to, if any."""
         try:
             func_node = next(
                 out_port.node
@@ -598,12 +609,14 @@ class ModelExport:
         match self.hugr[func_node].op:
             case FuncDecl() as func_op:
                 name = func_op.f_name
+                visibility = func_op.visibility
             case FuncDefn() as func_op:
                 name = func_op.f_name
+                visibility = func_op.visibility
             case _:
                 return None
 
-        return _mangle_name(func_node, name)
+        return _mangle_name(func_node, name, visibility)
 
     def find_const_input(self, node: Node) -> model.Term | None:
         """Find and export the constant that a node is connected to, if any."""
@@ -624,10 +637,17 @@ class ModelExport:
                 return None
 
 
-def _mangle_name(node: Node, name: str) -> str:
-    # Until we come to an agreement on the uniqueness of names, we mangle the names
-    # by adding the node id.
-    return f"_{name}_{node.idx}"
+def _mangle_name(node: Node, name: str, visibility: Visibility) -> str:
+    match visibility:
+        case "Private":
+            # Until we come to an agreement on the uniqueness of names,
+            # we mangle the names by replacing id with the node id.
+            return f"_{node.idx}"
+        case "Public":
+            return name
+        case _:
+            error = f"Unexpected visibility {visibility}"
+            raise ValueError(error)
 
 
 T = TypeVar("T")

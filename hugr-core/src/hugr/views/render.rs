@@ -340,8 +340,8 @@ pub(in crate::hugr) fn edge_style<'a>(
     config: MermaidFormatter<'_>,
 ) -> Box<
     dyn FnMut(
-            <MultiPortGraph as LinkView>::LinkEndpoint,
-            <MultiPortGraph as LinkView>::LinkEndpoint,
+            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
+            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
         ) -> EdgeStyle
         + 'a,
 > {

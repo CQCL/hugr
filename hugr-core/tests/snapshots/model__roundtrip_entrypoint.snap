@@ -11,7 +11,8 @@ expression: ast
 (import core.entrypoint)
 
 (define-func public main (core.fn [] [])
-  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+  (meta core.entrypoint)
+  (dfg (signature (core.fn [] []))))
 
 (mod)
 
@@ -19,8 +20,9 @@ expression: ast
 
 (import core.entrypoint)
 
-(define-func private wrapper_dfg (core.fn [] [])
-  (dfg (signature (core.fn [] [])) (meta core.entrypoint)))
+(define-func public wrapper_dfg (core.fn [] [])
+  (meta core.entrypoint)
+  (dfg (signature (core.fn [] []))))
 
 (mod)
 
@@ -39,6 +41,7 @@ expression: ast
     (signature (core.fn [] []))
     (cfg
       (signature (core.fn [] []))
+      (meta core.entrypoint)
       (cfg [%0] [%1]
         (signature (core.ctrl [[]] [[]]))
         (meta core.entrypoint)

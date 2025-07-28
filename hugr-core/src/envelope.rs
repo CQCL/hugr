@@ -73,17 +73,42 @@ pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 /// If multiple modules have different generators, a comma-separated list is returned in
 /// module order.
 /// If no generator is found, `None` is returned.
-fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
+pub fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
     let generators: Vec<String> = modules
         .iter()
         .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
-        .map(|v| v.to_string())
+        .map(format_generator)
         .collect();
     if generators.is_empty() {
         return None;
     }
 
     Some(generators.join(", "))
+}
+
+/// Format a generator value from the metadata.
+pub fn format_generator(json_val: &serde_json::Value) -> String {
+    match json_val {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(obj) => {
+            if let (Some(name), version) = (
+                obj.get("name").and_then(|v| v.as_str()),
+                obj.get("version").and_then(|v| v.as_str()),
+            ) {
+                if let Some(version) = version {
+                    // Expected format: {"name": "generator", "version": "1.0.0"}
+                    format!("{name}-v{version}")
+                } else {
+                    name.to_string()
+                }
+            } else {
+                // just print the whole object as a string
+                json_val.to_string()
+            }
+        }
+        // Raw JSON string fallback
+        _ => json_val.to_string(),
+    }
 }
 
 fn gen_str(generator: &Option<String>) -> String {
@@ -280,7 +305,7 @@ pub enum EnvelopeError {
         source: hugr_model::v0::binary::WriteError,
     },
     /// Error reading a HUGR model payload.
-    #[error(transparent)]
+    #[error("Model text parsing error")]
     ModelTextRead {
         /// The source error.
         #[from]
@@ -299,6 +324,15 @@ pub enum EnvelopeError {
         /// The source error.
         #[from]
         source: crate::extension::ExtensionRegistryLoadError,
+    },
+    /// The specified payload format is not supported.
+    #[error(
+        "The envelope configuration has unknown {}. Please update your HUGR version.",
+        if flag_ids.len() == 1 {format!("flag #{}", flag_ids[0])} else {format!("flags {}", flag_ids.iter().join(", "))}
+    )]
+    FlagUnsupported {
+        /// The unrecognized flag bits.
+        flag_ids: Vec<usize>,
     },
 }
 
@@ -817,6 +851,6 @@ pub(crate) mod test {
 
         let err_msg = with_gen.to_string();
         assert!(err_msg.contains("Extension 'test' version mismatch"));
-        assert!(err_msg.contains(generator_name.to_string().as_str()));
+        assert!(err_msg.contains("TestGenerator-v1.2.3"));
     }
 }

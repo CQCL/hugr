@@ -182,9 +182,6 @@ fn ser_roundtrip_check_schema<TSer: Serialize, TDeser: serde::de::DeserializeOwn
 
 /// Serialize a Hugr and check that it is valid against the schema.
 ///
-/// NOTE: The schema definition is currently broken, so this check always succeeds.
-/// See <https://github.com/CQCL/hugr/issues/2401>
-///
 /// # Panics
 ///
 /// Panics if the serialization fails or if the schema validation fails.
@@ -303,7 +300,7 @@ fn wrong_fields(
 }
 
 /// Generate an optype for a node with a matching amount of inputs and outputs.
-fn gen_optype(g: &MultiPortGraph, node: portgraph::NodeIndex) -> OpType {
+fn gen_optype(g: &MultiPortGraph<u32, u32, u32>, node: portgraph::NodeIndex) -> OpType {
     let inputs = g.num_inputs(node);
     let outputs = g.num_outputs(node);
     match (inputs == 0, outputs == 0) {

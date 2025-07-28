@@ -42,10 +42,10 @@ debug_assert_with_mut_call = "warn"
 anyhow = "1.0.98"
 insta = { version = "1.43.1" }
 bitvec = "1.0.1"
-capnp = "0.20.6"
+capnp = "0.21.3"
 cgmath = "0.18.0"
 cool_asserts = "2.0.3"
-delegate = "0.13.3"
+delegate = "0.13.4"
 derive_more = "1.0.0"
 downcast-rs = "2.0.1"
 enum_dispatch = "0.3.11"
@@ -71,7 +71,7 @@ strum = "0.27.0"
 tempfile = "3.20"
 thiserror = "2.0.12"
 typetag = "0.2.20"
-clap = { version = "4.5.40" }
+clap = { version = "4.5.41" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.3"
 assert_cmd = "2.0.17"
@@ -94,7 +94,7 @@ wyhash = "0.6.0"
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
 pyo3 = ">= 0.23.4, < 0.25"
-portgraph = { version = "0.14.1" }
+portgraph = { version = "0.15.1" }
 petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
 [profile.dev.package]

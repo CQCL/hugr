@@ -1,5 +1,14 @@
 # Changelog
 
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.21.0...hugr-model-v0.22.0) - 2025-07-24
+
+### New Features
+
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+- Version number in hugr binary format. ([#2468](https://github.com/CQCL/hugr/pull/2468))
+- Use semver crate for -model version, and include in docs ([#2471](https://github.com/CQCL/hugr/pull/2471))
 ## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.2...hugr-model-v0.21.0) - 2025-07-09
 
 ### Bug Fixes

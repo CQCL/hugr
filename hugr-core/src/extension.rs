@@ -36,7 +36,7 @@ mod type_def;
 pub use const_fold::{ConstFold, ConstFoldResult, Folder, fold_out_row};
 pub use op_def::{
     CustomSignatureFunc, CustomValidator, LowerFunc, OpDef, SignatureFromArgs, SignatureFunc,
-    ValidateJustArgs, ValidateTypeArgs,
+    ValidateJustArgs, ValidateTypeArgs, deserialize_lower_funcs,
 };
 pub use prelude::{PRELUDE, PRELUDE_REGISTRY};
 pub use type_def::{TypeDef, TypeDefBound};
@@ -706,6 +706,7 @@ pub enum ExtensionRegistryError {
 /// An error that can occur while loading an extension registry.
 #[derive(Debug, Error)]
 #[non_exhaustive]
+#[error("Extension registry load error")]
 pub enum ExtensionRegistryLoadError {
     /// Deserialization error.
     #[error(transparent)]

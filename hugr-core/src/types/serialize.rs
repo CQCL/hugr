@@ -14,7 +14,7 @@ use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
-pub(super) enum SerSimpleType {
+pub(crate) enum SerSimpleType {
     Q,
     I,
     G(Box<FuncValueType>),

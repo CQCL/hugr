@@ -31,12 +31,53 @@ jobs:
           rustup toolchain install nightly --component miri
           rustup override set nightly
           cargo miri setup
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: v0-miri
-      - name: Test with Miri
-        run: cargo miri test
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      # Run miri unsoundness checks.
+      #
+      # The default "zstd" feature requires FFI to the zstd library encode/decode envelopes.
+      # As this is not supported in miri, we must disable it here.
+      #
+      # We also skip tests that take over 5mins in CI.
+      - name: Test with Miri
+        run: |
+          cargo miri nextest run --no-default-features -- \
+            --skip "builder::circuit::test::with_nonlinear_and_outputs" \
+            --skip "extension::op_def::test::check_ext_id_wellformed" \
+            --skip "extension::resolution::test::register_new_cyclic" \
+            --skip "extension::simple_op::test::check_ext_id_wellformed" \
+            --skip "extension::test::test_register_update" \
+            --skip "extension::type_def::test::test_instantiate_typedef" \
+            --skip "hugr::ident::test::proptest::arbitrary_identlist_valid" \
+            --skip "hugr::ident::test::test_idents" \
+            --skip "hugr::patch::replace::test::test_invalid" \
+            --skip "hugr::validate::test::check_ext_id_wellformed" \
+            --skip "ops::constant::test::test_json_const" \
+            --skip "ops::custom::test::resolve_missing" \
+            --skip "ops::custom::test::new_opaque_op" \
+            --skip "std_extensions::arithmetic::int_types::test::proptest::valid_signed_int" \
+            --skip "types::test::construct" \
+            --skip "types::test::transform" \
+            --skip "types::test::transform_copyable_to_linear" \
+            --skip "types::type_param::test::proptest::term_contains_itself" \
+            `# -------- hugr-model` \
+            --skip "v0::test::test_literal_text" \
+            `# -------- hugr-passes` \
+            --skip "dataflow::partial_value::test::bounded_lattice" \
+            --skip "dataflow::partial_value::test::lattice" \
+            --skip "dataflow::partial_value::test::lattice_associative" \
+            --skip "dataflow::partial_value::test::meet_join_self_noop" \
+            --skip "dataflow::partial_value::test::partial_value_type" \
+            --skip "dataflow::partial_value::test::partial_value_valid" \
+            --skip "merge_bbs::test::check_ext_id_wellformed" \
+            --skip "monomorphize::test::test_recursion_module" \
+            --skip "replace_types::test::dfg_conditional_case" \
+            --skip "replace_types::test::module_func_cfg_call" \
+            --skip "replace_types::test::op_to_call" \
+            #
 
   create-issue:
     uses: CQCL/hugrverse-actions/.github/workflows/create-issue.yml@main
