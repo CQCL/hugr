@@ -149,7 +149,8 @@ mod test {
             .into_iter()
             .map(|name| find_func(&h, name))
             .collect::<HashSet<_>>();
-        inline_acyclic(&mut h, |h, _, tgt| {
+        inline_acyclic(&mut h, |h, call| {
+            let tgt = h.static_source(call).unwrap();
             // Check the callback is never asked about an impossible inlining
             assert!(["a", "b", "c"].contains(&func_name(h, tgt).as_str()));
             target_funcs.contains(&tgt)
@@ -192,7 +193,7 @@ mod test {
         let mut h = make_test_hugr();
         let [g, b, c] = ["g", "b", "c"].map(|n| find_func(&h, n));
         // Inline calls contained within `g`
-        inline_acyclic(&mut h, |h, mut call, _| {
+        inline_acyclic(&mut h, |h, mut call| {
             loop {
                 if call == g {
                     return true;
