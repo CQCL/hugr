@@ -399,7 +399,16 @@ mod test {
             assert_eq!(target.static_source(c).is_none(), target.get_parent(c) == Some(dfg));
         }
         target.remove_subtree(dfg);
-        target.validate().unwrap(); // ALAN assert_eq!(target, orig_target) fails...??
+        target.validate().unwrap();
+        // Hugrs will not be equal because of internal graph representation details
+        assert_eq!(target.num_nodes(), orig_target.num_nodes());
+        for n in target.nodes() {
+            assert_eq!(target.get_optype(n), orig_target.get_optype(n));
+            for inp in target.node_inputs(n) {
+                assert_eq!(target.linked_outputs(n, inp).collect_vec(),
+                    orig_target.linked_outputs(n, inp).collect_vec());
+            }
+        }
 
         // AddAll (w/out entrypoint): conflicting FuncDecls / FuncDefns.
         let mut target = orig_target.clone();
@@ -446,7 +455,7 @@ mod test {
         }
     }
 
-    // TODO test copy_private_funcs; absence of parent
+    // TODO test copy_private_funcs actually copying; presence/absence of parent when inserting (subtree of) public func
     /*#[test]
     fn sig_conflict() {
         // Hugr with
