@@ -429,7 +429,10 @@ mod test {
             Err(ValidationError::UnconnectedPort { .. })
         ));
         let dfg = node_map[&inserted.entrypoint()];
-        assert!(target.descendants(dfg).all(|n| target.get_parent(n) == dfg));
+        assert_eq!(
+            target.children(dfg).flat_map(|n| target.children(n)).next(),
+            None
+        );
         for c in target.nodes().filter(|n| target.get_optype(*n).is_call()) {
             assert_eq!(
                 target.static_source(c).is_none(),
@@ -487,8 +490,8 @@ mod test {
                 MultipleImplHandling::UseExisting,
                 MultipleImplHandling::UseBoth,
             ] {
-                let policy = NameLinkingPolicy::LinkByName {
-                    copy_private_funcs: true,
+                let pol = |copy_private_funcs| NameLinkingPolicy::LinkByName {
+                    copy_private_funcs,
                     error_on_conflicting_sig,
                     multi_impls,
                 };
@@ -496,7 +499,7 @@ mod test {
                 let res = target.insert_from_view_link_names(
                     Some(target.entrypoint()),
                     &inserted,
-                    policy,
+                    pol(true),
                 );
                 assert_eq!(
                     res.err().unwrap(),
@@ -507,13 +510,8 @@ mod test {
                 );
                 assert_eq!(target, orig_target);
 
-                let policy = NameLinkingPolicy::LinkByName {
-                    copy_private_funcs: false,
-                    error_on_conflicting_sig,
-                    multi_impls,
-                };
                 target
-                    .insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), policy)
+                    .insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), pol(false))
                     .unwrap();
                 target.validate().unwrap();
                 let (decls, defns) = list_decls_defns(&target);
