@@ -223,10 +223,13 @@ pub trait HugrMut: HugrMutInternals {
             per_node
         };
         let ep = other.entrypoint();
-        let node_map =
-            self.insert_hugr_link_nodes(Some(root), other, children)
-                .expect("Policy constructed to avoid any errors");
-        InsertionResult { inserted_entrypoint: node_map[&ep], node_map }
+        let node_map = self
+            .insert_hugr_link_nodes(Some(root), other, children)
+            .expect("Policy constructed to avoid any errors");
+        InsertionResult {
+            inserted_entrypoint: node_map[&ep],
+            node_map,
+        }
     }
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
@@ -278,7 +281,7 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<HashMap<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
-        if parent.is_some_and(|p| p!=self.module_root()) {
+        if parent.is_some_and(|p| p != self.module_root()) {
             if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
                 return Err(NameLinkingError::AddFunctionContainingEntrypoint(
                     n,
@@ -330,10 +333,13 @@ pub trait HugrMut: HugrMutInternals {
                 per_node.remove(&anc).unwrap();
             }
         }
-        let node_map = 
-            self.insert_from_view_link_nodes(Some(root), other, per_node)
-                .expect("Policy constructed to avoid any errors");
-        InsertionResult { inserted_entrypoint: node_map[&other.entrypoint()], node_map }
+        let node_map = self
+            .insert_from_view_link_nodes(Some(root), other, per_node)
+            .expect("Policy constructed to avoid any errors");
+        InsertionResult {
+            inserted_entrypoint: node_map[&other.entrypoint()],
+            node_map,
+        }
     }
 
     /// Copy nodes from another hugr into this one. If `parent` is `Some`, then the
@@ -388,7 +394,7 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<HashMap<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, other)?;
-        if parent.is_some_and(|p| p!=self.module_root()) {
+        if parent.is_some_and(|p| p != self.module_root()) {
             if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
                 return Err(NameLinkingError::AddFunctionContainingEntrypoint(
                     n,
@@ -1066,8 +1072,7 @@ mod test {
         h.validate().unwrap();
         let num_nodes = h.num_nodes();
         let num_ep_nodes = h.descendants(node_map[&insert.entrypoint()]).count();
-        let [inserted_defn, inserted_decl] =
-            [defn.node(), decl.node()].map(|n| node_map[&n]);
+        let [inserted_defn, inserted_decl] = [defn.node(), decl.node()].map(|n| node_map[&n]);
 
         // No reason we can't add the decl again, or replace the defn with the decl,
         // but here we'll limit to the "interesting" (likely) cases

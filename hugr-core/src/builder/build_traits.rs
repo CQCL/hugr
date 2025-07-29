@@ -235,8 +235,7 @@ pub trait Dataflow: Container {
         let ep = hugr.entrypoint();
         let node = self
             .hugr_mut()
-            .insert_hugr_link_nodes(parent, hugr, defns)?
-            [&ep];
+            .insert_hugr_link_nodes(parent, hugr, defns)?[&ep];
         wire_ins_return_outs(input_wires, node, self)
     }
 
