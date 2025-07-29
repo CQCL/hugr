@@ -77,13 +77,14 @@ impl<TN> NodeLinkingDirective<TN> {
 pub enum NameLinkingPolicy {
     /// Do not use linking - just insert all functions from source Hugr into target.
     /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
-    AddAll,
+    AddAll, // ==> make this be insert_hugr
     /// Do not use linking - break any edges from functions in the source Hugr to the insert part.
-    AddNone,
+    AddNone, // ==> make this be insert_from_view
     /// Identify public functions in source and target Hugr by name.
     /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
     /// will be combined, taking the FuncDefn from either Hugr.
     LinkByName {
+        // ==> struct NameLinkingPolicy
         /// If true, all private functions from the source hugr are inserted into the target.
         /// (Since these are private, name conflicts do not make the Hugr invalid.)
         /// If false, instead edges from said private functions to any inserted parts
@@ -113,19 +114,22 @@ pub enum NameLinkingPolicy {
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MultipleImplHandling {
+    CopyDeclsOnly {
+        treat_new_defns_as_decls: bool,
+    },
     /// Do not perform insertion; raise an error instead
-    ErrorDontInsert,
+    ErrorDontInsert, // ==> CopyDefnsErrorOnMulti,
     /// Keep the implementation already in the target Hugr. (Edges in the source
     /// Hugr will be redirected to use the function from the target.)
-    UseExisting,
+    UseExisting, // ==> CopyNewDefnsOnly
     /// Keep the implementation in the source Hugr. (Edges in the target Hugr
     /// will be redirected to use the function from the source; the previously-existing
     /// function in the target Hugr will be removed.)
-    UseNew,
+    UseNew, // ==> CopyDefnsOverOld/Existing
     /// Add the new function alongside the existing one in the target Hugr,
     /// preserving (separately) uses of both. (The Hugr will be invalid because
     /// of duplicate names.)
-    UseBoth,
+    UseBoth, // ==> CopyDefns ==~== AddAll but link when possible
 }
 
 /// An error in using names to determine how to link functions in source and target Hugrs.
