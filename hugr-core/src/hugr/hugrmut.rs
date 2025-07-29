@@ -275,7 +275,7 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
-        if parent.is_some() {
+        if parent.is_some_and(|p| p!=self.module_root()) {
             if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
                 return Err(NameLinkingError::AddFunctionContainingEntrypoint(
                     n,
@@ -383,12 +383,14 @@ pub trait HugrMut: HugrMutInternals {
         policy: NameLinkingPolicy,
     ) -> Result<InsertionResult<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, other)?;
-        if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
-            return Err(NameLinkingError::AddFunctionContainingEntrypoint(
-                n,
-                dirv.clone(),
-            ));
-        };
+        if parent.is_some_and(|p| p!=self.module_root()) {
+            if let Some((n, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
+                return Err(NameLinkingError::AddFunctionContainingEntrypoint(
+                    n,
+                    dirv.clone(),
+                ));
+            }
+        }
         Ok(self
             .insert_from_view_link_nodes(parent, other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
@@ -797,8 +799,6 @@ fn insert_hugr_internal<H: HugrView>(
                 let new_node = *node_map.get(&ch).unwrap();
                 for replace in replace {
                     replace_static_src(hugr, replace, new_node);
-                    assert_eq!("ALAN", "NO TEST COVERAGE"); // when there is, following line will break, remove:
-                    hugr.remove_subtree(replace);
                 }
             }
         }
