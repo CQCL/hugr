@@ -530,24 +530,58 @@ mod test {
     }
 
     // TODO test copy_private_funcs actually copying; presence/absence of parent when inserting (subtree of) public func
-    /*#[test]
-    fn sig_conflict() {
-        // Hugr with
-        // a public funcdecl "foo"; or a funcDefn
+    #[rstest]
+    fn sig_conflict(
+        #[values(false, true)] host_defn: bool,
+        #[values(false, true)] inserted_defn: bool,
+    ) {
+        let mk_def_or_decl = |n, sig: Signature, defn| {
+            let mut mb = ModuleBuilder::new();
+            let node = if defn {
+                let fb = mb.define_function_vis(n, sig, Visibility::Public).unwrap();
+                let ins = fb.input_wires();
+                fb.finish_with_outputs(ins).unwrap().node()
+            } else {
+                mb.declare(n, sig.into()).unwrap().node()
+            };
+            (mb.finish_hugr().unwrap(), node)
+        };
 
-        // Hugr with
-        // a public funcdecl "foo", different sig; or a funcDefn (4 ways)
+        let old_sig = Signature::new_endo(usize_t());
+        let (orig_host, orig_fn) = mk_def_or_decl("foo", old_sig.clone(), host_defn);
+        let new_sig = Signature::new_endo(INT_TYPES[3].clone());
+        let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        AddAll/AddNone would leave invalid exactly as previous
-        ....so whichever doesn't do AddXYZ, can try parentless?? Not really, still want another (added) func to check edges
-        ....so one does parentless w/private func using public ones, another uses entrypoint
+        let mk_pol = |error_on_conflicting_sig| NameLinkingPolicy::LinkByName {
+            copy_private_funcs: true,
+            error_on_conflicting_sig,
+            multi_impls: MultipleImplHandling::ErrorDontInsert,
+        };
+        let mut host = orig_host.clone();
+        let res = host.insert_hugr_link_names(None, inserted.clone(), mk_pol(true));
+        assert_eq!(host, orig_host); // Did nothing
+        assert_eq!(
+            res,
+            Err(NameLinkingError::Signatures {
+                name: "foo".to_string(),
+                src_node: inserted_fn,
+                src_sig: Box::new(new_sig.into()),
+                tgt_node: orig_fn,
+                tgt_sig: Box::new(old_sig.into())
+            })
+        );
 
-        LinkByName {
-            copy-private may/not do anything??
-            error-on-conflicting-sig => error, or invalid hugr
-            multi_impls: use MultipleImplHandling::ErrorDontInsert, or check makes no difference
-        }
-    }*/
+        let node_map = host
+            .insert_hugr_link_names(None, inserted, mk_pol(false))
+            .unwrap();
+        assert_eq!(
+            host.validate(),
+            Err(ValidationError::DuplicateExport {
+                link_name: "foo".to_string(),
+                children: [orig_fn, node_map[&inserted_fn]]
+            })
+        );
+    }
 
     #[rstest]
     #[case(MultipleImplHandling::UseNew, vec![11])]
