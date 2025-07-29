@@ -321,12 +321,17 @@ mod test {
     use itertools::Itertools as _;
     use rstest::rstest;
 
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder};
-    use crate::extension::prelude::{ConstUsize,usize_t};
-    use crate::hugr::linking::{MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective};
+    use crate::builder::{
+        DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
+    };
+    use crate::extension::prelude::{ConstUsize, usize_t};
+    use crate::hugr::linking::{
+        MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective,
+    };
     use crate::hugr::{ValidationError, hugrmut::HugrMut};
-    use crate::ops::handle::NodeHandle;
     use crate::ops::OpType;
+    use crate::ops::handle::NodeHandle;
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::types::Signature;
@@ -339,14 +344,15 @@ mod test {
             match h.get_optype(n) {
                 OpType::FuncDecl(fd) => decls.insert(n, fd.func_name().as_str()),
                 OpType::FuncDefn(fd) => defns.insert(n, fd.func_name().as_str()),
-                _ => None
+                _ => None,
             };
         }
         (decls, defns)
     }
 
     fn call_targets<H: HugrView>(h: &H) -> HashMap<H::Node, H::Node> {
-        h.nodes().filter(|n| h.get_optype(*n).is_call())
+        h.nodes()
+            .filter(|n| h.get_optype(*n).is_call())
             .map(|n| {
                 let tgt = h.static_source(n).expect(format!("For node {n}").as_str());
                 (n, tgt)
@@ -358,45 +364,77 @@ mod test {
     fn combines_decls_defn() {
         let i64_t = || INT_TYPES[6].to_owned();
         let foo_sig = Signature::new_endo(i64_t());
-        let bar_sig  = Signature::new(vec![i64_t();2], i64_t());
+        let bar_sig = Signature::new(vec![i64_t(); 2], i64_t());
         let orig_target = {
-            let mut fb = FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
+            let mut fb =
+                FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
             let mut mb = fb.module_root_builder();
-            let bar1= mb.declare("bar", bar_sig.clone().into()).unwrap();
-            let bar2= mb.declare("bar", bar_sig.clone().into()).unwrap(); // alias
+            let bar1 = mb.declare("bar", bar_sig.clone().into()).unwrap();
+            let bar2 = mb.declare("bar", bar_sig.clone().into()).unwrap(); // alias
             let [i] = fb.input_wires_arr();
-            let [c] = fb.call(&bar1, &[], [i,i]).unwrap().outputs_arr();
-            let r = fb.call(&bar2, &[], [i,c]).unwrap();
+            let [c] = fb.call(&bar1, &[], [i, i]).unwrap().outputs_arr();
+            let r = fb.call(&bar2, &[], [i, c]).unwrap();
             let h = fb.finish_hugr_with_outputs(r.outputs()).unwrap();
-            assert_eq!(list_decls_defns(&h), (HashMap::from([(bar1.node(), "bar"), (bar2.node(), "bar")]), HashMap::from([(h.entrypoint(), "foo")])));
+            assert_eq!(
+                list_decls_defns(&h),
+                (
+                    HashMap::from([(bar1.node(), "bar"), (bar2.node(), "bar")]),
+                    HashMap::from([(h.entrypoint(), "foo")])
+                )
+            );
             h
         };
-        
 
-        let inserted= {
+        let inserted = {
             let mut dfb = DFGBuilder::new(Signature::new(vec![], i64_t())).unwrap();
             let mut mb = dfb.module_root_builder();
             let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
-            let foo2  = mb.declare("foo", foo_sig.clone().into()).unwrap();
-            let mut bar = mb.define_function_vis("bar", bar_sig.clone(), Visibility::Public).unwrap();
-            let res = bar.add_dataflow_op(IntOpDef::iadd.with_log_width(6), bar.input_wires()).unwrap();
+            let foo2 = mb.declare("foo", foo_sig.clone().into()).unwrap();
+            let mut bar = mb
+                .define_function_vis("bar", bar_sig.clone(), Visibility::Public)
+                .unwrap();
+            let res = bar
+                .add_dataflow_op(IntOpDef::iadd.with_log_width(6), bar.input_wires())
+                .unwrap();
             let bar = bar.finish_with_outputs(res.outputs()).unwrap();
             let i = dfb.add_load_value(ConstInt::new_u(6, 257).unwrap());
             let c = dfb.call(&foo1, &[], [i]).unwrap();
             let r = dfb.call(&foo2, &[], c.outputs()).unwrap();
             let h = dfb.finish_hugr_with_outputs(r.outputs()).unwrap();
-            assert_eq!(list_decls_defns(&h), (HashMap::from([(foo1.node(), "foo"), (foo2.node(), "foo")]), HashMap::from([(h.get_parent(h.entrypoint()).unwrap(), "main"), (bar.node(), "bar")])));
+            assert_eq!(
+                list_decls_defns(&h),
+                (
+                    HashMap::from([(foo1.node(), "foo"), (foo2.node(), "foo")]),
+                    HashMap::from([
+                        (h.get_parent(h.entrypoint()).unwrap(), "main"),
+                        (bar.node(), "bar")
+                    ])
+                )
+            );
             h
         };
 
         // AddNone: inserted DFG has all calls disconnected
         let mut target = orig_target.clone();
-        target.insert_from_view_link_names(Some(target.entrypoint()), &inserted, NameLinkingPolicy::AddNone).unwrap();
+        let node_map = target
+            .insert_from_view_link_names(
+                Some(target.entrypoint()),
+                &inserted,
+                NameLinkingPolicy::AddNone,
+            )
+            .unwrap();
         assert_eq!(list_decls_defns(&target), list_decls_defns(&orig_target)); // no new Funcs
-        assert!(matches!(target.validate(), Err(ValidationError::UnconnectedPort {..})));
-        let dfg = target.entry_descendants().filter(|n| target.get_optype(*n).is_dfg()).exactly_one().ok().unwrap();
+        assert!(matches!(
+            target.validate(),
+            Err(ValidationError::UnconnectedPort { .. })
+        ));
+        let dfg = node_map[&inserted.entrypoint()];
+        assert!(target.descendants(dfg).all(|n| target.get_parent(n) == dfg));
         for c in target.nodes().filter(|n| target.get_optype(*n).is_call()) {
-            assert_eq!(target.static_source(c).is_none(), target.get_parent(c) == Some(dfg));
+            assert_eq!(
+                target.static_source(c).is_none(),
+                target.get_parent(c) == Some(dfg)
+            );
         }
         target.remove_subtree(dfg);
         target.validate().unwrap();
@@ -405,8 +443,10 @@ mod test {
         for n in target.nodes() {
             assert_eq!(target.get_optype(n), orig_target.get_optype(n));
             for inp in target.node_inputs(n) {
-                assert_eq!(target.linked_outputs(n, inp).collect_vec(),
-                    orig_target.linked_outputs(n, inp).collect_vec());
+                assert_eq!(
+                    target.linked_outputs(n, inp).collect_vec(),
+                    orig_target.linked_outputs(n, inp).collect_vec()
+                );
             }
         }
 
@@ -415,40 +455,76 @@ mod test {
         // Do not add entrypoint subtree - it is contained in an added subtree. (Hence, AddAll + Some useless for any non-module entrypoint....TODO what about AddAll+Some w/module entrypoint?)
         // TODO - allow adding only public, w/out linking ??
         // Or, make AddAll exclude the entrypoint-container ?? (Like current insert_hugr)
-        target.insert_from_view_link_names(None, &inserted, NameLinkingPolicy::AddAll).unwrap();
-        assert!(matches!(target.validate(), Err(ValidationError::DuplicateExport { .. })));
+        target
+            .insert_from_view_link_names(None, &inserted, NameLinkingPolicy::AddAll)
+            .unwrap();
+        assert!(matches!(
+            target.validate(),
+            Err(ValidationError::DuplicateExport { .. })
+        ));
         let (decls, defns) = list_decls_defns(&target);
-        assert_eq!(decls.values().copied().sorted().collect_vec(), ["bar", "bar", "foo", "foo"]);
-        assert_eq!(defns.values().copied().sorted().collect_vec(), ["bar", "foo", "main"]);
+        assert_eq!(
+            decls.values().copied().sorted().collect_vec(),
+            ["bar", "bar", "foo", "foo"]
+        );
+        assert_eq!(
+            defns.values().copied().sorted().collect_vec(),
+            ["bar", "foo", "main"]
+        );
         let call_tgts = call_targets(&target);
-        for decl in decls.keys() { // Decls (still) have one call each
-            assert_eq!(call_tgts.values().filter(|tgt| *tgt == decl).count(), 1);
+        for decl in decls.keys() {
+            assert_eq!(call_tgts.values().filter(|tgt| *tgt == decl).count(), 1); // as before
         }
-        for defn in defns.keys() { // Defns (still) have no calls
-            assert_eq!(call_tgts.values().find(|tgt| *tgt == defn), None);
+        for defn in defns.keys() {
+            assert_eq!(call_tgts.values().find(|tgt| *tgt == defn), None); // as before
         }
-        
+
         // Linking by name...neither of the looped-over params should make any difference:
         for error_on_conflicting_sig in [false, true] {
-            for multi_impls in [MultipleImplHandling::ErrorDontInsert, MultipleImplHandling::UseNew, MultipleImplHandling::UseExisting, MultipleImplHandling::UseBoth] {
+            for multi_impls in [
+                MultipleImplHandling::ErrorDontInsert,
+                MultipleImplHandling::UseNew,
+                MultipleImplHandling::UseExisting,
+                MultipleImplHandling::UseBoth,
+            ] {
                 let policy = NameLinkingPolicy::LinkByName {
-                    copy_private_funcs: true, error_on_conflicting_sig, multi_impls
+                    copy_private_funcs: true,
+                    error_on_conflicting_sig,
+                    multi_impls,
                 };
                 let mut target = orig_target.clone();
-                let res = target.insert_from_view_link_names(Some(target.entrypoint()), &inserted, policy);
-                assert_eq!(res.err().unwrap(), NameLinkingError::AddFunctionContainingEntrypoint(inserted.get_parent(inserted.entrypoint()).unwrap(), NodeLinkingDirective::add()));
+                let res = target.insert_from_view_link_names(
+                    Some(target.entrypoint()),
+                    &inserted,
+                    policy,
+                );
+                assert_eq!(
+                    res.err().unwrap(),
+                    NameLinkingError::AddFunctionContainingEntrypoint(
+                        inserted.get_parent(inserted.entrypoint()).unwrap(),
+                        NodeLinkingDirective::add()
+                    )
+                );
                 assert_eq!(target, orig_target);
 
                 let policy = NameLinkingPolicy::LinkByName {
-                    copy_private_funcs: false, error_on_conflicting_sig, multi_impls
+                    copy_private_funcs: false,
+                    error_on_conflicting_sig,
+                    multi_impls,
                 };
-                target.insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), policy).unwrap();
+                target
+                    .insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), policy)
+                    .unwrap();
                 target.validate().unwrap();
                 let (decls, defns) = list_decls_defns(&target);
                 assert_eq!(decls, HashMap::new());
-                assert_eq!(defns.values().copied().sorted().collect_vec(), ["bar", "foo"]);
+                assert_eq!(
+                    defns.values().copied().sorted().collect_vec(),
+                    ["bar", "foo"]
+                );
                 let call_tgts = call_targets(&target);
-                for defn in defns.keys() { // Defns now have two calls each (was one to each alias)
+                for defn in defns.keys() {
+                    // Defns now have two calls each (was one to each alias)
                     assert_eq!(call_tgts.values().filter(|tgt| *tgt == defn).count(), 2);
                 }
             }
