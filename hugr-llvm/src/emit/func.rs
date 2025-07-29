@@ -357,3 +357,19 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     let either = builder.build_select(is_ok, right, left, "")?;
     Ok(either)
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_func_getter() {
+        // Use TestContext for consistent test setup
+        let test_ctx = crate::test::test_ctx(-1);
+        let emit_context = test_ctx.get_emit_module_context();
+        let func_type = emit_context.iw_context().void_type().fn_type(&[], false);
+        let function = emit_context.module().add_function("test_func", func_type, None);
+        let func_context = super::EmitFuncContext::new(emit_context, function).unwrap();
+
+        // Assert the getter returns the correct function
+        assert_eq!(func_context.func(), function);
+    }
+}
