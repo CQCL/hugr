@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.0) (2025-07-29)
+## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0rc1...hugr-py-v0.13.0) (2025-07-29)
 
 
 ### Bug Fixes
