@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.0) (2025-07-29)
+
+
+### Bug Fixes
+
+* **py:** Python builder for function declarations did not create static output port ([#2485](https://github.com/CQCL/hugr/issues/2485)) ([06bc080](https://github.com/CQCL/hugr/commit/06bc080713398450f8c64d94bddc70f4e31749ee))
+
+
+### Documentation
+
+* **py:** add docstrings for result fields ([#2480](https://github.com/CQCL/hugr/issues/2480)) ([20dd25f](https://github.com/CQCL/hugr/commit/20dd25f1fcc911f73fcc92a58ec8e781f48db4ec))
+
 ## [0.13.0rc1](https://github.com/CQCL/hugr/compare/hugr-py-v0.12.5...hugr-py-v0.13.0rc1) (2025-07-24)
 
 
