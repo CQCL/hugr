@@ -209,9 +209,14 @@ pub trait HugrMut: HugrMutInternals {
                 n = other.get_parent(n).unwrap()
             }
         };
-
-        self.insert_hugr_link_nodes(Some(root), other, children)
-            .expect("Construction of `children` should ensure no possibility of NodeLinkingError")
+        let ep = other.entrypoint();
+        let node_map = self
+            .insert_hugr_link_nodes(Some(root), other, children)
+            .expect("Construction of `children` should ensure no possibility of NodeLinkingError");
+        InsertionResult {
+            inserted_entrypoint: node_map[&ep],
+            node_map,
+        }
     }
 
     /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
@@ -232,7 +237,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Option<Self::Node>,
         other: Hugr,
         children: NodeLinkingPolicy<Node, Self::Node>,
-    ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>>;
+    ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node>>;
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
     /// This will result in an invalid Hugr (with disconnected edges) if there are any
@@ -250,8 +255,13 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        self.insert_from_view_link_nodes(Some(root), other, HashMap::new())
-            .expect("No defns being inserted so no possibility of error")
+        let node_map = self
+            .insert_from_view_link_nodes(Some(root), other, HashMap::new())
+            .expect("No defns being inserted so no possibility of error");
+        InsertionResult {
+            inserted_entrypoint: node_map[&other.entrypoint()],
+            node_map,
+        }
     }
 
     /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
@@ -274,7 +284,7 @@ pub trait HugrMut: HugrMutInternals {
         parent: Option<Self::Node>,
         other: &H,
         children: NodeLinkingPolicy<H::Node, Self::Node>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
+    ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node>>;
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -479,7 +489,7 @@ impl HugrMut for Hugr {
         parent: Option<Self::Node>,
         mut other: Hugr,
         children: HashMap<Node, NodeLinkingDirective>,
-    ) -> Result<InsertionResult<Node, Self::Node>, NodeLinkingError<Node>> {
+    ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node>> {
         let node_map = insert_hugr_internal(self, parent, &other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -494,10 +504,7 @@ impl HugrMut for Hugr {
             let meta = other.metadata.take(node_pg);
             self.metadata.set(new_node_pg, meta);
         }
-        Ok(InsertionResult {
-            inserted_entrypoint: node_map[&other.entrypoint()],
-            node_map,
-        })
+        Ok(node_map)
     }
 
     fn insert_from_view_link_nodes<H: HugrView>(
@@ -505,7 +512,7 @@ impl HugrMut for Hugr {
         parent: Option<Self::Node>,
         other: &H,
         children: HashMap<H::Node, NodeLinkingDirective>,
-    ) -> Result<InsertionResult<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
+    ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
         let node_map = insert_hugr_internal(self, parent, other, children)?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
@@ -522,10 +529,7 @@ impl HugrMut for Hugr {
                     .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        Ok(InsertionResult {
-            inserted_entrypoint: node_map[&other.entrypoint()],
-            node_map,
-        })
+        Ok(node_map)
     }
 
     fn insert_subgraph<H: HugrView>(
@@ -925,7 +929,7 @@ mod test {
         let (insert, defn, decl) = dfg_calling_defn_decl();
         let mut chmap =
             HashMap::from([defn.node(), decl.node()].map(|n| (n, NodeLinkingDirective::add())));
-        let (h, res) = {
+        let (h, node_map) = {
             let mut h = simple_dfg_hugr();
             let res = h
                 .insert_from_view_link_nodes(Some(h.entrypoint()), &insert, chmap.clone())
@@ -934,9 +938,8 @@ mod test {
         };
         h.validate().unwrap();
         let num_nodes = h.num_nodes();
-        let num_ep_nodes = h.descendants(res.inserted_entrypoint).count();
-        let [inserted_defn, inserted_decl] =
-            [defn.node(), decl.node()].map(|n| *res.node_map.get(&n).unwrap());
+        let num_ep_nodes = h.descendants(node_map[&insert.entrypoint()]).count();
+        let [inserted_defn, inserted_decl] = [defn.node(), decl.node()].map(|n| node_map[&n]);
 
         // No reason we can't add the decl again, or replace the defn with the decl,
         // but here we'll limit to the "interesting" (likely) cases

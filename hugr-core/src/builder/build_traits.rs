@@ -232,10 +232,10 @@ pub trait Dataflow: Container {
         defns: HashMap<Node, NodeLinkingDirective>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = Some(self.container_node());
+        let ep = hugr.entrypoint();
         let node = self
             .hugr_mut()
-            .insert_hugr_link_nodes(parent, hugr, defns)?
-            .inserted_entrypoint;
+            .insert_hugr_link_nodes(parent, hugr, defns)?[&ep];
         wire_ins_return_outs(input_wires, node, self)
     }
 
@@ -271,7 +271,7 @@ pub trait Dataflow: Container {
             .hugr_mut()
             .insert_from_view_link_nodes(parent, hugr, defns)
             .map_err(|ins_err| BuildError::HugrViewInsertionError(ins_err.to_string()))?
-            .inserted_entrypoint;
+            [&hugr.entrypoint()];
         wire_ins_return_outs(input_wires, node, self)
     }
 
