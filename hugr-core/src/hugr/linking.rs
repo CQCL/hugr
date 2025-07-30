@@ -34,9 +34,13 @@ pub enum NodeLinkingDirective<TN = Node> {
     Add {
         // TODO If non-None, change the name of the inserted function
         //rename: Option<String>,
-        /// If non-None, the specified node+subtree in the target Hugr will be removed,
-        /// with any ([EdgeKind::Function]) edges from it changed to come from the newly-inserted node instead.
-        replace: Option<TN>,
+        /// Existing/old nodes in the target which will be removed (with their subtrees),
+        /// and any ([EdgeKind::Function]) edges from them changed to leave the newly-inserted
+        /// node instead. (Typically, this `Vec` would contain at most one `FuncDefn`,
+        /// or perhaps-multiple, aliased, `FuncDecl`s.)
+        ///
+        /// [EdgeKind::Function]: crate::types::EdgeKind::Function
+        replace: Vec<TN>,
     },
     /// Do not insert the node/subtree from the source, but for any static edge from it
     /// to an inserted node, instead add an edge from the specified node already existing
@@ -51,7 +55,7 @@ impl<TN> NodeLinkingDirective<TN> {
     ///
     /// [Public]: crate::Visibility::Public
     pub const fn add() -> Self {
-        Self::Add { replace: None }
+        Self::Add { replace: vec![] }
     }
 }
 
