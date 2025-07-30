@@ -45,6 +45,9 @@ pub enum NodeLinkingDirective<TN = Node> {
     /// Do not insert the node/subtree from the source, but for any static edge from it
     /// to an inserted node, instead add an edge from the specified node already existing
     /// in the target Hugr. (Static edges are [EdgeKind::Function] and [EdgeKind::Const].)
+    ///
+    /// [EdgeKind::Const]: crate::types::EdgeKind::Const
+    /// [EdgeKind::Function]: crate::types::EdgeKind::Function
     UseExisting(TN),
 }
 
