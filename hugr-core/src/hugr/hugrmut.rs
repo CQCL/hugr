@@ -184,43 +184,32 @@ pub trait HugrMut: HugrMutInternals {
     /// Insert another hugr into this one, with the entrypoint-subtree placed under the given
     /// parent node. Unless `other.entrypoint() == other.module_root()`, then any children of
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
-    /// inserted under the Module root of this Hugr, with linking according to
-    /// [NameLinkingPolicy::default_for_hugr]:
-    /// * public FuncDecls in `other` will be replaced with any existing public function in `self`
-    ///   with the same name and signature
-    /// * public FuncDefns in `other` will replace any existing public function in `self` with the
-    ///   same name and signature
+    /// inserted under the Module root of this Hugr - see [Self::insert_hugr_with_defns].
     ///
-    /// Note there are a number of cases here which produce an invalid Hugr:
+    /// Note there are two cases here which produce an invalid Hugr:
     /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
     ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
     ///    its root is to set the entrypoint to a child of the root.
-    ///    (ALAN note: there just doesn't seem to be a good thing to do here. Linking is only
-    ///    gonna make the invalid Hugr even weirder - where do merged funcdefns/decls end up?)
     /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and
     ///    contains a (recursive) [`OpType::Call`] (or `LoadFunction`) to that ancestor
     ///    FuncDefn. In such a case, the containing FuncDefn will not be inserted, so the
     ///    `Call` will have no callee.
-    /// 3. Public functions with the same name but different signatures in `self` and `other`
-    ///    will sit alongside each other.
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let children = if other.entrypoint() == other.module_root() {
-            NodeLinkingPolicy::new()
-        } else {
-            let mut per_node = NameLinkingPolicy::default_for_hugr()
-                .to_node_linking(&*self, &other)
-                .expect("Policy copies functions to avoid conflicts");
-            // `get_entrypoint_ancestor` always returns None if other's entrypoint is its module-root
-            if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
-                if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
-                    per_node.remove(&anc).unwrap();
-                }
+        let mut n = other.entrypoint();
+        let mut children = HashMap::new();
+        if n != other.module_root() {
+            children.extend(
+                other
+                    .children(other.module_root())
+                    .map(|n| (n, NodeLinkingDirective::add())),
+            );
+            while children.remove(&n).is_none() {
+                n = other.get_parent(n).unwrap()
             }
-            per_node
         };
         let ep = other.entrypoint();
         let node_map = self
@@ -295,47 +284,24 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Copy the entrypoint-subtree of another hugr into this one, under a given parent node.
-    /// Public functions (children of the module-root of `other`) are also copied under the
-    /// module-root of `self`, with linking according to [NameLinkingPolicy::default_for_view]:
-    /// * Public [FuncDecl]s in `other` are replaced by public functions in `self` with the same
-    ///   name and signature
-    /// * Public [FuncDefn]s in `other` are replaced by public [FuncDefn]s in `self` with the
-    ///   same name and signature, but replace any such public [FuncDecl]s.
-    ///
-    /// (ALAN NOTE: alternatively we could just use NameLinkingPolicy::AddNone ?
-    /// Or same as default_for_hugr, and make that Default?)
-    ///
-    /// Note there are a number of situations where this can lead to an invalid Hugr.
-    /// * If `other.entrypoint() == other.module_root(), as this leads to `self` containing
-    ///   two module nodes.
-    /// * An inserted portion contains an edge from a private function in `other` (private
-    ///   functions are not copied); this will be disconnected.
-    /// * There are public functions with the same name but different signatures in `self` and
-    ///   `other` (these will sit alongside each other, which is invalid)
+    /// This will result in an invalid Hugr (with disconnected edges) if there are any
+    /// nonlocal edges (including [Const] / [Function]) into the entrypoint-subtree.
+    /// (See [Self::insert_from_view_with_defns].)
     ///
     /// # Panics
     ///
     /// If `parent` is not in the graph.
     ///
-    /// [FuncDefn]: crate::ops::FuncDefn
-    /// [FuncDecl]: crate::ops::FuncDecl
+    /// [Const]: crate::types::EdgeKind::Const
+    /// [Function]: crate::types::EdgeKind::Function
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
         other: &H,
     ) -> InsertionResult<H::Node, Self::Node> {
-        // ALAN TODO: use empty NodeLinkingPolicy if other.entrypoint() == other.module_root() ?
-        let mut per_node = NameLinkingPolicy::default_for_view()
-            .to_node_linking(&*self, other)
-            .expect("Policy copies functions to avoid conflicts");
-        if let Some((anc, dirv)) = get_entrypoint_ancestor(&other, &per_node) {
-            if anc == other.entrypoint() || matches!(dirv, NodeLinkingDirective::Add { .. }) {
-                per_node.remove(&anc).unwrap();
-            }
-        }
         let node_map = self
-            .insert_from_view_link_nodes(Some(root), other, per_node)
-            .expect("Policy constructed to avoid any errors");
+            .insert_from_view_link_nodes(Some(root), other, HashMap::new())
+            .expect("No insertions so no possibility of error");
         InsertionResult {
             inserted_entrypoint: node_map[&other.entrypoint()],
             node_map,
@@ -993,7 +959,7 @@ mod test {
 
         // Defaults
         h.insert_from_view(h.entrypoint(), &insert);
-        check_insertion(h, false, true); // FuncDecl is public so copied
+        check_insertion(h, false, false); // FuncDecl is public so copied
 
         let mut h = simple_dfg_hugr();
         h.insert_hugr(h.entrypoint(), insert);

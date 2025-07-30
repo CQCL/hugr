@@ -159,36 +159,6 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
-    /// The default policy used by [HugrMut::insert_hugr].
-    /// * All private functions are copied
-    /// * If public functions have conflicting signatures, we keep both
-    /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
-    ///   the newly inserted one replaces the original
-    ///
-    /// [HugrMut::insert_hugr]: crate::hugr::HugrMut::insert_hugr
-    pub fn default_for_hugr() -> Self {
-        Self::LinkByName {
-            copy_private_funcs: true,
-            error_on_conflicting_sig: false,
-            multi_impls: MultipleImplHandling::UseNew,
-        }
-    }
-
-    /// The default policy used by [HugrMut::insert_from_view].
-    /// * Private functions are not copied, i.e. edges from them into the inserted portion, are disconnected in the target
-    /// * If public functions have conflicting signatures, we keep both
-    /// * If both existing and inserted Hugrs have same-signature public FuncDefns,
-    ///   the original is used in place of the new.
-    ///
-    /// [HugrMut::insert_from_view]: crate::hugr::HugrMut::insert_from_view
-    pub fn default_for_view() -> Self {
-        Self::LinkByName {
-            copy_private_funcs: false,
-            error_on_conflicting_sig: false,
-            multi_impls: MultipleImplHandling::UseExisting,
-        }
-    }
-
     /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
     /// source (inserted) and target (inserted-into) Hugr.
     /// The map should be such that no [NodeLinkingError] will occur.
