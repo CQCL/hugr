@@ -197,7 +197,23 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let mut n = other.entrypoint();
+        let region = other.entrypoint();
+        Self::insert_region(self, root, other, region)
+    }
+
+    /// Insert a sub-region of another hugr into this one, under a given parent node.
+    ///
+    /// # Panics
+    ///
+    /// - If the root node is not in the graph.
+    /// - If the `region` node is not in `other`.
+    fn insert_region(
+        &mut self,
+        root: Self::Node,
+        mut other: Hugr,
+        region: Node,
+    ) -> InsertionResult<Node, Self::Node> {
+        let mut n = region;
         let mut children = HashMap::new();
         if n != other.module_root() {
             children.extend(
@@ -209,12 +225,12 @@ pub trait HugrMut: HugrMutInternals {
                 n = other.get_parent(n).unwrap()
             }
         };
-        let ep = other.entrypoint();
+        other.set_entrypoint(region);
         let node_map = self
             .insert_hugr_link_nodes(Some(root), other, children)
             .expect("Construction of `children` should ensure no possibility of NodeLinkingError");
         InsertionResult {
-            inserted_entrypoint: node_map[&ep],
+            inserted_entrypoint: node_map[&region],
             node_map,
         }
     }
@@ -337,15 +353,17 @@ pub trait HugrMut: HugrMutInternals {
         ExtensionRegistry: Extend<Reg>;
 }
 
-/// Records the result of inserting a Hugr or view
-/// via [`HugrMut::insert_hugr`] or [`HugrMut::insert_from_view`].
+/// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
+/// [`HugrMut::insert_from_view`], or [`HugrMut::insert_region`].
 ///
-/// Contains a map from the nodes in the source HUGR to the nodes in the
-/// target HUGR, using their respective `Node` types.
+/// Contains a map from the nodes in the source HUGR to the nodes in the target
+/// HUGR, using their respective `Node` types.
 pub struct InsertionResult<SourceN = Node, TargetN = Node> {
-    /// The node, after insertion, that was the entrypoint of the inserted Hugr.
+    /// The node, after insertion, that was the root of the inserted Hugr.
     ///
-    /// That is, the value in [`InsertionResult::node_map`] under the key that was the [`HugrView::entrypoint`].
+    /// That is, the value in [`InsertionResult::node_map`] under the key that
+    /// was the the `region` passed to [`HugrMut::insert_region`] or the
+    /// [`HugrView::entrypoint`] in the other cases.
     pub inserted_entrypoint: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.

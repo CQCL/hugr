@@ -5,6 +5,7 @@ use hugr_core::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::Graph;
 
 /// Weight for an edge in a [`CallGraph`]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallGraphEdge<N = Node> {
     /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
     Call(N),

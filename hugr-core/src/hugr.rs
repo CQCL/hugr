@@ -41,7 +41,7 @@ use crate::{Direction, Node};
 #[derive(Clone, Debug, PartialEq)]
 pub struct Hugr {
     /// The graph encoding the adjacency structure of the HUGR.
-    graph: MultiPortGraph,
+    graph: MultiPortGraph<u32, u32, u32>,
 
     /// The node hierarchy.
     hierarchy: Hierarchy,

@@ -22,6 +22,11 @@ pr_labels = ["release"]
 release_always = false
 
 [changelog]
+
+header = """# Changelog
+
+"""
+
 sort_commits = "oldest"
 
 # Allowed conventional commit types
@@ -69,3 +74,7 @@ version_group = "hugr"
 name = "hugr-llvm"
 release = true
 version_group = "hugr"
+
+[[package]]
+name = "hugr-persistent"
+release = true

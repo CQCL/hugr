@@ -78,6 +78,7 @@ impl<T: DeserializeOwned> Versioned<T> {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 struct NodeSer {
+    /// Node index of the parent.
     parent: Node,
     #[serde(flatten)]
     op: OpType,
@@ -89,7 +90,7 @@ struct SerHugrLatest {
     /// For each node: (parent, `node_operation`)
     nodes: Vec<NodeSer>,
     /// for each edge: (src, `src_offset`, tgt, `tgt_offset`)
-    edges: Vec<[(Node, Option<u16>); 2]>,
+    edges: Vec<[(Node, Option<u32>); 2]>,
     /// for each node: (metadata)
     #[serde(default)]
     metadata: Option<Vec<Option<NodeMetadataMap>>>,
@@ -113,7 +114,7 @@ pub enum HUGRSerializationError {
     AttachError(#[from] AttachError),
     /// Failed to add edge.
     #[error("Failed to build edge when deserializing: {0}.")]
-    LinkError(#[from] LinkError),
+    LinkError(#[from] LinkError<u32>),
     /// Edges without port offsets cannot be present in operations without non-dataflow ports.
     #[error(
         "Cannot connect an {dir:?} edge without port offset to node {node} with operation type {op_type}."
@@ -214,7 +215,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             let op = hugr.get_optype(node);
             let is_value_port = offset < op.value_port_count(dir);
             let is_static_input = op.static_port(dir).is_some_and(|p| p.index() == offset);
-            let offset = (is_value_port || is_static_input).then_some(offset as u16);
+            let offset = (is_value_port || is_static_input).then_some(offset as u32);
             (node_rekey[&node], offset)
         };
 
@@ -282,7 +283,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
         }
 
         if let Some(entrypoint) = entrypoint {
-            hugr.set_entrypoint(entrypoint);
+            hugr.set_entrypoint(hugr_node(entrypoint));
         }
 
         if let Some(metadata) = metadata {

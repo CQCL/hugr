@@ -195,7 +195,7 @@ impl Operation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
     /// The visibility of the symbol.
-    pub visibility: Visibility,
+    pub visibility: Option<Visibility>,
     /// The name of the symbol.
     pub name: SymbolName,
     /// The parameters of the symbol.

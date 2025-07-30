@@ -8,15 +8,19 @@ expression: ast
 
 (import core.meta.description)
 
-(import core.nat)
-
-(import core.order_hint.key)
-
-(import core.fn)
+(import core.order_hint.input_key)
 
 (import core.order_hint.order)
 
 (import arithmetic.int.types.int)
+
+(import core.nat)
+
+(import core.order_hint.key)
+
+(import core.order_hint.output_key)
+
+(import core.fn)
 
 (declare-operation
   arithmetic.int.ineg
@@ -27,6 +31,7 @@ expression: ast
       "negation modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
+  public
   main
   (core.fn
     [(arithmetic.int.types.int 6)
@@ -48,9 +53,14 @@ expression: ast
          (arithmetic.int.types.int 6)
          (arithmetic.int.types.int 6)
          (arithmetic.int.types.int 6)]))
+    (meta (core.order_hint.input_key 2))
+    (meta (core.order_hint.order 2 4))
+    (meta (core.order_hint.order 2 3))
+    (meta (core.order_hint.output_key 3))
     (meta (core.order_hint.order 4 7))
     (meta (core.order_hint.order 5 6))
     (meta (core.order_hint.order 5 4))
+    (meta (core.order_hint.order 5 3))
     (meta (core.order_hint.order 6 7))
     ((arithmetic.int.ineg 6) [%0] [%4]
       (signature

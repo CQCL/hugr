@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -154,7 +155,8 @@ class FixedHugr:
     hugr: Hugr
 
     def _to_serial(self) -> ext_s.FixedHugr:
-        return ext_s.FixedHugr(extensions=self.extensions, hugr=self.hugr.to_str())
+        hugr_64: str = base64.b64encode(self.hugr.to_bytes()).decode()
+        return ext_s.FixedHugr(extensions=self.extensions, hugr=hugr_64)
 
 
 @dataclass

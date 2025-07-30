@@ -10,7 +10,7 @@ use hugr_core::{
     std_extensions::collections::{
         array::{
             ARRAY_REPEAT_OP_ID, ARRAY_SCAN_OP_ID, Array, ArrayKind, ArrayOpDef, ArrayRepeatDef,
-            ArrayScanDef, ArrayValue, array_type_def, array_type_parametric,
+            ArrayScanDef, ArrayValue, array_type_parametric,
         },
         value_array::{self, VArrayFromArrayDef, VArrayToArrayDef, VArrayValue, ValueArray},
     },
@@ -21,9 +21,7 @@ use strum::IntoEnumIterator;
 
 use crate::{
     ComposablePass, ReplaceTypes,
-    replace_types::{
-        DelegatingLinearizer, NodeTemplate, ReplaceTypesError, handlers::copy_discard_array,
-    },
+    replace_types::{DelegatingLinearizer, NodeTemplate, ReplaceTypesError},
 };
 
 /// A HUGR -> HUGR pass that turns 'value_array`s into regular linear `array`s.
@@ -114,8 +112,6 @@ impl Default for LinearizeArrayPass {
                 ))
             },
         );
-        pass.linearizer()
-            .register_callback(array_type_def(), copy_discard_array);
         Self(pass)
     }
 }

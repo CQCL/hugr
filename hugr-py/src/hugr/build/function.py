@@ -78,7 +78,9 @@ class Module(DefinitionBuilder[ops.Module]):
             >>> m.declare_function("f", sig)
             Node(1)
         """
-        return self.hugr.add_node(ops.FuncDecl(name, signature), self.hugr.entrypoint)
+        return self.hugr.add_node(
+            ops.FuncDecl(name, signature), self.hugr.entrypoint, num_outs=1
+        )
 
     def add_alias_defn(self, name: str, ty: Type) -> Node:
         """Add a type alias definition."""

@@ -39,7 +39,7 @@ impl Patch<PersistentHugr> for PersistentReplacement {
 
 impl<R> HugrInternals for PersistentHugr<R> {
     type RegionPortgraph<'p>
-        = portgraph::MultiPortGraph
+        = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
 

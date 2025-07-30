@@ -1,6 +1,6 @@
 ---
 source: hugr-core/tests/model.rs
-expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-const.edn\"))"
+expression: ast
 ---
 (hugr 0)
 
@@ -20,6 +20,8 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 
 (import arithmetic.int.types.int)
 
+(import core.const)
+
 (import collections.array.const)
 
 (import arithmetic.float.types.float64)
@@ -28,7 +30,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
 
 (import core.adt)
 
-(define-func example.bools (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
+(define-func
+  public
+  example.bools
+  (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%0 %1]
     (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])]))
     ((core.load_const (core.const.adt [[] []] _ 0 [])) [] [%0]
@@ -37,6 +42,7 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
       (signature (core.fn [] [(core.adt [[] []])])))))
 
 (define-func
+  public
   example.make-pair
   (core.fn
     []
@@ -73,7 +79,10 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
              [[(collections.array.array 5 (arithmetic.int.types.int 6))
                arithmetic.float.types.float64]])])))))
 
-(define-func example.f64-json (core.fn [] [arithmetic.float.types.float64])
+(define-func
+  public
+  example.f64-json
+  (core.fn [] [arithmetic.float.types.float64])
   (dfg [] [%0 %1]
     (signature
       (core.fn
@@ -87,3 +96,9 @@ expression: "roundtrip(include_str!(\"../../hugr-model/tests/fixtures/model-cons
           "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"))
       [] [%1]
       (signature (core.fn [] [arithmetic.float.types.float64])))))
+
+(declare-func
+  public
+  example.const_as_param
+  (param ?0 (core.const arithmetic.float.types.float64))
+  (core.fn [] [arithmetic.float.types.float64]))

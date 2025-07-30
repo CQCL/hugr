@@ -14,7 +14,7 @@ use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
-pub(super) enum SerSimpleType {
+pub(crate) enum SerSimpleType {
     Q,
     I,
     G(Box<FuncValueType>),
@@ -79,6 +79,7 @@ pub(super) enum TypeParamSer {
     StaticType,
     List { param: Box<Term> },
     Tuple { params: ArrayOrTermSer },
+    ConstType { ty: Type },
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -136,6 +137,7 @@ impl From<Term> for TermSer {
             Term::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
             Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
             Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
+            Term::ConstType(ty) => TermSer::TypeParam(TypeParamSer::ConstType { ty: *ty }),
             Term::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
             Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple {
                 params: (*params).into(),
@@ -165,6 +167,7 @@ impl From<TermSer> for Term {
                 TypeParamSer::Float => Term::FloatType,
                 TypeParamSer::List { param } => Term::ListType(param),
                 TypeParamSer::Tuple { params } => Term::TupleType(Box::new(params.into())),
+                TypeParamSer::ConstType { ty } => Term::ConstType(Box::new(ty)),
             },
             TermSer::TypeArg(arg) => match arg {
                 TypeArgSer::Type { ty } => Term::Runtime(ty),

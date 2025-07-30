@@ -19,7 +19,7 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import comma_sep_str, ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -132,11 +132,12 @@ class DataflowOp(Op, Protocol):
             Bool
 
         """
-        sig = self.outer_signature()
         if port.offset == -1:
             # Order port
             msg = "Order port has no type."
             raise ValueError(msg)
+
+        sig = self.outer_signature()
         try:
             if port.direction == Direction.INCOMING:
                 return sig.input[port.offset]
@@ -241,6 +242,12 @@ class Input(DataflowOp):
     def _inputs(self) -> tys.TypeRow:
         return []
 
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        # Input only allows order edges on outgoing ports
+        if port.offset == -1 and port.direction == Direction.OUTGOING:
+            return tys.OrderKind()
+        return tys.ValueKind(self.port_type(port))
+
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=[], output=self.types)
 
@@ -258,7 +265,10 @@ class Output(DataflowOp, _PartialOp):
     """
 
     _types: tys.TypeRow | None = field(default=None, repr=False)
-    num_out: int = field(default=0, repr=False)
+
+    @property
+    def num_out(self) -> int:
+        return 0
 
     @property
     def types(self) -> tys.TypeRow:
@@ -269,6 +279,12 @@ class Output(DataflowOp, _PartialOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.types
+
+    def port_kind(self, port: InPort | OutPort) -> tys.Kind:
+        # Output only allows order edges on incoming ports
+        if port.offset == -1 and port.direction == Direction.INCOMING:
+            return tys.OrderKind()
+        return tys.ValueKind(self.port_type(port))
 
     def outer_signature(self) -> tys.FunctionType:
         return tys.FunctionType(input=self.types, output=[])
@@ -605,7 +621,7 @@ class UnpackTuple(AsExtOp, _PartialOp):
         return "UnpackTuple"
 
 
-@dataclass()
+@dataclass(frozen=True)
 class Tag(DataflowOp):
     """Tag a row of incoming values to make them a variant of a sum type.
 
@@ -633,46 +649,56 @@ class Tag(DataflowOp):
         )
 
     def __repr__(self) -> str:
+        if len(self.sum_ty.variant_rows) == 2:
+            left, right = self.sum_ty.variant_rows
+            if len(left) == 0 and self.tag == 1:
+                return f"Some({comma_sep_repr(right)})"
+            elif self.tag == 0:
+                return f"Left({left!r}, {right!r})"
+            else:
+                return f"Right({left!r}, {right!r})"
+        return f"Tag(tag={self.tag}, sum_ty={self.sum_ty!r})"
+
+    def __str__(self) -> str:
+        if len(self.sum_ty.variant_rows) == 2:
+            left, right = self.sum_ty.variant_rows
+            if len(left) == 0 and self.tag == 1:
+                return "Some"
+            elif self.tag == 0:
+                return "Left"
+            else:
+                return "Right"
         return f"Tag({self.tag})"
 
 
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Some(Tag):
     """Tag operation for the `Some` variant of an Option type.
 
     Example:
         # construct a Some variant holding a row of Bool and Unit types
         >>> Some(tys.Bool, tys.Unit)
-        Some
+        Some(Bool, Unit)
     """
 
     def __init__(self, *some_tys: tys.Type) -> None:
         super().__init__(1, tys.Option(*some_tys))
 
-    def __repr__(self) -> str:
-        return "Some"
 
-
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Right(Tag):
     """Tag operation for the `Right` variant of an type."""
 
     def __init__(self, either_type: tys.Either) -> None:
         super().__init__(1, either_type)
 
-    def __repr__(self) -> str:
-        return "Right"
 
-
-@dataclass
+@dataclass(frozen=True, eq=False, repr=False)
 class Left(Tag):
     """Tag operation for the `Left` variant of an type."""
 
     def __init__(self, either_type: tys.Either) -> None:
         super().__init__(0, either_type)
-
-    def __repr__(self) -> str:
-        return "Left"
 
 
 class Continue(Left):
@@ -680,15 +706,9 @@ class Continue(Left):
     controlling Either type.
     """
 
-    def __repr__(self) -> str:
-        return "Continue"
-
 
 class Break(Right):
     """Tag operation for the `Break` variant of a TailLoop controlling Either type."""
-
-    def __repr__(self) -> str:
-        return "Break"
 
 
 class DfParentOp(Op, Protocol):
@@ -820,7 +840,7 @@ class CFG(DataflowOp):
 
 @dataclass
 class DataflowBlock(DfParentOp):
-    """Parent of non-entry basic block in a control flow graph."""
+    """Parent of non-exit basic block in a control flow graph."""
 
     #: Inputs types of the inner dataflow graph.
     inputs: tys.TypeRow
@@ -1398,7 +1418,9 @@ class LoadFunc(_CallOrLoad, DataflowOp):
             is provided.
     """
 
-    num_out: int = field(default=1, repr=False)
+    @property
+    def num_out(self) -> int:
+        return 1
 
     def _to_serial(self, parent: Node) -> sops.LoadFunction:
         return sops.LoadFunction(

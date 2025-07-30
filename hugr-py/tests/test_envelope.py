@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import semver
 
 from hugr import ops, tys
 from hugr.build.function import Module
@@ -9,7 +10,8 @@ from hugr.hugr.node_port import Node
 from hugr.package import Package
 
 
-def test_envelope():
+@pytest.fixture
+def package() -> Package:
     mod = Module()
     f_id = mod.define_function("id", [tys.Qubit])
     f_id.set_outputs(f_id.input_node[0])
@@ -22,8 +24,10 @@ def test_envelope():
     q = f_main.input_node[0]
     call = f_main.call(f_id_decl, q)
     f_main.set_outputs(call)
-    package = Package([mod.hugr, mod2.hugr])
+    return Package([mod.hugr, mod2.hugr])
 
+
+def test_envelope(package: Package):
     # Binary compression roundtrip
     for format in [EnvelopeFormat.JSON]:
         for compression in [None, 0]:
@@ -32,9 +36,16 @@ def test_envelope():
             assert decoded == package
 
     # String roundtrip
-    encoded = package.to_str(EnvelopeConfig.TEXT)
-    decoded = Package.from_str(encoded)
+    encoded_str = package.to_str(EnvelopeConfig.TEXT)
+    decoded = Package.from_str(encoded_str)
     assert decoded == package
+
+
+def test_model(package: Package):
+    model_pkg = package.to_model()
+
+    # This value is statically defined in the rust bindings.
+    assert model_pkg.version >= semver.Version(major=1, minor=0, patch=0)
 
 
 def test_legacy_funcdefn():

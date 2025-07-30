@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
 import hugr.model as model
-from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
+from hugr.utils import comma_sep_repr, comma_sep_str, comma_sep_str_paren, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -216,6 +216,23 @@ class TupleParam(TypeParam):
     def to_model(self) -> model.Term:
         item_types = model.List([param.to_model() for param in self.params])
         return model.Apply("core.tuple", [item_types])
+
+
+@dataclass(frozen=True)
+class ConstParam(TypeParam):
+    """Type parameter which requires a constant value."""
+
+    ty: Type
+
+    def _to_serial(self) -> stys.ConstParam:
+        return stys.ConstParam(ty=self.ty._to_serial_root())
+
+    def __str__(self) -> str:
+        return f"Const({self.ty!s})"
+
+    def to_model(self) -> model.Term:
+        ty = cast(model.Term, self.ty.to_model())
+        return model.Apply("core.const", [ty])
 
 
 # ------------------------------------------
@@ -430,7 +447,38 @@ class Sum(Type):
         return Tuple(*self.variant_rows[0])
 
     def __repr__(self) -> str:
-        return f"Sum({self.variant_rows})"
+        if self == Bool:
+            return "Bool"
+        elif self == Unit:
+            return "Unit"
+        elif all(len(row) == 0 for row in self.variant_rows):
+            return f"UnitSum({len(self.variant_rows)})"
+        elif len(self.variant_rows) == 1:
+            return f"Tuple{tuple(self.variant_rows[0])}"
+        elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
+            return f"Option({comma_sep_repr(self.variant_rows[1])})"
+        elif len(self.variant_rows) == 2:
+            left, right = self.variant_rows
+            return f"Either(left={left}, right={right})"
+        else:
+            return f"Sum({self.variant_rows})"
+
+    def __str__(self) -> str:
+        if self == Bool:
+            return "Bool"
+        elif self == Unit:
+            return "Unit"
+        elif all(len(row) == 0 for row in self.variant_rows):
+            return f"UnitSum({len(self.variant_rows)})"
+        elif len(self.variant_rows) == 1:
+            return f"Tuple{tuple(self.variant_rows[0])}"
+        elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
+            return f"Option({comma_sep_str(self.variant_rows[1])})"
+        elif len(self.variant_rows) == 2:
+            left, right = self.variant_rows
+            return f"Either({comma_sep_str_paren(left)}, {comma_sep_str_paren(right)})"
+        else:
+            return f"Sum({self.variant_rows})"
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, Sum) and self.variant_rows == other.variant_rows
@@ -449,7 +497,7 @@ class Sum(Type):
         return model.Apply("core.adt", [variants])
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class UnitSum(Sum):
     """Simple :class:`Sum` type with `size` variants of empty rows."""
 
@@ -462,18 +510,14 @@ class UnitSum(Sum):
     def _to_serial(self) -> stys.UnitSum:  # type: ignore[override]
         return stys.UnitSum(size=self.size)
 
-    def __repr__(self) -> str:
-        if self == Bool:
-            return "Bool"
-        elif self == Unit:
-            return "Unit"
-        return f"UnitSum({self.size})"
-
     def resolve(self, registry: ext.ExtensionRegistry) -> UnitSum:
         return self
 
+    def __str__(self) -> str:
+        return self.__repr__()
 
-@dataclass(eq=False)
+
+@dataclass(eq=False, repr=False)
 class Tuple(Sum):
     """Product type with `tys` elements. Instances of this type correspond to
     :class:`Sum` with a single variant.
@@ -482,11 +526,8 @@ class Tuple(Sum):
     def __init__(self, *tys: Type):
         self.variant_rows = [list(tys)]
 
-    def __repr__(self) -> str:
-        return f"Tuple{tuple(self.variant_rows[0])}"
 
-
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Option(Sum):
     """Optional tuple of elements.
 
@@ -497,11 +538,8 @@ class Option(Sum):
     def __init__(self, *tys: Type):
         self.variant_rows = [[], list(tys)]
 
-    def __repr__(self) -> str:
-        return f"Option({comma_sep_repr(self.variant_rows[1])})"
 
-
-@dataclass(eq=False)
+@dataclass(eq=False, repr=False)
 class Either(Sum):
     """Two-variant tuple of elements.
 
@@ -513,16 +551,6 @@ class Either(Sum):
 
     def __init__(self, left: Iterable[Type], right: Iterable[Type]):
         self.variant_rows = [list(left), list(right)]
-
-    def __repr__(self) -> str:  # pragma: no cover
-        left, right = self.variant_rows
-        return f"Either(left={left}, right={right})"
-
-    def __str__(self) -> str:
-        left, right = self.variant_rows
-        left_str = left[0] if len(left) == 1 else tuple(left)
-        right_str = right[0] if len(right) == 1 else tuple(right)
-        return f"Either({left_str}, {right_str})"
 
 
 @dataclass(frozen=True)
@@ -756,15 +784,7 @@ class ExtType(Type):
         return super().__eq__(value)
 
     def to_model(self) -> model.Term:
-        # This cast is only neccessary because `Type` can both be an
-        # actual type or a row variable.
-        args = [cast(model.Term, arg.to_model()) for arg in self.args]
-
-        extension_name = self.type_def.get_extension().name
-        type_name = self.type_def.name
-        name = f"{extension_name}.{type_name}"
-
-        return model.Apply(name, args)
+        return self._to_opaque().to_model()
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
@@ -811,11 +831,11 @@ class Opaque(Type):
         return _type_str(self.id, self.args)
 
     def to_model(self) -> model.Term:
-        # This cast is only neccessary because `Type` can both be an
+        # This cast is only necessary because `Type` can both be an
         # actual type or a row variable.
         args = [cast(model.Term, arg.to_model()) for arg in self.args]
 
-        return model.Apply(self.id, args)
+        return model.Apply(f"{self.extension}.{self.id}", args)
 
 
 @dataclass

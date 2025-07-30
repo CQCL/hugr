@@ -1,6 +1,9 @@
 use std::collections::{BTreeSet, VecDeque};
 
-use hugr_core::{Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire};
+use hugr_core::{
+    Direction, HugrView, IncomingPort, OutgoingPort, Port, Wire,
+    hugr::patch::simple_replace::BoundaryMode,
+};
 use itertools::Itertools;
 
 use crate::{CommitId, PatchNode, PersistentHugr, Resolver, Walker};
@@ -47,6 +50,12 @@ impl CommitWire {
 
     fn commit_id(&self) -> CommitId {
         self.0.node().0
+    }
+
+    delegate::delegate! {
+        to self.0 {
+            fn node(&self) -> PatchNode;
+        }
     }
 }
 
@@ -111,10 +120,15 @@ impl PersistentWire {
                         // ports in the child commit that deleted the node.
                         for (opp_node, opp_port) in commit_hugr.linked_ports(node, port) {
                             let opp_node = per_hugr.to_persistent_node(opp_node, commit_id);
-                            for (child_node, child_port) in per_hugr
-                                .as_state_space()
-                                .linked_child_ports(opp_node, opp_port, deleted_by)
+                            for (child_node, child_port) in
+                                per_hugr.as_state_space().linked_child_ports(
+                                    opp_node,
+                                    opp_port,
+                                    deleted_by,
+                                    BoundaryMode::IncludeIO,
+                                )
                             {
+                                debug_assert_eq!(child_node.owner(), deleted_by);
                                 let w = CommitWire::from_connected_port(
                                     child_node, child_port, per_hugr,
                                 );
@@ -165,6 +179,11 @@ impl PersistentWire {
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = (PatchNode, Port)> {
         all_ports_impl(self.wires.iter().copied(), dir.into(), hugr)
+    }
+
+    /// All commit IDs that the wire traverses.
+    pub fn owners(&self) -> impl Iterator<Item = CommitId> {
+        self.wires.iter().map(|w| w.node().owner()).unique()
     }
 
     /// Consume the wire and return all ports attached to a wire in `hugr`.

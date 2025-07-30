@@ -4,7 +4,7 @@ mod check;
 pub mod custom;
 mod poly_func;
 mod row_var;
-mod serialize;
+pub(crate) mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;
@@ -1155,7 +1155,8 @@ pub(super) mod proptest_utils {
             | TypeParamSer::String
             | TypeParamSer::Bytes
             | TypeParamSer::Float
-            | TypeParamSer::StaticType => true,
+            | TypeParamSer::StaticType
+            | TypeParamSer::ConstType { .. } => true,
             TypeParamSer::List { param } => term_is_serde_type_param(&param),
             TypeParamSer::Tuple { params } => {
                 match &params {

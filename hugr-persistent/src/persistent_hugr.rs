@@ -38,6 +38,9 @@ impl Commit {
     /// Requires a reference to the commit state space that the nodes in
     /// `replacement` refer to.
     ///
+    /// Use [`Self::try_new`] instead if the parents of the commit cannot be
+    /// inferred from the invalidation set of `replacement` alone.
+    ///
     /// The replacement must act on a non-empty subgraph, otherwise this
     /// function will return an [`InvalidCommit::EmptyReplacement`] error.
     ///
@@ -48,19 +51,36 @@ impl Commit {
         replacement: PersistentReplacement,
         graph: &CommitStateSpace<R>,
     ) -> Result<Commit, InvalidCommit> {
+        Self::try_new(replacement, [], graph)
+    }
+
+    /// Create a new commit
+    ///
+    /// Requires a reference to the commit state space that the nodes in
+    /// `replacement` refer to.
+    ///
+    /// The returned commit will correspond to the application of `replacement`
+    /// and will be the child of the commits in `parents` as well as of all
+    /// the commits in the invalidation set of `replacement`.
+    ///
+    /// The replacement must act on a non-empty subgraph, otherwise this
+    /// function will return an [`InvalidCommit::EmptyReplacement`] error.
+    /// If any of the parents of the replacement are not in the commit state
+    /// space, this function will return an [`InvalidCommit::UnknownParent`]
+    /// error.
+    pub fn try_new<R>(
+        replacement: PersistentReplacement,
+        parents: impl IntoIterator<Item = Commit>,
+        graph: &CommitStateSpace<R>,
+    ) -> Result<Commit, InvalidCommit> {
         if replacement.subgraph().nodes().is_empty() {
             return Err(InvalidCommit::EmptyReplacement);
         }
-        let parent_ids = replacement.invalidation_set().map(|n| n.0).unique();
-        let parents = parent_ids
-            .map(|id| {
-                if graph.contains_id(id) {
-                    Ok(graph.get_commit(id).clone())
-                } else {
-                    Err(InvalidCommit::UnknownParent(id))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let repl_parents = get_parent_commits(&replacement, graph)?;
+        let parents = parents
+            .into_iter()
+            .chain(repl_parents)
+            .unique_by(|p| p.as_ptr());
         let rc = RelRc::with_parents(
             replacement.into(),
             parents.into_iter().map(|p| (p.into(), ())),
@@ -434,6 +454,8 @@ impl<R> PersistentHugr<R> {
             pub fn base_commit(&self) -> &Commit;
             /// Get the commit with ID `commit_id`.
             pub fn get_commit(&self, commit_id: CommitId) -> &Commit;
+            /// Check whether `commit_id` exists and return it.
+            pub fn try_get_commit(&self, commit_id: CommitId) -> Option<&Commit>;
             /// Get an iterator over all nodes inserted by `commit_id`.
             ///
             /// All nodes will be PatchNodes with commit ID `commit_id`.
@@ -529,6 +551,32 @@ impl<R> PersistentHugr<R> {
             .expect("invalid port")
             .is_value()
     }
+
+    pub(super) fn value_ports(
+        &self,
+        patch_node @ PatchNode(commit_id, node): PatchNode,
+        dir: Direction,
+    ) -> impl Iterator<Item = (PatchNode, Port)> + '_ {
+        let hugr = self.commit_hugr(commit_id);
+        let ports = hugr.node_ports(node, dir);
+        ports.filter_map(move |p| self.is_value_port(patch_node, p).then_some((patch_node, p)))
+    }
+
+    pub(super) fn output_value_ports(
+        &self,
+        patch_node: PatchNode,
+    ) -> impl Iterator<Item = (PatchNode, OutgoingPort)> + '_ {
+        self.value_ports(patch_node, Direction::Outgoing)
+            .map(|(n, p)| (n, p.as_outgoing().expect("unexpected port direction")))
+    }
+
+    pub(super) fn input_value_ports(
+        &self,
+        patch_node: PatchNode,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
+        self.value_ports(patch_node, Direction::Incoming)
+            .map(|(n, p)| (n, p.as_incoming().expect("unexpected port direction")))
+    }
 }
 
 impl<R> IntoIterator for PersistentHugr<R> {
@@ -549,11 +597,11 @@ impl<R> IntoIterator for PersistentHugr<R> {
 /// among `children`.
 pub(crate) fn find_conflicting_node<'a>(
     commit_id: CommitId,
-    mut children: impl Iterator<Item = &'a Commit>,
+    children: impl IntoIterator<Item = &'a Commit>,
 ) -> Option<Node> {
     let mut all_invalidated = BTreeSet::new();
 
-    children.find_map(|child| {
+    children.into_iter().find_map(|child| {
         let mut new_invalidated =
             child
                 .invalidation_set()
@@ -566,4 +614,19 @@ pub(crate) fn find_conflicting_node<'a>(
                 });
         new_invalidated.find(|&n| !all_invalidated.insert(n))
     })
+}
+
+fn get_parent_commits<R>(
+    replacement: &PersistentReplacement,
+    graph: &CommitStateSpace<R>,
+) -> Result<Vec<Commit>, InvalidCommit> {
+    let parent_ids = replacement.invalidation_set().map(|n| n.owner()).unique();
+    parent_ids
+        .map(|id| {
+            graph
+                .try_get_commit(id)
+                .cloned()
+                .ok_or(InvalidCommit::UnknownParent(id))
+        })
+        .collect()
 }
