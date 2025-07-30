@@ -1152,21 +1152,32 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         serial = SerialHugr.load_json(json_dict)
         return cls._from_serial(serial)
 
-    def render_dot(self, config: RenderConfig | None = None) -> gv.Digraph:
+    def render_dot(
+        self, config: RenderConfig | None = None, root: Node | None = None
+    ) -> gv.Digraph:
         """Render the HUGR to a graphviz Digraph.
 
         Args:
             config: Render configuration.
+            root: Root node defining the set of nodes to render. By default this is the
+                module root and all nodes are rendered. If this is a container node, all
+                nodes under it are rendered. Every incoming edge to the rendered set and
+                outgoing edge from it is also shown, with its other endpoint labelled
+                with its node index.
 
         Returns:
             The graphviz Digraph.
         """
         from .render import DotRenderer
 
-        return DotRenderer(config).render(self)
+        return DotRenderer(config).render(self, root)
 
     def store_dot(
-        self, filename: str, format: str = "svg", config: RenderConfig | None = None
+        self,
+        filename: str,
+        format: str = "svg",
+        config: RenderConfig | None = None,
+        root: Node | None = None,
     ) -> None:
         """Render the HUGR to a graphviz dot file.
 
@@ -1175,7 +1186,12 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             format: The format used for rendering ('pdf', 'png', etc.).
                 Defaults to SVG.
             config: Render configuration.
+            root: Root node defining the set of nodes to render. By default this is the
+                module root and all nodes are rendered. If this is a container node, all
+                nodes under it are rendered. Every incoming edge to the rendered set and
+                outgoing edge from it is also shown, with its other endpoint labelled
+                with its node index.
         """
         from .render import DotRenderer
 
-        DotRenderer(config).store(self, filename=filename, format=format)
+        DotRenderer(config).store(self, filename=filename, format=format, root=root)

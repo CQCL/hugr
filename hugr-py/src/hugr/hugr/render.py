@@ -92,9 +92,20 @@ class DotRenderer:
 
     def __init__(self, config: RenderConfig | None = None) -> None:
         self.config = config or RenderConfig()
+        self.nodes: set[Node] = set()
 
-    def render(self, hugr: Hugr) -> Digraph:
-        """Render a HUGR to a graphviz dot object."""
+    def render(self, hugr: Hugr, root: Node | None = None) -> Digraph:
+        """Render a HUGR to a graphviz dot object.
+
+        Args:
+            hugr: The HUGR to render.
+            root: Root node defining the set of nodes to render. By default this is the
+                module root and all nodes are rendered. If this is a container node, all
+                nodes under it are rendered. Every incoming edge to the rendered set and
+                outgoing edge from it is also shown, with its other endpoint labelled
+                with its node index.
+        """
+        root = root or hugr.module_root
         graph_attr = {
             "rankdir": "",
             "ranksep": "0.1",
@@ -102,7 +113,7 @@ class DotRenderer:
             "margin": "0",
             "bgcolor": self.config.palette.background,
         }
-        if name := hugr[hugr.module_root].metadata.get("name", None):
+        if name := hugr[root].metadata.get("name", None):
             name = html.escape(str(name))
         else:
             name = ""
@@ -110,7 +121,7 @@ class DotRenderer:
         graph = gv.Digraph(name, strict=False)
         graph.attr(**graph_attr)
 
-        self._viz_node(hugr.module_root, hugr, graph)
+        self._viz_node(root, hugr, graph)
 
         for src_port, tgt_port in hugr.links():
             kind = hugr.port_kind(src_port)
@@ -118,7 +129,9 @@ class DotRenderer:
 
         return graph
 
-    def store(self, hugr: Hugr, filename: str, format: str = "svg") -> None:
+    def store(
+        self, hugr: Hugr, filename: str, format: str = "svg", root: Node | None = None
+    ) -> None:
         """Render a HUGR and save it to a file.
 
         Args:
@@ -126,8 +139,13 @@ class DotRenderer:
             filename: Filename for saving the rendered graph.
             format: The format used for rendering ('pdf', 'png', etc.).
                 Defaults to SVG.
+            root: Root node defining the set of nodes to render. By default this is the
+                module root and all nodes are rendered. If this is a container node, all
+                nodes under it are rendered. Every incoming edge to the rendered set and
+                outgoing edge from it is also shown, with its other endpoint labelled
+                with its node index.
         """
-        gv_graph = self.render(hugr)
+        gv_graph = self.render(hugr, root=root)
         gv_graph.render(filename, format=format)
 
     _FONTFACE = "monospace"
@@ -266,6 +284,7 @@ class DotRenderer:
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
+                self.nodes.add(node)
                 sub.attr(
                     label="",
                     margin="10",
@@ -275,6 +294,7 @@ class DotRenderer:
         else:
             html_label = self._format_html_label(**label_config)
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")
+            self.nodes.add(node)
 
     def _viz_link(
         self, src_port: OutPort, tgt_port: InPort, kind: Kind, graph: Digraph
@@ -302,10 +322,11 @@ class DotRenderer:
             case _:
                 assert_never(kind)
 
-        graph.edge(
-            self._out_port_name(src_port),
-            self._in_port_name(tgt_port),
-            label=label,
-            color=color,
-            **edge_attr,
-        )
+        if src_port.node in self.nodes or tgt_port.node in self.nodes:
+            graph.edge(
+                self._out_port_name(src_port),
+                self._in_port_name(tgt_port),
+                label=label,
+                color=color,
+                **edge_attr,
+            )
