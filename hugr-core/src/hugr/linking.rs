@@ -75,11 +75,6 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NameLinkingPolicy {
-    /// Do not use linking - just insert all functions from source Hugr into target.
-    /// (This can lead to an invalid Hugr if there are name/signature conflicts on public functions).
-    AddAll,
-    /// Do not use linking - break any edges from functions in the source Hugr to the insert part.
-    AddNone,
     /// Identify public functions in source and target Hugr by name.
     /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
     /// will be combined, taking the FuncDefn from either Hugr.
@@ -175,8 +170,6 @@ impl NameLinkingPolicy {
             if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
                 let mut dirv = NodeLinkingDirective::add();
                 match self {
-                    NameLinkingPolicy::AddAll => (),
-                    NameLinkingPolicy::AddNone => continue,
                     NameLinkingPolicy::LinkByName {
                         copy_private_funcs,
                         error_on_conflicting_sig,
@@ -383,74 +376,6 @@ mod test {
             );
             h
         };
-
-        // AddNone: inserted DFG has all calls disconnected
-        let mut target = orig_target.clone();
-        let node_map = target
-            .insert_from_view_link_names(
-                Some(target.entrypoint()),
-                &inserted,
-                NameLinkingPolicy::AddNone,
-            )
-            .unwrap();
-        assert_eq!(list_decls_defns(&target), list_decls_defns(&orig_target)); // no new Funcs
-        assert!(matches!(
-            target.validate(),
-            Err(ValidationError::UnconnectedPort { .. })
-        ));
-        let dfg = node_map[&inserted.entrypoint()];
-        assert_eq!(
-            target.children(dfg).flat_map(|n| target.children(n)).next(),
-            None
-        );
-        for c in target.nodes().filter(|n| target.get_optype(*n).is_call()) {
-            assert_eq!(
-                target.static_source(c).is_none(),
-                target.get_parent(c) == Some(dfg)
-            );
-        }
-        target.remove_subtree(dfg);
-        target.validate().unwrap();
-        // Hugrs will not be equal because of internal graph representation details
-        assert_eq!(target.num_nodes(), orig_target.num_nodes());
-        for n in target.nodes() {
-            assert_eq!(target.get_optype(n), orig_target.get_optype(n));
-            for inp in target.node_inputs(n) {
-                assert_eq!(
-                    target.linked_outputs(n, inp).collect_vec(),
-                    orig_target.linked_outputs(n, inp).collect_vec()
-                );
-            }
-        }
-
-        // AddAll (w/out entrypoint): conflicting FuncDecls / FuncDefns.
-        let mut target = orig_target.clone();
-        // Do not add entrypoint subtree - it is contained in an added subtree. (Hence, AddAll + Some useless for any non-module entrypoint....TODO what about AddAll+Some w/module entrypoint?)
-        // TODO - allow adding only public, w/out linking ??
-        // Or, make AddAll exclude the entrypoint-container ?? (Like current insert_hugr)
-        target
-            .insert_from_view_link_names(None, &inserted, NameLinkingPolicy::AddAll)
-            .unwrap();
-        assert!(matches!(
-            target.validate(),
-            Err(ValidationError::DuplicateExport { .. })
-        ));
-        let (decls, defns) = list_decls_defns(&target);
-        assert_eq!(
-            decls.values().copied().sorted().collect_vec(),
-            ["bar", "bar", "foo", "foo"]
-        );
-        assert_eq!(
-            defns.values().copied().sorted().collect_vec(),
-            ["bar", "foo", "main"]
-        );
-        let call_tgts = call_targets(&target);
-        for decl in decls.keys() {
-            assert_eq!(call_tgts.values().filter(|tgt| *tgt == decl).count(), 1); // as before
-        }
-        for defn in defns.keys() {
-            assert_eq!(call_tgts.values().find(|tgt| *tgt == defn), None); // as before
-        }
 
         // Linking by name...neither of the looped-over params should make any difference:
         for error_on_conflicting_sig in [false, true] {
