@@ -142,8 +142,8 @@ pub enum Term {
 
     /// The type of constants for a runtime type.
     ///
-    /// A constant is a compile time description of a runtime value. The runtime
-    /// value is constructed when the constant is loaded.
+    /// A constant is a compile time description of how to produce a runtime value.
+    /// The runtime value is constructed when the constant is loaded.
     ///
     /// Constants are distinct from the runtime values that they describe. In
     /// particular, as part of the term language, constants can be freely copied

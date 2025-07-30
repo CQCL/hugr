@@ -62,4 +62,4 @@
 
 (declare-func public example.const_as_param
   (param ?c (core.const arithmetic.float.types.float64))
-  (core.fn [] [?c]))
+  (core.fn [] [arithmetic.float.types.float64]))
