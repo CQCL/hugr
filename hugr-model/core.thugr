@@ -1,0 +1,72 @@
+mod {
+  /// The type of static types.
+  pub ctr @core.static: @core.static;
+
+  /// The type of runtime types.
+  pub ctr @core.type: @core.static;
+
+  /// The type of constraints.
+  pub ctr @core.constraint: @core.static;
+
+  /// The type of metadata.
+  pub ctr @core.meta: @core.static;
+
+  /// The type for lists of static data.
+  ///
+  /// Lists are finite sequences such that all elements have the same type.
+  /// For heterogeneous sequences, see [`@core.tuple`].
+  pub ctr @core.list(?type: @core.static): @core.static;
+
+  /// The type of tuples of static data.
+  ///
+  /// Tuples are finite sequences that allow elements to have different types.
+  /// For homogeneous sequences, see [`@core.list`].
+  pub ctr @core.tuple(?types: @core.list(@core.static)): @core.static;
+
+  /// The type of runtime functions.
+  pub ctr @core.fn(
+    ?inputs: @core.list(@core.type),
+    ?outputs: @core.list(@core.type)
+  ): @core.static;
+
+  /// Operation to call a statically known function.
+  pub op @core.call(
+    ?inputs: @core.list(@core.type),
+    ?outputs: @core.list(@core.type),
+    ?func: @core.const(?inputs -> ?outputs)
+  ): ?inputs -> ?outputs;
+
+  /// Operation to call a function known at runtime.
+  pub op @core.call_indirect(
+    ?inputs: @core.list(@core.type),
+    ?outputs: @core.list(@core.type)
+  ): [?inputs -> ?outputs, ... ?inputs] -> ?outputs;
+
+  /// The constraint for non-linear runtime values.
+  ///
+  /// Runtime values are copied implicitly by connecting an output port to more
+  /// than one input port. Similarly runtime values can be deleted implicitly when
+  /// an output port is not connected to any input port. In either of these cases
+  /// the type of the runtime value must satisfy this constraint.
+  pub ctr @core.nonlinear(?type: @core.type): @core.constraint;
+
+  /// Runtime algebraic data types.
+  pub ctr @core.adt(
+    ?variants: @core.list(@core.list(@core.type))
+  ): @core.type;
+
+  /// The type of static strings.
+  pub ctr @core.str: @core.static;
+
+  /// The type of static natural numbers.
+  pub ctr @core.nat: @core.static;
+
+  /// The type of static byte strings.
+  pub ctr @core.bytes: @core.static;
+
+  /// The type of static floating point numbers.
+  pub ctr @core.float: @core.static;
+
+  /// The type of constants for a runtime type..
+  pub ctr @core.const(?type: @core.type): @core.static;
+}

@@ -31,6 +31,9 @@ semver = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 pyo3 = { workspace = true, optional = true, features = ["extension-module"] }
+tree-sitter-hugr = { path = "../../tree-sitter-hugr" }
+tree-sitter = "0.25.8"
+rust-sitter = "0.4.5"
 
 [features]
 pyo3 = ["dep:pyo3"]
@@ -43,3 +46,6 @@ insta = { workspace = true }
 pretty_assertions = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
+
+[build-dependencies]
+rust-sitter-tool = "0.4.5"

@@ -32,6 +32,7 @@ mod print;
 #[cfg(feature = "pyo3")]
 mod python;
 mod resolve;
+mod ts;
 mod view;
 
 pub use parse::ParseError;
