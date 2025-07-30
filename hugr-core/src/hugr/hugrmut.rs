@@ -750,50 +750,43 @@ fn insert_hugr_internal<H: HugrView>(
     other: &H,
     children: HashMap<H::Node, NodeLinkingDirective>,
 ) -> Result<HashMap<H::Node, Node>, NodeLinkingError<H::Node>> {
+    if parent.is_some() {
+        if other.entrypoint() == other.module_root() {
+            if let Some(c) = children.keys().next() {
+                return Err(NodeLinkingError::ChildOfEntrypoint(*c));
+            }
+        } else {
+            let mut n = other.entrypoint();
+            if children.contains_key(&n) {
+                return Err(NodeLinkingError::ChildContainsEntrypoint(n));
+            }
+            while let Some(p) = other.get_parent(n) {
+                if matches!(children.get(&p), Some(NodeLinkingDirective::Add { .. })) {
+                    return Err(NodeLinkingError::ChildContainsEntrypoint(p));
+                }
+                n = p
+            }
+        }
+    }
     for &c in children.keys() {
         if other.get_parent(c) != Some(other.module_root()) {
             return Err(NodeLinkingError::NotChildOfRoot(c));
         }
     }
-    if parent.is_some() {
-        let mut n = other.entrypoint();
-        while let Some(p) = other.get_parent(n) {
-            if matches!(children.get(&p), Some(NodeLinkingDirective::Add { .. })) {
-                return Err(NodeLinkingError::ChildContainsEntrypoint(p));
-            }
-            n = p
-        }
-    }
     // In fact we'll copy all `children`, but only including subtrees
     // for children that should be `Add`ed. This ensures we copy
     // edges from any of those children to any other copied nodes.
-    let (before, after) = if parent.is_some() {
-        let (b, a) = if other.entrypoint() == other.module_root() {
-            (
-                Some(other.entrypoint()),
-                Either::Left(other.children(other.module_root())),
-            )
-        } else {
-            (None, Either::Right(std::iter::once(other.entrypoint())))
-        };
-        (b, a.filter(|n| !children.contains_key(n)).collect())
-    } else {
-        (None, vec![])
-    };
-    let nodes = before
-        .into_iter()
-        .chain(children.iter().flat_map(|(&ch, m)| match m {
+    let nodes = children
+        .iter()
+        .flat_map(|(&ch, m)| match m {
             NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
             NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
-        }))
-        .chain(after.into_iter().flat_map(|n| other.descendants(n)));
+        })
+        .chain(parent.iter().flat_map(|_| other.entry_descendants()));
     let hugr_root = hugr.module_root();
-    let two_modules = (other.entrypoint() == other.module_root()) && parent.is_some();
     let mut node_map = insert_hugr_nodes(hugr, &other, nodes, |&n| {
-        if n == other.entrypoint() && parent.is_some() {
-            parent
-        } else if two_modules && other.get_parent(n) == Some(other.entrypoint()) {
-            None
+        if n == other.entrypoint() {
+            parent // If parent is None, quite possible this case will not be used
         } else {
             children.contains_key(&n).then_some(hugr_root)
         }
@@ -804,13 +797,7 @@ fn insert_hugr_internal<H: HugrView>(
             NodeLinkingDirective::UseExisting(replace_with) => {
                 let copy = node_map.remove(&ch).unwrap();
                 // Because of `UseExisting` we avoided adding `ch`s descendants above
-                // - unless one was the entrypoint and added somewhere else
-                debug_assert_eq!(
-                    hugr.children(copy)
-                        .filter(|n| node_map.get(&other.entrypoint()).is_none_or(|e| n != e))
-                        .next(),
-                    None
-                );
+                debug_assert_eq!(hugr.children(copy).next(), None);
                 replace_static_src(hugr, copy, replace_with);
             }
             NodeLinkingDirective::Add { replace } => {
@@ -909,7 +896,7 @@ fn insert_hugr_nodes<H: HugrView>(
 }
 
 #[cfg(test)]
-pub(super) mod test {
+mod test {
     use itertools::Itertools;
 
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
@@ -1128,8 +1115,8 @@ pub(super) mod test {
         let backup = simple_dfg_hugr();
         let mut h = backup.clone();
 
-        let (insert, defn, _) = dfg_calling_defn_decl();
-        let defn = defn.node();
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let (defn, decl) = (defn.node(), decl.node());
 
         let epp = insert.get_parent(insert.entrypoint()).unwrap();
         let r = h.insert_from_view_link_nodes(
@@ -1151,62 +1138,30 @@ pub(super) mod test {
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::NotChildOfRoot(inp));
         assert_eq!(h, backup);
-    }
 
-    #[test]
-    fn insert_link_nodes_inside_entrypoint() {
-        let backup = simple_dfg_hugr();
-        let mut h = backup.clone();
-        let h_fn = h.get_parent(h.entrypoint()).unwrap();
-        assert!(h.get_optype(h_fn).is_func_defn());
-
-        let (mut insert, defn, decl) = dfg_calling_defn_decl();
-        let (defn, decl) = (defn.node(), decl.node());
-
+        let mut insert = insert;
         insert.set_entrypoint(defn);
-        h.insert_from_view_link_nodes(
+        let r = h.insert_from_view_link_nodes(
             Some(h.module_root()),
             &insert,
             HashMap::from([(
                 defn,
                 NodeLinkingDirective::UseExisting(h.get_parent(h.entrypoint()).unwrap()),
             )]),
-        )
-        .unwrap(); // TODO also test Add+replace
-        assert_equal_nodes_edges(&h, &backup);
+        );
+        assert_eq!(
+            r.err().unwrap(),
+            NodeLinkingError::ChildContainsEntrypoint(defn)
+        );
 
-        let mut h = backup.clone();
-        assert_eq!(h.static_targets(h_fn).unwrap().count(), 0);
+        assert_eq!(h, backup);
         insert.set_entrypoint(insert.module_root());
-        h.insert_hugr_link_nodes(
+        let r = h.insert_hugr_link_nodes(
             Some(h.module_root()),
             insert,
-            HashMap::from([(decl, NodeLinkingDirective::UseExisting(h_fn))]),
-        )
-        .unwrap();
-        // main*2 (original dfg_hugr, and dfg_calling_defn_decl), plus one fn from latter
-        assert_eq!(
-            h.nodes()
-                .filter(|n| h.get_optype(*n).is_func_defn())
-                .count(),
-            3
+            HashMap::from([(decl, NodeLinkingDirective::add())]),
         );
-        assert_eq!(h.nodes().find(|n| h.get_optype(*n).is_func_decl()), None);
-        assert_eq!(h.static_targets(h_fn).unwrap().count(), 1);
-    }
-
-    /// When hugrs will not be equal because of internal graph representation details
-    pub fn assert_equal_nodes_edges<H: HugrView>(h1: &H, h2: &H) {
-        assert_eq!(h1.num_nodes(), h2.num_nodes());
-        for n in h1.nodes() {
-            assert_eq!(h1.get_optype(n), h2.get_optype(n));
-            for inp in h1.node_inputs(n) {
-                assert_eq!(
-                    h1.linked_outputs(n, inp).collect_vec(),
-                    h2.linked_outputs(n, inp).collect_vec()
-                );
-            }
-        }
+        assert_eq!(r.err().unwrap(), NodeLinkingError::ChildOfEntrypoint(decl));
     }
 
     // (End) tests of insert_{hugr,from_view}(_link_nodes) ====================================
