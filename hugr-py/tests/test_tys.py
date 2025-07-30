@@ -17,6 +17,7 @@ from hugr.tys import (
     BoundedNatParam,
     BytesArg,
     BytesParam,
+    ConstParam,
     Either,
     ExtType,
     FloatArg,
@@ -102,6 +103,7 @@ def test_tys_sum_str(ty: Type, string: str, repr_str: str):
             "(Linear, Nat(3))",
         ),
         (ListParam(StringParam()), "[String]"),
+        (ConstParam(Qubit), "Const(Qubit)"),
     ],
 )
 def test_params_str(param: TypeParam, string: str):
