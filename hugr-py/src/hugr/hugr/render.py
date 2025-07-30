@@ -284,7 +284,6 @@ class DotRenderer:
                     self._viz_node(child, hugr, sub)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
-                self.nodes.add(node)
                 sub.attr(
                     label="",
                     margin="10",
@@ -294,7 +293,7 @@ class DotRenderer:
         else:
             html_label = self._format_html_label(**label_config)
             graph.node(f"{node.idx}", label=f"<{html_label}>", shape="plain")
-            self.nodes.add(node)
+        self.nodes.add(node)
 
     def _viz_link(
         self, src_port: OutPort, tgt_port: InPort, kind: Kind, graph: Digraph
