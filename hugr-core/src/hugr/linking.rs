@@ -14,12 +14,6 @@ use crate::{HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::Poly
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum NodeLinkingError<N: Display> {
-    /// Inserting the whole Hugr, yet also asked to insert some of its children
-    /// (so the inserted Hugr's entrypoint was its module-root).
-    #[error(
-        "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (with module entrypoint)"
-    )]
-    ChildOfEntrypoint(N),
     /// A module-child requested contained (or was) the entrypoint
     #[error("Requested to insert module-child {_0} but this contains the entrypoint")]
     ChildContainsEntrypoint(N),
@@ -326,6 +320,7 @@ mod test {
         ModuleBuilder,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
+    use crate::hugr::hugrmut::test::assert_equal_nodes_edges;
     use crate::hugr::linking::{
         MultipleImplHandling, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective,
     };
@@ -441,17 +436,7 @@ mod test {
         }
         target.remove_subtree(dfg);
         target.validate().unwrap();
-        // Hugrs will not be equal because of internal graph representation details
-        assert_eq!(target.num_nodes(), orig_target.num_nodes());
-        for n in target.nodes() {
-            assert_eq!(target.get_optype(n), orig_target.get_optype(n));
-            for inp in target.node_inputs(n) {
-                assert_eq!(
-                    target.linked_outputs(n, inp).collect_vec(),
-                    orig_target.linked_outputs(n, inp).collect_vec()
-                );
-            }
-        }
+        assert_equal_nodes_edges(&target, &orig_target);
 
         // AddAll (w/out entrypoint): conflicting FuncDecls / FuncDefns.
         let mut target = orig_target.clone();
