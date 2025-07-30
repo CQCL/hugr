@@ -73,38 +73,34 @@ impl<TN> NodeLinkingDirective<TN> {
 }
 
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
+/// ALAN TODO accessor methods!
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NameLinkingPolicy {
-    /// Identify public functions in source and target Hugr by name.
-    /// Multiple FuncDecls, and FuncDecl+FuncDefn pairs, with the same name and signature
-    /// will be combined, taking the FuncDefn from either Hugr.
-    LinkByName {
-        /// If true, all private functions from the source hugr are inserted into the target.
-        /// (Since these are private, name conflicts do not make the Hugr invalid.)
-        /// If false, instead edges from said private functions to any inserted parts
-        /// of the source Hugr will be broken, making the target Hugr invalid.
-        copy_private_funcs: bool,
-        /// How to handle cases where the same (public) name is present in both
-        /// inserted and target Hugr but with different signatures.
-        /// `true` means an error is raised and nothing is added to the target Hugr.
-        /// `false` means the new function will be added alongside the existing one
-        ///   - this will give an invalid Hugr (duplicate names).
-        // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
-        //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
-        //   * use (or replace) the existing function --> incompatible ports
-        // but given you'll need to patch the Hugr up afterwards, you can get there just
-        // by setting this to `false` (and maybe removing one FuncDefn), or via explicit node linking.
-        error_on_conflicting_sig: bool,
-        /// How to handle cases where both target and inserted Hugr have a FuncDefn
-        /// with the same name and signature.
-        multi_impls: MultipleImplHandling,
-        // TODO Renames to apply to public functions in the inserted Hugr. These take effect
-        // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
-        // rename_map: HashMap<String, String>
-    },
+pub struct NameLinkingPolicy {
+    /// If true, all private functions from the source hugr are inserted into the target.
+    /// (Since these are private, name conflicts do not make the Hugr invalid.)
+    /// If false, instead edges from said private functions to any inserted parts
+    /// of the source Hugr will be broken, making the target Hugr invalid.
+    copy_private_funcs: bool,
+    /// How to handle cases where the same (public) name is present in both
+    /// inserted and target Hugr but with different signatures.
+    /// `true` means an error is raised and nothing is added to the target Hugr.
+    /// `false` means the new function will be added alongside the existing one
+    ///   - this will give an invalid Hugr (duplicate names).
+    // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
+    //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
+    //   * use (or replace) the existing function --> incompatible ports
+    // but given you'll need to patch the Hugr up afterwards, you can get there just
+    // by setting this to `false` (and maybe removing one FuncDefn), or via explicit node linking.
+    error_on_conflicting_sig: bool,
+    /// How to handle cases where both target and inserted Hugr have a FuncDefn
+    /// with the same name and signature.
+    multi_impls: MultipleImplHandling,
+    // TODO Renames to apply to public functions in the inserted Hugr. These take effect
+    // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
+    // rename_map: HashMap<String, String>
 }
 
-/// What to do when [NameLinkingPolicy::LinkByName] finds both target and inserted Hugr
+/// What to do when both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum MultipleImplHandling {
@@ -166,37 +162,35 @@ impl NameLinkingPolicy {
         let existing = gather_existing(target);
         let mut res = NodeLinkingPolicy::new();
 
+        let NameLinkingPolicy {
+            copy_private_funcs,
+            error_on_conflicting_sig,
+            multi_impls,
+        } = self;
         for n in source.children(source.module_root()) {
             if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
                 let mut dirv = NodeLinkingDirective::add();
-                match self {
-                    NameLinkingPolicy::LinkByName {
-                        copy_private_funcs,
-                        error_on_conflicting_sig,
-                        multi_impls,
-                    } => {
-                        if !vis.is_public() {
-                            if !copy_private_funcs {
-                                continue;
-                            };
-                        } else if let Some((ex_ns, ex_sig)) = existing.get(name) {
-                            if sig == *ex_sig {
-                                dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
-                            } else if *error_on_conflicting_sig {
-                                return Err(NameLinkingError::Signatures {
-                                    name: name.clone(),
-                                    src_node: n,
-                                    src_sig: Box::new(sig.clone()),
-                                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
-                                    tgt_sig: Box::new((*ex_sig).clone()),
-                                });
-                            }
-                        };
+                if !vis.is_public() {
+                    if !copy_private_funcs {
+                        continue;
+                    };
+                } else if let Some((ex_ns, ex_sig)) = existing.get(name) {
+                    if sig == *ex_sig {
+                        dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
+                    } else if *error_on_conflicting_sig {
+                        return Err(NameLinkingError::Signatures {
+                            name: name.clone(),
+                            src_node: n,
+                            src_sig: Box::new(sig.clone()),
+                            tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
+                            tgt_sig: Box::new((*ex_sig).clone()),
+                        });
                     }
                 };
                 res.insert(n, dirv);
             }
         }
+
         Ok(res)
     }
 }
@@ -385,8 +379,8 @@ mod test {
                 MultipleImplHandling::UseExisting,
                 MultipleImplHandling::UseBoth,
             ] {
-                let pol = |copy_private_funcs| NameLinkingPolicy::LinkByName {
-                    copy_private_funcs,
+                let mut pol = NameLinkingPolicy {
+                    copy_private_funcs: true,
                     error_on_conflicting_sig,
                     multi_impls,
                 };
@@ -394,7 +388,7 @@ mod test {
                 let res = target.insert_from_view_link_names(
                     Some(target.entrypoint()),
                     &inserted,
-                    pol(true),
+                    pol.clone(),
                 );
                 assert_eq!(
                     res.err().unwrap(),
@@ -405,8 +399,9 @@ mod test {
                 );
                 assert_eq!(target, orig_target);
 
+                pol.copy_private_funcs = false;
                 target
-                    .insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), pol(false))
+                    .insert_hugr_link_names(Some(target.entrypoint()), inserted.clone(), pol)
                     .unwrap();
                 target.validate().unwrap();
                 let (decls, defns) = list_decls_defns(&target);
@@ -447,13 +442,13 @@ mod test {
         let new_sig = Signature::new_endo(INT_TYPES[3].clone());
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        let mk_pol = |error_on_conflicting_sig| NameLinkingPolicy::LinkByName {
+        let mut pol = NameLinkingPolicy {
             copy_private_funcs: true,
-            error_on_conflicting_sig,
+            error_on_conflicting_sig: true,
             multi_impls: MultipleImplHandling::ErrorDontInsert,
         };
         let mut host = orig_host.clone();
-        let res = host.insert_hugr_link_names(None, inserted.clone(), mk_pol(true));
+        let res = host.insert_hugr_link_names(None, inserted.clone(), pol.clone());
         assert_eq!(host, orig_host); // Did nothing
         assert_eq!(
             res,
@@ -466,9 +461,8 @@ mod test {
             })
         );
 
-        let node_map = host
-            .insert_hugr_link_names(None, inserted, mk_pol(false))
-            .unwrap();
+        pol.error_on_conflicting_sig = false;
+        let node_map = host.insert_hugr_link_names(None, inserted, pol).unwrap();
         assert_eq!(
             host.validate(),
             Err(ValidationError::DuplicateExport {
@@ -500,7 +494,7 @@ mod test {
         let res = host.insert_hugr_link_names(
             None,
             inserted,
-            NameLinkingPolicy::LinkByName {
+            NameLinkingPolicy {
                 copy_private_funcs: true,
                 error_on_conflicting_sig: false,
                 multi_impls,

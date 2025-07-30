@@ -247,10 +247,10 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// * If [NameLinkingPolicy::LinkByName::error_on_conflicting_sig] is true and there are public
+    /// * If [NameLinkingPolicy::error_on_conflicting_sig] is true and there are public
     ///   functions with the same name but different signatures
     ///
-    /// * If [NameLinkingPolicy::LinkByName] is used with [MultipleImplHandling::ErrorDontInsert]
+    /// * If [MultipleImplHandling::ErrorDontInsert] is used
     ///   and both `self` and `other` have public [FuncDefn]s with the same name and signature
     ///
     /// * If `parent` is not None and the `other.entrypoint()` is (or is within) a function
@@ -337,10 +337,10 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// * If [NameLinkingPolicy::LinkByName::error_on_conflicting_sig] is true and there are public
+    /// * If [NameLinkingPolicy::error_on_conflicting_sig] is true and there are public
     ///   functions with the same name but different signatures
     ///
-    /// * If [NameLinkingPolicy::LinkByName] is used with [MultipleImplHandling::ErrorDontInsert]
+    /// * If [MultipleImplHandling::ErrorDontInsert] is used
     ///   and both `self` and `other` have public [FuncDefn]s with the same name and signature
     ///
     /// * If `parent` is not None and the `other.entrypoint()` is (or is within) a function
