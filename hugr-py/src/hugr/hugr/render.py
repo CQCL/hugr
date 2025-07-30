@@ -321,11 +321,32 @@ class DotRenderer:
             case _:
                 assert_never(kind)
 
-        if src_port.node in self.nodes or tgt_port.node in self.nodes:
-            graph.edge(
-                self._out_port_name(src_port),
-                self._in_port_name(tgt_port),
-                label=label,
-                color=color,
-                **edge_attr,
+        src = self._out_port_name(src_port)
+        tgt = self._in_port_name(tgt_port)
+
+        unknown_src = src_port.node not in self.nodes
+        unknown_tgt = tgt_port.node not in self.nodes
+        if unknown_src and unknown_tgt:
+            return
+        if unknown_src:
+            src = f"{src_port.node.idx}"
+            html_label = self._format_html_label(
+                node_back_color=self.config.palette.node,
+                node_label=f"{src_port.node}",
+                node_data="",
+                border_colour=self.config.palette.background,
+                border_width="1",
             )
+            graph.node(src, label=f"<{html_label}>", shape="plain")
+        if unknown_tgt:
+            tgt = f"{tgt_port.node.idx}"
+            html_label = self._format_html_label(
+                node_back_color=self.config.palette.node,
+                node_label=f"{tgt_port.node}",
+                node_data="",
+                border_colour=self.config.palette.background,
+                border_width="1",
+            )
+            graph.node(tgt, label=f"<{html_label}>", shape="plain")
+
+        graph.edge(src, tgt, label=label, color=color, **edge_attr)
