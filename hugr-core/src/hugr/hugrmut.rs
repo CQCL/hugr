@@ -669,8 +669,6 @@ fn insert_hugr_internal<H: HugrView>(
                 let new_node = *node_map.get(&ch).unwrap();
                 for replace in replace {
                     replace_static_src(hugr, replace, new_node);
-                    assert_eq!("ALAN", "NO TEST COVERAGE"); // when there is, following line will break, remove:
-                    hugr.remove_subtree(replace);
                 }
             }
         }
@@ -770,6 +768,7 @@ mod test {
     use crate::extension::PRELUDE;
     use crate::extension::prelude::{Noop, usize_t};
     use crate::hugr::ValidationError;
+    use crate::ops::OpTag;
     use crate::ops::handle::NodeHandle;
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
     use crate::types::Signature;
@@ -926,6 +925,36 @@ mod test {
 
     #[test]
     fn insert_link_nodes_replace() {
+        let (mut host, defn, decl) = dfg_calling_defn_decl();
+        assert_eq!(
+            host.children(host.module_root())
+                .map(|n| host.get_optype(n).tag())
+                .collect_vec(),
+            vec![OpTag::FuncDefn, OpTag::FuncDefn, OpTag::Function]
+        );
+        let insert = simple_dfg_hugr();
+        let pol = HashMap::from([(
+            insert
+                .children(insert.module_root())
+                .exactly_one()
+                .ok()
+                .unwrap(),
+            NodeLinkingDirective::Add {
+                replace: vec![defn.node(), decl.node()],
+            },
+        )]);
+        host.insert_hugr_link_nodes(None, insert, pol).unwrap();
+        host.validate().unwrap();
+        assert_eq!(
+            host.children(host.module_root())
+                .map(|n| host.get_optype(n).tag())
+                .collect_vec(),
+            vec![OpTag::FuncDefn; 2]
+        );
+    }
+
+    #[test]
+    fn insert_link_nodes_use_existing() {
         let (insert, defn, decl) = dfg_calling_defn_decl();
         let mut chmap =
             HashMap::from([defn.node(), decl.node()].map(|n| (n, NodeLinkingDirective::add())));
