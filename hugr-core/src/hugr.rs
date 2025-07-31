@@ -1,9 +1,9 @@
 //! The Hugr data structure, and its basic component handles.
 
 pub mod hugrmut;
-
 pub(crate) mod ident;
 pub mod internal;
+pub mod linking;
 pub mod patch;
 pub mod serialize;
 pub mod validate;
