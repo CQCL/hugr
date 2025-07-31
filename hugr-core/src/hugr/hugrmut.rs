@@ -245,9 +245,11 @@ pub trait HugrMut: HugrMutInternals {
         }
     }
 
-    /// Insert another Hugr into this one. The entrypoint-subtree is placed under the
-    /// specified `parent` in this Hugr, and `children` of the Module root of `other`
-    /// are either inserted with their subtrees or linked according to their [NodeLinkingDirective].
+    /// Insert another Hugr into this one, with linking directives specified by Node.
+    ///
+    /// If `parent` is non-None, then `other`'s entrypoint-subtree is placed under it.
+    /// `children` of the Module root of `other` may also be inserted with their
+    /// subtrees or linked according to their [NodeLinkingDirective].
     ///
     /// # Errors
     ///
@@ -290,10 +292,11 @@ pub trait HugrMut: HugrMutInternals {
         }
     }
 
-    /// Copy nodes from another hugr into this one. The entrypoint-subtree of `other`
-    /// is copied under the specified `parent` of this; each element of `children`,
-    /// which must be a child of `other.module_root()`, will be copied with its subtree,
-    /// or linked according to its [NodeLinkingDirective].
+    /// Copy nodes from another Hugr into this one, with linking directives specified by Node.
+    ///
+    /// If `parent` is non-None, then `other`'s entrypoint-subtree is copied under it.
+    /// `children` of the Module root of `other` may also be inserted with their
+    /// subtrees or linked according to their [NodeLinkingDirective].
     ///
     /// # Errors
     ///
