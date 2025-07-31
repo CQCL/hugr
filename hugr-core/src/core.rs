@@ -34,7 +34,7 @@ pub struct Node {
 )]
 #[serde(transparent)]
 pub struct Port {
-    offset: portgraph::PortOffset,
+    offset: portgraph::PortOffset<u32>,
 }
 
 /// A trait for getting the undirected index of a port.
@@ -139,7 +139,7 @@ impl Port {
 
     /// Returns the port as a portgraph `PortOffset`.
     #[inline]
-    pub(crate) fn pg_offset(self) -> portgraph::PortOffset {
+    pub(crate) fn pg_offset(self) -> portgraph::PortOffset<u32> {
         self.offset
     }
 }

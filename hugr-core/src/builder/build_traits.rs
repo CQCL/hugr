@@ -87,9 +87,22 @@ pub trait Container {
     /// Insert a HUGR. Its entrypoint will become a child of the container; other
     /// children of the Module root will be added to the Module root of the Hugr
     /// being built. (See [Dataflow::add_hugr_with_wires_link_nodes]).
+    ///
+    /// To insert an arbitrary region of a HUGR, use [`Container::add_hugr_region`].
     fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
         let parent = self.container_node();
         self.hugr_mut().insert_hugr(parent, child)
+    }
+
+    /// Insert a HUGR region as a child of the container. The subtree of `region`
+    /// will be inserted into the container; other children of the Module root will
+    /// be added to the Module root of the Hugr being built.
+    ///
+    /// To insert the entrypoint region of a HUGR, use [`Container::add_hugr`].
+    #[deprecated(note = "Set child.entrypoint and then call add_hugr")]
+    fn add_hugr_region(&mut self, mut child: Hugr, region: Node) -> InsertionResult {
+        child.set_entrypoint(region);
+        self.add_hugr(child)
     }
 
     /// Insert a copy of a HUGR as a child of the container.
@@ -208,6 +221,10 @@ pub trait Dataflow: Container {
     /// of the module root of `hugr` will be added to the module root being built.
     /// (See [Self::add_hugr_with_wires_link_nodes].)
     ///
+    /// Inserts everything from the entrypoint region of the HUGR.
+    /// See [`Dataflow::add_hugr_region_with_wires`] for a generic version that allows
+    /// inserting a region other than the entrypoint.
+    ///
     /// # Errors
     ///
     /// This function will return an error if there is an error when adding the
@@ -219,6 +236,26 @@ pub trait Dataflow: Container {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let node = self.add_hugr(hugr).inserted_entrypoint;
         wire_ins_return_outs(input_wires, node, self)
+    }
+
+    /// Insert a hugr-defined op to the sibling graph, wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node.
+    ///
+    /// `region` must be a node in the `hugr`. See [`Dataflow::add_hugr_with_wires`]
+    /// for a helper that inserts the entrypoint region to the HUGR.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// node.
+    fn add_hugr_region_with_wires(
+        &mut self,
+        mut hugr: Hugr,
+        region: Node,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        hugr.set_entrypoint(region);
+        self.add_hugr_with_wires(hugr, input_wires)
     }
 
     /// Insert a hugr, adding its entrypoint to the sibling graph and wiring up the

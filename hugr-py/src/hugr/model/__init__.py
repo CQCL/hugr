@@ -5,8 +5,20 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Protocol
 
+from semver import Version
+
 import hugr._hugr as rust
 from hugr.tys import Visibility
+
+
+def _current_version() -> Version:
+    """Get the current version of the HUGR model."""
+    (major, minor, patch) = rust.current_model_version()
+    return Version(major=major, minor=minor, patch=patch)
+
+
+# The current version of the HUGR model.
+CURRENT_VERSION: Version = _current_version()
 
 
 class Term(Protocol):
@@ -291,3 +303,8 @@ class Package:
     def from_bytes(b: bytes) -> "Package":
         """Read a package from its binary representation."""
         return rust.bytes_to_package(b)
+
+    @property
+    def version(self) -> Version:
+        """Returns the model version used to encode this package."""
+        return CURRENT_VERSION

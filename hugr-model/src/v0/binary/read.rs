@@ -1,6 +1,6 @@
 use crate::capnp::hugr_v0_capnp as hugr_capnp;
-use crate::v0 as model;
 use crate::v0::table;
+use crate::{CURRENT_VERSION, v0 as model};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::io::BufRead;
@@ -8,10 +8,20 @@ use std::io::BufRead;
 /// An error encountered while deserialising a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
+#[display("Error reading a HUGR model payload.")]
 pub enum ReadError {
     #[from(forward)]
     /// An error encountered while decoding a model from a `capnproto` buffer.
     DecodingError(capnp::Error),
+
+    /// The file could not be read due to a version mismatch.
+    #[display("Can not read file with version {actual} (tooling version {current}).")]
+    VersionError {
+        /// The current version of the hugr-model format.
+        current: semver::Version,
+        /// The version of the hugr-model format in the file.
+        actual: semver::Version,
+    },
 }
 
 type ReadResult<T> = Result<T, ReadError>;
@@ -57,6 +67,15 @@ fn read_package<'a>(
     bump: &'a Bump,
     reader: hugr_capnp::package::Reader,
 ) -> ReadResult<table::Package<'a>> {
+    let version = read_version(reader.get_version()?)?;
+
+    if version.major != CURRENT_VERSION.major || version.minor > CURRENT_VERSION.minor {
+        return Err(ReadError::VersionError {
+            current: CURRENT_VERSION.clone(),
+            actual: version,
+        });
+    }
+
     let modules = reader
         .get_modules()?
         .iter()
@@ -64,6 +83,12 @@ fn read_package<'a>(
         .collect::<ReadResult<_>>()?;
 
     Ok(table::Package { modules })
+}
+
+fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<semver::Version> {
+    let major = reader.get_major();
+    let minor = reader.get_minor();
+    Ok(semver::Version::new(major as u64, minor as u64, 0))
 }
 
 fn read_module<'a>(
@@ -190,6 +215,16 @@ fn read_region_scope(reader: hugr_capnp::region_scope::Reader) -> ReadResult<tab
     Ok(table::RegionScope { links, ports })
 }
 
+impl From<hugr_capnp::Visibility> for Option<model::Visibility> {
+    fn from(value: hugr_capnp::Visibility) -> Self {
+        match value {
+            hugr_capnp::Visibility::Unspecified => None,
+            hugr_capnp::Visibility::Private => Some(model::Visibility::Private),
+            hugr_capnp::Visibility::Public => Some(model::Visibility::Public),
+        }
+    }
+}
+
 /// (Only) if `constraints` are None, then they are read from the `reader`
 fn read_symbol<'a>(
     bump: &'a Bump,
@@ -197,11 +232,7 @@ fn read_symbol<'a>(
     constraints: Option<&'a [table::TermId]>,
 ) -> ReadResult<&'a mut table::Symbol<'a>> {
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
-    let visibility = match reader.get_visibility() {
-        Ok(hugr_capnp::Visibility::Private) => model::Visibility::Private,
-        Ok(hugr_capnp::Visibility::Public) => model::Visibility::Public,
-        Err(_) => model::Visibility::default(),
-    };
+    let visibility = reader.get_visibility()?.into();
     let visibility = bump.alloc(visibility);
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {

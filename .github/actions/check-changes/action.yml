@@ -1,0 +1,55 @@
+name: Detect changed files.
+description: Checks if any relevant files have changed in the current pull request or commit. Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
+
+# The file filters are defined in `.github/change-filters.yml`.
+#
+# Requires
+# ```
+# permissions:
+#   pull-requests: read
+# ```
+
+# Set job outputs to values from filter step
+# These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
+outputs:
+  extensions:
+    description: "The extension definitions have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.std-extensions == 'true' }}
+  llvm:
+    description: "hugr-llvm files have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.llvm == 'true' }}
+  model:
+    description: "Model files have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.model == 'true' }}
+  rust:
+    description: "Rust files have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.rust == 'true' }}
+  python:
+    description: "Python files have changed"
+    value: ${{ steps.override.outputs.out == 'true' || steps.change-filters.outputs.python == 'true' }}
+
+runs:
+  using: composite
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
+  steps:
+    - name: Override label
+      shell: bash
+      id: override
+      run: |
+        echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
+        if [ "$OVERRIDE_LABEL" == "true" ]; then
+          echo "Overriding due to label 'run-ci-checks'"
+          echo "out=true" >> $GITHUB_OUTPUT
+        elif [ "$DEFAULT_BRANCH" == "true" ]; then
+          echo "Overriding due to running on the default branch"
+          echo "out=true" >> $GITHUB_OUTPUT
+        fi
+      env:
+        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
+        DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
+    - if: steps.override.outputs.out != 'true'
+      uses: dorny/paths-filter@v3
+      id: change-filters
+      with:
+        filters: .github/change-filters.yml

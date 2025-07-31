@@ -1,5 +1,29 @@
 # Changelog
 
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.21.0...hugr-model-v0.22.0) - 2025-07-24
+
+### New Features
+
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+- Version number in hugr binary format. ([#2468](https://github.com/CQCL/hugr/pull/2468))
+- Use semver crate for -model version, and include in docs ([#2471](https://github.com/CQCL/hugr/pull/2471))
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.2...hugr-model-v0.21.0) - 2025-07-09
+
+### Bug Fixes
+
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+- [**breaking**] Fix panic in model resolver when variable is used outside of symbol. ([#2362](https://github.com/CQCL/hugr/pull/2362))
+- Order hints on input and output nodes. ([#2422](https://github.com/CQCL/hugr/pull/2422))
+
+### New Features
+
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] Add Visibility to FuncDefn/FuncDecl. ([#2143](https://github.com/CQCL/hugr/pull/2143))
+- [**breaking**] hugr-model use explicit Option<Visibility>, with ::Unspecified in capnp ([#2424](https://github.com/CQCL/hugr/pull/2424))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-model-v0.20.1...hugr-model-v0.20.2) - 2025-06-25
 
 ### New Features

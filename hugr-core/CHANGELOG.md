@@ -1,5 +1,65 @@
 # Changelog
 
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.21.0...hugr-core-v0.22.0) - 2025-07-24
+
+### Bug Fixes
+
+- Ensure SumTypes have the same json encoding in -rs and -py ([#2465](https://github.com/CQCL/hugr/pull/2465))
+
+### New Features
+
+- Export entrypoint metadata in Python and fix bug in import ([#2434](https://github.com/CQCL/hugr/pull/2434))
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- [**breaking**] Use binary envelopes for operation lower_func encoding  ([#2447](https://github.com/CQCL/hugr/pull/2447))
+- [**breaking**] Update portgraph dependency to 0.15 ([#2455](https://github.com/CQCL/hugr/pull/2455))
+- Detect and fail on unrecognised envelope flags ([#2453](https://github.com/CQCL/hugr/pull/2453))
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+- [**breaking**] Add `insert_region` to HugrMut ([#2463](https://github.com/CQCL/hugr/pull/2463))
+- Non-region entrypoints in `hugr-model`. ([#2467](https://github.com/CQCL/hugr/pull/2467))
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.2...hugr-core-v0.21.0) - 2025-07-09
+
+### Bug Fixes
+
+- Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/pull/2324))
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+- Use List instead of Tuple in conversions for TypeArg/TypeRow ([#2378](https://github.com/CQCL/hugr/pull/2378))
+- Do extension resolution on loaded extensions from the model format ([#2389](https://github.com/CQCL/hugr/pull/2389))
+- Make JSON Schema checks actually work again ([#2412](https://github.com/CQCL/hugr/pull/2412))
+- Order hints on input and output nodes. ([#2422](https://github.com/CQCL/hugr/pull/2422))
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+- [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- *(persistent)* Add serialisation for CommitStateSpace ([#2344](https://github.com/CQCL/hugr/pull/2344))
+- add TryFrom impls for TypeArg/TypeRow ([#2366](https://github.com/CQCL/hugr/pull/2366))
+- Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
+- Open lists and tuples in `Term` ([#2360](https://github.com/CQCL/hugr/pull/2360))
+- Call `FunctionBuilder::add_{in,out}put` for any AsMut<Hugr> ([#2376](https://github.com/CQCL/hugr/pull/2376))
+- Add Root checked methods to DataflowParentID ([#2382](https://github.com/CQCL/hugr/pull/2382))
+- Add PersistentWire type ([#2361](https://github.com/CQCL/hugr/pull/2361))
+- Add `BorrowArray` extension ([#2395](https://github.com/CQCL/hugr/pull/2395))
+- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
+- [**breaking**] Add Visibility to FuncDefn/FuncDecl. ([#2143](https://github.com/CQCL/hugr/pull/2143))
+- *(per)* [**breaking**] Support empty wires in commits ([#2349](https://github.com/CQCL/hugr/pull/2349))
+- [**breaking**] hugr-model use explicit Option<Visibility>, with ::Unspecified in capnp ([#2424](https://github.com/CQCL/hugr/pull/2424))
+
+### Refactor
+
+- [**breaking**] move PersistentHugr into separate crate ([#2277](https://github.com/CQCL/hugr/pull/2277))
+- [**breaking**] remove deprecated runtime extension errors ([#2369](https://github.com/CQCL/hugr/pull/2369))
+- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
+
+### Testing
+
+- Check hugr json serializations against the schema (again) ([#2216](https://github.com/CQCL/hugr/pull/2216))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.20.1...hugr-core-v0.20.2) - 2025-06-25
 
 ### Documentation

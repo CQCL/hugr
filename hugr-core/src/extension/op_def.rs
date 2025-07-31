@@ -12,7 +12,7 @@ use super::{
 };
 
 use crate::Hugr;
-use crate::envelope::serde_with::AsStringEnvelope;
+use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
@@ -268,8 +268,12 @@ impl Debug for SignatureFunc {
 
 /// Different ways that an [OpDef] can lower operation nodes i.e. provide a Hugr
 /// that implements the operation using a set of other extensions.
+///
+/// Does not implement [`serde::Deserialize`] directly since the serde error for
+/// untagged enums is unhelpful. Use [`deserialize_lower_funcs`] with
+/// [`serde(deserialize_with = "deserialize_lower_funcs")] instead.
 #[serde_as]
-#[derive(serde::Deserialize, serde::Serialize)]
+#[derive(serde::Serialize)]
 #[serde(untagged)]
 pub enum LowerFunc {
     /// Lowering to a fixed Hugr. Since this cannot depend upon the [TypeArg]s,
@@ -281,13 +285,41 @@ pub enum LowerFunc {
         /// [OpDef]
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
-        #[serde_as(as = "Box<AsStringEnvelope>")]
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
         hugr: Box<Hugr>,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available extensions.
     #[serde(skip)]
     CustomFunc(Box<dyn CustomLowerFunc>),
+}
+
+/// A function for deserializing sequences of [`LowerFunc::FixedHugr`].
+///
+/// We could let serde deserialize [`LowerFunc`] as-is, but if the LowerFunc
+/// deserialization fails it just returns an opaque "data did not match any
+/// variant of untagged enum LowerFunc" error. This function will return the
+/// internal errors instead.
+pub fn deserialize_lower_funcs<'de, D>(deserializer: D) -> Result<Vec<LowerFunc>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[serde_as]
+    #[derive(serde::Deserialize)]
+    struct FixedHugrDeserializer {
+        pub extensions: ExtensionSet,
+        #[serde_as(as = "Box<AsBinaryEnvelope>")]
+        pub hugr: Box<Hugr>,
+    }
+
+    let funcs: Vec<FixedHugrDeserializer> = serde::Deserialize::deserialize(deserializer)?;
+    Ok(funcs
+        .into_iter()
+        .map(|f| LowerFunc::FixedHugr {
+            extensions: f.extensions,
+            hugr: f.hugr,
+        })
+        .collect())
 }
 
 impl Debug for LowerFunc {
@@ -322,7 +354,11 @@ pub struct OpDef {
     signature_func: SignatureFunc,
     // Some operations cannot lower themselves and tools that do not understand them
     // can only treat them as opaque/black-box ops.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "deserialize_lower_funcs"
+    )]
     pub(crate) lower_funcs: Vec<LowerFunc>,
 
     /// Operations can optionally implement [`ConstFold`] to implement constant folding.

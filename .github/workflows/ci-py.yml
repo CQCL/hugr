@@ -23,21 +23,17 @@ jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
   changes:
-    name: Check for changes in Python files
+    name: Check for changes
     runs-on: ubuntu-latest
-    # Required permissions
     permissions:
       pull-requests: read
-    # Set job outputs to values from filter step
     outputs:
-      python: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.python }}
-      extensions: ${{ github.ref_name == github.event.repository.default_branch || steps.filter.outputs.std-extensions }}
+      python: ${{ steps.filter.outputs.python }}
+      extensions: ${{ steps.filter.outputs.llvm }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: ./.github/actions/check-changes
         id: filter
-        with:
-          filters: .github/change-filters.yml
 
   check:
     needs: changes

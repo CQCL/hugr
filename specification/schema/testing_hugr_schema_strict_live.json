@@ -345,6 +345,25 @@
             "title": "Const",
             "type": "object"
         },
+        "ConstParam": {
+            "additionalProperties": false,
+            "properties": {
+                "tp": {
+                    "const": "ConstType",
+                    "default": "ConstType",
+                    "title": "Tp",
+                    "type": "string"
+                },
+                "ty": {
+                    "$ref": "#/$defs/Type"
+                }
+            },
+            "required": [
+                "ty"
+            ],
+            "title": "ConstParam",
+            "type": "object"
+        },
         "CustomConst": {
             "additionalProperties": false,
             "properties": {
@@ -581,6 +600,7 @@
             "type": "object"
         },
         "FixedHugr": {
+            "description": "Fixed HUGR used to define the lowering of an operation.\n\nArgs:\n    extensions: Extensions used in the HUGR.\n    hugr: Base64-encoded HUGR envelope.",
             "properties": {
                 "extensions": {
                     "items": {
@@ -1462,17 +1482,30 @@
             "description": "A Sum variant For any Sum type where this value meets the type of the variant indicated by the tag.",
             "properties": {
                 "v": {
-                    "const": "Sum",
                     "default": "Sum",
+                    "enum": [
+                        "Sum",
+                        "Tuple"
+                    ],
                     "title": "ValueTag",
                     "type": "string"
                 },
                 "tag": {
-                    "title": "Tag",
+                    "default": 0,
+                    "title": "VariantTag",
                     "type": "integer"
                 },
                 "typ": {
-                    "$ref": "#/$defs/SumType"
+                    "anyOf": [
+                        {
+                            "$ref": "#/$defs/SumType"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ],
+                    "default": null,
+                    "title": "SumType"
                 },
                 "vs": {
                     "items": {
@@ -1483,8 +1516,6 @@
                 }
             },
             "required": [
-                "tag",
-                "typ",
                 "vs"
             ],
             "title": "SumValue",
@@ -1694,30 +1725,6 @@
             "title": "TupleParam",
             "type": "object"
         },
-        "TupleValue": {
-            "additionalProperties": false,
-            "description": "A constant tuple value.",
-            "properties": {
-                "v": {
-                    "const": "Tuple",
-                    "default": "Tuple",
-                    "title": "ValueTag",
-                    "type": "string"
-                },
-                "vs": {
-                    "items": {
-                        "$ref": "#/$defs/Value"
-                    },
-                    "title": "Vs",
-                    "type": "array"
-                }
-            },
-            "required": [
-                "vs"
-            ],
-            "title": "TupleValue",
-            "type": "object"
-        },
         "Type": {
             "description": "A HUGR type.",
             "discriminator": {
@@ -1877,6 +1884,7 @@
                 "mapping": {
                     "BoundedNat": "#/$defs/BoundedNatParam",
                     "Bytes": "#/$defs/BytesParam",
+                    "ConstType": "#/$defs/ConstParam",
                     "Float": "#/$defs/FloatParam",
                     "List": "#/$defs/ListParam",
                     "String": "#/$defs/StringParam",
@@ -1906,6 +1914,9 @@
                 },
                 {
                     "$ref": "#/$defs/TupleParam"
+                },
+                {
+                    "$ref": "#/$defs/ConstParam"
                 }
             ],
             "required": [
@@ -1999,7 +2010,7 @@
                     "Extension": "#/$defs/CustomValue",
                     "Function": "#/$defs/FunctionValue",
                     "Sum": "#/$defs/SumValue",
-                    "Tuple": "#/$defs/TupleValue"
+                    "Tuple": "#/$defs/SumValue"
                 },
                 "propertyName": "v"
             },
@@ -2009,9 +2020,6 @@
                 },
                 {
                     "$ref": "#/$defs/FunctionValue"
-                },
-                {
-                    "$ref": "#/$defs/TupleValue"
                 },
                 {
                     "$ref": "#/$defs/SumValue"

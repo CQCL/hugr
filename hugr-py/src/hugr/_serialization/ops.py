@@ -7,10 +7,10 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
 
+from hugr import tys
 from hugr.hugr.node_port import (
     NodeIdx,  # noqa: TCH001 # pydantic needs this alias in scope
 )
-from hugr.tys import Visibility  # noqa: TCH001 # pydantic needs this in scope
 from hugr.utils import deser_it
 
 from . import tys as stys
@@ -76,7 +76,7 @@ class FuncDefn(BaseOp):
 
     name: str
     signature: PolyFuncType
-    visibility: Visibility = Field(default="Private")
+    visibility: tys.Visibility = Field(default="Private")
 
     def deserialize(self) -> ops.FuncDefn:
         poly_func = self.signature.deserialize()
@@ -95,7 +95,7 @@ class FuncDecl(BaseOp):
     op: Literal["FuncDecl"] = "FuncDecl"
     name: str
     signature: PolyFuncType
-    visibility: Visibility = Field(default="Public")
+    visibility: tys.Visibility = Field(default="Public")
 
     def deserialize(self) -> ops.FuncDecl:
         return ops.FuncDecl(
@@ -141,25 +141,15 @@ class FunctionValue(BaseValue):
         return val.Function(Hugr.from_str(self.hugr))
 
 
-class TupleValue(BaseValue):
-    """A constant tuple value."""
-
-    v: Literal["Tuple"] = Field(default="Tuple", title="ValueTag")
-    vs: list[Value]
-
-    def deserialize(self) -> val.Value:
-        return val.Tuple(*deser_it(v.root for v in self.vs))
-
-
 class SumValue(BaseValue):
     """A Sum variant.
 
     For any Sum type where this value meets the type of the variant indicated by the tag
     """
 
-    v: Literal["Sum"] = Field(default="Sum", title="ValueTag")
-    tag: int
-    typ: SumType
+    v: Literal["Sum", "Tuple"] = Field(default="Sum", title="ValueTag")
+    tag: int = Field(default=0, title="VariantTag")
+    typ: SumType | None = Field(default=None, title="SumType")
     vs: list[Value]
     model_config = ConfigDict(
         json_schema_extra={
@@ -171,15 +161,22 @@ class SumValue(BaseValue):
     )
 
     def deserialize(self) -> val.Value:
-        return val.Sum(
-            self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
-        )
+        if self.typ is None:
+            # Backwards compatibility of "Tuple" values
+            assert self.tag == 0, "Sum type must be provided if tag is not 0"
+            vs = deser_it(v.root for v in self.vs)
+            typ = tys.Sum(variant_rows=[[v.type_() for v in vs]])
+            return val.Sum(0, typ, vs)
+        else:
+            return val.Sum(
+                self.tag, self.typ.deserialize(), deser_it(v.root for v in self.vs)
+            )
 
 
 class Value(RootModel):
     """A constant Value."""
 
-    root: CustomValue | FunctionValue | TupleValue | SumValue = Field(discriminator="v")
+    root: CustomValue | FunctionValue | SumValue = Field(discriminator="v")
 
     model_config = ConfigDict(json_schema_extra={"required": ["v"]})
 
@@ -606,6 +603,5 @@ tys_model_rebuild(dict(classes))
 
 from hugr import (  # noqa: E402 # needed to avoid circular imports
     ops,
-    tys,
     val,
 )

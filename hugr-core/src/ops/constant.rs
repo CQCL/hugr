@@ -1,6 +1,7 @@
 //! Constant value definitions.
 
 mod custom;
+mod serialize;
 
 use std::borrow::Cow;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
@@ -11,6 +12,7 @@ use super::{OpTag, OpType};
 use crate::envelope::serde_with::AsStringEnvelope;
 use crate::types::{CustomType, EdgeKind, Signature, SumType, SumTypeError, Type, TypeRow};
 use crate::{Hugr, HugrView};
+use serialize::SerialSum;
 
 use delegate::delegate;
 use itertools::Itertools;
@@ -108,16 +110,6 @@ impl AsRef<Value> for Const {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-struct SerialSum {
-    #[serde(default)]
-    tag: usize,
-    #[serde(rename = "vs")]
-    values: Vec<Value>,
-    #[serde(default, rename = "typ")]
-    sum_type: Option<SumType>,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "SerialSum")]
 #[serde(into = "SerialSum")]
 /// A Sum variant, with a tag indicating the index of the variant and its
@@ -157,43 +149,6 @@ pub(crate) fn maybe_hash_values<H: Hasher>(vals: &[Value], st: &mut H) -> bool {
     vals.iter().all(|e| e.try_hash(&mut hasher)) && {
         st.write_u64(hasher.finish());
         true
-    }
-}
-
-impl TryFrom<SerialSum> for Sum {
-    type Error = &'static str;
-
-    fn try_from(value: SerialSum) -> Result<Self, Self::Error> {
-        let SerialSum {
-            tag,
-            values,
-            sum_type,
-        } = value;
-
-        let sum_type = if let Some(sum_type) = sum_type {
-            sum_type
-        } else {
-            if tag != 0 {
-                return Err("Sum type must be provided if tag is not 0");
-            }
-            SumType::new_tuple(values.iter().map(Value::get_type).collect_vec())
-        };
-
-        Ok(Self {
-            tag,
-            values,
-            sum_type,
-        })
-    }
-}
-
-impl From<Sum> for SerialSum {
-    fn from(value: Sum) -> Self {
-        Self {
-            tag: value.tag,
-            values: value.values,
-            sum_type: Some(value.sum_type),
-        }
     }
 }
 
