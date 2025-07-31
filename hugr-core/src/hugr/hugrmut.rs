@@ -179,7 +179,7 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert (the entrypoint-subtree) of another hugr into this one, under a given parent node.
+    /// Insert (the entrypoint-subtree of) another hugr into this one, under a given parent node.
     /// Unless `other.entrypoint() == other.module_root()`, then any children of
     /// `other.module_root()` except the unique ancestor of `other.entrypoint()` will also be
     /// inserted under the Module root of this Hugr - see [Self::insert_hugr_link_nodes].
@@ -302,12 +302,13 @@ pub trait HugrMut: HugrMutInternals {
     /// # Errors
     ///
     /// * If `children` are not `children` of the root of `other`
-    /// * If `other`s entrypoint is among `children`, or descends from an element
-    ///   of `children` with [NodeLinkingDirective::Add]
+    /// * If `parent` is Some, and `other.entrypoint()` is either
+    ///   * among `children`, or
+    ///   * descends from an element of `children` with [NodeLinkingDirective::Add]
     ///
     /// # Panics
     ///
-    /// If `parent` is not in the graph.
+    /// If `parent` is `Some` but not in the graph.
     #[allow(clippy::type_complexity)]
     fn insert_from_view_link_nodes<H: HugrView>(
         &mut self,
