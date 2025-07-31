@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @0 = private unnamed_addr constant [7 x i8] c"Error!\00", align 1
 
-define { i32, i8* } @_hl.main.1() {
+define private { i32, i8* } @_hl.main.1() {
 alloca_block:
   %"0" = alloca { i32, i8* }, align 8
   %"7_0" = alloca i8*, align 8
