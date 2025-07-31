@@ -188,10 +188,9 @@ pub trait HugrMut: HugrMutInternals {
     /// 1. if `other.entrypoint() == other.module_root()` as this will insert a second
     ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
     ///    its root is to set the entrypoint to a child of the root.
-    /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and
-    ///    contains a (recursive) [`OpType::Call`] (or `LoadFunction`) to that ancestor
-    ///    FuncDefn. In such a case, the containing FuncDefn will not be inserted, so the
-    ///    `Call` will have no callee.
+    /// 2. If `other.entrypoint()` is a node inside (not itself) a `FuncDefn`, and there
+    ///    are outgoing edges from that `FuncDefn` to [`OpType::Call`] (or `LoadFunction`)
+    ///    nodes being inserted. These edges will be disconnected in `self`.
     ///
     /// # Panics
     ///
@@ -202,6 +201,17 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Insert a sub-region of another hugr into this one, under a given parent node.
+    /// Unless `region == other.module_root()`, then any children of
+    /// `other.module_root()` except the unique ancestor of `region` will also be
+    /// inserted under the Module root of this Hugr - see [Self::insert_hugr_link_nodes].
+    ///
+    /// Note there are two cases here which produce an invalid Hugr:
+    /// 1. if `region == other.module_root()` as this will insert a second
+    ///    [`OpType::Module`] into `self`. The recommended way to insert a Hugr without
+    ///    its root is to set the entrypoint to a child of the root.
+    /// 2. If `region` is a node inside (not itself) a `FuncDefn`, and there
+    ///    are outgoing edges from that `FuncDefn` to [`OpType::Call`] (or `LoadFunction`)
+    ///    nodes being inserted. These edges will be disconnected in `self`.
     ///
     /// # Panics
     ///
