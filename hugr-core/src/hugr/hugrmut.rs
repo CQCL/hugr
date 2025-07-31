@@ -655,6 +655,12 @@ fn insert_hugr_internal<H: HugrView>(
         } else {
             let mut n = other.entrypoint();
             if children.contains_key(&n) {
+                // If parent == hugr.module_root() and the directive is to Add, we could
+                // allow that - it amounts to two instructions to do the same thing.
+                // (If the directive is to UseExisting, then we'd have nothing to add
+                //  beneath parent! And if parent != hugr.module_root(), then not only
+                //  would we have to double-copy the entrypoint-subtree, but also
+                //  (unless n is a Const!) we would be creating an illegal Hugr.)
                 return Err(NodeLinkingError::ChildContainsEntrypoint(n));
             }
             while let Some(p) = other.get_parent(n) {
