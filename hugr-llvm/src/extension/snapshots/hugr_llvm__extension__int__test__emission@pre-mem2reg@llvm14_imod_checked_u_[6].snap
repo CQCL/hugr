@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
 
-define { i1, { i32, i8* }, i64 } @_hl.main.1(i64 %0, i64 %1) {
+define private { i1, { i32, i8* }, i64 } @_hl.main.1(i64 %0, i64 %1) {
 alloca_block:
   %"0" = alloca { i1, { i32, i8* }, i64 }, align 8
   %"2_0" = alloca i64, align 8

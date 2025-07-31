@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define i64 @_hl.main.1() {
+define private i64 @_hl.main.1() {
 alloca_block:
   br label %entry_block
 

@@ -1,11 +1,11 @@
 ---
-source: src/extension/float.rs
+source: hugr-llvm/src/extension/float.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define double @_hl.main.1(double %0, double %1) {
+define private double @_hl.main.1(double %0, double %1) {
 alloca_block:
   %"0" = alloca double, align 8
   %"2_0" = alloca double, align 8
