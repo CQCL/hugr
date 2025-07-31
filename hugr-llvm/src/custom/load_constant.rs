@@ -9,7 +9,9 @@ use anyhow::{Result, anyhow, bail, ensure};
 use crate::emit::EmitFuncContext;
 
 /// A helper trait for describing the callback used for emitting [`CustomConst`]s,
-/// and for hanging documentation. We have the appropriate `Fn` as a supertrait,
+/// and for hanging documentation.
+///
+/// We have the appropriate `Fn` as a supertrait,
 /// and there is a blanket impl for that `Fn`. We do not intend users to impl
 /// this trait.
 ///

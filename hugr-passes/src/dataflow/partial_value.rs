@@ -169,6 +169,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
 }
 
 /// Trait implemented by value types into which [`PartialValue`]s can be converted,
+///
 /// so long as the PV has no [Top](PartialValue::Top), [Bottom](PartialValue::Bottom)
 /// or [`PartialSum`]s with more than one possible tag. See [`PartialSum::try_into_sum`]
 /// and [`PartialValue::try_into_concrete`].

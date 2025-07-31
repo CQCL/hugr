@@ -23,10 +23,13 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 
 #[derive(Clone, Debug, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
-/// Describes the edges required to/from a node or inside a [`FuncDefn`] (when ROWVARS=[`NoRV`]);
-/// or (when ROWVARS=[`RowVariable`]) the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`
+/// Base type for listing inputs and output types.
 ///
-/// ROWVARS specifies whether it may contain [`RowVariable`]s or not.
+/// The exact semantics depend on the use case:
+/// - If `ROWVARS=`[`NoRV`], describes the edges required to/from a node or inside a [`FuncDefn`].
+/// - If `ROWVARS=`[`RowVariable`], describes the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`.
+///
+/// `ROWVARS` specifies whether the type lists may contain [`RowVariable`]s or not.
 ///
 /// [`function value`]: crate::ops::constant::Value::Function
 /// [`FuncDefn`]: crate::ops::FuncDefn

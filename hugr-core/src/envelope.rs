@@ -70,6 +70,7 @@ pub const GENERATOR_KEY: &str = "core.generator";
 pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 
 /// Get the name of the generator from the metadata of the HUGR modules.
+///
 /// If multiple modules have different generators, a comma-separated list is returned in
 /// module order.
 /// If no generator is found, `None` is returned.

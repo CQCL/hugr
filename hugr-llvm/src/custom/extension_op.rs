@@ -16,7 +16,9 @@ use strum::IntoEnumIterator;
 use crate::emit::{EmitFuncContext, EmitOpArgs};
 
 /// A helper trait for describing the callback used for emitting [`ExtensionOp`]s,
-/// and for hanging documentation. We have the appropriate `Fn` as a supertrait,
+/// and for hanging documentation.
+///
+/// We have the appropriate `Fn` as a supertrait,
 /// and there is a blanket impl for that `Fn`. We do not intend users to impl
 /// this trait.
 ///

@@ -15,7 +15,9 @@ use super::handlers::{copy_discard_array, linearize_value_array};
 use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
-/// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
+/// target.
+///
+/// Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
 /// results in types of such outports changing from [Copyable] to linear (i.e.
 /// [`hugr_core::types::TypeBound::Linear`]).
 ///

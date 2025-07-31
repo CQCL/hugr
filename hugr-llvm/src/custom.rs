@@ -142,8 +142,9 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-/// The result of [`CodegenExtsBuilder::finish`]. Users are expected to
-/// deconstruct this type, and consume the fields independently.
+/// The result of [`CodegenExtsBuilder::finish`].
+///
+/// Users are expected to deconstruct this type, and consume the fields independently.
 /// We expect to add further collections at a later date, and so this type is
 /// marked `non_exhaustive`
 #[derive(Default)]
