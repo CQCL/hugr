@@ -88,6 +88,7 @@ use pyo3::PyTypeInfo as _;
 #[cfg(feature = "pyo3")]
 use pyo3::types::PyAnyMethods as _;
 use smol_str::SmolStr;
+use std::str::FromStr;
 use std::sync::Arc;
 use table::LinkIndex;
 

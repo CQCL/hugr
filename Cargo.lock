@@ -1339,6 +1339,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "pyo3",
+ "regex",
  "rust-sitter",
  "rust-sitter-tool",
  "semver",

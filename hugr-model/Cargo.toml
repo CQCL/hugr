@@ -34,6 +34,7 @@ pyo3 = { workspace = true, optional = true, features = ["extension-module"] }
 tree-sitter-hugr = { path = "../../tree-sitter-hugr" }
 tree-sitter = "0.25.8"
 rust-sitter = "0.4.5"
+regex.workspace = true
 
 [features]
 pyo3 = ["dep:pyo3"]
