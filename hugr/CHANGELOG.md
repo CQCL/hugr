@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-v0.22.1...hugr-v0.22.2) - 2025-07-31
+
+### New Features
+
+- Type of constants in `core` `Term`s. ([#2411](https://github.com/CQCL/hugr/pull/2411))
+
 ## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-v0.22.0...hugr-v0.22.1) - 2025-07-28
 
 ### New Features
