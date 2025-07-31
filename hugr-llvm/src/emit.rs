@@ -1,10 +1,9 @@
 use anyhow::{Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
-    HugrView, Node,
+    HugrView, Node, Visibility,
     ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
-    Visibility,
 };
 use inkwell::{
     builder::Builder,
@@ -153,7 +152,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature(), node.visibility())
+        self.get_hugr_func_impl(
+            node.func_name(),
+            node.node(),
+            node.signature(),
+            node.visibility(),
+        )
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDecl`].
@@ -166,7 +170,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature(), node.visibility())
+        self.get_hugr_func_impl(
+            node.func_name(),
+            node.node(),
+            node.signature(),
+            node.visibility(),
+        )
     }
 
     /// Adds or get the [`FunctionValue`] in the [Module] with the given symbol
