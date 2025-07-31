@@ -1,6 +1,8 @@
 //! Utilities for resolving operations and types present in a HUGR, and updating
-//! the list of used extensions. The functionalities of this module can be
-//! called from the type methods [`crate::ops::OpType::used_extensions`] and
+//! the list of used extensions.
+//!
+//! The functionalities of this module can be called from the type methods
+//! [`crate::ops::OpType::used_extensions`] and
 //! [`crate::types::Signature::used_extensions`].
 //!
 //! When listing "used extensions" we only care about _definitional_ extension

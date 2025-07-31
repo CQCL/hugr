@@ -37,6 +37,7 @@ missing_docs = "warn"
 # Unstable check, may cause false positives.
 # https://github.com/rust-lang/rust-clippy/issues/5112
 debug_assert_with_mut_call = "warn"
+too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.98"

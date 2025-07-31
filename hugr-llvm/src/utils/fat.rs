@@ -14,7 +14,9 @@ use hugr_core::{
 use itertools::Itertools as _;
 
 /// A Fat Node is a [Node] along with a reference to the [`HugrView`] whence it
-/// originates. It carries a type `OT`, the [`OpType`] of that node. `OT` may be
+/// originates.
+///
+/// It carries a type `OT`, the [`OpType`] of that node. `OT` may be
 /// general, i.e. exactly [`OpType`], or specifec, e.g. [`FuncDefn`].
 ///
 /// We provide a [Deref<Target=OT>] impl, so it can be used in place of `OT`.

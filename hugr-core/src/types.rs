@@ -778,6 +778,7 @@ impl<'a> Substitution<'a> {
 }
 
 /// A transformation that can be applied to a [Type] or [`TypeArg`].
+///
 /// More general in some ways than a Substitution: can fail with a
 /// [`Self::Err`],  may change [`TypeBound::Copyable`] to [`TypeBound::Linear`],
 /// and applies to arbitrary extension types rather than type variables.

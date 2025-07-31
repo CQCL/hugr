@@ -171,8 +171,9 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
-/// Options for how the replacement for an op is processed. May be specified by
-/// [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
+/// Options for how the replacement for an op is processed.
+///
+/// May be specified by [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
 /// Otherwise (the default), replacements are inserted as is (without further processing).
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {

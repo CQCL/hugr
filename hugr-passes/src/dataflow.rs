@@ -53,6 +53,7 @@ impl<N> From<N> for ConstLocation<'_, N> {
 }
 
 /// Trait for loading [`PartialValue`]s from constant [Value]s in a Hugr.
+///
 /// Implementors will likely want to override either/both of [`Self::value_from_opaque`]
 /// and [`Self::value_from_const_hugr`]: the defaults
 /// are "correct" but maximally conservative (minimally informative).
@@ -73,8 +74,9 @@ pub trait ConstLoader<V> {
     }
 }
 
-/// Produces a [`PartialValue`] from a constant. Traverses [Sum](Value::Sum) constants
-/// to their leaves ([`Value::Extension`] and [`Value::Function`]),
+/// Produces a [`PartialValue`] from a constant.
+///
+/// Traverses [Sum](Value::Sum) constants to their leaves ([`Value::Extension`] and [`Value::Function`]),
 /// converts these using [`ConstLoader::value_from_opaque`] and [`ConstLoader::value_from_const_hugr`],
 /// and builds nested [`PartialValue::new_variant`] to represent the structure.
 pub fn partial_from_const<'a, V, CL: ConstLoader<V>>(
