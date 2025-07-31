@@ -196,8 +196,26 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the root node is not in the graph.
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
-        let region = other.entrypoint();
-        Self::insert_region(self, root, other, region)
+        let mut n = other.entrypoint();
+        let mut children = HashMap::new();
+        if n != other.module_root() {
+            children.extend(
+                other
+                    .children(other.module_root())
+                    .map(|n| (n, NodeLinkingDirective::add())),
+            );
+            while children.remove(&n).is_none() {
+                n = other.get_parent(n).unwrap()
+            }
+        };
+        let ep = other.entrypoint();
+        let node_map = self
+            .insert_hugr_link_nodes(Some(root), other, children)
+            .expect("Construction of `children` should ensure no possibility of NodeLinkingError");
+        InsertionResult {
+            inserted_entrypoint: node_map[&ep],
+            node_map,
+        }
     }
 
     /// Insert a sub-region of another hugr into this one, under a given parent node.
@@ -223,26 +241,8 @@ pub trait HugrMut: HugrMutInternals {
         mut other: Hugr,
         region: Node,
     ) -> InsertionResult<Node, Self::Node> {
-        let mut n = region;
-        let mut children = HashMap::new();
-        if n != other.module_root() {
-            children.extend(
-                other
-                    .children(other.module_root())
-                    .map(|n| (n, NodeLinkingDirective::add())),
-            );
-            while children.remove(&n).is_none() {
-                n = other.get_parent(n).unwrap()
-            }
-        };
         other.set_entrypoint(region);
-        let node_map = self
-            .insert_hugr_link_nodes(Some(root), other, children)
-            .expect("Construction of `children` should ensure no possibility of NodeLinkingError");
-        InsertionResult {
-            inserted_entrypoint: node_map[&region],
-            node_map,
-        }
+        self.insert_hugr(root, other)
     }
 
     /// Insert another Hugr into this one, with linking directives specified by Node.
