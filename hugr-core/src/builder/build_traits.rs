@@ -90,8 +90,8 @@ pub trait Container {
     ///
     /// To insert an arbitrary region of a HUGR, use [`Container::add_hugr_region`].
     fn add_hugr(&mut self, child: Hugr) -> InsertionResult {
-        let region = child.entrypoint();
-        self.add_hugr_region(child, region)
+        let parent = self.container_node();
+        self.hugr_mut().insert_hugr(parent, child)
     }
 
     /// Insert a HUGR region as a child of the container. The subtree of `region`
@@ -99,9 +99,10 @@ pub trait Container {
     /// be added to the Module root of the Hugr being built.
     ///
     /// To insert the entrypoint region of a HUGR, use [`Container::add_hugr`].
-    fn add_hugr_region(&mut self, child: Hugr, region: Node) -> InsertionResult {
-        let parent = self.container_node();
-        self.hugr_mut().insert_region(parent, child, region)
+    #[deprecated(note = "Set child.entrypoint and then call add_hugr")]
+    fn add_hugr_region(&mut self, mut child: Hugr, region: Node) -> InsertionResult {
+        child.set_entrypoint(region);
+        self.add_hugr(child)
     }
 
     /// Insert a copy of a HUGR as a child of the container.

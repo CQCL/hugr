@@ -235,6 +235,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// - If the root node is not in the graph.
     /// - If the `region` node is not in `other`.
+    #[deprecated(note = "Set other.entrypoint and then call insert_hugr")]
     fn insert_region(
         &mut self,
         root: Self::Node,
