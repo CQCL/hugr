@@ -328,7 +328,7 @@ jobs:
         with:
           # Nightly is required to count doctests coverage
           # TODO: Pinned due to <https://github.com/CQCL/hugr/issues/2227>
-          toolchain: "nightly-2025-05-14"
+          toolchain: "nightly"
           components: llvm-tools-preview
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
