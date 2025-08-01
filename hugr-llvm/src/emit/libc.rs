@@ -1,8 +1,7 @@
 use anyhow::Result;
 use hugr_core::{HugrView, Node};
 use inkwell::{
-    AddressSpace,
-    values::{BasicMetadataValueEnum, BasicValueEnum},
+    attributes::{Attribute, AttributeLoc}, values::{BasicMetadataValueEnum, BasicValueEnum}, AddressSpace
 };
 
 use crate::emit::func::EmitFuncContext;
@@ -41,6 +40,14 @@ pub fn emit_libc_malloc<'c, H: HugrView<Node = Node>>(
         .ptr_type(AddressSpace::default())
         .fn_type(&[iw_ctx.i64_type().into()], false);
     let malloc = context.get_extern_func("malloc", malloc_sig)?;
+    // LLVM14 seems to have a bug in DeadStoreEliminationPass that causes segfaults.
+    // This prevents it from treating this function as malloc
+    let nobuiltin = Attribute::get_named_enum_kind_id("nobuiltin");
+    debug_assert!(nobuiltin != 0);
+    malloc.add_attribute(
+        AttributeLoc::Function,
+        iw_ctx.create_enum_attribute(nobuiltin, 0),
+    );
     let res = context
         .builder()
         .build_call(malloc, &[size], "")?
@@ -62,6 +69,14 @@ pub fn emit_libc_free<H: HugrView<Node = Node>>(
 
     let free_sig = iw_ctx.void_type().fn_type(&[ptr_ty.into()], false);
     let free = context.get_extern_func("free", free_sig)?;
+    // LLVM14 seems to have a bug in DeadStoreEliminationPass that causes segfaults.
+    // This prevents it from treating this function as free
+    let nobuiltin = Attribute::get_named_enum_kind_id("nobuiltin");
+    debug_assert!(nobuiltin != 0);
+    free.add_attribute(
+        AttributeLoc::Function,
+        iw_ctx.create_enum_attribute(nobuiltin, 0),
+    );
     context.builder().build_call(free, &[ptr.into()], "")?;
     Ok(())
 }

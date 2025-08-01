@@ -467,10 +467,14 @@ cond_exit_64:                                     ; preds = %cond_64_case_1, %co
   ret void
 }
 
-declare i8* @malloc(i64)
+; Function Attrs: nobuiltin
+declare i8* @malloc(i64) #0
 
 declare i32 @printf(i8*, ...)
 
 declare void @abort()
 
-declare void @free(i8*)
+; Function Attrs: nobuiltin
+declare void @free(i8*) #0
+
+attributes #0 = { nobuiltin }
