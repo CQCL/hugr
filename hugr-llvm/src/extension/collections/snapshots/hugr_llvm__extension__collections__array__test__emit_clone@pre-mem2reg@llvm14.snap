@@ -50,11 +50,14 @@ entry_block:                                      ; preds = %alloca_block
   ret void
 }
 
-declare i8* @malloc(i64)
+; Function Attrs: nobuiltin
+declare i8* @malloc(i64) #0
 
 ; Function Attrs: argmemonly nofree nounwind willreturn
-declare void @llvm.memcpy.p0i64.p0i64.i64(i64* noalias nocapture writeonly, i64* noalias nocapture readonly, i64, i1 immarg) #0
+declare void @llvm.memcpy.p0i64.p0i64.i64(i64* noalias nocapture writeonly, i64* noalias nocapture readonly, i64, i1 immarg) #1
 
-declare void @free(i8*)
+; Function Attrs: nobuiltin
+declare void @free(i8*) #0
 
-attributes #0 = { argmemonly nofree nounwind willreturn }
+attributes #0 = { nobuiltin }
+attributes #1 = { argmemonly nofree nounwind willreturn }
