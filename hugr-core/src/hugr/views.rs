@@ -438,7 +438,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_format(&self) -> MermaidFormatter<Self> {
+    fn mermaid_format(&self) -> MermaidFormatter<'_, Self> {
         MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
     }
 

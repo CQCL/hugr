@@ -840,7 +840,7 @@ pub(super) mod test {
             // But not with an external row variable
             let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
             assert_eq!(
-                def.compute_signature(&[arg.clone()]),
+                def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(
                     TermTypeError::TypeMismatch {
                         type_: Box::new(TypeBound::Linear.into()),
