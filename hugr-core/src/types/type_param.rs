@@ -1039,7 +1039,7 @@ mod test {
         // Now substitute a list of two types for that row-variable
         let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
         check_term_type(&row_var_arg, &row_var_decl).unwrap();
-        let subst_arg = good_arg.substitute(&Substitution(&[row_var_arg.clone()]));
+        let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
         check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,

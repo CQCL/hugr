@@ -93,7 +93,7 @@ impl<'a> SymbolTable<'a> {
     /// # Panics
     ///
     /// Panics if there is no current scope.
-    pub fn insert(&mut self, name: &'a str, node: NodeId) -> Result<(), DuplicateSymbolError> {
+    pub fn insert(&mut self, name: &'a str, node: NodeId) -> Result<(), DuplicateSymbolError<'_>> {
         let scope_depth = self.scopes.len() as u16 - 1;
         let (symbol_index, shadowed) = self.symbols.insert_full(name, self.bindings.len());
 
@@ -129,7 +129,7 @@ impl<'a> SymbolTable<'a> {
     }
 
     /// Tries to resolve a symbol name in the current scope.
-    pub fn resolve(&self, name: &'a str) -> Result<NodeId, UnknownSymbolError> {
+    pub fn resolve(&self, name: &'a str) -> Result<NodeId, UnknownSymbolError<'_>> {
         let index = *self
             .symbols
             .get(name)
