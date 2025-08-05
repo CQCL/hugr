@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use smol_str::ToSmolStr;
-use std::ops::Range;
+use std::{io, iter::FusedIterator, ops::Range};
 use thiserror::Error;
 use tree_sitter::{Node as TSNode, TreeCursor};
 use tree_sitter_hugr;
@@ -10,12 +10,15 @@ use crate::v0::{
 };
 
 use super::{
-    Module, Node, Operation, Param, Region, SeqPart, Symbol, Term, literals::LiteralParseError,
-    names::NameParseError,
+    Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term,
+    literals::LiteralParseError, names::NameParseError,
 };
 
 #[derive(Debug, Error)]
 pub enum ParseError {
+    #[error("parse error")]
+    Error { location: Span },
+
     #[error("failed to parse literal")]
     Literal {
         #[source]
@@ -30,6 +33,32 @@ pub enum ParseError {
     },
 }
 
+impl ParseError {
+    pub fn location(&self) -> Span {
+        match self {
+            ParseError::Error { location } => location,
+            ParseError::Literal { location, .. } => location,
+            ParseError::Name { location, .. } => location,
+        }
+        .clone()
+    }
+
+    pub fn eprint(&self, source: &str) -> io::Result<()> {
+        self.to_report().eprint(ariadne::Source::from(source))
+    }
+
+    fn to_report(&self) -> ariadne::Report {
+        ariadne::Report::build(ariadne::ReportKind::Error, self.location())
+            .with_message("parse error")
+            .with_label(
+                ariadne::Label::new(self.location())
+                    .with_color(ariadne::Color::Red)
+                    .with_message("parse error"),
+            )
+            .finish()
+    }
+}
+
 pub type Span = Range<usize>;
 
 type ParseResult<T> = Result<T, ParseError>;
@@ -37,25 +66,49 @@ type ParseResult<T> = Result<T, ParseError>;
 #[test]
 fn test() {
     let src = include_str!("../../../core.thugr");
+
+    let package = match parse(src) {
+        Ok(package) => package,
+        Err(err) => {
+            err.eprint(src).unwrap();
+            panic!();
+        }
+    };
+}
+
+fn parse(source: &str) -> ParseResult<Package> {
     let mut parser = tree_sitter::Parser::new();
     parser
         .set_language(&tree_sitter_hugr::LANGUAGE.into())
-        .unwrap();
+        .expect("failed to set `hugr` language in tree-sitter parser");
 
-    let ast = parser.parse(src, None).unwrap();
+    // NOTE: The `parse` method should always succeed. Parse errors are communicated
+    // via error ndoes in the produced AST.
+    let ast = parser.parse(source, None).unwrap();
     let root = ast.root_node();
 
     if root.has_error() {
-        eprintln!("found a parse error");
+        // Find the first error node
+        let error = AllNodes::new(root.walk())
+            .find(|node| node.is_error())
+            .unwrap();
+
+        return Err(ParseError::Error {
+            location: error.byte_range(),
+        });
     }
 
-    // let mut walk = Walk::new(ast.walk());
+    parse_package(Token { node: root, source })
+}
 
-    // walk.debug();
-    panic!("{}", root.to_sexp());
+fn parse_package(token: Token) -> ParseResult<Package> {
+    let mut inner = token.children();
+    let modules = inner.parse_many("module", parse_module)?;
+    Ok(Package { modules })
 }
 
 fn parse_module(token: Token) -> ParseResult<Module> {
+    debug_assert_eq!(token.name(), "module");
     let mut inner = token.children();
     let meta = parse_meta_seq(&mut inner)?;
     let children = inner.map(parse_node).try_collect()?;
@@ -340,15 +393,19 @@ impl<'a> Token<'a> {
     }
 }
 
+/// Sequence of [`Token`]s.
 struct Tokens<'a> {
+    /// The current token or `None` if the sequence is empty.
     token: Option<Token<'a>>,
+
+    /// The number of tokens remaining.
     count: usize,
 }
 
 impl<'a> Tokens<'a> {
     /// Create an iterator over all subsequent tokens for a specified rule.
-    pub fn take_rule<'p>(&'p mut self, rule: &'static str) -> RuleParser<'p, 'a> {
-        RuleParser { parser: self, rule }
+    pub fn take_rule<'p>(&'p mut self, rule: &'static str) -> RuleTokens<'p, 'a> {
+        RuleTokens { parser: self, rule }
     }
 
     /// Parse one token for a specified rule.
@@ -397,7 +454,7 @@ impl<'a> Iterator for Tokens<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.token.take()?;
         self.count -= 1;
-        assert!(token.node.is_error());
+        debug_assert!(!token.node.is_error());
         let node = token.node.next_named_sibling();
         self.token = node.map(|node| Token {
             node,
@@ -411,12 +468,16 @@ impl<'a> Iterator for Tokens<'a> {
     }
 }
 
-struct RuleParser<'p, 'a> {
+impl<'a> ExactSizeIterator for Tokens<'a> {}
+impl<'a> FusedIterator for Tokens<'a> {}
+
+/// Sequence of [`Token`]s for a specific rule.
+struct RuleTokens<'p, 'a> {
     parser: &'p mut Tokens<'a>,
     rule: &'static str,
 }
 
-impl<'p, 'a> Iterator for RuleParser<'p, 'a> {
+impl<'p, 'a> Iterator for RuleTokens<'p, 'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -434,12 +495,14 @@ impl<'p, 'a> Iterator for RuleParser<'p, 'a> {
     }
 }
 
-struct Nodes<'a> {
+impl<'p, 'a> FusedIterator for RuleTokens<'p, 'a> {}
+
+struct AllNodes<'a> {
     cursor: Option<TreeCursor<'a>>,
     size: usize,
 }
 
-impl<'a> Nodes<'a> {
+impl<'a> AllNodes<'a> {
     pub fn new(cursor: TreeCursor<'a>) -> Self {
         Self {
             size: cursor.node().descendant_count(),
@@ -448,7 +511,7 @@ impl<'a> Nodes<'a> {
     }
 }
 
-impl<'a> Iterator for Nodes<'a> {
+impl<'a> Iterator for AllNodes<'a> {
     type Item = TSNode<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
