@@ -31,7 +31,7 @@ semver = { workspace = true }
 smol_str = { workspace = true, features = ["serde"] }
 thiserror.workspace = true
 pyo3 = { workspace = true, optional = true, features = ["extension-module"] }
-tree-sitter-hugr = { path = "../../tree-sitter-hugr" }
+tree-sitter-hugr = { path = "../tree-sitter-hugr" }
 tree-sitter = "0.25.8"
 rust-sitter = "0.4.5"
 regex.workspace = true

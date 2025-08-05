@@ -1,0 +1,32 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "hugr",
+      "camelcase": "Hugr",
+      "title": "HUGR",
+      "scope": "source.hugr",
+      "file-types": ["thugr"],
+      "injection-regex": "^hugr$",
+      "class-name": "TreeSitterHugr",
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "HUGR Intermediate Representation",
+    "authors": [
+      {
+        "name": "Lukas Heidemann",
+        "email": "lukas@heidemann.me"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/CQCL/hugr"
+    }
+  },
+  "bindings": {
+    "rust": true
+  }
+}

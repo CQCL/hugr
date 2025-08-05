@@ -1,0 +1,36 @@
+mod {
+  use @quantum.cnot;
+  use @core.const;
+  use @core.title;
+
+  // Just some examples
+  pub fn @swap {
+    %0, %1 =>
+    %2, %3 = @quantum.cnot %0, %1 : [@quantum.qubit, @quantum.qubit] -> [@quantum.qubit, @quantum.qubit];
+    %4, %5 = @quantum.cnot %3, %2;
+    %6, %7 = @quantum.cnot %5, %4;
+    %6, %7
+  } : [@quantum.qubit, @quantum.qubit] -> [@quantum.qubit, @quantum.qubit];
+
+  #[core.title("foo")]
+  fn @test {
+    %0 = @core.const(@arithmetic.int.const(6, 0));
+    %1 = @core.const(@arithmetic.int.const(6, 1));
+    %0, %1
+  };
+
+  fn @conditional_swap {
+    %cond, %a, %b =>
+    %result_a, %result_b = @core.cond %cond, %a, %b {
+      %0, %a0, %b0 =>
+      %a1, %b1 = @swap %a0, %b0;
+      %a1, %b1
+    } { %1, %a2, %b2 => %a2, %b2 };
+    %result_a, %result_b
+  };
+
+  #[core.entrypoint]
+  pub fn @main {
+  };
+}
+
