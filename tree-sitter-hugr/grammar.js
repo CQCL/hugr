@@ -23,7 +23,7 @@ function stringLiteral() {
   );
 }
 
-function bareId() {
+function bareName() {
   return choice(
     /[0-9]+/,
     /[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*/,
@@ -31,22 +31,21 @@ function bareId() {
   );
 }
 
-function sigilId(sigil) {
-  return token(seq(sigil, bareId()));
+function sigilName(sigil) {
+  return token(seq(sigil, bareName()));
 }
 
 module.exports = grammar({
   name: "hugr",
 
   rules: {
-    // TODO: add the actual grammar rules
     source_file: ($) => repeat($.module),
 
     module: ($) => seq(repeat($.meta), "mod", "{", repeat($._module_item), "}"),
     _module_item: ($) =>
       choice($.symbol_import, $.symbol_function, $.symbol_ctr, $.symbol_op),
 
-    symbol_import: ($) => seq("use", field("name", $.symbol), ";"),
+    symbol_import: ($) => seq("use", field("name", $.symbol_name), ";"),
 
     symbol_function: ($) =>
       seq(
@@ -54,7 +53,7 @@ module.exports = grammar({
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "fn",
-        field("name", $.symbol),
+        field("name", $.symbol_name),
         optional(field("parameters", seq("(", commaSep1($.param), ")"))),
         optional(field("constraints", $.constraints)),
         optional(field("signature", seq(":", $.term))),
@@ -68,7 +67,7 @@ module.exports = grammar({
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "ctr",
-        field("name", $.symbol),
+        field("name", $.symbol_name),
         optional(field("parameters", seq("(", commaSep1($.param), ")"))),
         optional(field("constraints", $.constraints)),
         field("signature", seq(":", $.term)),
@@ -81,7 +80,7 @@ module.exports = grammar({
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "op",
-        field("name", $.symbol),
+        field("name", $.symbol_name),
         optional(field("parameters", seq("(", commaSep1($.param), ")"))),
         optional(field("constraints", $.constraints)),
         field("signature", seq(":", $.term)),
@@ -91,14 +90,14 @@ module.exports = grammar({
     pub: ($) => "pub",
     constraints: ($) => seq("where", commaSep1($.term)),
 
-    param: ($) => seq($.var, ":", $.term),
+    param: ($) => seq($.var_name, ":", $.term),
 
     operation: ($) =>
       seq(
         field("meta", repeat($.meta)),
-        optional(field("outputs", seq(commaSep1($.link), "="))),
+        optional(field("outputs", seq(commaSep1($.link_name), "="))),
         field("operation", $.term),
-        optional(field("inputs", seq(commaSep($.link)))),
+        optional(field("inputs", seq(commaSep($.link_name)))),
         repeat($.region),
         optional($._signature),
         ";",
@@ -111,9 +110,9 @@ module.exports = grammar({
       seq(
         "{",
         field("meta", repeat($.region_meta)),
-        field("sources", optional(seq(commaSep($.link), "=>"))),
+        field("sources", optional(seq(commaSep($.link_name), "=>"))),
         field("body", repeat($.operation)),
-        field("targets", commaSep($.link)),
+        field("targets", commaSep($.link_name)),
         "}",
       ),
 
@@ -123,18 +122,17 @@ module.exports = grammar({
       choice(
         $.term_apply,
         $.func_type,
-        $.var,
+        $.var_name,
         $.term_list,
         $.term_tuple,
         $.term_parens,
-        $.string,
-        $.literal_nat,
+        $.literal,
         $.wildcard,
       ),
 
     term_apply: ($) =>
       seq(
-        field("symbol", $.symbol),
+        field("symbol", $.symbol_name),
         optional(field("arguments", seq("(", commaSep($.term), ")"))),
       ),
     term_list: ($) => seq("[", commaSep(choice($.term, $.splice)), "]"),
@@ -156,7 +154,6 @@ module.exports = grammar({
         seq(field("inputs", $.term), "->", field("outputs", $.term)),
       ),
 
-    symbol_bare: ($) => /[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*/,
     meta: ($) =>
       seq(
         "#[",
@@ -172,13 +169,18 @@ module.exports = grammar({
         "]",
       ),
 
+    // Literals
+    literal: ($) => choice($.string, $.nat, $.bytes, $.float),
     string: ($) => token(stringLiteral()),
+    nat: ($) => /([1-9][0-9]*)|0/,
+    bytes: ($) => /b"[a-zA-Z0-9/+]+={0,2}"/,
+    float: ($) => /[+-]?[0-9]+\.[0-9]+(e[+-]?[0-9]+)?/,
 
-    literal_nat: ($) => /([1-9][0-9]*)|0/,
-
-    var: ($) => sigilId("?"),
-    link: ($) => sigilId("%"),
-    symbol: ($) => sigilId("@"),
+    // Names
+    var_name: ($) => sigilName("?"),
+    link_name: ($) => sigilName("%"),
+    symbol_name: ($) => sigilName("@"),
+    symbol_bare: ($) => bareName(),
 
     comment: ($) => token(seq(/\/\/[^/]/, /.*/)),
   },

@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::v0::{LinkName, Literal, SymbolName, VarName};
 
-use super::literals::{StringParseError, parse_string_literal};
+use super::literals::{ParseStringError, parse_string_literal};
 
 /// Check if a name can be printed as a bare name or if it needs to be wrapped
 /// in a string.
@@ -36,7 +36,7 @@ pub enum NameParseError {
     #[error("expected sigil `{expected}`")]
     Sigil { expected: char },
     #[error("error parsing string escaped id")]
-    String(#[from] StringParseError),
+    String(#[from] ParseStringError),
 }
 
 macro_rules! impl_name {

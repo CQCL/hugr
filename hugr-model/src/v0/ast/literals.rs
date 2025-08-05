@@ -1,4 +1,8 @@
-use std::{str::FromStr, sync::Arc};
+use std::{
+    num::{ParseFloatError, ParseIntError},
+    str::FromStr,
+    sync::Arc,
+};
 
 use base64::Engine as _;
 use base64::prelude::BASE64_STANDARD;
@@ -7,9 +11,9 @@ use thiserror::Error;
 
 use crate::v0::Literal;
 
-pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseError> {
+pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, ParseStringError> {
     let Some(str) = str.strip_prefix('"').and_then(|str| str.strip_suffix('"')) else {
-        return Err(StringParseError::Delimiters);
+        return Err(ParseStringError::Delimiters);
     };
 
     let mut builder = SmolStrBuilder::new();
@@ -17,9 +21,9 @@ pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseErro
 
     while let Some((_, char)) = chars.next() {
         let unescaped = match char {
-            '"' => return Err(StringParseError::UnescapedQuote),
+            '"' => return Err(ParseStringError::UnescapedQuote),
             '\\' => {
-                let (start, char) = chars.next().ok_or(StringParseError::MissingEscape)?;
+                let (start, char) = chars.next().ok_or(ParseStringError::MissingEscape)?;
                 match char {
                     'n' => '\n',
                     'r' => '\r',
@@ -29,17 +33,17 @@ pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseErro
                     'u' => {
                         let rest = str[start..]
                             .strip_prefix("u{")
-                            .ok_or(StringParseError::BadUnicode)?;
+                            .ok_or(ParseStringError::BadUnicode)?;
                         let (code_str, rest) =
-                            rest.split_once("}").ok_or(StringParseError::BadUnicode)?;
+                            rest.split_once("}").ok_or(ParseStringError::BadUnicode)?;
                         let code = u32::from_str_radix(code_str, 16)
-                            .map_err(|_| StringParseError::BadUnicode)?;
+                            .map_err(|_| ParseStringError::BadUnicode)?;
                         let char = char::from_u32(code)
-                            .ok_or_else(|| StringParseError::UnknownUnicode(code))?;
+                            .ok_or_else(|| ParseStringError::UnknownUnicode(code))?;
                         chars = rest.char_indices();
                         char
                     }
-                    _ => return Err(StringParseError::UnknownEscape(char)),
+                    _ => return Err(ParseStringError::UnknownEscape(char)),
                 }
             }
             char => char,
@@ -52,7 +56,7 @@ pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseErro
 }
 
 #[derive(Debug, Error)]
-pub enum StringParseError {
+pub enum ParseStringError {
     #[error("unknown escape char `{0}`")]
     UnknownEscape(char),
     #[error("missing escaped char after backslash")]
@@ -67,23 +71,23 @@ pub enum StringParseError {
     Delimiters,
 }
 
-fn parse_bytes_literal(str: &str) -> Result<Arc<[u8]>, BytesParseError> {
+fn parse_bytes_literal(str: &str) -> Result<Arc<[u8]>, ParseBytesError> {
     let Some(str) = str
         .strip_prefix("b\"")
         .and_then(|str| str.strip_suffix('"'))
     else {
-        return Err(BytesParseError::Delimiters);
+        return Err(ParseBytesError::Delimiters);
     };
 
     let data = BASE64_STANDARD
         .decode(str)
-        .map_err(|_| BytesParseError::Base64)?;
+        .map_err(|_| ParseBytesError::Base64)?;
 
     Ok(data.into())
 }
 
 #[derive(Debug, Error)]
-pub enum BytesParseError {
+pub enum ParseBytesError {
     #[error(r#"byte string literals must start with `b"` and end with `"`"#)]
     Delimiters,
     #[error("failed to decode base64 string")]
@@ -94,12 +98,14 @@ impl FromStr for Literal {
     type Err = LiteralParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with('"') {
-            Ok(Self::Str(parse_string_literal(s)?))
-        } else if s.starts_with('b') {
-            Ok(Self::Bytes(parse_bytes_literal(s)?))
-        } else {
-            todo!()
+        let first = s.chars().next().ok_or(LiteralParseError::Unexpected)?;
+
+        match first {
+            '"' => Ok(Self::Str(parse_string_literal(s)?)),
+            'b' => Ok(Self::Bytes(parse_bytes_literal(s)?)),
+            '0'..'9' if s.contains(".") => Ok(Self::Float(s.parse()?)),
+            '0'..'9' => Ok(Self::Nat(s.parse()?)),
+            _ => Err(LiteralParseError::Unexpected),
         }
     }
 }
@@ -109,7 +115,11 @@ pub enum LiteralParseError {
     #[error("unexpected literal")]
     Unexpected,
     #[error("failed to parse string")]
-    String(#[from] StringParseError),
+    String(#[from] ParseStringError),
     #[error("failed to byte string")]
-    Bytes(#[from] BytesParseError),
+    Bytes(#[from] ParseBytesError),
+    #[error("failed to parse natural number")]
+    Nat(#[from] ParseIntError),
+    #[error("failed to parse float")]
+    Float(#[from] ParseFloatError),
 }

@@ -137,7 +137,7 @@ fn parse_node(token: Token) -> ParseResult<Node> {
 
 fn parse_symbol(tokens: &mut Tokens) -> ParseResult<Symbol> {
     let visibility = Some(parse_visibility(tokens)?);
-    let name = tokens.parse_one("symbol", parse_symbol_name)?;
+    let name = tokens.parse_one("symbol_name", parse_symbol_name)?;
     let params = tokens.parse_many("param", parse_param)?;
     let constraints = tokens
         .parse_opt("constraints", parse_constraints)?
@@ -211,9 +211,9 @@ fn parse_operation(token: Token) -> ParseResult<Node> {
     assert_eq!(token.name(), "operation");
     let mut inner = token.children();
     let meta = inner.parse_many("meta", parse_meta)?;
-    let outputs = inner.parse_many("link", parse_link_name)?;
+    let outputs = inner.parse_many("link_name", parse_link_name)?;
     let operation = inner.parse_one("term", parse_term)?;
-    let inputs = inner.parse_many("link", parse_link_name)?;
+    let inputs = inner.parse_many("link_name", parse_link_name)?;
     let regions = inner.parse_many("region", parse_region)?;
     let signature = inner.parse_opt("term", parse_term)?;
     Ok(Node {
@@ -247,7 +247,7 @@ fn parse_constraints(token: Token) -> ParseResult<Box<[Term]>> {
 fn parse_param(token: Token) -> ParseResult<Param> {
     assert_eq!(token.name(), "param");
     let mut inner = token.children();
-    let name = inner.parse_one("var", parse_var_name)?;
+    let name = inner.parse_one("var_name", parse_var_name)?;
     let r#type = inner.parse_one("term", parse_term)?;
     Ok(Param { name, r#type })
 }
@@ -285,7 +285,7 @@ fn parse_term(token: Token) -> ParseResult<Term> {
 
     match node.name() {
         "term_apply" => {
-            let symbol = inner.parse_one("symbol", parse_symbol_name)?;
+            let symbol = inner.parse_one("symbol_name", parse_symbol_name)?;
             let args = inner.map(parse_term).try_collect()?;
             Ok(Term::Apply(symbol, args))
         }
@@ -305,7 +305,7 @@ fn parse_term(token: Token) -> ParseResult<Term> {
                 [inputs, outputs].into(),
             ))
         }
-        "var" => {
+        "var_name" => {
             let var = parse_var_name(node)?;
             Ok(Term::Var(var))
         }

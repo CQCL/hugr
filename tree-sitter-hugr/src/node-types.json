@@ -1,5 +1,20 @@
 [
   {
+    "type": "constraints",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "term",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "doc_comment",
     "named": true,
     "fields": {}
@@ -13,39 +28,7 @@
         "required": true,
         "types": [
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -55,43 +38,38 @@
         "required": true,
         "types": [
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "literal",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "bytes",
+          "named": true
+        },
+        {
+          "type": "float",
+          "named": true
+        },
+        {
+          "type": "nat",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -115,39 +93,7 @@
             "named": false
           },
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -208,7 +154,7 @@
             "named": false
           },
           {
-            "type": "link",
+            "type": "link_name",
             "named": true
           }
         ]
@@ -228,39 +174,7 @@
         "required": true,
         "types": [
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -278,7 +192,7 @@
             "named": false
           },
           {
-            "type": "link",
+            "type": "link_name",
             "named": true
           }
         ]
@@ -289,43 +203,11 @@
       "required": false,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
           "type": "region",
           "named": true
         },
         {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
@@ -340,39 +222,11 @@
       "required": true,
       "types": [
         {
-          "type": "func_type",
+          "type": "term",
           "named": true
         },
         {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "var_name",
           "named": true
         }
       ]
@@ -430,7 +284,7 @@
             "named": false
           },
           {
-            "type": "link",
+            "type": "link_name",
             "named": true
           }
         ]
@@ -444,7 +298,7 @@
             "named": false
           },
           {
-            "type": "link",
+            "type": "link_name",
             "named": true
           }
         ]
@@ -460,43 +314,11 @@
       "required": true,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
           "type": "symbol_bare",
           "named": true
         },
         {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
@@ -527,48 +349,31 @@
       "required": true,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
     }
   },
   {
+    "type": "symbol_bare",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "symbol_ctr",
     "named": true,
     "fields": {
+      "constraints": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "constraints",
+            "named": true
+          }
+        ]
+      },
       "doc": {
         "multiple": false,
         "required": false,
@@ -594,7 +399,7 @@
         "required": true,
         "types": [
           {
-            "type": "symbol",
+            "type": "symbol_name",
             "named": true
           }
         ]
@@ -630,39 +435,7 @@
             "named": false
           },
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -673,7 +446,7 @@
         "types": [
           {
             "type": "pub",
-            "named": false
+            "named": true
           }
         ]
       }
@@ -693,6 +466,16 @@
           }
         ]
       },
+      "constraints": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "constraints",
+            "named": true
+          }
+        ]
+      },
       "doc": {
         "multiple": false,
         "required": false,
@@ -718,7 +501,7 @@
         "required": true,
         "types": [
           {
-            "type": "symbol",
+            "type": "symbol_name",
             "named": true
           }
         ]
@@ -754,39 +537,7 @@
             "named": false
           },
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -797,7 +548,7 @@
         "types": [
           {
             "type": "pub",
-            "named": false
+            "named": true
           }
         ]
       }
@@ -812,7 +563,7 @@
         "required": true,
         "types": [
           {
-            "type": "symbol",
+            "type": "symbol_name",
             "named": true
           }
         ]
@@ -823,6 +574,16 @@
     "type": "symbol_op",
     "named": true,
     "fields": {
+      "constraints": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "constraints",
+            "named": true
+          }
+        ]
+      },
       "doc": {
         "multiple": false,
         "required": false,
@@ -848,7 +609,7 @@
         "required": true,
         "types": [
           {
-            "type": "symbol",
+            "type": "symbol_name",
             "named": true
           }
         ]
@@ -884,39 +645,7 @@
             "named": false
           },
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -927,10 +656,53 @@
         "types": [
           {
             "type": "pub",
-            "named": false
+            "named": true
           }
         ]
       }
+    }
+  },
+  {
+    "type": "term",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "func_type",
+          "named": true
+        },
+        {
+          "type": "literal",
+          "named": true
+        },
+        {
+          "type": "term_apply",
+          "named": true
+        },
+        {
+          "type": "term_list",
+          "named": true
+        },
+        {
+          "type": "term_parens",
+          "named": true
+        },
+        {
+          "type": "term_tuple",
+          "named": true
+        },
+        {
+          "type": "var_name",
+          "named": true
+        },
+        {
+          "type": "wildcard",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -954,39 +726,7 @@
             "named": false
           },
           {
-            "type": "func_type",
-            "named": true
-          },
-          {
-            "type": "literal_nat",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "term_apply",
-            "named": true
-          },
-          {
-            "type": "term_list",
-            "named": true
-          },
-          {
-            "type": "term_parens",
-            "named": true
-          },
-          {
-            "type": "term_tuple",
-            "named": true
-          },
-          {
-            "type": "var",
-            "named": true
-          },
-          {
-            "type": "wildcard",
+            "type": "term",
             "named": true
           }
         ]
@@ -996,7 +736,7 @@
         "required": true,
         "types": [
           {
-            "type": "symbol",
+            "type": "symbol_name",
             "named": true
           }
         ]
@@ -1012,43 +752,11 @@
       "required": false,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
           "type": "splice",
           "named": true
         },
         {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
@@ -1063,39 +771,7 @@
       "required": true,
       "types": [
         {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
@@ -1107,50 +783,22 @@
     "fields": {},
     "children": {
       "multiple": true,
-      "required": true,
+      "required": false,
       "types": [
-        {
-          "type": "func_type",
-          "named": true
-        },
-        {
-          "type": "literal_nat",
-          "named": true
-        },
         {
           "type": "splice",
           "named": true
         },
         {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "term_apply",
-          "named": true
-        },
-        {
-          "type": "term_list",
-          "named": true
-        },
-        {
-          "type": "term_parens",
-          "named": true
-        },
-        {
-          "type": "term_tuple",
-          "named": true
-        },
-        {
-          "type": "var",
-          "named": true
-        },
-        {
-          "type": "wildcard",
+          "type": "term",
           "named": true
         }
       ]
     }
+  },
+  {
+    "type": "\"",
+    "named": false
   },
   {
     "type": "#![",
@@ -1209,6 +857,10 @@
     "named": false
   },
   {
+    "type": "bytes",
+    "named": true
+  },
+  {
     "type": "comment",
     "named": true,
     "extra": true
@@ -1218,15 +870,15 @@
     "named": false
   },
   {
+    "type": "float",
+    "named": true
+  },
+  {
     "type": "fn",
     "named": false
   },
   {
-    "type": "link",
-    "named": true
-  },
-  {
-    "type": "literal_nat",
+    "type": "link_name",
     "named": true
   },
   {
@@ -1234,23 +886,23 @@
     "named": false
   },
   {
+    "type": "nat",
+    "named": true
+  },
+  {
     "type": "op",
     "named": false
   },
   {
     "type": "pub",
-    "named": false
+    "named": true
   },
   {
     "type": "string",
     "named": true
   },
   {
-    "type": "symbol",
-    "named": true
-  },
-  {
-    "type": "symbol_bare",
+    "type": "symbol_name",
     "named": true
   },
   {
@@ -1258,8 +910,12 @@
     "named": false
   },
   {
-    "type": "var",
+    "type": "var_name",
     "named": true
+  },
+  {
+    "type": "where",
+    "named": false
   },
   {
     "type": "wildcard",
