@@ -453,9 +453,6 @@ macro_rules! impl_from_str {
     };
 }
 
-impl_from_str!(SymbolName, symbol_name, parse_symbol_name);
-impl_from_str!(VarName, term_var, parse_var_name);
-impl_from_str!(LinkName, link_name, parse_link_name);
 impl_from_str!(Term, term, parse_term);
 impl_from_str!(Node, node, parse_node);
 impl_from_str!(Region, region, parse_region);
@@ -463,5 +460,4 @@ impl_from_str!(Param, param, parse_param);
 impl_from_str!(Package, package, parse_package);
 impl_from_str!(Module, module, parse_module);
 impl_from_str!(SeqPart, part, parse_seq_part);
-impl_from_str!(Literal, literal, parse_literal);
 impl_from_str!(Symbol, symbol, parse_symbol);

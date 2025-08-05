@@ -1,7 +1,7 @@
 use std::{
     iter::Peekable,
     ops::Range,
-    str::{CharIndices, Chars},
+    str::{CharIndices, Chars, FromStr},
     sync::{Arc, LazyLock},
 };
 
@@ -16,10 +16,25 @@ use crate::v0::{
     CORE_FN, CORE_META_DESCRIPTION, LinkName, Literal, SymbolName, VarName, Visibility,
 };
 
-use super::{Module, Node, Operation, Param, Region, SeqPart, Symbol, Term};
+use super::{Module, Node, Operation, Param, Region, SeqPart, Symbol, Term, names::NameParseError};
 
 #[derive(Debug, Error)]
-pub enum ParseError {}
+pub enum ParseError {
+    #[error("failed to parse literal")]
+    Literal {
+        #[source]
+        error: LiteralParseError,
+        location: Span,
+    },
+    #[error("failed to parse name")]
+    Name {
+        #[source]
+        error: NameParseError,
+        location: Span,
+    },
+}
+
+pub type Span = Range<usize>;
 
 type ParseResult<T> = Result<T, ParseError>;
 
@@ -228,13 +243,9 @@ fn parse_term(token: Token) -> ParseResult<Term> {
             let var = parse_var_name(node)?;
             Ok(Term::Var(var))
         }
-        "string" => {
-            let value = parse_string(node)?;
-            Ok(Term::Literal(Literal::Str(value)))
-        }
-        "nat" => {
-            let value = parse_nat(node)?;
-            Ok(Term::Literal(Literal::Nat(value)))
+        "literal" => {
+            let value = parse_literal(node)?;
+            Ok(Term::Literal(value))
         }
         "wildcard" => Ok(Term::Wildcard),
         "term_parens" => inner.parse_one("term", parse_term),
@@ -255,47 +266,38 @@ fn parse_seq_part(token: Token) -> ParseResult<SeqPart> {
 }
 
 fn parse_symbol_name(token: Token) -> ParseResult<SymbolName> {
-    todo!()
+    assert_eq!(token.name(), "symbol_name");
+    token.slice().parse().map_err(|error| ParseError::Name {
+        error,
+        location: token.range(),
+    })
 }
 
 fn parse_link_name(token: Token) -> ParseResult<LinkName> {
-    todo!()
+    assert_eq!(token.name(), "link_name");
+    token.slice().parse().map_err(|error| ParseError::Name {
+        error,
+        location: token.range(),
+    })
 }
 
 fn parse_var_name(token: Token) -> ParseResult<VarName> {
-    todo!()
+    assert_eq!(token.name(), "var_name");
+    token.slice().parse().map_err(|error| ParseError::Name {
+        error,
+        location: token.range(),
+    })
 }
 
-fn parse_string(node: Token) -> ParseResult<SmolStr> {
-    todo!()
-    // parse_string_literal(node.slice())
+fn parse_literal(token: Token) -> ParseResult<Literal> {
+    assert_eq!(token.name(), "literal");
+    token.slice().parse().map_err(|error| ParseError::Literal {
+        error,
+        location: token.range(),
+    })
 }
 
-fn parse_nat(node: Token) -> ParseResult<u64> {
-    node.slice().parse().map_err(|_| todo!())
-}
-
-fn parse_sigil_id(sigil: char, str: &str) -> Result<SmolStr, IdParseError> {
-    let Some(str) = str.strip_prefix(sigil) else {
-        return Err(IdParseError::UnexpectedSigil { expected: sigil });
-    };
-
-    if str.starts_with('"') {
-        Ok(parse_string_literal(str)?)
-    } else {
-        Ok(str.to_smolstr())
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum IdParseError {
-    #[error("expected sigil `{expected}`")]
-    UnexpectedSigil { expected: char },
-    #[error("error parsing string escaped id")]
-    String(#[from] StringParseError),
-}
-
-fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseError> {
+pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseError> {
     let mut builder = SmolStrBuilder::new();
     let mut chars = str.char_indices();
 
@@ -347,6 +349,20 @@ pub enum StringParseError {
     BadUnicode,
     #[error("unknown unicode code point {0}")]
     UnknownUnicode(u32),
+}
+
+impl FromStr for Literal {
+    type Err = LiteralParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum LiteralParseError {
+    #[error("failed to parse string")]
+    String(#[from] StringParseError),
 }
 
 #[derive(Debug, Clone, Copy)]

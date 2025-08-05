@@ -27,6 +27,7 @@ use bumpalo::Bump;
 use super::table::{self};
 use super::{LinkName, Literal, RegionKind, SymbolName, VarName, Visibility};
 
+mod names;
 mod parse;
 mod print;
 #[cfg(feature = "pyo3")]

@@ -440,21 +440,3 @@ impl_display!(Term, print_term);
 impl_display!(SeqPart, print_seq_part);
 impl_display!(Literal, print_literal);
 impl_display!(Symbol, print_symbol);
-
-impl Display for VarName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "?{}", self.0)
-    }
-}
-
-impl Display for SymbolName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl Display for LinkName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "%{}", self.0)
-    }
-}
