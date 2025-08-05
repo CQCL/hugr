@@ -1,22 +1,18 @@
-use std::{
-    iter::Peekable,
-    ops::Range,
-    str::{CharIndices, Chars, FromStr},
-    sync::{Arc, LazyLock},
-};
-
 use itertools::Itertools;
-use regex::Regex;
-use smol_str::{SmolStr, SmolStrBuilder, ToSmolStr};
+use smol_str::ToSmolStr;
+use std::ops::Range;
 use thiserror::Error;
 use tree_sitter::{Node as TSNode, TreeCursor};
 use tree_sitter_hugr;
 
 use crate::v0::{
-    CORE_FN, CORE_META_DESCRIPTION, LinkName, Literal, SymbolName, VarName, Visibility,
+    CORE_FN, CORE_META_DESCRIPTION, LinkName, Literal, RegionKind, SymbolName, VarName, Visibility,
 };
 
-use super::{Module, Node, Operation, Param, Region, SeqPart, Symbol, Term, names::NameParseError};
+use super::{
+    Module, Node, Operation, Param, Region, SeqPart, Symbol, Term, literals::LiteralParseError,
+    names::NameParseError,
+};
 
 #[derive(Debug, Error)]
 pub enum ParseError {
@@ -57,6 +53,23 @@ fn test() {
 
     // walk.debug();
     panic!("{}", root.to_sexp());
+}
+
+fn parse_module(token: Token) -> ParseResult<Module> {
+    let mut inner = token.children();
+    let meta = parse_meta_seq(&mut inner)?;
+    let children = inner.map(parse_node).try_collect()?;
+
+    Ok(Module {
+        root: Region {
+            kind: RegionKind::Module,
+            sources: Default::default(),
+            targets: Default::default(),
+            children,
+            meta,
+            signature: None,
+        },
+    })
 }
 
 fn parse_node(token: Token) -> ParseResult<Node> {
@@ -297,74 +310,6 @@ fn parse_literal(token: Token) -> ParseResult<Literal> {
     })
 }
 
-pub(crate) fn parse_string_literal(str: &str) -> Result<SmolStr, StringParseError> {
-    let mut builder = SmolStrBuilder::new();
-    let mut chars = str.char_indices();
-
-    while let Some((_, char)) = chars.next() {
-        let unescaped = match char {
-            '"' => return Err(StringParseError::UnescapedQuote),
-            '\\' => {
-                let (start, char) = chars.next().ok_or(StringParseError::MissingEscape)?;
-                match char {
-                    'n' => '\n',
-                    'r' => '\r',
-                    't' => '\t',
-                    '\\' => '\\',
-                    '"' => '"',
-                    'u' => {
-                        let rest = str[start..]
-                            .strip_prefix("u{")
-                            .ok_or(StringParseError::BadUnicode)?;
-                        let (code_str, rest) =
-                            rest.split_once("}").ok_or(StringParseError::BadUnicode)?;
-                        let code = u32::from_str_radix(code_str, 16)
-                            .map_err(|_| StringParseError::BadUnicode)?;
-                        let char = char::from_u32(code)
-                            .ok_or_else(|| StringParseError::UnknownUnicode(code))?;
-                        chars = rest.char_indices();
-                        char
-                    }
-                    _ => return Err(StringParseError::UnknownEscape(char)),
-                }
-            }
-            char => char,
-        };
-
-        builder.push(unescaped);
-    }
-
-    Ok(builder.finish())
-}
-
-#[derive(Debug, Error)]
-pub enum StringParseError {
-    #[error("unknown escape char `{0}`")]
-    UnknownEscape(char),
-    #[error("missing escaped char after backslash")]
-    MissingEscape,
-    #[error("unescaped quote")]
-    UnescapedQuote,
-    #[error("badly formatted unicode escape sequence")]
-    BadUnicode,
-    #[error("unknown unicode code point {0}")]
-    UnknownUnicode(u32),
-}
-
-impl FromStr for Literal {
-    type Err = LiteralParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum LiteralParseError {
-    #[error("failed to parse string")]
-    String(#[from] StringParseError),
-}
-
 #[derive(Debug, Clone, Copy)]
 struct Token<'a> {
     source: &'a str,
@@ -401,15 +346,18 @@ struct Tokens<'a> {
 }
 
 impl<'a> Tokens<'a> {
-    /// Peeks at the next node in the parser.
-    pub fn peek(&self) -> Option<Token<'a>> {
-        self.token
-    }
-
+    /// Create an iterator over all subsequent tokens for a specified rule.
     pub fn take_rule<'p>(&'p mut self, rule: &'static str) -> RuleParser<'p, 'a> {
         RuleParser { parser: self, rule }
     }
 
+    /// Parse one token for a specified rule.
+    ///
+    /// Use this method when the grammar guarantees that such a token will be present.
+    ///
+    /// # Panics
+    ///
+    /// Panics when there are no tokens left or the next token is for a different rule.
     pub fn parse_one<T, F>(&mut self, rule: &'static str, parse: F) -> ParseResult<T>
     where
         F: FnOnce(Token<'a>) -> ParseResult<T>,
@@ -425,6 +373,7 @@ impl<'a> Tokens<'a> {
         parse(token)
     }
 
+    /// Parse many tokens for a specified rule.
     pub fn parse_many<T, C, F>(&mut self, rule: &'static str, parse: F) -> ParseResult<C>
     where
         C: FromIterator<T>,
@@ -433,6 +382,7 @@ impl<'a> Tokens<'a> {
         self.take_rule(rule).map(parse).try_collect()
     }
 
+    /// Parse up to one token for a specified rule.
     pub fn parse_opt<T, F>(&mut self, rule: &'static str, parse: F) -> ParseResult<Option<T>>
     where
         F: FnOnce(Token<'a>) -> ParseResult<T>,
@@ -470,7 +420,7 @@ impl<'p, 'a> Iterator for RuleParser<'p, 'a> {
     type Item = Token<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let node = self.parser.peek()?;
+        let node = self.parser.token?;
 
         if node.name() == self.rule {
             self.parser.next()

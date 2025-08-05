@@ -4,8 +4,9 @@ use regex::Regex;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
-use super::ts::{StringParseError, parse_string_literal};
 use crate::v0::{LinkName, Literal, SymbolName, VarName};
+
+use super::literals::{StringParseError, parse_string_literal};
 
 /// Check if a name can be printed as a bare name or if it needs to be wrapped
 /// in a string.
