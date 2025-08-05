@@ -57,6 +57,7 @@ impl MermaidArgs {
 
     /// Write the mermaid diagram for a legacy HUGR json.
     pub fn run_print_hugr(&mut self) -> Result<()> {
+        #[allow(deprecated)]
         let hugr = self.input_args.get_hugr()?;
 
         if self.validate {

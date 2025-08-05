@@ -28,6 +28,7 @@ impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<()> {
         if self.input_args.hugr_json {
+            #[allow(deprecated)]
             let hugr = self.input_args.get_hugr()?;
             let generator = hugr::envelope::get_generator(&[&hugr]);
 

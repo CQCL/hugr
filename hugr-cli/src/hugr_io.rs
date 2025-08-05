@@ -72,6 +72,7 @@ impl HugrInputArgs {
     /// [`HugrInputArgs::hugr_json`] flag is used.
     ///
     /// For most cases, [`HugrInputArgs::get_package`] should be called instead.
+    #[deprecated(note = "Use `HugrInputArgs::get_package` instead.", since = "0.22.2")]
     pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
         let extensions = self.load_extensions()?;
         let mut buffer = BufReader::new(&mut self.input);
