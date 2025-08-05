@@ -49,7 +49,7 @@ module.exports = grammar({
 
     symbol_function: ($) =>
       seq(
-        field("doc", optional($.doc_comment)),
+        field("doc", repeat($.doc_comment)),
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "fn",
@@ -63,7 +63,7 @@ module.exports = grammar({
 
     symbol_ctr: ($) =>
       seq(
-        field("doc", optional($.doc_comment)),
+        field("doc", repeat($.doc_comment)),
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "ctr",
@@ -76,7 +76,7 @@ module.exports = grammar({
 
     symbol_op: ($) =>
       seq(
-        field("doc", optional($.doc_comment)),
+        field("doc", repeat($.doc_comment)),
         field("meta", repeat($.meta)),
         field("visibility", optional($.pub)),
         "op",
@@ -116,7 +116,7 @@ module.exports = grammar({
         "}",
       ),
 
-    doc_comment: ($) => repeat1(seq("///", /[^\r\n]*\r?\n/)),
+    doc_comment: ($) => token(seq("///", /[^\r\n]*\r?\n/)),
 
     term: ($) =>
       choice(

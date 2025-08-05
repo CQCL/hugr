@@ -74,6 +74,8 @@ fn test() {
             panic!();
         }
     };
+
+    panic!("{}", package);
 }
 
 fn parse(source: &str) -> ParseResult<Package> {
@@ -257,7 +259,7 @@ fn parse_meta_seq(tokens: &mut Tokens) -> ParseResult<Box<[Term]>> {
     let mut meta: Vec<_> = tokens.parse_many("meta", parse_meta)?;
 
     if !doc_lines.is_empty() {
-        let doc = Term::Literal(Literal::Str(doc_lines.join("").to_smolstr()));
+        let doc = Term::Literal(Literal::Str(doc_lines.join("\n").to_smolstr()));
         meta.insert(
             0,
             Term::Apply(SymbolName::new(CORE_META_DESCRIPTION), [doc].into()),
@@ -268,7 +270,9 @@ fn parse_meta_seq(tokens: &mut Tokens) -> ParseResult<Box<[Term]>> {
 }
 
 fn parse_doc_comment<'a>(token: Token<'a>) -> ParseResult<&'a str> {
-    Ok(token.slice().strip_prefix("/// ").unwrap())
+    let comment = token.slice().strip_prefix("///").unwrap().trim();
+    println!("Comment: `{}`", comment);
+    Ok(comment)
 }
 
 fn parse_meta(token: Token) -> ParseResult<Term> {

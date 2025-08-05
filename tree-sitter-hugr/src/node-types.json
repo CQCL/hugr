@@ -15,11 +15,6 @@
     }
   },
   {
-    "type": "doc_comment",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "func_type",
     "named": true,
     "fields": {
@@ -375,7 +370,7 @@
         ]
       },
       "doc": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
@@ -477,7 +472,7 @@
         ]
       },
       "doc": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
@@ -585,7 +580,7 @@
         ]
       },
       "doc": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
@@ -829,10 +824,6 @@
     "named": false
   },
   {
-    "type": "///",
-    "named": false
-  },
-  {
     "type": ":",
     "named": false
   },
@@ -868,6 +859,10 @@
   {
     "type": "ctr",
     "named": false
+  },
+  {
+    "type": "doc_comment",
+    "named": true
   },
   {
     "type": "float",
