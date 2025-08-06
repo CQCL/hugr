@@ -16,7 +16,7 @@ categories = ["compilers"]
 name = "persistent_walker_example"
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.23.0" }
+hugr-core = { path = "../hugr-core", version = "0.22.2" }
 
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 delegate.workspace = true

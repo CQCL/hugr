@@ -1,7 +1,7 @@
 # Changelog
 
 
-## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.1...hugr-llvm-v0.23.0) - 2025-08-06
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.1...hugr-llvm-v0.22.2) - 2025-08-06
 
 ### Bug Fixes
 
