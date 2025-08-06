@@ -2181,8 +2181,9 @@ checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
 
 [[package]]
 name = "portgraph"
-version = "0.15.1"
-source = "git+https://github.com/CQCL/portgraph?rev=7019dd6#7019dd6d651f82b7ee320e9345365e72722d2449"
+version = "0.15.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "654a4341391cb49edc51ea9905b8271e5c2685bb0fdf09eda940f6281fbc95a9"
 dependencies = [
  "bitvec",
  "delegate",
