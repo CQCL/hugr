@@ -1,5 +1,5 @@
 ---
-source: src/extension/prelude.rs
+source: hugr-llvm/src/extension/prelude.rs
 expression: mod_str
 ---
 ; ModuleID = 'test_context'
@@ -8,7 +8,7 @@ source_filename = "test_context"
 @0 = private unnamed_addr constant [14 x i8] c"Hello, world!\00", align 1
 @prelude.print_template = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
 
-define void @_hl.main.1() {
+define private void @_hl.main.1() {
 alloca_block:
   %"5_0" = alloca i8*, align 8
   br label %entry_block

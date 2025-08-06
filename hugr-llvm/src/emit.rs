@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
-    HugrView, Node,
+    HugrView, Node, Visibility,
     ops::{FuncDecl, FuncDefn, OpType},
     types::PolyFuncType,
 };
@@ -128,13 +128,18 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         name: impl AsRef<str>,
         node: Node,
         func_ty: &PolyFuncType,
+        visibility: &Visibility,
     ) -> Result<FunctionValue<'c>> {
         let func_ty = (func_ty.params().is_empty())
             .then_some(func_ty.body())
             .ok_or(anyhow!("function has type params"))?;
         let llvm_func_ty = self.llvm_func_type(func_ty)?;
         let name = self.name_func(name, node);
-        self.get_func_impl(name, llvm_func_ty, None)
+        match visibility {
+            Visibility::Public => self.get_func_impl(name, llvm_func_ty, Some(Linkage::External)),
+            Visibility::Private => self.get_func_impl(name, llvm_func_ty, Some(Linkage::Private)),
+            _ => self.get_func_impl(name, llvm_func_ty, None),
+        }
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDefn`].
@@ -147,7 +152,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature())
+        self.get_hugr_func_impl(
+            node.func_name(),
+            node.node(),
+            node.signature(),
+            node.visibility(),
+        )
     }
 
     /// Adds or gets the [`FunctionValue`] in the [Module] corresponding to the given [`FuncDecl`].
@@ -160,7 +170,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     where
         H: HugrView<Node = Node>,
     {
-        self.get_hugr_func_impl(node.func_name(), node.node(), node.signature())
+        self.get_hugr_func_impl(
+            node.func_name(),
+            node.node(),
+            node.signature(),
+            node.visibility(),
+        )
     }
 
     /// Adds or get the [`FunctionValue`] in the [Module] with the given symbol
