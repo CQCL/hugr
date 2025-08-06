@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-v0.22.1...hugr-v0.23.0) - 2025-08-06
+
+### New Features
+
+- Type of constants in `core` `Term`s. ([#2411](https://github.com/CQCL/hugr/pull/2411))
+- Support LineConvexChecker ([#2487](https://github.com/CQCL/hugr/pull/2487))
+
 ## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-v0.22.0...hugr-v0.22.1) - 2025-07-28
 
 ### New Features
