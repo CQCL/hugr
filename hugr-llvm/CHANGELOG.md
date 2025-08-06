@@ -1,5 +1,12 @@
 # Changelog
 
+
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.1...hugr-llvm-v0.22.2) - 2025-08-06
+
+### Bug Fixes
+
+- added public func getter for EmitFuncContext ([#2482](https://github.com/CQCL/hugr/pull/2482))
+- *(hugr-llvm)* Set llvm function linkage based on Visibility hugr node field ([#2502](https://github.com/CQCL/hugr/pull/2502))
 # Changelog
 All notable changes to this project will be documented in this file.
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.1...hugr-cli-v0.22.2) - 2025-08-06
+
+### New Features
+
+- *(cli)* Deprecate HugrInputArgs::get_hugr ([#2506](https://github.com/CQCL/hugr/pull/2506))
 
 ## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.21.0...hugr-cli-v0.22.0) - 2025-07-24
 
