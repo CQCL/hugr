@@ -54,7 +54,7 @@ module.exports = grammar({
         field("visibility", optional($.pub)),
         "fn",
         field("name", $.symbol_name),
-        optional(field("parameters", seq("(", commaSep1($.param), ")"))),
+        optional(field("parameters", seq("[", commaSep1($.param), "]"))),
         optional(field("constraints", $.constraints)),
         optional(field("signature", seq(":", $.term))),
         optional(field("body", $.region)),
@@ -68,7 +68,7 @@ module.exports = grammar({
         field("visibility", optional($.pub)),
         "ctr",
         field("name", $.symbol_name),
-        optional(field("parameters", seq("(", commaSep1($.param), ")"))),
+        optional(field("parameters", seq("[", commaSep1($.param), "]"))),
         optional(field("constraints", $.constraints)),
         field("signature", seq(":", $.term)),
         ";",
@@ -81,7 +81,7 @@ module.exports = grammar({
         field("visibility", optional($.pub)),
         "op",
         field("name", $.symbol_name),
-        optional(field("parameters", seq("(", commaSep1($.param), ")"))),
+        optional(field("parameters", seq("[", commaSep1($.param), "]"))),
         optional(field("constraints", $.constraints)),
         field("signature", seq(":", $.term)),
         ";",
@@ -105,16 +105,27 @@ module.exports = grammar({
 
     _signature: ($) => seq(":", $.term),
 
-    region: ($) => seq(choice($.region_dfg)),
+    region: ($) => seq(choice($.region_dfg, $.region_cfg)),
     region_dfg: ($) =>
       seq(
         "{",
         field("meta", repeat($.region_meta)),
-        field("sources", optional(seq(commaSep($.link_name), "=>"))),
+        field("sources", optional($.sources)),
         field("body", repeat($.operation)),
         field("targets", commaSep($.link_name)),
         "}",
       ),
+    region_cfg: ($) =>
+      seq(
+        "{|",
+        field("meta", repeat($.region_meta)),
+        field("sources", optional(seq(commaSep($.link_name), "=>"))),
+        field("body", repeat($.operation)),
+        field("targets", commaSep($.link_name)),
+        "|}",
+      ),
+
+    sources: ($) => seq(commaSep($.link_name), "=>"),
 
     doc_comment: ($) => token(seq("///", /[^\r\n]*\r?\n/)),
 
@@ -133,7 +144,7 @@ module.exports = grammar({
     term_apply: ($) =>
       seq(
         field("symbol", $.symbol_name),
-        optional(field("arguments", seq("(", commaSep($.term), ")"))),
+        optional(field("arguments", seq("[", commaSep($.term), "]"))),
       ),
     term_list: ($) => seq("[", commaSep(choice($.term, $.splice)), "]"),
     term_tuple: ($) =>
@@ -154,20 +165,8 @@ module.exports = grammar({
         seq(field("inputs", $.term), "->", field("outputs", $.term)),
       ),
 
-    meta: ($) =>
-      seq(
-        "#[",
-        field("name", $.symbol_bare),
-        optional(field("arguments", seq("(", commaSep1($.term), ")"))),
-        "]",
-      ),
-    region_meta: ($) =>
-      seq(
-        "#![",
-        $.symbol_bare,
-        optional(seq("(", commaSep1($.term), ")")),
-        "]",
-      ),
+    meta: ($) => seq("#[", field("meta", $.term), "]"),
+    region_meta: ($) => seq("#![", field("meta", $.term), "]"),
 
     // Literals
     literal: ($) => choice($.string, $.nat, $.bytes, $.float),

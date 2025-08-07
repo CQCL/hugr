@@ -1,0 +1,16 @@
+mod {
+  /// This is a function declaration.
+  pub fn @example.callee : [@arithmetic.int.types.int(6)] -> [@arithmetic.int.types.int(6)];
+
+  /// This defines a function that calls the function we have declared earlier.
+  pub fn @example.caller : [@arithmetic.int.types.int(6)] -> [@arithmetic.int.types.int(6)] {
+    %0 =>
+    %1 = @core.call(@example.callee) %0 : [@arithmetic.int.types.int(6)] -> [@arithmetic.int.types.int(6)];
+    %1
+  };
+
+  pub fn @example.load : [] -> [[@arithmetic.int.types.int(6)] -> [@arithmetic.int.types.int(6)]] {
+    %0 = @core.load_const(@example.caller) : [] -> [[@arithmetic.int.types.int(6)] -> [@arithmetic.int.types.int(6)]];
+    %0
+  };
+}

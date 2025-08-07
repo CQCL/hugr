@@ -1,7 +1,8 @@
-["mod" "fn" "pub" "ctr" "op" "use"] @keyword
-(symbol) @function
-(var) @variable
-(link) @variable
+["mod" "fn" "ctr" "op" "use"] @keyword
+(pub) @keyword
+(symbol_name) @function
+(var_name) @variable
+(link_name) @variable
 
 ["#[" "[" "]" "{" "}" "(" ")" ":" ";" ","] @punctuation
 
@@ -12,4 +13,4 @@
 (string) @string
 (comment) @comment
 (doc_comment) @comment
-(literal_nat) @constant.numeric.integer
+(nat) @constant.numeric.integer

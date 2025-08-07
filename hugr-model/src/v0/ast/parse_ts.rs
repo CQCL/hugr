@@ -84,8 +84,8 @@ fn parse(source: &str) -> ParseResult<Package> {
         .set_language(&tree_sitter_hugr::LANGUAGE.into())
         .expect("failed to set `hugr` language in tree-sitter parser");
 
-    // NOTE: The `parse` method should always succeed. Parse errors are communicated
-    // via error ndoes in the produced AST.
+    // NOTE: The `parse` method should always succeed.
+    // Parse errors are communicated via error ndoes in the produced AST.
     let ast = parser.parse(source, None).unwrap();
     let root = ast.root_node();
 
@@ -103,6 +103,24 @@ fn parse(source: &str) -> ParseResult<Package> {
     parse_package(Token { node: root, source })
 }
 
+/// Error hint to show for parser bugs.
+const ERROR_HINT: &str = concat!(
+    "This is a bug in the parser and *not* a parse error caused by invalid input.\n",
+    "It might have been caused by a mismatch between the tree-sitter grammar and the `hugr-model` parser code."
+);
+
+/// Expect a token to correspond to a given grammar rule, when encountering a token
+/// for a different rule should be considered a bug in the parser.
+#[inline(always)]
+fn expect_rule(token: Token, rule: &str) {
+    let actual = token.name();
+    debug_assert_eq!(
+        rule, actual,
+        "Expected token for grammar rule `{}` but got `{}`.\n{}",
+        rule, actual, ERROR_HINT
+    );
+}
+
 fn parse_package(token: Token) -> ParseResult<Package> {
     let mut inner = token.children();
     let modules = inner.parse_many("module", parse_module)?;
@@ -110,7 +128,7 @@ fn parse_package(token: Token) -> ParseResult<Package> {
 }
 
 fn parse_module(token: Token) -> ParseResult<Module> {
-    debug_assert_eq!(token.name(), "module");
+    expect_rule(token, "module");
     let mut inner = token.children();
     let meta = parse_meta_seq(&mut inner)?;
     let children = inner.map(parse_node).try_collect()?;
@@ -155,7 +173,7 @@ fn parse_symbol(tokens: &mut Tokens) -> ParseResult<Symbol> {
 }
 
 fn parse_symbol_function(token: Token) -> ParseResult<Node> {
-    assert_eq!(token.name(), "symbol_function");
+    expect_rule(token, "symbol_function");
     let mut inner = token.children();
 
     let meta = parse_meta_seq(&mut inner)?;
@@ -176,7 +194,7 @@ fn parse_symbol_function(token: Token) -> ParseResult<Node> {
 }
 
 fn parse_symbol_ctr(token: Token) -> ParseResult<Node> {
-    assert_eq!(token.name(), "symbol_ctr");
+    expect_rule(token, "symbol_ctr");
     let mut inner = token.children();
 
     let meta = parse_meta_seq(&mut inner)?;
@@ -193,7 +211,7 @@ fn parse_symbol_ctr(token: Token) -> ParseResult<Node> {
 }
 
 fn parse_symbol_op(token: Token) -> ParseResult<Node> {
-    assert_eq!(token.name(), "symbol_op");
+    expect_rule(token, "symbol_op");
     let mut inner = token.children();
 
     let meta = parse_meta_seq(&mut inner)?;
@@ -210,7 +228,7 @@ fn parse_symbol_op(token: Token) -> ParseResult<Node> {
 }
 
 fn parse_operation(token: Token) -> ParseResult<Node> {
-    assert_eq!(token.name(), "operation");
+    expect_rule(token, "operation");
     let mut inner = token.children();
     let meta = inner.parse_many("meta", parse_meta)?;
     let outputs = inner.parse_many("link_name", parse_link_name)?;
@@ -229,8 +247,33 @@ fn parse_operation(token: Token) -> ParseResult<Node> {
 }
 
 fn parse_region(token: Token) -> ParseResult<Region> {
-    assert_eq!(token.name(), "region");
+    expect_rule(token, "region");
     todo!()
+}
+
+fn parse_region_dfg(token: Token) -> ParseResult<Region> {
+    expect_rule(token, "region_dfg");
+    let mut inner = token.children();
+
+    let meta = inner.parse_many("region_meta", parse_region_meta)?;
+    let sources = inner
+        .parse_opt("sources", parse_sources)?
+        .unwrap_or_default();
+    let children = inner.parse_many("operation", parse_operation)?;
+    let targets = inner.parse_many("link_name", parse_link_name)?;
+    Ok(Region {
+        kind: RegionKind::ControlFlow,
+        sources,
+        targets,
+        children,
+        meta,
+        signature: None,
+    })
+}
+
+fn parse_sources(token: Token) -> ParseResult<Box<[LinkName]>> {
+    expect_rule(token, "sources");
+    token.children().map(parse_link_name).try_collect()
 }
 
 fn parse_visibility(tokens: &mut Tokens) -> ParseResult<Visibility> {
@@ -242,12 +285,12 @@ fn parse_visibility(tokens: &mut Tokens) -> ParseResult<Visibility> {
 }
 
 fn parse_constraints(token: Token) -> ParseResult<Box<[Term]>> {
-    assert_eq!(token.name(), "constraints");
+    expect_rule(token, "constraints");
     token.children().map(parse_term).try_collect()
 }
 
 fn parse_param(token: Token) -> ParseResult<Param> {
-    assert_eq!(token.name(), "param");
+    expect_rule(token, "param");
     let mut inner = token.children();
     let name = inner.parse_one("var_name", parse_var_name)?;
     let r#type = inner.parse_one("term", parse_term)?;
@@ -271,17 +314,21 @@ fn parse_meta_seq(tokens: &mut Tokens) -> ParseResult<Box<[Term]>> {
 
 fn parse_doc_comment<'a>(token: Token<'a>) -> ParseResult<&'a str> {
     let comment = token.slice().strip_prefix("///").unwrap().trim();
-    println!("Comment: `{}`", comment);
     Ok(comment)
 }
 
 fn parse_meta(token: Token) -> ParseResult<Term> {
-    assert_eq!(token.name(), "meta");
+    expect_rule(token, "meta");
+    token.children().parse_one("term", parse_term)
+}
+
+fn parse_region_meta(token: Token) -> ParseResult<Term> {
+    expect_rule(token, "region_meta");
     token.children().parse_one("term", parse_term)
 }
 
 fn parse_term(token: Token) -> ParseResult<Term> {
-    assert_eq!(token.name(), "term");
+    expect_rule(token, "term");
 
     let mut inner = token.children();
     let node = inner.next().unwrap();
@@ -336,7 +383,7 @@ fn parse_seq_part(token: Token) -> ParseResult<SeqPart> {
 }
 
 fn parse_symbol_name(token: Token) -> ParseResult<SymbolName> {
-    assert_eq!(token.name(), "symbol_name");
+    expect_rule(token, "symbol_name");
     token.slice().parse().map_err(|error| ParseError::Name {
         error,
         location: token.range(),
@@ -344,7 +391,7 @@ fn parse_symbol_name(token: Token) -> ParseResult<SymbolName> {
 }
 
 fn parse_link_name(token: Token) -> ParseResult<LinkName> {
-    assert_eq!(token.name(), "link_name");
+    expect_rule(token, "link_name");
     token.slice().parse().map_err(|error| ParseError::Name {
         error,
         location: token.range(),
@@ -352,7 +399,7 @@ fn parse_link_name(token: Token) -> ParseResult<LinkName> {
 }
 
 fn parse_var_name(token: Token) -> ParseResult<VarName> {
-    assert_eq!(token.name(), "var_name");
+    expect_rule(token, "var_name");
     token.slice().parse().map_err(|error| ParseError::Name {
         error,
         location: token.range(),
@@ -360,7 +407,7 @@ fn parse_var_name(token: Token) -> ParseResult<VarName> {
 }
 
 fn parse_literal(token: Token) -> ParseResult<Literal> {
-    assert_eq!(token.name(), "literal");
+    expect_rule(token, "literal");
     token.slice().parse().map_err(|error| ParseError::Literal {
         error,
         location: token.range(),
