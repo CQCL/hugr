@@ -136,3 +136,17 @@ pub enum CliError {
         generator: Box<String>,
     },
 }
+
+impl CliError {
+    /// Returns a validation error, with an optional generator.
+    pub fn validation(generator: Option<String>, val_err: PackageValidationError) -> Self {
+        if let Some(g) = generator {
+            Self::ValidateKnownGenerator {
+                inner: val_err,
+                generator: Box::new(g.to_string()),
+            }
+        } else {
+            Self::Validate(val_err)
+        }
+    }
+}
