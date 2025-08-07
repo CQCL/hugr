@@ -7,6 +7,7 @@ use tree_sitter_hugr;
 
 use crate::v0::{
     CORE_FN, CORE_META_DESCRIPTION, LinkName, Literal, RegionKind, SymbolName, VarName, Visibility,
+    scope::SymbolTable,
 };
 
 use super::{
@@ -65,7 +66,8 @@ type ParseResult<T> = Result<T, ParseError>;
 
 #[test]
 fn test() {
-    let src = include_str!("../../../core.thugr");
+    // let src = include_str!("../../../core.thugr");
+    let src = include_str!("../../../tests/fixtures/test.thugr");
 
     let package = match parse(src) {
         Ok(package) => package,
@@ -231,49 +233,61 @@ fn parse_operation(token: Token) -> ParseResult<Node> {
     expect_rule(token, "operation");
     let mut inner = token.children();
     let meta = inner.parse_many("meta", parse_meta)?;
-    let outputs = inner.parse_many("link_name", parse_link_name)?;
+    let (inputs, input_types) = parse_typed_links(&mut inner)?;
     let operation = inner.parse_one("term", parse_term)?;
-    let inputs = inner.parse_many("link_name", parse_link_name)?;
+    let (outputs, output_types) = parse_typed_links(&mut inner)?;
     let regions = inner.parse_many("region", parse_region)?;
-    let signature = inner.parse_opt("term", parse_term)?;
+
+    let signature = Term::Apply(SymbolName::new(CORE_FN), [input_types, output_types].into());
+
     Ok(Node {
         operation: Operation::Custom(operation),
         inputs,
         outputs,
         regions,
         meta,
-        signature,
+        signature: Some(signature),
     })
 }
 
 fn parse_region(token: Token) -> ParseResult<Region> {
     expect_rule(token, "region");
-    todo!()
+    let mut inner = token.children();
+    inner.parse_one("region_dfg", parse_region_dfg)
 }
 
 fn parse_region_dfg(token: Token) -> ParseResult<Region> {
     expect_rule(token, "region_dfg");
     let mut inner = token.children();
 
-    let meta = inner.parse_many("region_meta", parse_region_meta)?;
-    let sources = inner
-        .parse_opt("sources", parse_sources)?
-        .unwrap_or_default();
+    let meta = inner.parse_many("meta", parse_meta)?;
+    let (sources, source_types) = inner.parse_one("sources", parse_sources)?;
+    let (targets, target_types) = inner.parse_one("targets", parse_targets)?;
     let children = inner.parse_many("operation", parse_operation)?;
-    let targets = inner.parse_many("link_name", parse_link_name)?;
+
+    let signature = Term::Apply(
+        SymbolName::new(CORE_FN),
+        [source_types, target_types].into(),
+    );
+
     Ok(Region {
         kind: RegionKind::ControlFlow,
         sources,
         targets,
         children,
         meta,
-        signature: None,
+        signature: Some(signature),
     })
 }
 
-fn parse_sources(token: Token) -> ParseResult<Box<[LinkName]>> {
+fn parse_sources(token: Token) -> ParseResult<(Box<[LinkName]>, Term)> {
     expect_rule(token, "sources");
-    token.children().map(parse_link_name).try_collect()
+    parse_typed_links(&mut token.children())
+}
+
+fn parse_targets(token: Token) -> ParseResult<(Box<[LinkName]>, Term)> {
+    expect_rule(token, "targets");
+    parse_typed_links(&mut token.children())
 }
 
 fn parse_visibility(tokens: &mut Tokens) -> ParseResult<Visibility> {
@@ -319,11 +333,6 @@ fn parse_doc_comment<'a>(token: Token<'a>) -> ParseResult<&'a str> {
 
 fn parse_meta(token: Token) -> ParseResult<Term> {
     expect_rule(token, "meta");
-    token.children().parse_one("term", parse_term)
-}
-
-fn parse_region_meta(token: Token) -> ParseResult<Term> {
-    expect_rule(token, "region_meta");
     token.children().parse_one("term", parse_term)
 }
 
@@ -388,6 +397,28 @@ fn parse_symbol_name(token: Token) -> ParseResult<SymbolName> {
         error,
         location: token.range(),
     })
+}
+
+fn parse_typed_link(token: Token) -> ParseResult<(LinkName, Option<Term>)> {
+    expect_rule(token, "typed_link");
+    let mut inner = token.children();
+    let link = inner.parse_one("link_name", parse_link_name)?;
+    let typ = inner.parse_opt("term", parse_term)?;
+    Ok((link, typ))
+}
+
+fn parse_typed_links(tokens: &mut Tokens) -> ParseResult<(Box<[LinkName]>, Term)> {
+    let combined: Vec<_> = tokens.parse_many("typed_link", parse_typed_link)?;
+    let (links, types) = combined.into_iter().unzip::<_, _, Vec<_>, Vec<_>>();
+
+    let types = Term::List(
+        types
+            .into_iter()
+            .map(|typ| SeqPart::Item(typ.unwrap_or_default()))
+            .collect(),
+    );
+
+    Ok((links.into(), types))
 }
 
 fn parse_link_name(token: Token) -> ParseResult<LinkName> {
@@ -506,8 +537,8 @@ impl<'a> Iterator for Tokens<'a> {
         let token = self.token.take()?;
         self.count -= 1;
         debug_assert!(!token.node.is_error());
-        let node = token.node.next_named_sibling();
-        self.token = node.map(|node| Token {
+        let next = token.node.next_named_sibling();
+        self.token = next.map(|node| Token {
             node,
             source: token.source,
         });

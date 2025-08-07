@@ -5,10 +5,7 @@
 (link_name) @variable
 
 ["#[" "[" "]" "{" "}" "(" ")" ":" ";" ","] @punctuation
-
-["=>" "->"] @operator
-
-(meta name: (symbol_bare)) @function
+["->"] @operator
 
 (string) @string
 (comment) @comment

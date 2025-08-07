@@ -1,0 +1,62 @@
+mod {
+  // Functions are definited in a familiar syntax.
+  // We also give names to the outputs.
+
+  pub fn @swap_via_cnot(%0: @quantum.qubit, %1: @quantum.qubit) -> (%6: @quantum.qubit, %7: @quantum.qubit) {
+    %2: @quantum.qubit, %3: @quantum.qubit = @quantum.cnot %0: @quantum.qubit, %1: @quantum.qubit;
+    %5: @quantum.qubit, %4: @quantum.qubit = @quantum.cnot %3: @quantum.qubit, %2: @quantum.qubit;
+    %6: @quantum.qubit, %7: @quantum.qubit = @quantum.cnot %4: @quantum.qubit, %5: @quantum.qubit;
+  };
+
+  // The syntax allows to leave out types to reduce the noise.
+  // Currently this will fail import, but this can be quite neat once we have inference.
+  
+  pub fn @swap_via_cnot_2(%0: @quantum.qubit, %1: @quantum.qubit) -> (%6: @quantum.qubit, %7: @quantum.qubit) {
+    %2, %3 = @quantum.cnot %0, %1;
+    %5, %4 = @quantum.cnot %3, %2;
+    %6, %7 = @quantum.cnot %4, %5;
+  };
+
+  // Square brackets are used for static parameters.
+  // This can be used for polymorphic functions.
+  
+  pub fn @swap_directly[?a: @core.type, ?b: @core.type](%0: ?a, %1: ?b) -> (%1: ?b, %0: ?a) {};
+
+  // Function declarations omit the body. Instead we provide the function type.
+  
+  pub fn @t_gate: [@quantum.qubit] -> [@quantum.qubit];
+
+  // Nested regions have reasonably concise syntax.
+
+  /// Compute the Collatz sequence given an initial value until it reaches `1`.
+  pub fn @collatz(%initial: @arithmetic.int.types.int[6]) -> () {
+    %zero = @core.load_const[@arithmetic.int.const[6, 0]];
+    %one = @core.load_const[@arithmetic.int.const[6, 1]];
+    %two = @core.load_const[@arithmetic.int.const[6, 2]];
+    %three = @core.load_const[@arithmetic.int.const[6, 3]];
+    @core.loop %initial {
+      (%n) -> (%step) {
+        %done = @arithmetic.int.ieq %n, %one;
+        %step = @core.cond %done {
+          () -> (%finish) {
+            %finish = @core.make_adt[0];
+          },
+          () -> (%continue) {
+            %mod = @arithmetic.int.imod_u %n, %two;
+            %even = @arithmetic.int.ieq %mod, %zero;
+            %next = @core.cond %even {
+              () -> (%n2) {
+                %n2 = @arithmetic.int.idiv %n, %two;
+              },
+              () -> (%n1) {
+                %n0 = @arithmetic.int.imul %n, %three;
+                %n1 = @arithmetic.int.iadd %n0, %one;
+              }
+            };
+            %continue = @core.make_adt[1] %next;
+          }
+        };
+      }
+    };
+  };
+}

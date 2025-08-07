@@ -127,7 +127,7 @@
             "named": false
           },
           {
-            "type": "link_name",
+            "type": "typed_link",
             "named": true
           }
         ]
@@ -165,7 +165,7 @@
             "named": false
           },
           {
-            "type": "link_name",
+            "type": "typed_link",
             "named": true
           }
         ]
@@ -177,10 +177,6 @@
       "types": [
         {
           "type": "region",
-          "named": true
-        },
-        {
-          "type": "term",
           "named": true
         }
       ]
@@ -214,10 +210,6 @@
       "required": true,
       "types": [
         {
-          "type": "region_cfg",
-          "named": true
-        },
-        {
           "type": "region_dfg",
           "named": true
         }
@@ -225,127 +217,30 @@
     }
   },
   {
-    "type": "region_cfg",
-    "named": true,
-    "fields": {
-      "body": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "operation",
-            "named": true
-          }
-        ]
-      },
-      "meta": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "region_meta",
-            "named": true
-          }
-        ]
-      },
-      "sources": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "=>",
-            "named": false
-          },
-          {
-            "type": "link_name",
-            "named": true
-          }
-        ]
-      },
-      "targets": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "link_name",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
     "type": "region_dfg",
     "named": true,
-    "fields": {
-      "body": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "operation",
-            "named": true
-          }
-        ]
-      },
-      "meta": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "region_meta",
-            "named": true
-          }
-        ]
-      },
-      "sources": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "sources",
-            "named": true
-          }
-        ]
-      },
-      "targets": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": ",",
-            "named": false
-          },
-          {
-            "type": "link_name",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "region_meta",
-    "named": true,
-    "fields": {
-      "meta": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "term",
-            "named": true
-          }
-        ]
-      }
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "meta",
+          "named": true
+        },
+        {
+          "type": "operation",
+          "named": true
+        },
+        {
+          "type": "sources",
+          "named": true
+        },
+        {
+          "type": "targets",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -373,7 +268,7 @@
       "required": false,
       "types": [
         {
-          "type": "link_name",
+          "type": "typed_link",
           "named": true
         }
       ]
@@ -491,12 +386,20 @@
     "named": true,
     "fields": {
       "body": {
-        "multiple": false,
+        "multiple": true,
         "required": false,
         "types": [
           {
             "type": "region",
             "named": true
+          },
+          {
+            "type": "{",
+            "named": false
+          },
+          {
+            "type": "}",
+            "named": false
           }
         ]
       },
@@ -697,6 +600,21 @@
     }
   },
   {
+    "type": "targets",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "typed_link",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "term",
     "named": true,
     "fields": {},
@@ -831,8 +749,23 @@
     }
   },
   {
-    "type": "#![",
-    "named": false
+    "type": "typed_link",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "link_name",
+          "named": true
+        },
+        {
+          "type": "term",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "#[",
@@ -871,10 +804,6 @@
     "named": false
   },
   {
-    "type": "=>",
-    "named": false
-  },
-  {
     "type": "[",
     "named": false
   },
@@ -885,11 +814,6 @@
   {
     "type": "bytes",
     "named": true
-  },
-  {
-    "type": "comment",
-    "named": true,
-    "extra": true
   },
   {
     "type": "ctr",
@@ -953,14 +877,6 @@
   },
   {
     "type": "{",
-    "named": false
-  },
-  {
-    "type": "{|",
-    "named": false
-  },
-  {
-    "type": "|}",
     "named": false
   },
   {

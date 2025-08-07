@@ -57,7 +57,7 @@ module.exports = grammar({
         optional(field("parameters", seq("[", commaSep1($.param), "]"))),
         optional(field("constraints", $.constraints)),
         optional(field("signature", seq(":", $.term))),
-        optional(field("body", $.region)),
+        optional(field("body", choice($.region, seq("{", $.region, "}")))),
         ";",
       ),
 
@@ -95,37 +95,40 @@ module.exports = grammar({
     operation: ($) =>
       seq(
         field("meta", repeat($.meta)),
-        optional(field("outputs", seq(commaSep1($.link_name), "="))),
+        optional(field("outputs", seq(commaSep1($.typed_link), "="))),
         field("operation", $.term),
-        optional(field("inputs", seq(commaSep($.link_name)))),
-        repeat($.region),
-        optional($._signature),
+        optional(field("inputs", commaSep($.typed_link))),
+        optional(seq("{", commaSep($.region), "}")),
         ";",
       ),
 
     _signature: ($) => seq(":", $.term),
 
-    region: ($) => seq(choice($.region_dfg, $.region_cfg)),
+    region: ($) => seq(choice($.region_dfg)),
     region_dfg: ($) =>
       seq(
+        repeat($.meta),
+        $.sources,
+        "->",
+        $.targets,
         "{",
-        field("meta", repeat($.region_meta)),
-        field("sources", optional($.sources)),
-        field("body", repeat($.operation)),
-        field("targets", commaSep($.link_name)),
+        repeat($.operation),
         "}",
       ),
-    region_cfg: ($) =>
-      seq(
-        "{|",
-        field("meta", repeat($.region_meta)),
-        field("sources", optional(seq(commaSep($.link_name), "=>"))),
-        field("body", repeat($.operation)),
-        field("targets", commaSep($.link_name)),
-        "|}",
-      ),
 
-    sources: ($) => seq(commaSep($.link_name), "=>"),
+    typed_link: ($) => seq($.link_name, optional(seq(":", $.term))),
+    sources: ($) => seq("(", commaSep($.typed_link), ")"),
+    targets: ($) => seq("(", commaSep($.typed_link), ")"),
+
+    // region_cfg: ($) =>
+    //   seq(
+    //     "{|",
+    //     field("meta", repeat($.region_meta)),
+    //     field("sources", optional(seq(commaSep($.link_name), "=>"))),
+    //     field("body", repeat($.operation)),
+    //     field("targets", commaSep($.link_name)),
+    //     "|}",
+    //   ),
 
     doc_comment: ($) => token(seq("///", /[^\r\n]*\r?\n/)),
 
@@ -166,7 +169,6 @@ module.exports = grammar({
       ),
 
     meta: ($) => seq("#[", field("meta", $.term), "]"),
-    region_meta: ($) => seq("#![", field("meta", $.term), "]"),
 
     // Literals
     literal: ($) => choice($.string, $.nat, $.bytes, $.float),
@@ -181,7 +183,7 @@ module.exports = grammar({
     symbol_name: ($) => sigilName("@"),
     symbol_bare: ($) => bareName(),
 
-    comment: ($) => token(seq(/\/\/[^/]/, /.*/)),
+    _comment: ($) => token(seq(/\/\/[^/]/, /.*/)),
   },
-  extras: ($) => [/\s/, $.comment, /\r?\n/],
+  extras: ($) => [/\s/, $._comment, /\r?\n/],
 });
