@@ -1,10 +1,11 @@
 //! Implementation of the core hugr traits for different wrappers of a `Hugr`.
 
-use std::{borrow::Cow, rc::Rc, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, rc::Rc, sync::Arc};
 
 use super::HugrView;
 use crate::hugr::HugrMut;
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
+use crate::hugr::linking::{NodeLinkingDirective, NodeLinkingError};
 
 macro_rules! hugr_internal_methods {
     // The extra ident here is because invocations of the macro cannot pass `self` as argument
@@ -114,9 +115,8 @@ macro_rules! hugr_mut_methods {
                 fn connect(&mut self, src: Self::Node, src_port: impl Into<crate::OutgoingPort>, dst: Self::Node, dst_port: impl Into<crate::IncomingPort>);
                 fn disconnect(&mut self, node: Self::Node, port: impl Into<crate::Port>);
                 fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
-                fn insert_hugr(&mut self, root: Self::Node, other: crate::Hugr) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
-                fn insert_region(&mut self, root: Self::Node, other: crate::Hugr, region: crate::Node) -> crate::hugr::hugrmut::InsertionResult<crate::Node, Self::Node>;
-                fn insert_from_view<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other) -> crate::hugr::hugrmut::InsertionResult<Other::Node, Self::Node>;
+                fn insert_hugr_link_nodes(&mut self, root: Option<Self::Node>, other: crate::Hugr, children: HashMap<crate::Node, NodeLinkingDirective<Self::Node>>) -> Result<HashMap<crate::Node, Self::Node>, NodeLinkingError<crate::Node>>;
+                fn insert_from_view_link_nodes<Other: crate::hugr::HugrView>(&mut self, root: Option<Self::Node>, other: &Other, children: HashMap<Other::Node, NodeLinkingDirective<Self::Node>>) -> Result<HashMap<Other::Node, Self::Node>, NodeLinkingError<Other::Node>>;
                 fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
                 fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
                 fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
