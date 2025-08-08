@@ -36,6 +36,7 @@ tree-sitter = "0.25.8"
 rust-sitter = "0.4.5"
 regex.workspace = true
 ariadne = "0.5.1"
+indenter = "0.3.4"
 
 [features]
 pyo3 = ["dep:pyo3"]

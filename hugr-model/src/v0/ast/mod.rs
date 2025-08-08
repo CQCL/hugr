@@ -32,6 +32,7 @@ mod names;
 mod parse;
 mod parse_ts;
 mod print;
+mod print_ts;
 #[cfg(feature = "pyo3")]
 mod python;
 mod resolve;

@@ -433,10 +433,10 @@ macro_rules! impl_display {
 
 impl_display!(Package, print_package);
 impl_display!(Module, print_module);
-impl_display!(Node, print_node);
-impl_display!(Region, print_region);
+// impl_display!(Node, print_node);
+// impl_display!(Region, print_region);
 impl_display!(Param, print_param);
-impl_display!(Term, print_term);
-impl_display!(SeqPart, print_seq_part);
+// impl_display!(Term, print_term);
+// impl_display!(SeqPart, print_seq_part);
 impl_display!(Literal, print_literal);
-impl_display!(Symbol, print_symbol);
+// impl_display!(Symbol, print_symbol);
