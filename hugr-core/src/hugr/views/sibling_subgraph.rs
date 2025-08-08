@@ -57,13 +57,26 @@ pub struct SiblingSubgraph<N = Node> {
     nodes: Vec<N>,
     /// The input ports of the subgraph.
     ///
-    /// Grouped by input parameter. Each port must be unique and belong to a
-    /// node in `nodes`.
+    /// All ports within the same inner vector of `inputs `must be connected to
+    /// the same outgoing port (and thus have the same type). The outer vector
+    /// defines the input signature, i.e. the number and types of incoming wires
+    /// into the subgraph.
+    ///
+    /// Multiple input ports of the same type may be grouped within the same
+    /// inner vector: this corresponds to an input parameter that is copied and
+    /// useful multiple times in the subgraph. An inner vector may also be empty,
+    /// corresponding to discarding an input parameter.
+    ///
+    /// Each port must be unique and belong to a node in `nodes`. Input ports of
+    /// linear types will always appear as singleton vectors.
     inputs: Vec<Vec<(N, IncomingPort)>>,
     /// The output ports of the subgraph.
     ///
-    /// Repeated ports are allowed and correspond to copying the output. Every
-    /// port must belong to a node in `nodes`.
+    /// The type of the output ports define the output signature of the
+    /// subgraph. Repeated ports of copyable types are allowed and correspond to
+    /// copying a value of the subgraph multiple times.
+    ///
+    /// Every port must belong to a node in `nodes`.
     outputs: Vec<(N, OutgoingPort)>,
 }
 
