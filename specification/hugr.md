@@ -1186,47 +1186,22 @@ There are the following primitive operations.
 ###### `SimpleReplace`
 
 This method is used for simple replacement of dataflow subgraphs consisting of
-leaf nodes.
+leaf nodes. It works by replacing a convex induced subgraph of the main Hugr
+with a replacement Hugr having the same signature.
 
-Given a set $X$ of nodes in a hugr $G$, let:
+To this end, we specify a `SiblingSubgraph` in terms of a set $X$ of nodes of
+the containing Hugr, an input signature $I$ and an output signature $O$. $I$ is
+represented as a vector of vectors of input ports of nodes of $X$, where the
+outer vector corresponds to the signature and each inner vector corresponds to
+one or more copies of a given input into the subgraph (all connected to the
+same output port of the containing Hugr). $O$ is represented as a vector of
+output ports of nodes in $X$ (possibly with repeats, which correspond to
+copies).
 
-- $\textrm{inp}_G(X)$ be the set of input ports of nodes in $X$ whose source
-  is in $G \setminus X$;
-- $\textrm{out}_G(X)$ be the set of input ports of nodes in $G \setminus X$
-  whose source is in $X$.
-
-Notation: given an input port $p$, let $p^-$ be its unique predecessor port.
-
-The method takes as input:
-
-- the ID of a DFG node $P$ in $\Gamma$;
-- a DFG-convex set $S$ of IDs of leaf nodes that are children of $P$ (not
-  including the Input and Output nodes), and that have no incoming or outgoing
-  Ext edges;
-- a hugr $H$ whose root is a DFG node $R$ with only leaf nodes as children --
-  let $T$ be the set of children of $R$;
-- a map $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\}) \to \textrm{inp}\_{\Gamma}(S)$; note that
-  - $\nu\_\textrm{inp}: \textrm{inp}\_H(T \setminus \\{\texttt{Input}\\})$ is just "the successors of $\texttt{Input}$", so could be expressed as outputs of the $\texttt{Input}$ node
-  - in order to produce a valid Hugr, all possible keys must be present; and all possible values must be present exactly once unless Copyable);
-- a map $\nu_\textrm{out}: \textrm{out}_{\Gamma}(S) \to \textrm{out}_H(T \setminus \\{\texttt{Output}\\})$; again note that
-  - $\textrm{out}_H(T \setminus \\{\texttt{Output}\\})$ is just the input ports to the $\texttt{Output}$ node (their source must all be in $H$)
-  - in order to produce a valid hugr, all keys $\textrm{out}_{\Gamma}(S)$ must be present
-  - ...and each possible value must be either Copyable and/or present exactly once. Any that is absent could just be omitted from $H$....
-
-The new hugr is then derived as follows:
-
-  1. Make a copy in $\Gamma$ of all children of $R$, excluding Input and Output,
-     and all edges between them. Make all the newly added nodes children of $P$.
-     Notation: for each port $p$ of a node in $R$ of which a copy is made, write
-     $p^*$ for the copy of the port in $\Gamma$.
-  2. For each $(q, p = \nu_\textrm{inp}(q))$ such that $q \notin \texttt{Output}$,
-     add an edge from $p^-$ to $q^*$.
-  3. For each $(p, q = \nu_\textrm{out}(p))$ such that $q^- \notin \texttt{Input}$,
-     add an edge from $(q^-)^*$ to $p$.
-  4. For each $p_1, q, p_0$ such that
-     $q = \nu_\textrm{out}(p_1), p_0 = \nu_\textrm{inp}(q)$, add an edge from
-     $p_0^-$ to $p_1$. (Sanity check: $q^-$ must be an Input node in this case.)
-  5. Remove all nodes in $S$ and edges between them.
+Given a `SiblingSubgraph` $S = (X, I, O)$ of a Hugr $H$, and a DFG-rooted Hugr
+$H^\prime$ with an input signature matching the outer vector of $I$ and an
+output signature matching $O$, we can form a new Hugr by replacing the nodes of
+$X$ in $H$ with the Hugr $H^\prime$.
 
 ###### `Replace`
 
