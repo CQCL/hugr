@@ -26,6 +26,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["fmt"] }
+human-panic = "2"
 
 [lints]
 workspace = true
@@ -36,6 +37,9 @@ workspace = true
 # https://github.com/obi1kenobi/cargo-semver-checks/issues/355
 enum_missing = "warn"
 struct_missing = "warn"
+
+[features]
+panic-test = []
 
 [dev-dependencies]
 assert_cmd = { workspace = true }
