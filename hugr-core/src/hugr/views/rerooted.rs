@@ -141,7 +141,6 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
                 fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
                 fn insert_forest(&mut self, other: crate::Hugr, roots: HashMap<crate::Node, Self::Node>) -> HashMap<crate::Node, Self::Node>;
                 fn insert_view_forest<Other: crate::hugr::HugrView>(&mut self, other: &Other, nodes: impl IntoIterator<Item=Other::Node>, roots: HashMap<Other::Node, Self::Node>) -> HashMap<Other::Node, Self::Node>;
-                fn insert_subgraph<Other: crate::hugr::HugrView>(&mut self, root: Self::Node, other: &Other, subgraph: &crate::hugr::views::SiblingSubgraph<Other::Node>) -> std::collections::HashMap<Other::Node, Self::Node>;
                 fn use_extension(&mut self, extension: impl Into<std::sync::Arc<crate::extension::Extension>>);
                 fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>) where crate::extension::ExtensionRegistry: Extend<Reg>;
         }

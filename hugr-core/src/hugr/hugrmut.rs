@@ -249,7 +249,13 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
-    ) -> HashMap<H::Node, Self::Node>;
+    ) -> HashMap<H::Node, Self::Node> {
+        self.insert_view_forest(
+            other,
+            subgraph.nodes().iter().cloned(),
+            subgraph.nodes().iter().map(|n| (*n, root)).collect(),
+        )
+    }
 
     /// Insert a forest of nodes from another Hugr into this one.
     /// `root_parents` maps from roots of regions in the other Hugr to insert,
@@ -513,33 +519,6 @@ impl HugrMut for Hugr {
             if !meta.is_empty() {
                 self.metadata
                     .set(new_node.into_portgraph(), Some(meta.clone()));
-            }
-        }
-        node_map
-    }
-
-    fn insert_subgraph<H: HugrView>(
-        &mut self,
-        root: Self::Node,
-        other: &H,
-        subgraph: &SiblingSubgraph<H::Node>,
-    ) -> HashMap<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, subgraph.nodes().iter().copied(), |_| {
-            Some(root)
-        });
-        // Update the optypes and metadata, copying them from the other graph.
-        for (&node, &new_node) in &node_map {
-            let nodetype = other.get_optype(node);
-            self.op_types
-                .set(new_node.into_portgraph(), nodetype.clone());
-            let meta = other.node_metadata_map(node);
-            if !meta.is_empty() {
-                self.metadata
-                    .set(new_node.into_portgraph(), Some(meta.clone()));
-            }
-            // Add the required extensions to the registry.
-            if let Ok(exts) = nodetype.used_extensions() {
-                self.use_extensions(exts);
             }
         }
         node_map
