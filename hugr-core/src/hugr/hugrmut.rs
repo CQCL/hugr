@@ -188,7 +188,9 @@ pub trait HugrMut: HugrMutInternals {
         Self::insert_region(self, root, other, region)
     }
 
-    /// Insert a sub-region of another hugr into this one, under a given parent node.
+    /// Insert a subtree of another hugr into this one, under a given parent node.
+    /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
+    /// in `self`.
     ///
     /// # Panics
     ///
@@ -199,9 +201,17 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: Hugr,
         region: Node,
-    ) -> InsertionResult<Node, Self::Node>;
+    ) -> InsertionResult<Node, Self::Node> {
+        let node_map = self.insert_forest(other, HashMap::from([(region, root)]));
+        InsertionResult {
+            inserted_entrypoint: node_map[&region],
+            node_map,
+        }
+    }
 
-    /// Copy another hugr into this one, under a given parent node.
+    /// Copy the entrypoint subtree of another hugr into this one, under a given parent node.
+    /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
+    /// in `self`.
     ///
     /// # Panics
     ///
@@ -210,7 +220,15 @@ pub trait HugrMut: HugrMutInternals {
         &mut self,
         root: Self::Node,
         other: &H,
-    ) -> InsertionResult<H::Node, Self::Node>;
+    ) -> InsertionResult<H::Node, Self::Node> {
+        let ep = other.entrypoint();
+        let node_map =
+            self.insert_view_forest(other, other.descendants(ep), HashMap::from([(ep, root)]));
+        InsertionResult {
+            inserted_entrypoint: node_map[&ep],
+            node_map,
+        }
+    }
 
     /// Copy a subgraph from another hugr into this one, under a given parent node.
     ///
@@ -231,6 +249,41 @@ pub trait HugrMut: HugrMutInternals {
         root: Self::Node,
         other: &H,
         subgraph: &SiblingSubgraph<H::Node>,
+    ) -> HashMap<H::Node, Self::Node>;
+
+    /// Insert a forest of nodes from another Hugr into this one.
+    /// `root_parents` maps from roots of regions in the other Hugr to insert,
+    /// to the node in this Hugr that shall be parent for that region.
+    ///
+    /// # Panics
+    ///
+    /// If any of the values in `roots` are not nodes in `self`.
+    // TODO: Error for doubly-included subtrees
+    fn insert_forest(
+        &mut self,
+        other: Hugr,
+        root_parents: HashMap<Node, Self::Node>,
+    ) -> HashMap<Node, Self::Node>;
+
+    /// Copy a forest of nodes from a view into this one.
+    /// `nodes` enumerates all nodes to copy; `root_parents` identifies
+    /// those nodes from `other` which should be placed under the given
+    /// parent nodes in `self`.
+    ///
+    /// Note that item in `nodes` must *either* be present in `root_parents`,
+    /// or follow its parent (in `other`) in the iteration order.
+    ///
+    /// # Panics
+    ///
+    /// If any of the values in `roots` are not nodes in `self`.
+    /// ?? If `nodes` contains any duplicate elements, or does not adhere to the ordering
+    /// requirement above
+    // TODO: turn double-inclusion into error?
+    fn insert_view_forest<H: HugrView>(
+        &mut self,
+        other: &H,
+        nodes: impl IntoIterator<Item = H::Node>,
+        roots: HashMap<H::Node, Self::Node>,
     ) -> HashMap<H::Node, Self::Node>;
 
     /// Applies a patch to the graph.
@@ -412,15 +465,17 @@ impl HugrMut for Hugr {
         (src_port, dst_port)
     }
 
-    fn insert_region(
+    fn insert_forest(
         &mut self,
-        root: Self::Node,
         mut other: Hugr,
-        region: Node,
-    ) -> InsertionResult<Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, &other, other.descendants(region), |&n| {
-            if n == region { Some(root) } else { None }
-        });
+        roots: HashMap<Node, Self::Node>,
+    ) -> HashMap<Node, Self::Node> {
+        let node_map = insert_hugr_internal(
+            self,
+            &other,
+            roots.keys().flat_map(|n| other.descendants(*n)),
+            |k| roots.get(k).cloned(),
+        );
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, taking them from the other graph.
@@ -434,24 +489,17 @@ impl HugrMut for Hugr {
             let meta = other.metadata.take(node_pg);
             self.metadata.set(new_node_pg, meta);
         }
-        InsertionResult {
-            inserted_entrypoint: node_map[&region],
-            node_map,
-        }
+        node_map
     }
 
-    fn insert_from_view<H: HugrView>(
+    fn insert_view_forest<H: HugrView>(
         &mut self,
-        root: Self::Node,
         other: &H,
-    ) -> InsertionResult<H::Node, Self::Node> {
-        let node_map = insert_hugr_internal(self, other, other.entry_descendants(), |&n| {
-            if n == other.entrypoint() {
-                Some(root)
-            } else {
-                None
-            }
-        });
+        nodes: impl IntoIterator<Item = H::Node>,
+        roots: HashMap<H::Node, Self::Node>,
+    ) -> HashMap<H::Node, Self::Node> {
+        let node_map =
+            insert_hugr_internal(self, other, nodes.into_iter(), |k| roots.get(k).cloned());
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -467,10 +515,7 @@ impl HugrMut for Hugr {
                     .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        InsertionResult {
-            inserted_entrypoint: node_map[&other.entrypoint()],
-            node_map,
-        }
+        node_map
     }
 
     fn insert_subgraph<H: HugrView>(
