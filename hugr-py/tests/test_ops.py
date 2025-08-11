@@ -41,32 +41,36 @@ from hugr.val import TRUE
         (Output([]), "Output"),
         (Not, "logic.Not"),
         (DivMod, "arithmetic.int.idivmod_u<5>"),
-        (MakeTuple(), "MakeTuple"),
-        (UnpackTuple(), "UnpackTuple"),
+        (MakeTuple([]), "MakeTuple"),
+        (UnpackTuple([]), "UnpackTuple"),
         (Tag(0, Bool), "Left"),
         (Tag(0, tys.Sum([[Bool, Bool, Bool]])), "Tag(0)"),
-        (CFG([]), "CFG"),
-        (DFG([]), "DFG"),
-        (DataflowBlock([]), "DataflowBlock"),
+        (CFG([], []), "CFG"),
+        (DFG([], []), "DFG"),
+        (DataflowBlock([], tys.Sum([]), []), "DataflowBlock"),
         (ExitBlock([]), "ExitBlock"),
-        (LoadConst(), "LoadConst"),
-        (Conditional(Bool, []), "Conditional"),
-        (TailLoop([], []), "TailLoop"),
-        (Case([]), "Case"),
+        (LoadConst(Bool), "LoadConst"),
+        (Conditional(Bool, [], []), "Conditional"),
+        (TailLoop([], [], []), "TailLoop"),
+        (Case([], []), "Case"),
         (Module(), "Module"),
         (Call(PolyFuncType.empty()), "Call"),
-        (CallIndirect(), "CallIndirect"),
+        (CallIndirect(tys.FunctionType([], [])), "CallIndirect"),
         (LoadFunc(PolyFuncType.empty()), "LoadFunc"),
-        (FuncDefn("foo", []), "FuncDefn(foo)"),
+        (FuncDefn("foo", [], [], []), "FuncDefn(foo)"),
         (FuncDecl("bar", PolyFuncType.empty()), "FuncDecl(bar)"),
         (Const(TRUE), "Const(TRUE)"),
-        (Noop(), "Noop"),
+        (Noop(Bool), "Noop"),
         (AliasDecl("baz", TypeBound.Linear), "AliasDecl(baz)"),
         (AliasDefn("baz", Bool), "AliasDefn(baz)"),
     ],
 )
 def test_ops_str(op: Op, string: str):
     assert op.name() == string
+
+    serial = op._to_serial(Node(0))
+    deser = serial.deserialize()
+    assert deser.name() == string
 
 
 @pytest.mark.parametrize(
