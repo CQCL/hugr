@@ -696,12 +696,17 @@ fn insert_hugr_internal<H: HugrView>(
 
 #[cfg(test)]
 mod test {
+    use cool_asserts::assert_matches;
+    use itertools::Itertools;
+
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
     use crate::extension::PRELUDE;
-    use crate::{
-        extension::prelude::{Noop, usize_t},
-        ops::{self, FuncDefn, Input, Output, dataflow::IOTrait},
-        types::Signature,
-    };
+    use crate::extension::prelude::{Noop, bool_t, usize_t};
+    use crate::hugr::ValidationError;
+    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
+    use crate::types::Signature;
 
     use super::*;
 
@@ -779,5 +784,170 @@ mod test {
         hugr.remove_subtree(bar);
         hugr.validate().unwrap();
         assert_eq!(hugr.num_nodes(), 1);
+    }
+
+    /// A DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
+    /// to a FuncDefn and a FuncDecl each bool_t->bool_t, and their handles.
+    pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
+        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+        let new_defn = {
+            let mut mb = dfb.module_root_builder();
+            let fb = mb
+                .define_function("helper_id", Signature::new_endo(bool_t()))
+                .unwrap();
+            let [f_inp] = fb.input_wires_arr();
+            fb.finish_with_outputs([f_inp]).unwrap()
+        };
+        let new_decl = dfb
+            .module_root_builder()
+            .declare("helper2", Signature::new_endo(bool_t()).into())
+            .unwrap();
+        let cst = dfb.add_load_value(ops::Value::true_val());
+        let [c1] = dfb
+            .call(new_defn.handle(), &[], [cst])
+            .unwrap()
+            .outputs_arr();
+        let [c2] = dfb.call(&new_decl, &[], [c1]).unwrap().outputs_arr();
+        (
+            dfb.finish_hugr_with_outputs([c2]).unwrap(),
+            *new_defn.handle(),
+            new_decl,
+        )
+    }
+
+    #[test]
+    fn test_insert_forest() {
+        // Specify which decls to transfer
+        for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
+            let mut h = simple_dfg_hugr();
+            let (insert, defn, decl) = dfg_calling_defn_decl();
+            let roots = HashMap::from_iter(
+                std::iter::once((insert.entrypoint(), h.entrypoint()))
+                    .chain(call1.then_some((defn.node(), h.module_root())).into_iter())
+                    .chain(call2.then_some((decl.node(), h.module_root())).into_iter()),
+            );
+            h.insert_forest(insert, roots).unwrap();
+            if call1 && call2 {
+                h.validate().unwrap();
+            } else {
+                assert!(matches!(
+                    h.validate(),
+                    Err(ValidationError::UnconnectedPort { .. })
+                ));
+            }
+            assert_eq!(
+                h.children(h.module_root()).count(),
+                1 + (call1 as usize) + (call2 as usize)
+            );
+            let [calln1, calln2] = h
+                .nodes()
+                .filter(|n| h.get_optype(*n).is_call())
+                .collect_array()
+                .unwrap();
+
+            let tgt1 = h.nodes().find(|n| {
+                h.get_optype(*n)
+                    .as_func_defn()
+                    .is_some_and(|fd| fd.func_name() == "helper_id")
+            });
+            assert_eq!(tgt1.is_some(), call1);
+            assert_eq!(h.static_source(calln1), tgt1);
+
+            let tgt2 = h.nodes().find(|n| {
+                h.get_optype(*n)
+                    .as_func_decl()
+                    .is_some_and(|fd| fd.func_name() == "helper2")
+            });
+            assert_eq!(tgt2.is_some(), call2);
+            assert_eq!(h.static_source(calln2), tgt2);
+        }
+    }
+
+    #[test]
+    fn test_insert_view_forest() {
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let mut h = simple_dfg_hugr();
+
+        let mut roots = HashMap::from([
+            (insert.entrypoint(), h.entrypoint()),
+            (defn.node(), h.module_root()),
+            (decl.node(), h.module_root()),
+        ]);
+
+        // Straightforward case: three complete subtrees
+        h.insert_view_forest(
+            &insert,
+            insert
+                .entry_descendants()
+                .chain(insert.descendants(defn.node()))
+                .chain(std::iter::once(decl.node())),
+            roots.clone(),
+        )
+        .unwrap();
+        h.validate().unwrap();
+
+        // Copy the FuncDefn node but not its children
+        let mut h = simple_dfg_hugr();
+        let node_map = h
+            .insert_view_forest(
+                &insert,
+                insert.entry_descendants().chain([defn.node(), decl.node()]),
+                roots.clone(),
+            )
+            .unwrap();
+        assert_matches!(h.validate(),
+            Err(ValidationError::ContainerWithoutChildren { node, optype: _ }) => assert_eq!(node, node_map[&defn.node()]));
+
+        // Copy the FuncDefn *containing* the entrypoint but transplant the entrypoint
+        let func_containing_entry = insert.get_parent(insert.entrypoint()).unwrap();
+        assert!(matches!(
+            insert.get_optype(func_containing_entry),
+            OpType::FuncDefn(_)
+        ));
+        roots.insert(func_containing_entry, h.module_root());
+        let mut h = simple_dfg_hugr();
+        let node_map = h
+            .insert_view_forest(&insert, insert.nodes().skip(1), roots)
+            .unwrap();
+        assert!(matches!(
+            h.validate(),
+            Err(ValidationError::InterGraphEdgeError(_))
+        ));
+        for c in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
+            assert!(h.static_source(c).is_some());
+        }
+        let new_defn = node_map[&func_containing_entry];
+        // The DFG (entrypoint) has been moved elsewhere
+        let [inp, outp] = h.get_io(new_defn).unwrap();
+        assert_eq!(h.children(new_defn).count(), 2);
+        assert!(matches!(h.get_optype(inp), OpType::Input(_)));
+        assert!(matches!(h.get_optype(outp), OpType::Output(_)));
+        let inserted_ep = node_map[&insert.entrypoint()];
+        assert_eq!(h.output_neighbours(inp).next().unwrap(), inserted_ep);
+        assert_eq!(h.get_parent(inserted_ep), Some(h.entrypoint()));
+    }
+
+    #[test]
+    fn bad_insert_forest() {
+        let backup = simple_dfg_hugr();
+        let mut h = backup.clone();
+
+        let (insert, _, _) = dfg_calling_defn_decl();
+        let ep = insert.entrypoint();
+        let epp = insert.get_parent(ep).unwrap();
+        let roots = HashMap::from([(epp, h.module_root()), (ep, h.entrypoint())]);
+        let r = h.insert_view_forest(
+            &insert,
+            insert.descendants(epp).chain(insert.descendants(ep)),
+            roots.clone(),
+        );
+        assert_eq!(r, Err(InsertForestError::DoubleCopy(ep)));
+        assert!(h.validate().is_err());
+
+        let mut h = backup.clone();
+        let r = h.insert_forest(insert, roots);
+        assert_eq!(r, Err(InsertForestError::DoubleCopy(ep)));
+        // Here the error is detected in building `nodes` from `roots` so before any mutation
+        assert_eq!(h, backup);
     }
 }
