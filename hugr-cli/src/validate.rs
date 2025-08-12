@@ -34,28 +34,17 @@ impl ValArgs {
 
             hugr.validate()
                 .map_err(PackageValidationError::Validation)
-                .map_err(|val_err| wrap_generator(generator, val_err))?;
+                .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
             let package = self.input_args.get_package()?;
             let generator = hugr::envelope::get_generator(&package.modules);
             package
                 .validate()
-                .map_err(|val_err| wrap_generator(generator, val_err))?;
+                .map_err(|val_err| CliError::validation(generator, val_err))?;
         };
 
         info!("{VALID_PRINT}");
 
         Ok(())
-    }
-}
-
-fn wrap_generator(generator: Option<String>, val_err: PackageValidationError) -> CliError {
-    if let Some(g) = generator {
-        CliError::ValidateKnownGenerator {
-            inner: val_err,
-            generator: Box::new(g.to_string()),
-        }
-    } else {
-        CliError::Validate(val_err)
     }
 }
