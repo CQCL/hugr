@@ -52,17 +52,47 @@ pub struct ImportError {
     generator: Option<String>,
 }
 
+const UNSUPPORTED_HINT: &str = concat!(
+    "Hint: The import process encountered a `hugr-model` feature",
+    "that is currently unsupported in `hugr-core`.",
+    "As `hugr-core` evolves towards the same expressivity as `hugr-model`",
+    "we expect that errors of this kind will be removed.",
+);
+
+const UNINFERRED_HINT: &str = concat!(
+    "Hint: The import process encountered implicit information in the `hugr-model`",
+    "package that it can not yet fill in.",
+    "Such implicit information can be signatures for nodes and regions,",
+    "wildcard terms or symbol applications with fewer arguments than the symbol has parameters.",
+    "Until more comprehensive inference is implemented, `hugr-model` packages will need to be very explicit.",
+    "To avoid this error, make sure to include as much information as possible when generating packages."
+);
+
+/// Error hint explaining the concept of a closed tuple.
+const CLOSED_TUPLE_HINT: &str = concat!(
+    "Hint: A tuple is closed if all of its items are known.",
+    "Closed tuples can contain spliced subtuples, as long as they can be recursively flattened",
+    "into a tuple that only contains individual items."
+);
+
+/// Error hint explaining the concept of a closed list.
+const CLOSED_LIST_HINT: &str = concat!(
+    "Hint: A list is closed if all of its items are known.",
+    "Closed lists can contain spliced sublists, as long as they can be recursively flattened",
+    "into a list that only contains individual items."
+);
+
 #[derive(Debug, Clone, Error)]
 enum ImportErrorInner {
     /// The model contains a feature that is not supported by the importer yet.
     /// Errors of this kind are expected to be removed as the model format and
     /// the core HUGR representation converge.
-    #[error("currently unsupported: {0}")]
+    #[error("Unsupported: {0}\n{hint}", hint = UNSUPPORTED_HINT)]
     Unsupported(String),
 
     /// The model contains implicit information that has not yet been inferred.
     /// This includes wildcards and application of functions with implicit parameters.
-    #[error("uninferred implicit: {0}")]
+    #[error("Uninferred implicit: {0}\n{hint}", hint = UNINFERRED_HINT)]
     Uninferred(String),
 
     /// The model is not well-formed.
@@ -419,7 +449,10 @@ impl<'a> Context<'a> {
                 }
                 _ => {
                     return Err(error_unsupported!(
-                        "link {:?} would require hyperedge",
+                        concat!(
+                            "Link {:?} would require a hyperedge because it connects more",
+                            "than one input port with more than one output port."
+                        ),
                         link_id
                     ));
                 }
@@ -432,6 +465,7 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
+    /// Connects static ports according to the connections in [`self.static_edges`].
     fn link_static_ports(&mut self) -> Result<(), ImportErrorInner> {
         for (src_id, dst_id) in std::mem::take(&mut self.static_edges) {
             // None of these lookups should fail given how we constructed `static_edges`.
@@ -497,7 +531,11 @@ impl<'a> Context<'a> {
 
         let result = match node_data.operation {
             table::Operation::Invalid => {
-                return Err(error_invalid!("tried to import an `invalid` operation"));
+                return Err(error_invalid!(concat!(
+                    "Tried to import an `invalid` operation.\n",
+                    "The `invalid` operation in `hugr-model` is a placeholder indicating a missing operation.",
+                    "It currently has no equivalent in `hugr-core`."
+                )));
             }
 
             table::Operation::Dfg => Some(
@@ -761,6 +799,9 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
+    /// Imports a closed list whose first element is an ADT with a closed list
+    /// of variants. The variants and the remaining elements of the list are
+    /// returned as type rows.
     fn import_adt_and_rest(
         &mut self,
         list: table::TermId,
@@ -812,7 +853,7 @@ impl<'a> Context<'a> {
 
             if sum_rows.len() != 2 {
                 return Err(error_invalid!(
-                    "loop nodes expect their first target to be an ADT with two variants"
+                    "Loop nodes expect their first target to be an ADT with two variants."
                 ));
             }
 
@@ -883,6 +924,21 @@ impl<'a> Context<'a> {
         Ok(node)
     }
 
+    /// Imports a control flow region.
+    ///
+    /// The `hugr-model` and `hugr-core` representations of control flow are
+    /// slightly different, and so this method needs to perform some conversion.
+    ///
+    /// In `hugr-core` the first node in the region is a [`BasicBlock`] that by
+    /// virtue of its position is the designated entry block. The second node in
+    /// the region is an [`ExitBlock`]. The [`ExitBlock`] is analogous to an
+    /// [`Output`] node in a dataflow graph, while there is no direct control flow
+    /// equivalent to [`Input`] nodes.
+    ///
+    /// In `hugr-model` control flow regions have a single source and target port,
+    /// respectively, mirroring data flow regions. The region's source port needs
+    /// to be connected to either the input port of a block in the region or to the
+    /// target port.
     fn import_cfg_region(
         &mut self,
         region: table::RegionId,
@@ -1055,6 +1111,18 @@ impl<'a> Context<'a> {
         })
     }
 
+    /// Import a node with a custom operation.
+    ///
+    /// A custom operation in `hugr-model` referred to by a symbol application
+    /// term. The name of the symbol specifies the name of the custom operation,
+    /// and the arguments supplied to the symbol are the arguments to be passed
+    /// to the custom operation. This method imports the custom operations as
+    /// [`OpaqueOp`]s. The [`OpaqueOp`]s are then resolved later against the
+    /// [`ExtensionRegistry`].
+    ///
+    /// Some operations that needed to be builtins in `hugr-core` are custom
+    /// operations in `hugr-model`. This method detects these and converts them
+    /// to the corresponding `hugr-core` builtins.
     fn import_node_custom(
         &mut self,
         node_id: table::NodeId,
@@ -1072,11 +1140,38 @@ impl<'a> Context<'a> {
         }
 
         if let Some([_, _, func]) = self.match_symbol(operation, model::CORE_CALL)? {
-            let table::Term::Apply(symbol, args) = self.get_term(func)? else {
-                return Err(error_invalid!(
-                    "expected a symbol application to be passed to `{}`",
-                    model::CORE_CALL
-                ));
+            let (symbol, args) = match self.get_term(func)? {
+                table::Term::Apply(symbol, args) => (symbol, args),
+                table::Term::Var(_) => {
+                    // TODO: Allow calling functions that are passed as variables.
+                    //
+                    // This would be necessary to allow functions which take
+                    // other functions as static parameters and then call them.
+                    return Err(error_unsupported!(
+                        "`{}` does not yet support function variables.",
+                        model::CORE_CALL
+                    ));
+                }
+                table::Term::Func(_) => {
+                    // TODO: Allow importing and calling anonoymous functions.
+                    //
+                    // This could be implemented in `hugr-core` by lifting the anonymous function
+                    // into a function to be added into the containing module and then calling that
+                    // function.
+                    return Err(error_unsupported!(
+                        "`{}` does not yet support anonymous functions.",
+                        model::CORE_CALL
+                    ));
+                }
+                _ => {
+                    return Err(error_invalid!(
+                        concat!(
+                            "Expected a function to be passed to `{}`.\n",
+                            "Currently this is restricted to symbols that refer to functions."
+                        ),
+                        model::CORE_CALL
+                    ));
+                }
             };
 
             let func_sig = self.get_func_signature(*symbol)?;
@@ -1152,11 +1247,24 @@ impl<'a> Context<'a> {
         }
 
         if let Some([_, _, tag]) = self.match_symbol(operation, model::CORE_MAKE_ADT)? {
-            let table::Term::Literal(model::Literal::Nat(tag)) = self.get_term(tag)? else {
-                return Err(error_invalid!(
-                    "`{}` expects a nat literal tag",
-                    model::CORE_MAKE_ADT
-                ));
+            let tag = match self.get_term(tag)? {
+                table::Term::Literal(model::Literal::Nat(tag)) => tag,
+                table::Term::Var(_) => {
+                    return Err(error_unsupported!(
+                        concat!(
+                            "`{}` does not yet support passing a variable as the tag.\n",
+                            "The `hugr-core` builtin `Tag` operation expects a concrete value for the tag.",
+                            "Therefore we must insist on a tag given as a natural number literal on import.",
+                        ),
+                        model::CORE_MAKE_ADT
+                    ));
+                }
+                _ => {
+                    return Err(error_invalid!(
+                        "`{}` expects a nat literal tag",
+                        model::CORE_MAKE_ADT
+                    ));
+                }
             };
 
             let signature = node_data
@@ -1267,12 +1375,19 @@ impl<'a> Context<'a> {
                         .ok_or_else(|| error_invalid!("unknown variable {}", var))?
                         .bound = TypeBound::Copyable;
                 } else {
-                    return Err(error_unsupported!("constraint other than copy or discard"));
+                    return Err(error_unsupported!(
+                        concat!(
+                            "Constraints other than `{}` can not yet be imported.\n",
+                            "`hugr-core` does not have support for arbitrary constraints yet,",
+                            "instead relying on operation-specific Rust code to compute and",
+                            "validate signatures of custom operations."
+                        ),
+                        model::CORE_NON_LINEAR
+                    ));
                 }
             }
 
             for (index, param) in symbol.params.iter().enumerate() {
-                // NOTE: `PolyFuncType` only has explicit type parameters at present.
                 let bound = self.local_vars[&table::VarId(node, index as _)].bound;
                 imported_params.push(
                     self.import_term_with_bound(param.r#type, bound)
@@ -1489,9 +1604,9 @@ impl<'a> Context<'a> {
 
                 // The following terms are not runtime types, but the core `Type` only contains runtime types.
                 // We therefore report a type error here.
-                table::Term::List { .. }
+                table::Term::Literal(_)
+                | table::Term::List { .. }
                 | table::Term::Tuple { .. }
-                | table::Term::Literal(_)
                 | table::Term::Func { .. } => Err(error_invalid!("expected a runtime type")),
             }
         })()
@@ -1514,6 +1629,14 @@ impl<'a> Context<'a> {
             .ok_or(error_invalid!("expected a control type"))
     }
 
+    /// Import a [`Signature`] or [`FuncValueType`].
+    ///
+    /// When importing a [`Signature`] the lists of input and output types need
+    /// to be closed. In constrast [`FuncValueType`] admits importing open lists
+    /// of input and output types via "row variables".
+    ///
+    /// Function types are not special-cased in `hugr-model` but are represented
+    /// via the `core.fn` term constructor.
     fn import_func_type<RV: MaybeRV>(
         &mut self,
         term_id: table::TermId,
@@ -1531,6 +1654,17 @@ impl<'a> Context<'a> {
         .map_err(|err| error_context!(err, "function type"))
     }
 
+    /// Import a closed list as a vector of term ids.
+    ///
+    /// This method supports list terms that contain spliced sublists as long as
+    /// the list can be recursively flattened to only contain individual items.
+    ///
+    /// To allow for IR constructions that are parameterised by static
+    /// parameters, open lists with spliced variables should be supported where
+    /// possible. Closed lists might be required in some places of the IR that
+    /// are not supposed to be parameterised with variables or where such
+    /// parameterisation is not yet supported by the `hugr-core` structures that
+    /// we are importing into.
     fn import_closed_list(
         &mut self,
         term_id: table::TermId,
@@ -1555,7 +1689,12 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                _ => return Err(error_invalid!("expected a closed list")),
+                _ => {
+                    return Err(error_invalid!(
+                        "Expected a closed list.\n{}",
+                        CLOSED_LIST_HINT
+                    ));
+                }
             }
 
             Ok(())
@@ -1566,6 +1705,9 @@ impl<'a> Context<'a> {
         Ok(types)
     }
 
+    /// Import a closed tuple as a vector of term ids.
+    ///
+    /// This is the tuple version of [`Self::import_closed_list`].
     fn import_closed_tuple(
         &mut self,
         term_id: table::TermId,
@@ -1590,7 +1732,12 @@ impl<'a> Context<'a> {
                         }
                     }
                 }
-                _ => return Err(error_invalid!("expected a closed tuple")),
+                _ => {
+                    return Err(error_invalid!(
+                        "Expected a closed tuple term.\n{}",
+                        CLOSED_TUPLE_HINT
+                    ));
+                }
             }
 
             Ok(())
@@ -1601,6 +1748,9 @@ impl<'a> Context<'a> {
         Ok(types)
     }
 
+    /// Imports a list of lists as a vector of type rows.
+    ///
+    /// See [`Self::import_type_row`].
     fn import_type_rows<RV: MaybeRV>(
         &mut self,
         term_id: table::TermId,
@@ -1611,6 +1761,11 @@ impl<'a> Context<'a> {
             .collect()
     }
 
+    /// Imports a list as a type row.
+    ///
+    /// This method works to produce a [`TypeRow`] or a [`TypeRowRV`], depending
+    /// on the `RV` type argument. For [`TypeRow`] a closed list is expected.
+    /// For [`TypeRowRV`] we import spliced variables as row variables.
     fn import_type_row<RV: MaybeRV>(
         &mut self,
         term_id: table::TermId,
@@ -1637,7 +1792,9 @@ impl<'a> Context<'a> {
                 }
                 table::Term::Var(table::VarId(_, index)) => {
                     let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Linear))
-                        .map_err(|_| error_invalid!("expected a closed list"))?;
+                        .map_err(|_| {
+                            error_invalid!("Expected a closed list.\n{}", CLOSED_LIST_HINT)
+                        })?;
                     types.push(TypeBase::new(TypeEnum::RowVar(var)));
                 }
                 _ => return Err(error_invalid!("expected a list")),
@@ -1672,6 +1829,11 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Import a constant term as a [`Value`].
+    ///
+    /// This method supports the JSON compatibility constants and a small selection of built in
+    /// constant constructors. It is a compatibility shim until constants can be represented as
+    /// terms in `hugr-core` at which point this method will become redundant.
     fn import_value(
         &mut self,
         term_id: table::TermId,
@@ -1809,13 +1971,23 @@ impl<'a> Context<'a> {
 
         match term_data {
             table::Term::Wildcard => Err(error_uninferred!("wildcard")),
-            table::Term::Var(_) => Err(error_unsupported!("constant value containing a variable")),
+            table::Term::Var(_) => Err(error_unsupported!(concat!(
+                "Constant value containing a variable.\n",
+                "The constant system in `hugr-core` is not set up yet to support",
+                "constants that depend on variables.",
+            ))),
 
             table::Term::Apply(symbol, _) => {
                 let symbol_name = self.get_symbol_name(*symbol)?;
                 Err(error_unsupported!(
-                    "unknown custom constant value `{}`",
-                    symbol_name
+                    concat!(
+                        "Unknown custom constant constructor `{}`.\n",
+                        "Importing constants from `hugr-model` to `hugr-core` currently only supports a small",
+                        "and hard-coded list of constant constructors. To support JSON encoded constants",
+                        "use the constant constructor `{}`."
+                    ),
+                    symbol_name,
+                    model::COMPAT_CONST_JSON
                 ))
                 // TODO: This should ultimately include the following cases:
                 // - function definitions
@@ -1826,10 +1998,27 @@ impl<'a> Context<'a> {
                 Err(error_invalid!("expected constant"))
             }
 
-            table::Term::Func { .. } => Err(error_unsupported!("constant function value")),
+            table::Term::Func { .. } => Err(error_unsupported!("Constant function value.")),
         }
     }
 
+    /// Check if a term is an application of a symbol with the given name. If
+    /// so, return the arguments of the application.
+    ///
+    /// We allow the match even if the symbol is applied to fewer arguments than
+    /// expected. In that case, the arguments are considered implicit and the
+    /// return array is padded with wildcard terms at the beginning. The match
+    /// fails if the symbol is applied to more arguments than expected.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned in the following cases:
+    ///
+    /// - The term id does not exist in the module to be imported.
+    /// - The term is a symbol application but the node id in the application does not refer to a symbol.
+    ///
+    /// Failed matches return `Ok(None)` instead of an error so that this method can be used
+    /// in sequence to probe for applications of different symbol constructors.
     fn match_symbol<const N: usize>(
         &self,
         term_id: table::TermId,
@@ -1847,9 +2036,6 @@ impl<'a> Context<'a> {
             return Ok(None);
         }
 
-        // We allow the match even if the symbol is applied to fewer arguments
-        // than parameters. In that case, the arguments are padded with wildcards
-        // at the beginning.
         if args.len() > N {
             return Ok(None);
         }
@@ -1864,19 +2050,35 @@ impl<'a> Context<'a> {
         Ok(Some(result))
     }
 
+    /// Expects a term to be an application of a symbol with the given name and
+    /// returns the arguments of the application.
+    ///
+    /// See [`Self::match_symbol`].
+    ///
+    /// # Errors
+    ///
+    /// In addition to the error cases described in [`Self::match_symbol`], this
+    /// method also returns an error when the match failed.
     fn expect_symbol<const N: usize>(
         &self,
         term_id: table::TermId,
         name: &str,
     ) -> Result<[table::TermId; N], ImportErrorInner> {
         self.match_symbol(term_id, name)?.ok_or(error_invalid!(
-            "expected symbol `{}` with arity {}",
+            "Expected symbol `{}` with arity {}.",
             name,
             N
         ))
     }
 
     /// Searches for `core.title` metadata on the given node.
+    ///
+    /// The `core.title` metadata is used as the `hugr-core` name for private function symbols.
+    /// This is necessary as a compatibility shim to bridge between the different concepts of name
+    /// in `hugr-core` and `hugr-model`: In `hugr-model` the name of a symbol uniquely identifies
+    /// that symbol within a module, while in `hugr-core` the name started out as procedurally
+    /// irrelevant debug metadata. With linking, the `hugr-core` name has become significant,
+    /// but only for public functions.
     fn import_title_metadata(
         &self,
         node_id: table::NodeId,
