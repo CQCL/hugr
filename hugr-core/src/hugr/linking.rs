@@ -11,6 +11,10 @@ use crate::{
 };
 
 /// Methods for linking Hugrs, i.e. merging the Hugrs and adding edges between old and inserted nodes.
+///
+/// This is done by module-children from the inserted (source) Hugr replacing, or being replaced by,
+/// module-children already in the target Hugr; static edges from the replaced node,
+/// are transferred to come from the replacing node, and the replaced node(/subtree) then deleted.
 pub trait LinkHugr: HugrMut {
     /// Copy nodes from another Hugr into this one, with linking directives specified by Node.
     ///
@@ -251,25 +255,24 @@ mod test {
 
     use super::{LinkHugr, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
-    use crate::hugr::{HugrMut, ValidationError};
+    use crate::hugr::hugrmut::test::check_calls_defn_decl;
     use crate::ops::{OpTag, OpTrait, handle::NodeHandle};
-    use crate::{Hugr, HugrView};
+    use crate::{HugrView, hugr::HugrMut};
 
     #[test]
     fn test_insert_link_nodes_add() {
-        // ALAN TODO these just duplicate tests of insert_forest..
+        // Default (non-linking) methods...just for comparison
         let (insert, _, _) = dfg_calling_defn_decl();
 
-        // Defaults
         let mut h = simple_dfg_hugr();
         h.insert_from_view(h.entrypoint(), &insert);
-        check_insertion(h, false, false);
+        check_calls_defn_decl(&h, false, false);
 
         let mut h = simple_dfg_hugr();
         h.insert_hugr(h.entrypoint(), insert);
-        check_insertion(h, false, false);
+        check_calls_defn_decl(&h, false, false);
 
-        // Specify which decls to transfer
+        // Specify which decls to transfer. No real "linking" here though.
         for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
             let (insert, defn, decl) = dfg_calling_defn_decl();
             let mod_children = HashMap::from_iter(
@@ -282,49 +285,13 @@ mod test {
             let mut h = simple_dfg_hugr();
             h.insert_from_view_link_nodes(Some(h.entrypoint()), &insert, mod_children.clone())
                 .unwrap();
-            check_insertion(h, call1, call2);
+            check_calls_defn_decl(&h, call1, call2);
 
             let mut h = simple_dfg_hugr();
             h.insert_hugr_link_nodes(Some(h.entrypoint()), insert, mod_children)
                 .unwrap();
-            check_insertion(h, call1, call2);
+            check_calls_defn_decl(&h, call1, call2);
         }
-    }
-
-    fn check_insertion(h: Hugr, call1_ok: bool, call2_ok: bool) {
-        if call1_ok && call2_ok {
-            h.validate().unwrap();
-        } else {
-            assert!(matches!(
-                h.validate(),
-                Err(ValidationError::UnconnectedPort { .. })
-            ));
-        }
-        assert_eq!(
-            h.children(h.module_root()).count(),
-            1 + (call1_ok as usize) + (call2_ok as usize)
-        );
-        let [call1, call2] = h
-            .nodes()
-            .filter(|n| h.get_optype(*n).is_call())
-            .collect_array()
-            .unwrap();
-
-        let tgt1 = h.nodes().find(|n| {
-            h.get_optype(*n)
-                .as_func_defn()
-                .is_some_and(|fd| fd.func_name() == "helper_id")
-        });
-        assert_eq!(tgt1.is_some(), call1_ok);
-        assert_eq!(h.static_source(call1), tgt1);
-
-        let tgt2 = h.nodes().find(|n| {
-            h.get_optype(*n)
-                .as_func_decl()
-                .is_some_and(|fd| fd.func_name() == "helper2")
-        });
-        assert_eq!(tgt2.is_some(), call2_ok);
-        assert_eq!(h.static_source(call2), tgt2);
     }
 
     #[test]
@@ -337,7 +304,7 @@ mod test {
             vec![OpTag::FuncDefn, OpTag::FuncDefn, OpTag::Function]
         );
         let insert = simple_dfg_hugr();
-        let pol = HashMap::from([(
+        let dirvs = HashMap::from([(
             insert
                 .children(insert.module_root())
                 .exactly_one()
@@ -347,7 +314,7 @@ mod test {
                 replace: vec![defn.node(), decl.node()],
             },
         )]);
-        host.insert_hugr_link_nodes(None, insert, pol).unwrap();
+        host.insert_hugr_link_nodes(None, insert, dirvs).unwrap();
         host.validate().unwrap();
         assert_eq!(
             host.children(host.module_root())

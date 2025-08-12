@@ -701,7 +701,7 @@ fn insert_hugr_internal<H: HugrView>(
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
@@ -792,6 +792,42 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
+    pub(in crate::hugr) fn check_calls_defn_decl(h: &Hugr, call1_defn: bool, call2_decl: bool) {
+        if call1_defn && call2_decl {
+            h.validate().unwrap();
+        } else {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
+        }
+        assert_eq!(
+            h.children(h.module_root()).count(),
+            1 + (call1_defn as usize) + (call2_decl as usize)
+        );
+        let [call1, call2] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect_array()
+            .unwrap();
+
+        let tgt1 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_defn()
+                .is_some_and(|fd| fd.func_name() == "helper_id")
+        });
+        assert_eq!(tgt1.is_some(), call1_defn);
+        assert_eq!(h.static_source(call1), tgt1);
+
+        let tgt2 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_decl()
+                .is_some_and(|fd| fd.func_name() == "helper2")
+        });
+        assert_eq!(tgt2.is_some(), call2_decl);
+        assert_eq!(h.static_source(call2), tgt2);
+    }
+
     #[test]
     fn test_insert_forest() {
         // Specify which decls to transfer
@@ -804,39 +840,7 @@ mod test {
                     .chain(call2.then_some((decl.node(), h.module_root())).into_iter()),
             );
             h.insert_forest(insert, roots).unwrap();
-            if call1 && call2 {
-                h.validate().unwrap();
-            } else {
-                assert!(matches!(
-                    h.validate(),
-                    Err(ValidationError::UnconnectedPort { .. })
-                ));
-            }
-            assert_eq!(
-                h.children(h.module_root()).count(),
-                1 + (call1 as usize) + (call2 as usize)
-            );
-            let [calln1, calln2] = h
-                .nodes()
-                .filter(|n| h.get_optype(*n).is_call())
-                .collect_array()
-                .unwrap();
-
-            let tgt1 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.func_name() == "helper_id")
-            });
-            assert_eq!(tgt1.is_some(), call1);
-            assert_eq!(h.static_source(calln1), tgt1);
-
-            let tgt2 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_decl()
-                    .is_some_and(|fd| fd.func_name() == "helper2")
-            });
-            assert_eq!(tgt2.is_some(), call2);
-            assert_eq!(h.static_source(calln2), tgt2);
+            check_calls_defn_decl(&h, call1, call2);
         }
     }
 
