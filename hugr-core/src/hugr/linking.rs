@@ -5,8 +5,7 @@ use std::{collections::HashMap, fmt::Display};
 use itertools::Either;
 
 use crate::{
-    Hugr, HugrView, Node,
-    hugr::{HugrMut, hugrmut::insert_hugr_internal},
+    core::HugrNode, hugr::{hugrmut::insert_hugr_internal, HugrMut}, Hugr, HugrView, Node
 };
 
 pub trait LinkHugr: HugrMut {
@@ -182,6 +181,12 @@ fn insert_link_by_node<H: HugrView>(
             children.contains_key(&n).then_some(hugr_root)
         }
     });
+    Ok(node_map)
+}
+
+fn link_by_node<SN: HugrNode, TGT: LinkHugr>(hugr: &TGT,
+    children: NodeLinkingDirectives<SN, TGT::Node>,
+    node_map: &mut HashMap<SN, TGT::Node>) {
     // Now enact any `Add`s with replaces, and `UseExisting`s, removing the copied children
     for (ch, m) in children {
         match m {
@@ -199,7 +204,6 @@ fn insert_link_by_node<H: HugrView>(
             }
         }
     }
-    Ok(node_map)
 }
 
 fn replace_static_src(hugr: &mut Hugr, old_src: Node, new_src: Node) {
