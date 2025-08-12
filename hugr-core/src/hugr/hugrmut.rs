@@ -643,7 +643,7 @@ impl HugrMut for Hugr {
 /// - `reroot`: A function that returns the new parent for each inserted node.
 ///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
 ///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
-fn insert_hugr_internal<H: HugrView>(
+pub(super) fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node>,
