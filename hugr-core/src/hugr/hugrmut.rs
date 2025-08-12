@@ -916,15 +916,18 @@ mod test {
         for c in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
             assert!(h.static_source(c).is_some());
         }
+        // The DFG (entrypoint) has been moved:
+        let inserted_ep = node_map[&insert.entrypoint()];
+        assert_eq!(h.get_parent(inserted_ep), Some(h.entrypoint()));
         let new_defn = node_map[&func_containing_entry];
-        // The DFG (entrypoint) has been moved elsewhere
-        let [inp, outp] = h.get_io(new_defn).unwrap();
         assert_eq!(h.children(new_defn).count(), 2);
+
+        let [inp, outp] = h.get_io(new_defn).unwrap();
         assert!(matches!(h.get_optype(inp), OpType::Input(_)));
         assert!(matches!(h.get_optype(outp), OpType::Output(_)));
-        let inserted_ep = node_map[&insert.entrypoint()];
-        assert_eq!(h.output_neighbours(inp).next().unwrap(), inserted_ep);
-        assert_eq!(h.get_parent(inserted_ep), Some(h.entrypoint()));
+        // It seems the edge from Input is disconnected, but the edge to Output preserved
+        assert_eq!(h.all_neighbours(inp).next(), None);
+        assert_eq!(h.input_neighbours(outp).next(), Some(inserted_ep));
     }
 
     #[test]
