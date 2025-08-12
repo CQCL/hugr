@@ -2,7 +2,7 @@ use indenter::indented;
 use itertools::{Either, Itertools};
 use pretty::{Arena, DocAllocator, RefDoc};
 
-use crate::v0::{RegionKind, SymbolName, Visibility, ast::Operation};
+use crate::v0::{LinkName, RegionKind, SymbolName, Visibility, ast::Operation};
 
 use super::{Node, Region, SeqPart, Symbol, Term};
 use std::fmt::{self, Display, Write as _};
@@ -16,11 +16,11 @@ impl Display for Term {
                 write!(f, "{}{}", symbol, OptSeq("[", args, "]"))
             }
             Term::List(seq_parts) => {
-                write!(f, "[{}]", Seq(seq_parts))
+                write!(f, "[{}]", seq_parts.iter().format(", "))
             }
             Term::Literal(literal) => write!(f, "{}", literal),
             Term::Tuple(seq_parts) => {
-                write!(f, "({})", Seq(seq_parts))
+                write!(f, "({})", seq_parts.iter().format(", "))
             }
             Term::Func(region) => todo!(),
         }
@@ -98,8 +98,8 @@ impl Display for Region {
                 writeln!(
                     f,
                     "({sources}) -> ({targets}) {{",
-                    sources = Seq(&self.sources),
-                    targets = Seq(&self.targets)
+                    sources = self.sources.iter().format(", "),
+                    targets = self.targets.iter().format(", ")
                 )?;
                 for node in self.children.iter() {
                     writeln!(&mut indented(f).ind(2), "{}", node)?;
@@ -128,6 +128,43 @@ fn write_symbol(f: &mut fmt::Formatter<'_>, sort: &'static str, symbol: &Symbol)
     )
 }
 
+fn list_items(term: &Term) -> Option<Vec<&Term>> {
+    let Term::List(parts) = term else {
+        return None;
+    };
+
+    let mut items = Vec::new();
+
+    for part in parts.iter() {
+        match part {
+            SeqPart::Item(item) => items.push(item),
+            SeqPart::Splice(list) => items.extend(list_items(list)?),
+        }
+    }
+
+    Some(items)
+}
+
+fn write_typed_links(f: &mut fmt::Formatter<'_>, links: &[LinkName], types: &Term) -> fmt::Result {
+    let mut types = list_items(&types).unwrap_or_default().into_iter();
+    let typed_links = links.iter().map(|link| TypedLink(link, types.next()));
+    write!(f, "{}", typed_links.format(", "))
+}
+
+struct TypedLink<'a>(&'a LinkName, Option<&'a Term>);
+
+impl<'a> Display for TypedLink<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)?;
+
+        if let Some(typ) = &self.1 {
+            write!(f, ": {}", typ)?;
+        }
+
+        Ok(())
+    }
+}
+
 struct Meta<'a>(&'a [Term]);
 
 impl<'a> Display for Meta<'a> {
@@ -144,21 +181,7 @@ struct OptSeq<'a, T>(&'a str, &'a [T], &'a str);
 impl<'a, T: Display> Display for OptSeq<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.1.is_empty() {
-            write!(f, "{}{}{}", self.0, Seq(self.1), self.2)?;
-        }
-        Ok(())
-    }
-}
-
-struct Seq<'a, T>(&'a [T]);
-
-impl<'a, T: Display> Display for Seq<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for item in Itertools::intersperse(self.0.iter().map(Some), None) {
-            match item {
-                Some(item) => write!(f, "{}", item)?,
-                None => write!(f, ", ")?,
-            }
+            write!(f, "{}{}{}", self.0, self.1.iter().format(", "), self.2)?;
         }
         Ok(())
     }
