@@ -257,16 +257,17 @@ mod test {
 
     #[test]
     fn test_insert_link_nodes_add() {
-        let mut h = simple_dfg_hugr();
+        // ALAN TODO these just duplicate tests of insert_forest..
         let (insert, _, _) = dfg_calling_defn_decl();
 
         // Defaults
+        let mut h = simple_dfg_hugr();
         h.insert_from_view(h.entrypoint(), &insert);
         check_insertion(h, false, false);
 
         let mut h = simple_dfg_hugr();
         h.insert_hugr(h.entrypoint(), insert);
-        check_insertion(h, true, true);
+        check_insertion(h, false, false);
 
         // Specify which decls to transfer
         for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
