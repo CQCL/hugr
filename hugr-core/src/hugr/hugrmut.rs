@@ -643,7 +643,7 @@ impl HugrMut for Hugr {
 /// - `reroot`: A function that returns the new parent for each inserted node.
 ///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
 ///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
-pub(super) fn insert_hugr_internal<H: HugrView>(
+fn insert_hugr_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node>,
@@ -706,11 +706,11 @@ mod test {
     use itertools::Itertools;
 
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
+
     use crate::extension::PRELUDE;
-    use crate::extension::prelude::{Noop, bool_t, usize_t};
+    use crate::extension::prelude::{Noop, usize_t};
     use crate::hugr::ValidationError;
-    use crate::ops::handle::{FuncID, NodeHandle};
+    use crate::ops::handle::NodeHandle;
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
     use crate::types::Signature;
 

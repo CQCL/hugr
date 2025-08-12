@@ -5,9 +5,12 @@ use std::{collections::HashMap, fmt::Display};
 use itertools::Either;
 
 use crate::{
-    core::HugrNode, hugr::{hugrmut::insert_hugr_internal, HugrMut}, Hugr, HugrView, Node
+    Hugr, HugrView, Node,
+    core::HugrNode,
+    hugr::{HugrMut, internal::HugrMutInternals},
 };
 
+/// Methods for linking Hugrs, i.e. merging the Hugrs and adding edges between old and inserted nodes.
 pub trait LinkHugr: HugrMut {
     /// Copy nodes from another Hugr into this one, with linking directives specified by Node.
     ///
@@ -32,7 +35,27 @@ pub trait LinkHugr: HugrMut {
         other: &H,
         children: NodeLinkingDirectives<H::Node, Self::Node>,
     ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
-        todo!()
+        check_directives(other, parent, &children)?;
+        let nodes =
+            parent
+                .iter()
+                .flat_map(|_| other.entry_descendants())
+                .chain(children.iter().flat_map(|(&ch, dirv)| match dirv {
+                    NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
+                    NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
+                }));
+        let mut roots = HashMap::new();
+        if let Some(parent) = parent {
+            roots.insert(other.entrypoint(), parent);
+        }
+        for ch in children.keys() {
+            roots.insert(*ch, self.module_root());
+        }
+        let mut node_map = self
+            .insert_view_forest(other, nodes, roots)
+            .expect("NodeLinkingDirectives were checked for disjointness");
+        link_by_node(self, children, &mut node_map);
+        Ok(node_map)
     }
 
     /// Insert another Hugr into this one, with linking directives specified by Node.
@@ -53,10 +76,30 @@ pub trait LinkHugr: HugrMut {
     fn insert_hugr_link_nodes(
         &mut self,
         parent: Option<Self::Node>,
-        other: Hugr,
+        mut other: Hugr,
         children: NodeLinkingDirectives<Node, Self::Node>,
     ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node>> {
-        todo!()
+        check_directives(&other, parent, &children)?;
+        let mut roots = HashMap::new();
+        if let Some(parent) = parent {
+            roots.insert(other.entrypoint(), parent);
+            other.set_parent(other.entrypoint(), other.module_root());
+        };
+        for (ch, dirv) in children.iter() {
+            roots.insert(*ch, self.module_root());
+            if matches!(dirv, NodeLinkingDirective::UseExisting(_)) {
+                // We do not need to copy the children of ch
+                while let Some(gch) = other.first_child(*ch) {
+                    // No point in deleting subtree, we won't copy disconnected nodes
+                    other.remove_node(gch);
+                }
+            }
+        }
+        let mut node_map = self
+            .insert_forest(other, roots)
+            .expect("NodeLinkingDirectives were checked for disjointness");
+        link_by_node(self, children, &mut node_map);
+        Ok(node_map)
     }
 }
 
@@ -128,12 +171,11 @@ impl<TN> NodeLinkingDirective<TN> {
 /// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
-fn insert_link_by_node<H: HugrView>(
-    hugr: &mut Hugr,
-    parent: Option<Node>,
-    other: &H,
-    children: HashMap<H::Node, NodeLinkingDirective>,
-) -> Result<HashMap<H::Node, Node>, NodeLinkingError<H::Node>> {
+fn check_directives<SRC: HugrView, TN: HugrNode>(
+    other: &SRC,
+    parent: Option<TN>,
+    children: &HashMap<SRC::Node, NodeLinkingDirective<TN>>,
+) -> Result<(), NodeLinkingError<SRC::Node>> {
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
             if let Some(c) = children.keys().next() {
@@ -163,30 +205,14 @@ fn insert_link_by_node<H: HugrView>(
             return Err(NodeLinkingError::NotChildOfRoot(c));
         }
     }
-    // In fact we'll copy all `children`, but only including subtrees
-    // for children that should be `Add`ed. This ensures we copy
-    // edges from any of those children to any other copied nodes.
-    let nodes = children
-        .iter()
-        .flat_map(|(&ch, m)| match m {
-            NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
-            NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
-        })
-        .chain(parent.iter().flat_map(|_| other.entry_descendants()));
-    let hugr_root = hugr.module_root();
-    let mut node_map = insert_hugr_internal(hugr, &other, nodes, |&n| {
-        if n == other.entrypoint() {
-            parent // If parent is None, quite possible this case will not be used
-        } else {
-            children.contains_key(&n).then_some(hugr_root)
-        }
-    });
-    Ok(node_map)
+    Ok(())
 }
 
-fn link_by_node<SN: HugrNode, TGT: LinkHugr>(hugr: &TGT,
+fn link_by_node<SN: HugrNode, TGT: LinkHugr + ?Sized>(
+    hugr: &mut TGT,
     children: NodeLinkingDirectives<SN, TGT::Node>,
-    node_map: &mut HashMap<SN, TGT::Node>) {
+    node_map: &mut HashMap<SN, TGT::Node>,
+) {
     // Now enact any `Add`s with replaces, and `UseExisting`s, removing the copied children
     for (ch, m) in children {
         match m {
@@ -206,7 +232,7 @@ fn link_by_node<SN: HugrNode, TGT: LinkHugr>(hugr: &TGT,
     }
 }
 
-fn replace_static_src(hugr: &mut Hugr, old_src: Node, new_src: Node) {
+fn replace_static_src<H: HugrMut + ?Sized>(hugr: &mut H, old_src: H::Node, new_src: H::Node) {
     let targets = hugr.all_linked_inputs(old_src).collect::<Vec<_>>();
     for (target, inport) in targets {
         let (src_node, outport) = hugr.single_linked_output(target, inport).unwrap();
