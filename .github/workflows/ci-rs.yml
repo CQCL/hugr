@@ -266,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download the hugr binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug
