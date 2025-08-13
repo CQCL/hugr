@@ -178,7 +178,9 @@ pub trait HugrMut: HugrMutInternals {
     /// If the node is not in the graph, or if the port is invalid.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
-    /// Insert another hugr into this one, under a given parent node.
+    /// Insert another hugr into this one, under a given parent node. Edges into the
+    /// inserted subtree (i.e. nonlocal or static) will be disconnected in `self`.
+    /// (See [Self::insert_forest] for a way to insert sources of such edges as well.)
     ///
     /// # Panics
     ///
@@ -190,7 +192,8 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert a subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`.
+    /// in `self`. (See [Self::insert_forest] for a way to preserve such edges by
+    /// inserting their sources as well.)
     ///
     /// # Panics
     ///
@@ -213,7 +216,8 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copy the entrypoint subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`.
+    /// in `self`. (See [Self::insert_view_forest] for a way to insert sources of such edges
+    /// as well.)
     ///
     /// # Panics
     ///
@@ -262,8 +266,10 @@ pub trait HugrMut: HugrMutInternals {
     }
 
     /// Insert a forest of nodes from another Hugr into this one.
+    ///
     /// `root_parents` maps from roots of regions in the other Hugr to insert,
     /// to the node in this Hugr that shall be parent for that region.
+    /// If `root_parents` is empty, nothing is inserted.
     ///
     /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
     /// and where each value is the corresponding (new) node in `self`.
