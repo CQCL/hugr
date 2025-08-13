@@ -1,11 +1,13 @@
 use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
+use crate::hugr::linking::{LinkHugr, NodeLinkingDirective};
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
+use std::collections::HashMap;
 use std::iter;
 use std::sync::Arc;
 
@@ -99,6 +101,8 @@ pub trait Container {
     }
 
     /// Insert a copy of a HUGR as a child of the container.
+    /// (Only the portion below the entrypoint will be inserted, with any incoming
+    /// edges broken; see [Dataflow::add_hugr_view_with_wires_link_nodes])
     fn add_hugr_view<H: HugrView>(&mut self, child: &H) -> InsertionResult<H::Node, Node> {
         let parent = self.container_node();
         self.hugr_mut().insert_from_view(parent, child)
@@ -243,20 +247,33 @@ pub trait Dataflow: Container {
         region: Node,
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
-        let optype = hugr.get_optype(region).clone();
-        let num_outputs = optype.value_output_count();
         let node = self.add_hugr_region(hugr, region).inserted_entrypoint;
 
-        wire_up_inputs(input_wires, node, self).map_err(|error| BuildError::OperationWiring {
-            op: Box::new(optype),
-            error,
-        })?;
+        wire_ins_return_outs(input_wires, node, self)
+    }
 
-        Ok((node, num_outputs).into())
+    /// Insert a hugr, adding its entrypoint to the sibling graph and wiring up the
+    /// `input_wires` to the incoming ports of the resulting root node. `defns` may
+    /// contain other children of the module root of `hugr`, which will be added to
+    /// the module root being built.
+    fn add_hugr_with_wires_link_nodes(
+        &mut self,
+        hugr: Hugr,
+        input_wires: impl IntoIterator<Item = Wire>,
+        defns: HashMap<Node, NodeLinkingDirective>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let parent = Some(self.container_node());
+        let ep = hugr.entrypoint();
+        let node = self
+            .hugr_mut()
+            .insert_hugr_link_nodes(parent, hugr, defns)?[&ep];
+        wire_ins_return_outs(input_wires, node, self)
     }
 
     /// Copy a hugr-defined op into the sibling graph, wiring up the
-    /// `input_wires` to the incoming ports of the resulting root node.
+    /// `input_wires` to the incoming ports of the node that was the entrypoint.
+    /// (Any part of `hugr` outside the entrypoint is not copied; see
+    /// [Self::add_hugr_view_with_wires_link_nodes])
     ///
     /// # Errors
     ///
@@ -268,15 +285,25 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let node = self.add_hugr_view(hugr).inserted_entrypoint;
-        let optype = hugr.get_optype(hugr.entrypoint()).clone();
-        let num_outputs = optype.value_output_count();
+        wire_ins_return_outs(input_wires, node, self)
+    }
 
-        wire_up_inputs(input_wires, node, self).map_err(|error| BuildError::OperationWiring {
-            op: Box::new(optype),
-            error,
-        })?;
-
-        Ok((node, num_outputs).into())
+    /// Copy a Hugr, adding its entrypoint into the sibling graph and wiring up the
+    /// `input_wires` to the incoming ports. `defns` may contain other children of
+    /// the module root of `hugr`, which will be added to the module root being built.
+    fn add_hugr_view_with_wires_link_nodes<H: HugrView>(
+        &mut self,
+        hugr: &H,
+        input_wires: impl IntoIterator<Item = Wire>,
+        defns: HashMap<H::Node, NodeLinkingDirective>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let parent = Some(self.container_node());
+        let node = self
+            .hugr_mut()
+            .insert_from_view_link_nodes(parent, hugr, defns)
+            .map_err(|ins_err| BuildError::HugrViewInsertionError(ins_err.to_string()))?
+            [&hugr.entrypoint()];
+        wire_ins_return_outs(input_wires, node, self)
     }
 
     /// Wire up the `output_wires` to the input ports of the Output node.
@@ -724,6 +751,20 @@ fn wire_up_inputs<T: Dataflow + ?Sized>(
         wire_up(data_builder, wire.node(), wire.source(), op_node, dst_port)?;
     }
     Ok(())
+}
+
+fn wire_ins_return_outs<T: Dataflow + ?Sized>(
+    inputs: impl IntoIterator<Item = Wire>,
+    node: Node,
+    data_builder: &mut T,
+) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+    let op = data_builder.hugr().get_optype(node).clone();
+    let num_outputs = op.value_output_count();
+    wire_up_inputs(inputs, node, data_builder).map_err(|error| BuildError::OperationWiring {
+        op: Box::new(op),
+        error,
+    })?;
+    Ok((node, num_outputs).into())
 }
 
 /// Add edge from src to dst.
