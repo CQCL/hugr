@@ -298,6 +298,13 @@ pub enum Visibility {
     Private,
 }
 
+impl Visibility {
+    /// Returns `true` iff this is [Self::Public]
+    pub fn is_public(&self) -> bool {
+        self == &Self::Public
+    }
+}
+
 impl From<hugr_model::v0::Visibility> for Visibility {
     fn from(value: hugr_model::v0::Visibility) -> Self {
         match value {
