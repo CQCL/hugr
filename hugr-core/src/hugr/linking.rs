@@ -169,8 +169,8 @@ impl<TN> NodeLinkingDirective<TN> {
         Self::Add { replace: vec![] }
     }
 
-    /// Replace the specified node in the target.
-
+    /// The new node should replace the specified node in the target.
+    ///
     /// (Could lead to an invalid Hugr if the replaced node has a different type,
     /// or if the target already has another function with the same name and both are public.)
     pub fn replace(replaced: TN) -> Self {
