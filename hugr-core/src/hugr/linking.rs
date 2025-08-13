@@ -281,6 +281,7 @@ fn replace_static_src<H: HugrMut + ?Sized>(hugr: &mut H, old_src: H::Node, new_s
 mod test {
     use std::collections::HashMap;
 
+    use cool_asserts::assert_matches;
     use itertools::Itertools;
 
     use super::{LinkHugr, NodeLinkingDirective, NodeLinkingError};
@@ -477,10 +478,12 @@ mod test {
                 (defn.node(), NodeLinkingDirective::replace([tmp])),
             ]),
         );
-        assert_eq!(
+        assert_matches!(
             r.err().unwrap(),
-            NodeLinkingError::NodeMultiplyReplaced(tmp, decl.node(), defn.node())
-        );
+            NodeLinkingError::NodeMultiplyReplaced(tn, sn1, sn2) => {
+                assert_eq!(tmp, tn);
+                assert_eq!([sn1,sn2].into_iter().sorted().collect_vec(), [defn.node(), decl.node()]);
+        });
     }
 
     #[test]
@@ -504,7 +507,7 @@ mod test {
             .unwrap();
         let defn = node_map[&defn.node()];
         assert_eq!(node_map.get(&decl.node()), None);
-        assert_eq!(h.contains_node(temp), false);
+        assert!(!h.contains_node(temp));
 
         assert!(
             h.children(h.module_root())
