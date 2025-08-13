@@ -9,6 +9,15 @@ use hugr_cli::{CliArgs, CliCommand};
 use tracing::{error, metadata::LevelFilter};
 
 fn main() {
+    // Enable human-panic for release builds, or when tests force it via env.
+    if cfg!(not(debug_assertions)) || std::env::var_os("FORCE_HUMAN_PANIC").is_some() {
+        human_panic::setup_panic!();
+    }
+
+    // Test-only panic trigger (harmless in production; only fires if env is set).
+    if std::env::var_os("PANIC_FOR_TESTS").is_some() {
+        panic!("triggered by test");
+    }
     let cli_args = CliArgs::parse();
 
     let level = match cli_args.verbose.filter() {
