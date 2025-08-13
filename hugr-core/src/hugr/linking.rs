@@ -169,13 +169,14 @@ impl<TN> NodeLinkingDirective<TN> {
         Self::Add { replace: vec![] }
     }
 
-    /// The new node should replace the specified node in the target.
+    /// The new node should replace the specified node(s) already existing
+    /// in the target.
     ///
-    /// (Could lead to an invalid Hugr if the replaced node has a different type,
+    /// (Could lead to an invalid Hugr if they have different signatures,
     /// or if the target already has another function with the same name and both are public.)
-    pub fn replace(replaced: TN) -> Self {
+    pub fn replace(nodes: impl IntoIterator<Item = TN>) -> Self {
         Self::Add {
-            replace: vec![replaced],
+            replace: nodes.into_iter().collect(),
         }
     }
 }
@@ -472,8 +473,8 @@ mod test {
             Some(h.entrypoint()),
             insert,
             HashMap::from([
-                (decl.node(), NodeLinkingDirective::replace(tmp)),
-                (defn.node(), NodeLinkingDirective::replace(tmp)),
+                (decl.node(), NodeLinkingDirective::replace([tmp])),
+                (defn.node(), NodeLinkingDirective::replace([tmp])),
             ]),
         );
         assert_eq!(
@@ -496,7 +497,7 @@ mod test {
                 Some(h.entrypoint()),
                 insert,
                 HashMap::from([
-                    (defn.node(), NodeLinkingDirective::replace(temp)),
+                    (defn.node(), NodeLinkingDirective::replace([temp])),
                     (decl.node(), NodeLinkingDirective::UseExisting(temp)),
                 ]),
             )
