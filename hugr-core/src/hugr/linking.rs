@@ -168,6 +168,16 @@ impl<TN> NodeLinkingDirective<TN> {
     pub const fn add() -> Self {
         Self::Add { replace: vec![] }
     }
+
+    /// Replace the specified node in the target.
+
+    /// (Could lead to an invalid Hugr if the replaced node has a different type,
+    /// or if the target already has another function with the same name and both are public.)
+    pub fn replace(replaced: TN) -> Self {
+        Self::Add {
+            replace: vec![replaced],
+        }
+    }
 }
 
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
@@ -224,7 +234,7 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
             NodeLinkingDirective::Add { replace } => {
                 for &r in replace {
                     if let Some(old_sn) = trns.replace.insert(r, sn) {
-                        return Err(NodeLinkingError::NodeMultiplyReplaced(r, sn, old_sn));
+                        return Err(NodeLinkingError::NodeMultiplyReplaced(r, old_sn, sn));
                     }
                 }
             }
@@ -275,8 +285,8 @@ mod test {
     use super::{LinkHugr, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
-    use crate::ops::{OpTag, OpTrait, handle::NodeHandle};
-    use crate::{HugrView, hugr::HugrMut};
+    use crate::ops::{FuncDecl, OpTag, OpTrait, handle::NodeHandle};
+    use crate::{HugrView, hugr::HugrMut, types::Signature};
 
     #[test]
     fn test_insert_link_nodes_add() {
@@ -439,8 +449,8 @@ mod test {
             r.err().unwrap(),
             NodeLinkingError::ChildContainsEntrypoint(defn)
         );
-
         assert_eq!(h, backup);
+
         insert.set_entrypoint(insert.module_root());
         let r = h.insert_hugr_link_nodes(
             Some(h.module_root()),
@@ -448,5 +458,59 @@ mod test {
             HashMap::from([(decl, NodeLinkingDirective::add())]),
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::ChildOfEntrypoint(decl));
+        assert_eq!(h, backup);
+
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let sig = insert
+            .get_optype(defn.node())
+            .as_func_defn()
+            .unwrap()
+            .signature()
+            .clone();
+        let tmp = h.add_node_with_parent(h.module_root(), FuncDecl::new("replaced", sig));
+        let r = h.insert_hugr_link_nodes(
+            Some(h.entrypoint()),
+            insert,
+            HashMap::from([
+                (decl.node(), NodeLinkingDirective::replace(tmp)),
+                (defn.node(), NodeLinkingDirective::replace(tmp)),
+            ]),
+        );
+        assert_eq!(
+            r.err().unwrap(),
+            NodeLinkingError::NodeMultiplyReplaced(tmp, decl.node(), defn.node())
+        );
+    }
+
+    #[test]
+    fn test_replace_used() {
+        let mut h = simple_dfg_hugr();
+        let temp = h.add_node_with_parent(
+            h.module_root(),
+            FuncDecl::new("temp", Signature::new_endo(vec![])),
+        );
+
+        let (insert, defn, decl) = dfg_calling_defn_decl();
+        let node_map = h
+            .insert_hugr_link_nodes(
+                Some(h.entrypoint()),
+                insert,
+                HashMap::from([
+                    (defn.node(), NodeLinkingDirective::replace(temp)),
+                    (decl.node(), NodeLinkingDirective::UseExisting(temp)),
+                ]),
+            )
+            .unwrap();
+        let defn = node_map[&defn.node()];
+        assert_eq!(node_map.get(&decl.node()), None);
+        assert_eq!(h.contains_node(temp), false);
+
+        assert!(
+            h.children(h.module_root())
+                .all(|n| h.get_optype(n).is_func_defn())
+        );
+        for call in h.nodes().filter(|n| h.get_optype(*n).is_call()) {
+            assert_eq!(h.static_source(call), Some(defn));
+        }
     }
 }
