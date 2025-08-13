@@ -213,22 +213,13 @@ impl<TN> NodeLinkingDirective<TN> {
 }
 
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
-/// ALAN TODO accessor methods!
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
     // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
     // copy_private_funcs: bool, // TODO: allow filtering private funcs to only those reachable in callgraph
     /// How to handle cases where the same (public) name is present in both
     /// inserted and target Hugr but with different signatures.
-    /// `true` means an error is raised and nothing is added to the target Hugr.
-    /// `false` means the new function will be added alongside the existing one
-    ///   - this will give an invalid Hugr (duplicate names).
-    // NOTE there are other possible handling schemes, both where we don't insert the new function, both leading to an invalid Hugr:
-    //   * don't insert but break edges --> Unconnected ports (or, replace and break existing edges)
-    //   * use (or replace) the existing function --> incompatible ports
-    // but given you'll need to patch the Hugr up afterwards, you can get there just
-    // by setting this to `false` (and maybe removing one FuncDefn), or via explicit node linking.
-    error_on_conflicting_sig: bool,
+    sig_conflict: SignatureConflictHandling,
     /// How to handle cases where both target and inserted Hugr have a FuncDefn
     /// with the same name and signature.
     // TODO consider Set of names where to prefer new? Or optional map from name?
@@ -238,11 +229,28 @@ pub struct NameLinkingPolicy {
     // rename_map: HashMap<String, String>
 }
 
+/// What to do when both target and inserted Hugr have a
+/// [Visibility::Public] function with the same name but different signatures.
+// ALAN Note: we *could* combine with MultipleImplHandling; the UseExisting/UseNew variants
+// would lead to invalid edges (between ports of different EdgeKind).
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive] // could consider e.g. disconnections
+pub enum SignatureConflictHandling {
+    /// Do not link the Hugrs together; raise a [NameLinkingError::SignatureConflict] instead.
+    ErrorDontInsert,
+    /// Add the new function alongside the existing one in the target Hugr,
+    /// preserving (separately) uses of both. (The Hugr will be invalid because
+    /// of duplicate names.)
+    UseBoth,
+}
+
 /// What to do when both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive] // could consider e.g. disconnections
 pub enum MultipleImplHandling {
-    /// Do not perform insertion; raise an error instead
+    /// Do not link the Hugrs together; raise a [NameLinkingError::MultipleImpls] instead
     ErrorDontInsert,
     /// Keep the implementation already in the target Hugr. (Edges in the source
     /// Hugr will be redirected to use the function from the target.)
@@ -255,6 +263,36 @@ pub enum MultipleImplHandling {
     /// preserving (separately) uses of both. (The Hugr will be invalid because
     /// of duplicate names.)
     UseBoth,
+}
+
+impl NameLinkingPolicy {
+    pub fn err_on_conflict(multi_impls: MultipleImplHandling) -> Self {
+        Self {
+            multi_impls,
+            sig_conflict: SignatureConflictHandling::ErrorDontInsert,
+        }
+    }
+
+    pub fn keep_both_invalid() -> Self {
+        Self {
+            multi_impls: MultipleImplHandling::UseBoth,
+            sig_conflict: SignatureConflictHandling::UseBoth,
+        }
+    }
+
+    pub fn on_signature_conflict(&mut self, s: SignatureConflictHandling) {
+        self.sig_conflict = s;
+    }
+
+    pub fn on_multiple_impls(&mut self, mih: MultipleImplHandling) {
+        self.multi_impls = mih;
+    }
+}
+
+impl Default for NameLinkingPolicy {
+    fn default() -> Self {
+        Self::err_on_conflict(MultipleImplHandling::ErrorDontInsert)
+    }
 }
 
 /// An error in using names to determine how to link functions in source and target Hugrs.
@@ -273,7 +311,7 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
         "Conflicting signatures for name {name} - Source ({src_node}) has {src_sig}, Target ({tgt_node}) has ({tgt_sig})"
     )]
     #[allow(missing_docs)]
-    Signatures {
+    SignatureConflict {
         name: String,
         src_node: SN,
         src_sig: Box<PolyFuncType>,
@@ -301,18 +339,18 @@ impl NameLinkingPolicy {
         let mut res = NodeLinkingDirectives::new();
 
         let NameLinkingPolicy {
-            error_on_conflicting_sig,
+            sig_conflict,
             multi_impls,
         } = self;
         for n in source.children(source.module_root()) {
             if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
-                let mut dirv = NodeLinkingDirective::add();
-                if vis.is_public() {
-                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
-                        if sig == *ex_sig {
-                            dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
-                        } else if *error_on_conflicting_sig {
-                            return Err(NameLinkingError::Signatures {
+                let dirv = if let Some((ex_ns, ex_sig)) =
+                    vis.is_public().then(|| existing.get(name)).flatten()
+                {
+                    match *sig_conflict {
+                        _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_impls)?,
+                        SignatureConflictHandling::ErrorDontInsert => {
+                            return Err(NameLinkingError::SignatureConflict {
                                 name: name.clone(),
                                 src_node: n,
                                 src_sig: Box::new(sig.clone()),
@@ -320,8 +358,11 @@ impl NameLinkingPolicy {
                                 tgt_sig: Box::new((*ex_sig).clone()),
                             });
                         }
+                        SignatureConflictHandling::UseBoth => NodeLinkingDirective::add(),
                     }
-                }
+                } else {
+                    NodeLinkingDirective::add()
+                };
                 res.insert(n, dirv);
             }
         }
@@ -509,7 +550,9 @@ mod test {
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
-    use crate::hugr::linking::{MultipleImplHandling, NameLinkingError, NameLinkingPolicy};
+    use crate::hugr::linking::{
+        MultipleImplHandling, NameLinkingError, NameLinkingPolicy, SignatureConflictHandling,
+    };
     use crate::hugr::{ValidationError, hugrmut::HugrMut};
     use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
@@ -819,7 +862,10 @@ mod test {
         };
 
         // Linking by name...neither of the looped-over params should make any difference:
-        for error_on_conflicting_sig in [false, true] {
+        for sig_conflict in [
+            SignatureConflictHandling::ErrorDontInsert,
+            SignatureConflictHandling::UseBoth,
+        ] {
             for multi_impls in [
                 MultipleImplHandling::ErrorDontInsert,
                 MultipleImplHandling::UseNew,
@@ -827,7 +873,7 @@ mod test {
                 MultipleImplHandling::UseBoth,
             ] {
                 let pol = NameLinkingPolicy {
-                    error_on_conflicting_sig,
+                    sig_conflict,
                     multi_impls,
                 };
                 let mut target = orig_target.clone();
@@ -851,7 +897,6 @@ mod test {
         }
     }
 
-    // TODO test copy_private_funcs actually copying; presence/absence of parent when inserting (subtree of) public func
     #[rstest]
     fn sig_conflict(
         #[values(false, true)] host_defn: bool,
@@ -874,16 +919,13 @@ mod test {
         let new_sig = Signature::new_endo(INT_TYPES[3].clone());
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        let mut pol = NameLinkingPolicy {
-            error_on_conflicting_sig: true,
-            multi_impls: MultipleImplHandling::ErrorDontInsert,
-        };
+        let mut pol = NameLinkingPolicy::err_on_conflict(MultipleImplHandling::ErrorDontInsert);
         let mut host = orig_host.clone();
         let res = host.link_hugr(inserted.clone(), pol.clone());
         assert_eq!(host, orig_host); // Did nothing
         assert_eq!(
             res,
-            Err(NameLinkingError::Signatures {
+            Err(NameLinkingError::SignatureConflict {
                 name: "foo".to_string(),
                 src_node: inserted_fn,
                 src_sig: Box::new(new_sig.into()),
@@ -892,7 +934,7 @@ mod test {
             })
         );
 
-        pol.error_on_conflicting_sig = false;
+        pol.on_signature_conflict(SignatureConflictHandling::UseBoth);
         let node_map = host.link_hugr(inserted, pol).unwrap();
         assert_eq!(
             host.validate(),
@@ -922,13 +964,9 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let res = host.link_hugr(
-            inserted,
-            NameLinkingPolicy {
-                error_on_conflicting_sig: false,
-                multi_impls,
-            },
-        );
+        let mut pol = NameLinkingPolicy::keep_both_invalid();
+        pol.on_multiple_impls(multi_impls);
+        let res = host.link_hugr(inserted, pol);
         if multi_impls == MultipleImplHandling::ErrorDontInsert {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
             assert_eq!(host, backup);
