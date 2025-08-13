@@ -217,12 +217,7 @@ impl<TN> NodeLinkingDirective<TN> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
     // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
-    /// If true, all private functions from the source hugr are inserted into the target.
-    /// (Since these are private, name conflicts do not make the Hugr invalid.)
-    /// If false, instead edges from said private functions to any inserted parts
-    /// of the source Hugr will be broken, making the target Hugr invalid.
-    /// ALAN TODO: drop this; reintroduce "copy_only_required_privates" in next PR.
-    copy_private_funcs: bool,
+    // copy_private_funcs: bool, // TODO: allow filtering private funcs to only those reachable in callgraph
     /// How to handle cases where the same (public) name is present in both
     /// inserted and target Hugr but with different signatures.
     /// `true` means an error is raised and nothing is added to the target Hugr.
@@ -306,30 +301,27 @@ impl NameLinkingPolicy {
         let mut res = NodeLinkingDirectives::new();
 
         let NameLinkingPolicy {
-            copy_private_funcs,
             error_on_conflicting_sig,
             multi_impls,
         } = self;
         for n in source.children(source.module_root()) {
             if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
                 let mut dirv = NodeLinkingDirective::add();
-                if !vis.is_public() {
-                    if !copy_private_funcs {
-                        continue;
-                    };
-                } else if let Some((ex_ns, ex_sig)) = existing.get(name) {
-                    if sig == *ex_sig {
-                        dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
-                    } else if *error_on_conflicting_sig {
-                        return Err(NameLinkingError::Signatures {
-                            name: name.clone(),
-                            src_node: n,
-                            src_sig: Box::new(sig.clone()),
-                            tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
-                            tgt_sig: Box::new((*ex_sig).clone()),
-                        });
+                if vis.is_public() {
+                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
+                        if sig == *ex_sig {
+                            dirv = directive(name, n, is_defn, ex_ns, multi_impls)?
+                        } else if *error_on_conflicting_sig {
+                            return Err(NameLinkingError::Signatures {
+                                name: name.clone(),
+                                src_node: n,
+                                src_sig: Box::new(sig.clone()),
+                                tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
+                                tgt_sig: Box::new((*ex_sig).clone()),
+                            });
+                        }
                     }
-                };
+                }
                 res.insert(n, dirv);
             }
         }
@@ -513,8 +505,7 @@ mod test {
     use super::{LinkHugr, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
-        DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
+        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
@@ -802,8 +793,8 @@ mod test {
         };
 
         let inserted = {
-            let mut dfb = DFGBuilder::new(Signature::new(vec![], i64_t())).unwrap();
-            let mut mb = dfb.module_root_builder();
+            let mut main_b = FunctionBuilder::new("main", Signature::new(vec![], i64_t())).unwrap();
+            let mut mb = main_b.module_root_builder();
             let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
             let foo2 = mb.declare("foo", foo_sig.clone().into()).unwrap();
             let mut bar = mb
@@ -813,18 +804,15 @@ mod test {
                 .add_dataflow_op(IntOpDef::iadd.with_log_width(6), bar.input_wires())
                 .unwrap();
             let bar = bar.finish_with_outputs(res.outputs()).unwrap();
-            let i = dfb.add_load_value(ConstInt::new_u(6, 257).unwrap());
-            let c = dfb.call(&foo1, &[], [i]).unwrap();
-            let r = dfb.call(&foo2, &[], c.outputs()).unwrap();
-            let h = dfb.finish_hugr_with_outputs(r.outputs()).unwrap();
+            let i = main_b.add_load_value(ConstInt::new_u(6, 257).unwrap());
+            let c = main_b.call(&foo1, &[], [i]).unwrap();
+            let r = main_b.call(&foo2, &[], c.outputs()).unwrap();
+            let h = main_b.finish_hugr_with_outputs(r.outputs()).unwrap();
             assert_eq!(
                 list_decls_defns(&h),
                 (
                     HashMap::from([(foo1.node(), "foo"), (foo2.node(), "foo")]),
-                    HashMap::from([
-                        (h.get_parent(h.entrypoint()).unwrap(), "main"),
-                        (bar.node(), "bar")
-                    ])
+                    HashMap::from([(h.entrypoint(), "main"), (bar.node(), "bar")])
                 )
             );
             h
@@ -838,27 +826,26 @@ mod test {
                 MultipleImplHandling::UseExisting,
                 MultipleImplHandling::UseBoth,
             ] {
-                let mut pol = NameLinkingPolicy {
-                    copy_private_funcs: true,
+                let pol = NameLinkingPolicy {
                     error_on_conflicting_sig,
                     multi_impls,
                 };
                 let mut target = orig_target.clone();
 
-                // ALAN this won't work, test expects entrypoint-subtree to be copied
-                pol.copy_private_funcs = false;
                 target.link_hugr(inserted.clone(), pol).unwrap();
                 target.validate().unwrap();
                 let (decls, defns) = list_decls_defns(&target);
                 assert_eq!(decls, HashMap::new());
                 assert_eq!(
                     defns.values().copied().sorted().collect_vec(),
-                    ["bar", "foo"]
+                    ["bar", "foo", "main"]
                 );
                 let call_tgts = call_targets(&target);
-                for defn in defns.keys() {
-                    // Defns now have two calls each (was one to each alias)
-                    assert_eq!(call_tgts.values().filter(|tgt| *tgt == defn).count(), 2);
+                for (defn, name) in defns {
+                    if name != "main" {
+                        // Defns now have two calls each (was one to each alias)
+                        assert_eq!(call_tgts.values().filter(|tgt| **tgt == defn).count(), 2);
+                    }
                 }
             }
         }
@@ -888,7 +875,6 @@ mod test {
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
         let mut pol = NameLinkingPolicy {
-            copy_private_funcs: true,
             error_on_conflicting_sig: true,
             multi_impls: MultipleImplHandling::ErrorDontInsert,
         };
@@ -939,7 +925,6 @@ mod test {
         let res = host.link_hugr(
             inserted,
             NameLinkingPolicy {
-                copy_private_funcs: true,
                 error_on_conflicting_sig: false,
                 multi_impls,
             },
