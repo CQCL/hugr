@@ -38,8 +38,8 @@ pub trait LinkHugr: HugrMut {
         parent: Option<Self::Node>,
         other: &H,
         children: NodeLinkingDirectives<H::Node, Self::Node>,
-    ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node>> {
-        check_directives(other, parent, &children)?;
+    ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node, Self::Node>> {
+        let transfers = check_directives(other, parent, &children)?;
         let nodes =
             parent
                 .iter()
@@ -58,7 +58,7 @@ pub trait LinkHugr: HugrMut {
         let mut node_map = self
             .insert_view_forest(other, nodes, roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
-        link_by_node(self, children, &mut node_map);
+        link_by_node(self, transfers, &mut node_map);
         Ok(node_map)
     }
 
@@ -82,8 +82,8 @@ pub trait LinkHugr: HugrMut {
         parent: Option<Self::Node>,
         mut other: Hugr,
         children: NodeLinkingDirectives<Node, Self::Node>,
-    ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node>> {
-        check_directives(&other, parent, &children)?;
+    ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node, Self::Node>> {
+        let transfers = check_directives(&other, parent, &children)?;
         let mut roots = HashMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
@@ -102,7 +102,7 @@ pub trait LinkHugr: HugrMut {
         let mut node_map = self
             .insert_forest(other, roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
-        link_by_node(self, children, &mut node_map);
+        link_by_node(self, transfers, &mut node_map);
         Ok(node_map)
     }
 }
@@ -111,21 +111,27 @@ impl<T: HugrMut> LinkHugr for T {}
 
 /// An error resulting from an [NodeLinkingDirective] passed to [LinkHugr::insert_hugr_link_nodes]
 /// or [LinkHugr::insert_from_view_link_nodes].
+///
+/// `SN` is the type of nodes in the source (inserted) Hugr; `TN` similarly for the target Hugr.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive]
-pub enum NodeLinkingError<N: Display> {
+pub enum NodeLinkingError<SN: Display, TN: Display> {
     /// Inserting the whole Hugr, yet also asked to insert some of its children
     /// (so the inserted Hugr's entrypoint was its module-root).
     #[error(
         "Cannot insert children (e.g. {_0}) when already inserting whole Hugr (entrypoint == module_root)"
     )]
-    ChildOfEntrypoint(N),
+    ChildOfEntrypoint(SN),
     /// A module-child requested contained (or was) the entrypoint
     #[error("Requested to insert module-child {_0} but this contains the entrypoint")]
-    ChildContainsEntrypoint(N),
+    ChildContainsEntrypoint(SN),
     /// A module-child requested was not a child of the module root
     #[error("{_0} was not a child of the module root")]
-    NotChildOfRoot(N),
+    NotChildOfRoot(SN),
+    /// A node in the target Hugr was in a [NodeLinkingDirective::Add::replace] for multiple
+    /// inserted nodes (it is not clear to which we should transfer edges).
+    #[error("Target node {_0} is to be replaced by two source nodes {_1} and {_2}")]
+    NodeMultiplyReplaced(TN, SN, SN),
 }
 
 /// Directive for how to treat a particular FuncDefn/FuncDecl in the source Hugr.
@@ -170,11 +176,18 @@ impl<TN> NodeLinkingDirective<TN> {
 /// For use with [LinkHugr::insert_hugr_link_nodes] and [LinkHugr::insert_from_view_link_nodes].
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
+/// Invariant: no SourceNode can be in both maps (by type of [NodeLinkingDirective])
+/// TargetNodes can be (in RHS of multiple directives)
+struct Transfers<SourceNode, TargetNode> {
+    use_existing: HashMap<SourceNode, TargetNode>,
+    replace: HashMap<TargetNode, SourceNode>,
+}
+
 fn check_directives<SRC: HugrView, TN: HugrNode>(
     other: &SRC,
     parent: Option<TN>,
     children: &HashMap<SRC::Node, NodeLinkingDirective<TN>>,
-) -> Result<(), NodeLinkingError<SRC::Node>> {
+) -> Result<Transfers<SRC::Node, TN>, NodeLinkingError<SRC::Node, TN>> {
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
             if let Some(c) = children.keys().next() {
@@ -199,35 +212,46 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
             }
         }
     }
-    for &c in children.keys() {
-        if other.get_parent(c) != Some(other.module_root()) {
-            return Err(NodeLinkingError::NotChildOfRoot(c));
+    let mut trns = Transfers {
+        replace: HashMap::default(),
+        use_existing: HashMap::default(),
+    };
+    for (&sn, dirv) in children {
+        if other.get_parent(sn) != Some(other.module_root()) {
+            return Err(NodeLinkingError::NotChildOfRoot(sn));
+        }
+        match dirv {
+            NodeLinkingDirective::Add { replace } => {
+                for &r in replace {
+                    if let Some(old_sn) = trns.replace.insert(r, sn) {
+                        return Err(NodeLinkingError::NodeMultiplyReplaced(r, sn, old_sn));
+                    }
+                }
+            }
+            NodeLinkingDirective::UseExisting(tn) => {
+                trns.use_existing.insert(sn, *tn);
+            }
         }
     }
-    Ok(())
+    Ok(trns)
 }
 
 fn link_by_node<SN: HugrNode, TGT: LinkHugr + ?Sized>(
     hugr: &mut TGT,
-    children: NodeLinkingDirectives<SN, TGT::Node>,
+    transfers: Transfers<SN, TGT::Node>,
     node_map: &mut HashMap<SN, TGT::Node>,
 ) {
-    // Now enact any `Add`s with replaces, and `UseExisting`s, removing the copied children
-    for (ch, m) in children {
-        match m {
-            NodeLinkingDirective::UseExisting(replace_with) => {
-                let copy = node_map.remove(&ch).unwrap();
-                // Because of `UseExisting` we avoided adding `ch`s descendants above
-                debug_assert_eq!(hugr.children(copy).next(), None);
-                replace_static_src(hugr, copy, replace_with);
-            }
-            NodeLinkingDirective::Add { replace } => {
-                let new_node = *node_map.get(&ch).unwrap();
-                for replace in replace {
-                    replace_static_src(hugr, replace, new_node);
-                }
-            }
-        }
+    // Resolve `use_existing` first in case the existing node is also replaced by
+    // a new node (which we know will not be in RHS of any entry in `replace`).
+    for (sn, tn) in transfers.use_existing {
+        let copy = node_map.remove(&sn).unwrap();
+        // Because of `UseExisting` we avoided adding `sn`s descendants
+        debug_assert_eq!(hugr.children(copy).next(), None);
+        replace_static_src(hugr, copy, tn);
+    }
+    for (tn, sn) in transfers.replace {
+        let new_node = *node_map.get(&sn).unwrap();
+        replace_static_src(hugr, tn, new_node);
     }
 }
 

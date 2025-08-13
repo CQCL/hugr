@@ -180,7 +180,7 @@ pub enum BuildError {
 
     /// From [Dataflow::add_hugr_with_wires_link_nodes]
     #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(#[from] NodeLinkingError<Node>),
+    HugrInsertionError(#[from] NodeLinkingError<Node, Node>),
 
     /// From [Dataflow::add_hugr_view_with_wires_link_nodes].
     /// Note that because the type of node in the [NodeLinkingError] depends
