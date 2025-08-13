@@ -1,5 +1,11 @@
 # Changelog
 
+
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.2...hugr-core-v0.22.3) - 2025-08-13
+
+### Documentation
+
+- Clarify docs for SiblingSubgraph::{inputs, outputs} ([#2508](https://github.com/CQCL/hugr/pull/2508))
 ## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.1...hugr-core-v0.22.2) - 2025-08-06
 
 ### New Features
