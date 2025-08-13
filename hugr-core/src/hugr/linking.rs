@@ -109,11 +109,8 @@ pub trait LinkHugr: HugrMut {
 
 impl<T: HugrMut> LinkHugr for T {}
 
-/// An error resulting from an [NodeLinkingDirective] passed to [insert_hugr_link_nodes]
-/// or [insert_from_view_link_nodes].
-///
-/// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
-/// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
+/// An error resulting from an [NodeLinkingDirective] passed to [LinkHugr::insert_hugr_link_nodes]
+/// or [LinkHugr::insert_from_view_link_nodes].
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive]
 pub enum NodeLinkingError<N: Display> {
@@ -168,11 +165,9 @@ impl<TN> NodeLinkingDirective<TN> {
 }
 
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
-/// target Hugr (beneath the module root). For use with [insert_hugr_link_nodes] and
-/// [insert_from_view_link_nodes].
+/// target Hugr.
 ///
-/// [insert_hugr_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_hugr_link_nodes
-/// [insert_from_view_link_nodes]: crate::hugr::hugrmut::HugrMut::insert_from_view_link_nodes
+/// For use with [LinkHugr::insert_hugr_link_nodes] and [LinkHugr::insert_from_view_link_nodes].
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
 fn check_directives<SRC: HugrView, TN: HugrNode>(
