@@ -354,13 +354,15 @@ pub trait HugrMut: HugrMutInternals {
 /// Used by [HugrMut::insert_forest] and [HugrMut::insert_view_forest].
 pub type InsertForestResult<SN, TN> = Result<InsertedForest<SN, TN>, InsertForestError<SN>>;
 
-/// An error from [HugrMut::insert_forest] or [HugrMut::insert_view_forest]
+/// An error from [HugrMut::insert_forest] or [HugrMut::insert_view_forest].
+///
+/// `SN` is the type of nodes in the source Hugr
 #[derive(Clone, Debug, derive_more::Display, derive_more::Error, PartialEq)]
 #[non_exhaustive]
-pub enum InsertForestError<N: HugrNode = Node> {
+pub enum InsertForestError<SN: HugrNode = Node> {
     /// The specified source node would be copied twice into the target
     #[display("Node/subtree {_0} would be copied twice")]
-    DoubleCopy(N),
+    DoubleCopy(SN),
 }
 
 /// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
