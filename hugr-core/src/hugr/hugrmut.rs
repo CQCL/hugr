@@ -361,8 +361,11 @@ pub type InsertForestResult<SN, TN> = Result<InsertedForest<SN, TN>, InsertFores
 #[non_exhaustive]
 pub enum InsertForestError<SN: HugrNode = Node> {
     /// The specified source node would be copied twice into the target
-    #[display("Node/subtree {_0} would be copied twice")]
-    DoubleCopy(SN),
+    #[display("Node/subtree {node} would be copied twice")]
+    DoubleCopy {
+        /// The node or root of subtree that would be copied twice
+        node: SN,
+    },
 }
 
 /// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
@@ -550,13 +553,13 @@ impl HugrMut for Hugr {
             Some(snd_root) => {
                 let roots: HashMap<Node, Self::Node> =
                     [fst_root, snd_root].into_iter().chain(roots).collect();
-                for &r in roots.keys() {
-                    let mut n = r;
-                    while let Some(p) = other.get_parent(n) {
+                for &node in roots.keys() {
+                    let mut anc = node;
+                    while let Some(p) = other.get_parent(anc) {
                         if roots.contains_key(&p) {
-                            return Err(InsertForestError::DoubleCopy(r));
+                            return Err(InsertForestError::DoubleCopy { node });
                         }
-                        n = p;
+                        anc = p;
                     }
                 }
                 insert_hugr_internal(
@@ -695,7 +698,7 @@ fn insert_hugr_internal<H: HugrView>(
         let op = OpType::default();
         let new = hugr.add_node(op);
         if node_map.insert(old, new).is_some() {
-            return Err(InsertForestError::DoubleCopy(old));
+            return Err(InsertForestError::DoubleCopy { node: old });
         }
 
         hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
@@ -985,12 +988,12 @@ mod test {
             insert.descendants(epp).chain(insert.descendants(ep)),
             roots,
         );
-        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy { node: ep }));
         assert!(h.validate().is_err());
 
         let mut h = backup.clone();
         let r = h.insert_forest(insert, roots);
-        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy { node: ep }));
         // Here the error is detected in building `nodes` from `roots` so before any mutation
         assert_eq!(h, backup);
     }
