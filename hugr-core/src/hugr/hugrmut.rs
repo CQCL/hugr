@@ -739,6 +739,7 @@ fn insert_hugr_internal<H: HugrView>(
 mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
+    use rstest::{fixture, rstest};
 
     use crate::builder::test::simple_dfg_hugr;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
@@ -829,6 +830,7 @@ mod test {
 
     /// A DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
     /// to a FuncDefn and a FuncDecl each bool_t->bool_t, and their handles.
+    #[fixture]
     pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
         let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
         let new_defn = {
@@ -856,55 +858,56 @@ mod test {
         )
     }
 
-    #[test]
-    fn test_insert_forest() {
-        // Specify which decls to transfer
-        for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
-            let mut h = simple_dfg_hugr();
-            let (insert, defn, decl) = dfg_calling_defn_decl();
-            let roots = std::iter::once((insert.entrypoint(), h.entrypoint()))
-                .chain(call1.then_some((defn.node(), h.module_root())).into_iter())
-                .chain(call2.then_some((decl.node(), h.module_root())).into_iter());
-            h.insert_forest(insert, roots).unwrap();
-            if call1 && call2 {
-                h.validate().unwrap();
-            } else {
-                assert!(matches!(
-                    h.validate(),
-                    Err(ValidationError::UnconnectedPort { .. })
-                ));
-            }
-            assert_eq!(
-                h.children(h.module_root()).count(),
-                1 + (call1 as usize) + (call2 as usize)
-            );
-            let [calln1, calln2] = h
-                .nodes()
-                .filter(|n| h.get_optype(*n).is_call())
-                .collect_array()
-                .unwrap();
-
-            let tgt1 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_defn()
-                    .is_some_and(|fd| fd.func_name() == "helper_id")
-            });
-            assert_eq!(tgt1.is_some(), call1);
-            assert_eq!(h.static_source(calln1), tgt1);
-
-            let tgt2 = h.nodes().find(|n| {
-                h.get_optype(*n)
-                    .as_func_decl()
-                    .is_some_and(|fd| fd.func_name() == "helper2")
-            });
-            assert_eq!(tgt2.is_some(), call2);
-            assert_eq!(h.static_source(calln2), tgt2);
+    #[rstest]
+    fn test_insert_forest(
+        dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>),
+        #[values(false, true)] copy_defn: bool,
+        #[values(false, true)] copy_decl: bool,
+    ) {
+        let (insert, defn, decl) = dfg_calling_defn_decl;
+        let mut h = simple_dfg_hugr();
+        let roots = std::iter::once((insert.entrypoint(), h.entrypoint()))
+            .chain(copy_defn.then_some((defn.node(), h.module_root())))
+            .chain(copy_decl.then_some((decl.node(), h.module_root())));
+        h.insert_forest(insert, roots).unwrap();
+        if copy_defn && copy_decl {
+            h.validate().unwrap();
+        } else {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
         }
+        assert_eq!(
+            h.children(h.module_root()).count(),
+            1 + (copy_defn as usize) + (copy_decl as usize)
+        );
+        let [calln1, calln2] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect_array()
+            .unwrap();
+
+        let tgt1 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_defn()
+                .is_some_and(|fd| fd.func_name() == "helper_id")
+        });
+        assert_eq!(tgt1.is_some(), copy_defn);
+        assert_eq!(h.static_source(calln1), tgt1);
+
+        let tgt2 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_decl()
+                .is_some_and(|fd| fd.func_name() == "helper2")
+        });
+        assert_eq!(tgt2.is_some(), copy_decl);
+        assert_eq!(h.static_source(calln2), tgt2);
     }
 
-    #[test]
-    fn test_insert_view_forest() {
-        let (insert, defn, decl) = dfg_calling_defn_decl();
+    #[rstest]
+    fn test_insert_view_forest(dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>)) {
+        let (insert, defn, decl) = dfg_calling_defn_decl;
         let mut h = simple_dfg_hugr();
 
         let mut roots = HashMap::from([
@@ -971,12 +974,12 @@ mod test {
         assert_eq!(h.input_neighbours(outp).next(), Some(inserted_ep));
     }
 
-    #[test]
-    fn bad_insert_forest() {
+    #[rstest]
+    fn bad_insert_forest(dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>)) {
         let backup = simple_dfg_hugr();
         let mut h = backup.clone();
 
-        let (insert, _, _) = dfg_calling_defn_decl();
+        let (insert, _, _) = dfg_calling_defn_decl;
         let ep = insert.entrypoint();
         let epp = insert.get_parent(ep).unwrap();
         let roots = [(epp, h.module_root()), (ep, h.entrypoint())];
