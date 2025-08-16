@@ -878,10 +878,8 @@ mod test {
                 Err(ValidationError::UnconnectedPort { .. })
             ));
         }
-        assert_eq!(
-            h.children(h.module_root()).count(),
-            1 + (copy_defn as usize) + (copy_decl as usize)
-        );
+        let expected_mod_children = 1 + (copy_defn as usize) + (copy_decl as usize);
+        assert_eq!(h.children(h.module_root()).count(), expected_mod_children);
         let [calln1, calln2] = h
             .nodes()
             .filter(|n| h.get_optype(*n).is_call())
