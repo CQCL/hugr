@@ -97,7 +97,7 @@ fn bench_insertion(c: &mut Criterion) {
                 (defn.node(), h.module_root()),
                 (decl.node(), h.module_root()),
             ];
-            black_box(h.insert_forest(insert, roots.into_iter()))
+            black_box(h.insert_forest(insert, roots))
         })
     });
 }
@@ -151,5 +151,5 @@ criterion_group! {
     name = benches;
     config = Criterion::default();
     targets =
-        bench_builder, bench_serialization
+        bench_builder, bench_insertion, bench_serialization
 }
