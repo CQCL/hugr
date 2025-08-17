@@ -91,6 +91,7 @@ fn bench_insertion(c: &mut Criterion) {
     group.bench_function("insert_forest", |b| {
         let mut h = simple_dfg_hugr();
         b.iter(|| {
+            // Note the cost of constructing `insert`` here may dominate the cost of insertion!
             let (insert, decl, defn) = dfg_calling_defn_decl();
             let roots = [
                 (insert.entrypoint(), h.entrypoint()),

@@ -270,8 +270,11 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert a forest of nodes from another Hugr into this one.
     ///
-    /// `root_parents` maps from roots of regions in the other Hugr to insert,
-    /// to the node in this Hugr that shall be parent for that region.
+    /// `root_parents` contains pairs of
+    ///    * the root of a region in `other` to insert,
+    ///    * the node in `self` that shall be parent for that region.
+    ///
+    /// Later entries for the same region override earlier ones.
     /// If `root_parents` is empty, nothing is inserted.
     ///
     /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
@@ -279,8 +282,8 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// [InsertForestError::DoubleCopy] if the subtrees of the keys of `root_parents`
-    /// are not disjoint (the error indicates the root of the _inner_ subtree).
+    /// [InsertForestError::DoubleCopy] if the regions in `root_parents` are not disjount
+    /// (the error indicates the root of the _inner_ subtree).
     ///
     /// # Panics
     ///
@@ -295,13 +298,15 @@ pub trait HugrMut: HugrMutInternals {
     ///
     ///  `nodes` enumerates all nodes in `other` to copy.
     ///
-    ///  `root_parents` identifies those nodes in `nodes` which should be placed under
-    /// the given parent nodes in `self`. Note that unlike [Self::insert_forest] this
-    /// allows inserting most of a subtree in one location but with subparts of that
-    /// subtree placed elsewhere.
+    /// `root_parents` contains pairs of a node in `nodes` and the parent in `self` under which
+    /// it should be to placed. Later entries (for the same node) override earlier ones.
+    /// Note that unlike [Self::insert_forest] this allows inserting most of a subtree in one
+    /// location but with subparts of that subtree placed elsewhere.
     ///
-    /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
-    /// and where each value is the corresponding (new) node in `self`.
+    /// Nodes in `nodes` which are not mentioned in `root_parents` and whose parent in `other`
+    /// is not in `nodes`, will have no parent in `self`.
+    ///
+    /// Returns a [`HashMap`] from each node in `nodes` to the corresponding (new) node in `self`.
     ///
     /// # Errors
     ///
@@ -309,7 +314,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Panics
     ///
-    /// If any of the keys in `roots` are not in `nodes`, or any of the values not nodes in `self`.
+    /// If any of the keys in `root_parents` are not in `nodes`, or any of the values not nodes in `self`.
     fn insert_view_forest<H: HugrView>(
         &mut self,
         other: &H,
