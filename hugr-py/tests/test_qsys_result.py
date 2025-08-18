@@ -152,3 +152,58 @@ def test_collate_tag():
         {"f": [1.0, 0.1]},
         {"f": [[2.0]], "g": [2.0]},
     ]
+
+
+def test_qsys_shot_sequence_behavior():
+    """Test that QsysShot implements Sequence protocol correctly."""
+    shot = QsysShot([("a", 1), ("b", 2), ("c", 3)])
+
+    # Test __len__
+    assert len(shot) == 3
+
+    # Test __getitem__ with int index
+    assert shot[0] == ("a", 1)
+    assert shot[1] == ("b", 2)
+    assert shot[-1] == ("c", 3)
+
+    # Test __getitem__ with slice
+    assert shot[0:2] == [("a", 1), ("b", 2)]
+    assert shot[1:] == [("b", 2), ("c", 3)]
+
+    # Test __iter__
+    entries = list(shot)
+    assert entries == [("a", 1), ("b", 2), ("c", 3)]
+
+    # Test iteration with for loop
+    result = []
+    for tag, value in shot:
+        result.append((tag, value))
+    assert result == [("a", 1), ("b", 2), ("c", 3)]
+
+
+def test_qsys_result_sequence_behavior():
+    """Test that QsysResult implements Sequence protocol correctly."""
+    shot1 = QsysShot([("a", 1), ("b", 2)])
+    shot2 = QsysShot([("c", 3), ("d", 4)])
+    shot3 = QsysShot([("e", 5)])
+
+    result = QsysResult([shot1, shot2, shot3])
+
+    # Test __len__
+    assert len(result) == 3
+
+    # Test __getitem__ with int index
+    assert result[0] == shot1
+    assert result[1] == shot2
+    assert result[-1] == shot3
+
+    # Test __getitem__ with slice
+    assert result[0:2] == [shot1, shot2]
+    assert result[1:] == [shot2, shot3]
+
+    # Test __iter__
+    shots = list(result)
+    assert shots == [shot1, shot2, shot3]
+
+    # Test iteration behavior
+    assert all(isinstance(shot, QsysShot) for shot in result)
