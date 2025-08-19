@@ -560,7 +560,7 @@ impl HugrMut for Hugr {
             self,
             &other,
             roots.keys().flat_map(|n| other.descendants(*n)),
-            roots.iter().map(|(r, p)| (*r, *p)),
+            &roots,
         )
         .expect("Trees disjoint so no repeated nodes");
         // Merge the extension sets.
@@ -585,7 +585,8 @@ impl HugrMut for Hugr {
         nodes: impl Iterator<Item = H::Node> + Clone,
         root_parents: impl IntoIterator<Item = (H::Node, Self::Node)>,
     ) -> InsertForestResult<H::Node, Self::Node> {
-        let inserted = insert_forest_internal(self, other, nodes, root_parents.into_iter())?;
+        let inserted =
+            insert_forest_internal(self, other, nodes, &root_parents.into_iter().collect())?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -676,7 +677,7 @@ fn insert_forest_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node> + Clone,
-    root_parents: impl Iterator<Item = (H::Node, Node)>,
+    root_parents: &HashMap<H::Node, Node>,
 ) -> InsertForestResult<H::Node, Node> {
     let new_node_count_hint = other_nodes.size_hint().1.unwrap_or_default();
 
@@ -715,17 +716,11 @@ fn insert_forest_internal<H: HugrView>(
                 hugr.connect(new, src, neigh, tgt);
             }
         }
-    }
-    for (r, p) in root_parents {
-        hugr.set_parent(node_map[&r], p);
-    }
-    for old in other_nodes {
-        let new = node_map[&old];
-        if hugr.get_parent(new).is_none() {
-            let old_parent = other.get_parent(old).unwrap();
-            let new_parent = node_map[&old_parent];
-            hugr.set_parent(new, new_parent);
-        }
+        let new_parent = match root_parents.get(&old) {
+            Some(p) => *p,
+            None => node_map[&other.get_parent(old).unwrap()],
+        };
+        hugr.set_parent(new, new_parent);
     }
     Ok(InsertedForest { node_map })
 }
