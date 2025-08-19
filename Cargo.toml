@@ -40,7 +40,7 @@ debug_assert_with_mut_call = "warn"
 too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
-anyhow = "1.0.98"
+anyhow = "1.0.99"
 insta = { version = "1.43.1" }
 bitvec = "1.0.1"
 capnp = "0.21.4"
@@ -71,9 +71,9 @@ smol_str = "0.3.1"
 static_assertions = "1.1.0"
 strum = "0.27.2"
 tempfile = "3.20"
-thiserror = "2.0.12"
+thiserror = "2.0.15"
 typetag = "0.2.20"
-clap = { version = "4.5.42" }
+clap = { version = "4.5.45" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.3"
 assert_cmd = "2.0.17"
