@@ -282,8 +282,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// [InsertForestError::DoubleCopy] if the regions in `root_parents` are not disjount
-    /// (the error indicates the root of the _inner_ subtree).
+    /// [InsertForestError::SubtreeAlreadyCopied] if the regions in `root_parents` are not disjount
     ///
     /// # Panics
     ///
@@ -310,7 +309,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Errors
     ///
-    /// [InsertForestError::DoubleCopy] if any node appears in `nodes` more than once.
+    /// [InsertForestError::DuplicateNode] if any node appears in `nodes` more than once.
     ///
     /// # Panics
     ///
@@ -365,9 +364,20 @@ pub type InsertForestResult<SN, TN> = Result<InsertedForest<SN, TN>, InsertFores
 #[derive(Clone, Debug, derive_more::Display, derive_more::Error, PartialEq)]
 #[non_exhaustive]
 pub enum InsertForestError<SN: HugrNode = Node> {
-    /// The specified source node would be copied twice into the target
-    #[display("Node/subtree {_0} would be copied twice")]
-    DoubleCopy(SN),
+    /// A source node was specified twice in a call to [HugrMut::insert_view_forest]
+    #[display("Node {_0} would be copied twice")]
+    DuplicateNode(SN),
+    /// A subtree would be copied twice (i.e. it is contained in another) in a call to
+    /// [HugrMut::insert_forest]
+    #[display(
+        "Subtree rooted at {subtree} is already being copied as part of that rooted at {parent}"
+    )]
+    SubtreeAlreadyCopied {
+        /// Root of the inner subtree
+        subtree: SN,
+        /// Root of the outer subtree that also contains the inner
+        parent: SN,
+    },
 }
 
 /// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
@@ -537,13 +547,13 @@ impl HugrMut for Hugr {
         root_parents: impl IntoIterator<Item = (Node, Self::Node)>,
     ) -> InsertForestResult<Node, Self::Node> {
         let roots: HashMap<_, _> = root_parents.into_iter().collect();
-        for &r in roots.keys() {
-            let mut n = r;
-            while let Some(p) = other.get_parent(n) {
-                if roots.contains_key(&p) {
-                    return Err(InsertForestError::DoubleCopy(r));
+        for &subtree in roots.keys() {
+            let mut n = subtree;
+            while let Some(parent) = other.get_parent(n) {
+                if roots.contains_key(&parent) {
+                    return Err(InsertForestError::SubtreeAlreadyCopied { subtree, parent });
                 }
-                n = p;
+                n = parent;
             }
         }
         let inserted = insert_forest_internal(
@@ -680,7 +690,7 @@ fn insert_forest_internal<H: HugrView>(
         let op = OpType::default();
         let new = hugr.add_node(op);
         if node_map.insert(old, new).is_some() {
-            return Err(InsertForestError::DoubleCopy(old));
+            return Err(InsertForestError::DuplicateNode(old));
         }
 
         hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
@@ -971,12 +981,18 @@ mod test {
             insert.descendants(epp).chain(insert.descendants(ep)),
             roots,
         );
-        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(r.err(), Some(InsertForestError::DuplicateNode(ep)));
         assert!(h.validate().is_err());
 
         let mut h = backup.clone();
         let r = h.insert_forest(insert, roots);
-        assert_eq!(r.err(), Some(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(
+            r.err(),
+            Some(InsertForestError::SubtreeAlreadyCopied {
+                subtree: ep,
+                parent: epp
+            })
+        );
         // Here the error is detected in building `nodes` from `roots` so before any mutation
         assert_eq!(h, backup);
     }
