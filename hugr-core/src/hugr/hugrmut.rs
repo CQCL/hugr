@@ -550,7 +550,7 @@ impl HugrMut for Hugr {
             self,
             &other,
             roots.keys().flat_map(|n| other.descendants(*n)),
-            &roots,
+            roots.iter().map(|(r, p)| (*r, *p)),
         )
         .expect("Trees disjoint so no repeated nodes");
         // Merge the extension sets.
@@ -575,8 +575,7 @@ impl HugrMut for Hugr {
         nodes: impl Iterator<Item = H::Node> + Clone,
         root_parents: impl IntoIterator<Item = (H::Node, Self::Node)>,
     ) -> InsertForestResult<H::Node, Self::Node> {
-        let inserted =
-            insert_forest_internal(self, other, nodes, &root_parents.into_iter().collect())?;
+        let inserted = insert_forest_internal(self, other, nodes, root_parents.into_iter())?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
@@ -667,7 +666,7 @@ fn insert_forest_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
     other_nodes: impl Iterator<Item = H::Node> + Clone,
-    root_parents: &HashMap<H::Node, Node>,
+    root_parents: impl Iterator<Item = (H::Node, Node)>,
 ) -> InsertForestResult<H::Node, Node> {
     let new_node_count_hint = other_nodes.size_hint().1.unwrap_or_default();
 
@@ -708,7 +707,7 @@ fn insert_forest_internal<H: HugrView>(
         }
     }
     for (r, p) in root_parents {
-        hugr.set_parent(node_map[r], *p);
+        hugr.set_parent(node_map[&r], p);
     }
     for old in other_nodes {
         let new = node_map[&old];
