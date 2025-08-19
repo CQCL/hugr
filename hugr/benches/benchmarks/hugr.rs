@@ -2,7 +2,7 @@
 
 pub mod examples;
 
-use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
+use criterion::{AxisScale, BatchSize, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat};
 use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::NodeHandle;
@@ -72,14 +72,17 @@ fn bench_insertion(c: &mut Criterion) {
         let h2 = simple_cfg_hugr();
         b.iter(|| black_box(h1.insert_from_view(h1.entrypoint(), &h2)))
     });
-    group.bench_function("insert_hugr_view", |b| {
-        let mut h = simple_dfg_hugr();
-        // Note it's possible that creation of simple_dfg_hugr may dominate the cost of insertion!
-        b.iter(|| black_box(h.insert_hugr(h.entrypoint(), simple_dfg_hugr())))
+    group.bench_function("insert_hugr", |b| {
+        b.iter_batched(
+            || (simple_dfg_hugr(), simple_cfg_hugr()),
+            |(mut h, insert)| black_box(h.insert_hugr(h.entrypoint(), insert)),
+            BatchSize::SmallInput,
+        )
     });
     group.bench_function("insert_view_forest", |b| {
         let mut h = simple_dfg_hugr();
         let (insert, decl, defn) = dfg_calling_defn_decl();
+        // Note it would be better to use iter_batched to avoid cloning nodes/roots.
         let nodes = insert.entry_descendants().chain([defn.node(), decl.node()]);
         let roots = [
             (insert.entrypoint(), h.entrypoint()),
@@ -89,17 +92,20 @@ fn bench_insertion(c: &mut Criterion) {
         b.iter(|| black_box(h.insert_view_forest(&insert, nodes.clone(), roots.iter().cloned())))
     });
     group.bench_function("insert_forest", |b| {
-        let mut h = simple_dfg_hugr();
-        b.iter(|| {
-            // Note the cost of constructing `insert`` here may dominate the cost of insertion!
-            let (insert, decl, defn) = dfg_calling_defn_decl();
-            let roots = [
-                (insert.entrypoint(), h.entrypoint()),
-                (defn.node(), h.module_root()),
-                (decl.node(), h.module_root()),
-            ];
-            black_box(h.insert_forest(insert, roots))
-        })
+        b.iter_batched(
+            || {
+                let h = simple_dfg_hugr();
+                let (insert, decl, defn) = dfg_calling_defn_decl();
+                let roots = [
+                    (insert.entrypoint(), h.entrypoint()),
+                    (defn.node(), h.module_root()),
+                    (decl.node(), h.module_root()),
+                ];
+                (h, insert, roots)
+            },
+            |(mut h, insert, roots)| black_box(h.insert_forest(insert, roots)),
+            BatchSize::SmallInput,
+        )
     });
 }
 
