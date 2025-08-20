@@ -277,16 +277,14 @@ pub trait HugrMut: HugrMutInternals {
     /// Later entries for the same region override earlier ones.
     /// If `root_parents` is empty, nothing is inserted.
     ///
-    /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
-    /// and where each value is the corresponding (new) node in `self`.
-    ///
     /// # Errors
     ///
-    /// [InsertForestError::SubtreeAlreadyCopied] if the regions in `root_parents` are not disjount
+    /// [InsertForestError::SubtreeAlreadyCopied] if the regions in `root_parents` are not disjoint
     ///
     /// # Panics
     ///
-    /// If any of the keys in `roots` are not nodes in `other`, or any of the values not in `self`.
+    /// If any of the keys in `root_parents` are not nodes in `other`,
+    /// or any of the values not in `self`.
     fn insert_forest(
         &mut self,
         other: Hugr,
@@ -304,8 +302,6 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// Nodes in `nodes` which are not mentioned in `root_parents` and whose parent in `other`
     /// is not in `nodes`, will have no parent in `self`.
-    ///
-    /// Returns a [`HashMap`] from each node in `nodes` to the corresponding (new) node in `self`.
     ///
     /// # Errors
     ///
@@ -400,8 +396,8 @@ pub struct InsertionResult<SourceN = Node, TargetN = Node> {
 /// Records the result of inserting a Hugr or view via [`HugrMut::insert_forest`]
 /// or [`HugrMut::insert_view_forest`].
 ///
-/// Contains a map from the nodes in the source HUGR to the nodes in the target
-/// HUGR, using their respective `Node` types.
+/// Contains a map from the nodes in the source HUGR that were copied, to the
+/// corresponding nodes in the target HUGR, using the respective `Node` types.
 #[derive(Clone, Debug, Default)]
 pub struct InsertedForest<SourceN = Node, TargetN = Node> {
     /// Map from the nodes from the source Hugr/view that were inserted,
@@ -669,9 +665,7 @@ impl HugrMut for Hugr {
 /// - `hugr`: The hugr to insert into.
 /// - `other`: The other graph to insert from.
 /// - `other_nodes`: The nodes in the other graph to insert.
-/// - `reroot`: A function that returns the new parent for each inserted node.
-///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
-///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
+/// - `root_parents`: a list of pairs of (node in `other`, parent to assign in `hugr`)
 fn insert_forest_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
