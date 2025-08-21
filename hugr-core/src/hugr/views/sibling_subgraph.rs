@@ -187,7 +187,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         Self::try_new_with_checker(inputs, outputs, hugr, &checker)
     }
 
-    /// Create a new [`SiblingSubgraph`], bypassing all validity checks .
+    /// Create a new [`SiblingSubgraph`], bypassing all validity checks.
     ///
     /// You MUST make sure that the boundary ports and nodes provided satisfy
     /// the SiblingSubgraph validity conditions described in
