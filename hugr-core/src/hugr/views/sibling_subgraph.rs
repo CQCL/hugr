@@ -8,6 +8,7 @@ use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
 
+use fxhash::FxHashSet;
 use itertools::Itertools;
 use portgraph::LinkView;
 use portgraph::algorithms::CreateConvexChecker;
@@ -681,28 +682,37 @@ fn make_pg_subgraph<'h, H: HugrView>(
 
 fn get_boundary_from_nodes<N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
-    nodes: impl IntoIterator<Item = N>,
+    nodes: impl Into<Vec<N>>,
 ) -> (IncomingPorts<N>, OutgoingPorts<N>) {
-    let nodes = nodes.into_iter().unique().collect_vec();
+    // remove duplicates in `nodes` while preserving the order
+    // simultaneously build a set for fast lookup
+    let mut nodes = nodes.into();
+    let mut nodes_set = FxHashSet::default();
+    nodes.retain(|&n| nodes_set.insert(n));
+
     let incoming_edges = nodes
         .iter()
         .flat_map(|&n| hugr.node_inputs(n).map(move |p| (n, p)));
     let outgoing_edges = nodes
         .iter()
         .flat_map(|&n| hugr.node_outputs(n).map(move |p| (n, p)));
+
     let inputs = incoming_edges
         .filter(|&(n, p)| {
             if !hugr.is_linked(n, p) {
                 return false;
             }
             let (out_n, _) = hugr.single_linked_output(n, p).unwrap();
-            !nodes.contains(&out_n)
+            !nodes_set.contains(&out_n)
         })
         // Every incoming edge is its own input.
         .map(|p| vec![p])
         .collect_vec();
     let outputs = outgoing_edges
-        .filter(|&(n, p)| hugr.linked_ports(n, p).any(|(n1, _)| !nodes.contains(&n1)))
+        .filter(|&(n, p)| {
+            hugr.linked_ports(n, p)
+                .any(|(n1, _)| !nodes_set.contains(&n1))
+        })
         .collect_vec();
 
     (inputs, outputs)
