@@ -817,8 +817,9 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
-    /// A DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
-    /// to a FuncDefn and a FuncDecl each bool_t->bool_t, and their handles.
+    /// Builds a DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
+    /// to a FuncDefn and a FuncDecl each bool_t->bool_t.
+    /// Returns the Hugr and both function handles.
     #[fixture]
     pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
         let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
