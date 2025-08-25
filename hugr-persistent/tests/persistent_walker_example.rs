@@ -12,7 +12,9 @@ use hugr_core::{
     types::EdgeKind,
 };
 
-use hugr_persistent::{Commit, CommitStateSpace, PersistentWire, PinnedSubgraph, Walker};
+use hugr_persistent::{
+    Commit, CommitStateSpace, PersistentHugr, PersistentWire, PinnedSubgraph, Walker,
+};
 
 /// The maximum commit depth that we will consider in this example
 const MAX_COMMITS: usize = 4;
@@ -109,41 +111,44 @@ fn two_cz_3qb_hugr() -> Hugr {
 
 /// Traverse all commits in state space, enqueueing all outgoing wires of
 /// CZ nodes
-fn enqueue_all(
-    queue: &mut VecDeque<(PersistentWire, Walker<'static>)>,
-    state_space: &CommitStateSpace,
+fn enqueue_all<'a>(
+    queue: &mut VecDeque<(PersistentWire, Walker<'a>)>,
+    all_commits: &[Commit],
+    state_space: &'a CommitStateSpace,
 ) {
-    for id in state_space.all_commit_ids() {
-        let cz_nodes = state_space
-            .inserted_nodes(id)
-            .filter(|&n| state_space.get_optype(n) == &cz_gate().into());
+    for commit in all_commits {
+        let cz_nodes = commit
+            .inserted_nodes()
+            .filter(|&n| commit.get_optype(n) == &cz_gate().into());
         for node in cz_nodes {
-            let walker: Walker<'static> = Walker::from_pinned_node(node, state_space.clone());
+            let walker = Walker::from_pinned_node(commit.to_patch_node(node), state_space);
             if walker.as_hugr_view().all_commit_ids().count() > MAX_COMMITS {
                 continue;
             }
-            for outport in state_space.node_outputs(node) {
+            for outport in commit.node_outputs(node) {
                 if !matches!(
-                    state_space.get_optype(node).port_kind(outport),
+                    commit.get_optype(node).port_kind(outport),
                     Some(EdgeKind::Value(_))
                 ) {
                     continue;
                 }
-                let wire = walker.get_wire(node, outport);
+                let wire = walker.get_wire(commit.to_patch_node(node), outport);
                 queue.push_back((wire, walker.clone()));
             }
         }
     }
 }
 
-fn build_state_space() -> CommitStateSpace {
-    let base_hugr = dfg_hugr();
-    let mut state_space = CommitStateSpace::with_base(base_hugr);
+fn explore_state_space<'a>(
+    base_commit: Commit<'a>,
+    state_space: &'a CommitStateSpace,
+) -> Vec<Commit<'a>> {
+    let mut all_commits = vec![base_commit.clone()];
 
     let mut wire_queue = VecDeque::new();
     let mut added_patches = BTreeSet::new();
 
-    enqueue_all(&mut wire_queue, &state_space);
+    enqueue_all(&mut wire_queue, &all_commits, &state_space);
 
     while let Some((wire, walker)) = wire_queue.pop_front() {
         if !walker.is_complete(&wire, None) {
@@ -174,7 +179,7 @@ fn build_state_space() -> CommitStateSpace {
             // check that the patch applies to more than one commit (or the base),
             // otherwise we have infinite commutations back and forth
             let patch_owners: BTreeSet<_> = patch_nodes.iter().map(|n| n.0).collect();
-            if patch_owners.len() <= 1 && !patch_owners.contains(&state_space.base()) {
+            if patch_owners.len() <= 1 && !patch_owners.contains(&base_commit.id()) {
                 continue;
             }
             // check further that the same patch was not already added to `state_space`
@@ -188,23 +193,23 @@ fn build_state_space() -> CommitStateSpace {
             };
 
             assert_eq!(
-                new_commit.deleted_nodes().collect::<BTreeSet<_>>(),
+                new_commit.deleted_parent_nodes().collect::<BTreeSet<_>>(),
                 patch_nodes
             );
 
-            state_space.try_add_commit(new_commit).unwrap();
+            all_commits.push(new_commit);
 
             // enqueue new wires added by the replacement
             // (this will also add a lot of already visited wires, but they will
             // be deduplicated)
-            enqueue_all(&mut wire_queue, &state_space);
+            enqueue_all(&mut wire_queue, &all_commits, &state_space);
         }
     }
 
-    state_space
+    all_commits
 }
 
-fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
+fn create_commit<'a>(wire: PersistentWire, walker: &Walker<'a>) -> Option<Commit<'a>> {
     let hugr = walker.clone().into_persistent_hugr();
     let (out_node, _) = wire
         .single_outgoing_port(&hugr)
@@ -312,40 +317,38 @@ fn create_commit(wire: PersistentWire, walker: &Walker) -> Option<Commit> {
 #[ignore = "takes 10s (todo: optimise)"]
 #[test]
 fn walker_example() {
-    let state_space = build_state_space();
-    println!("n commits = {:?}", state_space.all_commit_ids().count());
+    let base_hugr = dfg_hugr();
+    let state_space = CommitStateSpace::new();
+    let base_commit = state_space.try_set_base(base_hugr).unwrap();
 
-    for commit_id in state_space.all_commit_ids() {
-        println!("========== Commit {commit_id:?} ============");
+    let all_commits = explore_state_space(base_commit, &state_space);
+    println!("n commits = {:?}", all_commits.len());
+
+    for commit in all_commits.iter() {
+        println!("========== Commit {:?} ============", commit.id());
         println!(
             "parents = {:?}",
-            state_space.parents(commit_id).collect_vec()
+            commit.parents().map(|p| p.id()).collect_vec()
         );
         println!(
-            "nodes deleted = {:?}",
-            state_space
-                .get_commit(commit_id)
-                .deleted_nodes()
-                .collect_vec()
+            "nodes deleted in parents = {:?}",
+            commit.deleted_parent_nodes().collect_vec()
         );
         println!("nodes added:");
-        println!(
-            "{:?}\n",
-            state_space.inserted_nodes(commit_id).collect_vec()
-        );
+        println!("{:?}\n", commit.inserted_nodes().collect_vec());
     }
 
-    let empty_commits = state_space
-        .all_commit_ids()
-        .filter(|&id| state_space.inserted_nodes(id).count() == 0)
+    let empty_commits = all_commits
+        .iter()
+        .filter(|cm| cm.inserted_nodes().count() == 0)
         .collect_vec();
 
     // there should be a combination of three empty commits that are compatible
     // and such that the resulting HUGR is empty
     let mut empty_hugr = None;
     for cs in empty_commits.iter().combinations(3) {
-        let cs = cs.into_iter().copied();
-        if let Ok(hugr) = state_space.try_extract_hugr(cs) {
+        let cs = cs.into_iter().copied().cloned();
+        if let Ok(hugr) = PersistentHugr::try_new(cs) {
             empty_hugr = Some(hugr);
         }
     }

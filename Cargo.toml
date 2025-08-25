@@ -89,7 +89,7 @@ pest_derive = "2.8.2"
 pretty = "0.12.4"
 pretty_assertions = "1.4.1"
 zstd = "0.13.2"
-relrc = "0.4.6"
+relrc = "0.5.0"
 wyhash = "0.6.0"
 
 # These public dependencies usually require breaking changes downstream, so we

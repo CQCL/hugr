@@ -2580,9 +2580,9 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
 name = "relrc"
-version = "0.4.6"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65b9e2100a2ee7d9efb575064b2f9a552d7f9f60289d7b95b9c22175101c7c4a"
+checksum = "f7c9d6253f1c4c3606b530b88ba15cd6803d4104ccd4d34173397ce49fe0b867"
 dependencies = [
  "derive-where",
  "derive_more 0.99.20",
@@ -2590,6 +2590,7 @@ dependencies = [
  "itertools 0.13.0",
  "petgraph 0.8.2",
  "serde",
+ "slotmap_fork_lmondada",
  "thiserror 1.0.69",
 ]
 
@@ -2911,6 +2912,16 @@ name = "slab"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a2ae44ef20feb57a68b23d846850f861394c2e02dc425a50098ae8c90267589"
+
+[[package]]
+name = "slotmap_fork_lmondada"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "936d3c60e7b845c8978d64485cffa451156294a772ebfafc0ea5fbd7a3c58669"
+dependencies = [
+ "serde",
+ "version_check",
+]
 
 [[package]]
 name = "smallvec"
