@@ -102,7 +102,7 @@ pub trait Container {
 
     /// Insert a copy of a HUGR as a child of the container.
     /// (Only the portion below the entrypoint will be inserted, with any incoming
-    /// edges broken; see [Dataflow::add_hugr_view_with_wires_link_nodes])
+    /// edges broken; see [Dataflow::add_view_with_wires_link_nodes])
     fn add_hugr_view<H: HugrView>(&mut self, child: &H) -> InsertionResult<H::Node, Node> {
         let parent = self.container_node();
         self.hugr_mut().insert_from_view(parent, child)
@@ -275,7 +275,7 @@ pub trait Dataflow: Container {
     /// `input_wires` to the incoming ports of the node that was the entrypoint.
     /// (Note, any part of `hugr` outside the entrypoint is not copied,
     /// this may lead to new input ports being disconnected. See
-    /// [Self::add_hugr_view_with_wires_link_nodes])
+    /// [Self::add_view_with_wires_link_nodes])
     ///
     /// # Errors
     ///
@@ -293,7 +293,7 @@ pub trait Dataflow: Container {
     /// Copy a Hugr, adding its entrypoint into the sibling graph and wiring up the
     /// `input_wires` to the incoming ports. `defns` may contain other children of
     /// the module root of `hugr`, which will be added to the module root being built.
-    fn add_hugr_view_with_wires_link_nodes<H: HugrView>(
+    fn add_view_with_wires_link_nodes<H: HugrView>(
         &mut self,
         hugr: &H,
         input_wires: impl IntoIterator<Item = Wire>,

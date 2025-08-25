@@ -610,7 +610,7 @@ pub(crate) mod test {
             (ins_decl.node(), decl_mode),
         ]);
         let inserted = if view {
-            fb.add_hugr_view_with_wires_link_nodes(&insert, [], link_spec)
+            fb.add_view_with_wires_link_nodes(&insert, [], link_spec)
                 .unwrap()
         } else {
             fb.add_hugr_with_wires_link_nodes(insert, [], link_spec)

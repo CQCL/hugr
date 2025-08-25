@@ -182,7 +182,7 @@ pub enum BuildError {
     #[error{"In inserting Hugr: {0}"}]
     HugrInsertionError(#[from] NodeLinkingError<Node, Node>),
 
-    /// From [Dataflow::add_hugr_view_with_wires_link_nodes].
+    /// From [Dataflow::add_view_with_wires_link_nodes].
     /// Note that because the type of node in the [NodeLinkingError] depends
     /// upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
