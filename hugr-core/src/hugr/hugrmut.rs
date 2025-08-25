@@ -180,11 +180,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert another hugr into this one, under a given parent node. Edges into the
     /// inserted subtree (i.e. nonlocal or static) will be disconnected in `self`.
-    /// (See [Self::insert_forest] for a way to insert sources of such edges as well.)
+    /// (See [Self::insert_forest] or trait [HugrLinking] for methods that can
+    /// preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
         let region = other.entrypoint();
         Self::insert_region(self, root, other, region)
@@ -192,13 +195,15 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert a subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_forest] for a way to preserve such edges by
-    /// inserting their sources as well.)
+    /// in `self`. (See [Self::insert_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// - If the root node is not in the graph.
     /// - If the `region` node is not in `other`.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_region(
         &mut self,
         root: Self::Node,
@@ -217,12 +222,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copy the entrypoint subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_view_forest] for a way to insert sources of such edges
-    /// as well.)
+    /// in `self`. (See [Self::insert_view_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also copying their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,

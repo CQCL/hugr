@@ -10,7 +10,7 @@ use crate::{
     hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
 };
 
-/// Methods for linking Hugrs, i.e. merging the Hugrs and adding edges between old and inserted nodes.
+/// Methods that merge Hugrs, adding edges between old and inserted nodes.
 ///
 /// This is done by module-children from the inserted (source) Hugr replacing, or being replaced by,
 /// module-children already in the target Hugr; static edges from the replaced node,

@@ -271,11 +271,10 @@ pub trait Dataflow: Container {
         wire_ins_return_outs(input_wires, node, self)
     }
 
-    /// Copy a hugr-defined op into the sibling graph, wiring up the
+    /// Copy a hugr's entrypoint-subtree (only) into the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the node that was the entrypoint.
-    /// (Note, any part of `hugr` outside the entrypoint is not copied,
-    /// this may lead to new input ports being disconnected. See
-    /// [Self::add_view_with_wires_link_nodes])
+    /// (Note that any wires from outside the entrypoint-subtree are disconnected in the copy;
+    /// see [Self::add_view_with_wires_link_nodes] for an alternative.)
     ///
     /// # Errors
     ///
