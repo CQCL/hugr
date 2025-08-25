@@ -7,7 +7,7 @@ use itertools::Either;
 use crate::{
     Hugr, HugrView, Node,
     core::HugrNode,
-    hugr::{HugrMut, internal::HugrMutInternals},
+    hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
 };
 
 /// Methods for linking Hugrs, i.e. merging the Hugrs and adding edges between old and inserted nodes.
@@ -38,7 +38,7 @@ pub trait LinkHugr: HugrMut {
         parent: Option<Self::Node>,
         other: &H,
         children: NodeLinkingDirectives<H::Node, Self::Node>,
-    ) -> Result<HashMap<H::Node, Self::Node>, NodeLinkingError<H::Node, Self::Node>> {
+    ) -> Result<InsertedForest<H::Node, Self::Node>, NodeLinkingError<H::Node, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
         let nodes =
             parent
@@ -55,11 +55,11 @@ pub trait LinkHugr: HugrMut {
         for ch in children.keys() {
             roots.insert(*ch, self.module_root());
         }
-        let mut node_map = self
+        let mut inserted = self
             .insert_view_forest(other, nodes, roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
-        link_by_node(self, transfers, &mut node_map);
-        Ok(node_map)
+        link_by_node(self, transfers, &mut inserted.node_map);
+        Ok(inserted)
     }
 
     /// Insert another Hugr into this one, with linking directives specified by Node.
@@ -82,7 +82,7 @@ pub trait LinkHugr: HugrMut {
         parent: Option<Self::Node>,
         mut other: Hugr,
         children: NodeLinkingDirectives<Node, Self::Node>,
-    ) -> Result<HashMap<Node, Self::Node>, NodeLinkingError<Node, Self::Node>> {
+    ) -> Result<InsertedForest<Node, Self::Node>, NodeLinkingError<Node, Self::Node>> {
         let transfers = check_directives(&other, parent, &children)?;
         let mut roots = HashMap::new();
         if let Some(parent) = parent {
@@ -99,11 +99,11 @@ pub trait LinkHugr: HugrMut {
                 }
             }
         }
-        let mut node_map = self
+        let mut inserted = self
             .insert_forest(other, roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
-        link_by_node(self, transfers, &mut node_map);
-        Ok(node_map)
+        link_by_node(self, transfers, &mut inserted.node_map);
+        Ok(inserted)
     }
 }
 
@@ -365,7 +365,7 @@ mod test {
             let res = h
                 .insert_from_view_link_nodes(Some(h.entrypoint()), &insert, chmap.clone())
                 .unwrap();
-            (h, res)
+            (h, res.node_map)
         };
         h.validate().unwrap();
         let num_nodes = h.num_nodes();
@@ -504,7 +504,8 @@ mod test {
                     (decl.node(), NodeLinkingDirective::UseExisting(temp)),
                 ]),
             )
-            .unwrap();
+            .unwrap()
+            .node_map;
         let defn = node_map[&defn.node()];
         assert_eq!(node_map.get(&decl.node()), None);
         assert!(!h.contains_node(temp));

@@ -266,13 +266,15 @@ pub trait Dataflow: Container {
         let ep = hugr.entrypoint();
         let node = self
             .hugr_mut()
-            .insert_hugr_link_nodes(parent, hugr, defns)?[&ep];
+            .insert_hugr_link_nodes(parent, hugr, defns)?
+            .node_map[&ep];
         wire_ins_return_outs(input_wires, node, self)
     }
 
     /// Copy a hugr-defined op into the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the node that was the entrypoint.
-    /// (Any part of `hugr` outside the entrypoint is not copied; see
+    /// (Note, any part of `hugr` outside the entrypoint is not copied,
+    /// this may lead to new input ports being disconnected. See
     /// [Self::add_hugr_view_with_wires_link_nodes])
     ///
     /// # Errors
@@ -302,7 +304,7 @@ pub trait Dataflow: Container {
             .hugr_mut()
             .insert_from_view_link_nodes(parent, hugr, defns)
             .map_err(|ins_err| BuildError::HugrViewInsertionError(ins_err.to_string()))?
-            [&hugr.entrypoint()];
+            .node_map[&hugr.entrypoint()];
         wire_ins_return_outs(input_wires, node, self)
     }
 
