@@ -387,38 +387,9 @@ impl NameLinkingPolicy {
     ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         let pub_funcs = self.to_node_linking_public(target, source)?;
         if self.filter_private {
-            let mut res = HashMap::new();
-            let mut queue = VecDeque::from_iter(pub_funcs.keys().copied());
-            while let Some(n) = queue.pop_front() {
-                if res.contains_key(&n) {
-                    continue;
-                }
-                let nld = match link_sig(source, n).unwrap() {
-                    LinkSig::Private => NodeLinkingDirective::add(),
-                    LinkSig::Public { .. } => pub_funcs[&n].clone(),
-                };
-
-                if matches!(nld, NodeLinkingDirective::Add { .. }) {
-                    // Would be great to use a CallGraph here but that is in hugr-passes
-                    // and we cannot have a cyclic dependency between crates !!
-                    // Also call-graph does not deal with (potentially-module-level) Constants.
-                    for d in source.descendants(n) {
-                        if matches!(
-                            source.get_optype(d),
-                            OpType::LoadConstant(_) | OpType::LoadFunction(_) | OpType::Call(_)
-                        ) {
-                            if let Some(static_) = source.static_source(d) {
-                                if source.get_parent(static_) == Some(source.module_root()) {
-                                    queue.push_back(static_)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                res.insert(n, nld);
-            }
-            Ok(res)
+            find_reachable(source, pub_funcs.keys().copied(), |n| {
+                Ok(pub_funcs[&n].clone())
+            })
         } else {
             let mut res = pub_funcs;
             for n in source.children(source.module_root()) {
@@ -509,6 +480,45 @@ fn directive<SN: Display, TN: HugrNode>(
             MultipleImplHandling::UseBoth => NodeLinkingDirective::add(),
         },
     })
+}
+
+fn find_reachable<H: HugrView + ?Sized, TN, E>(
+    h: &H,
+    starts: impl IntoIterator<Item = H::Node>,
+    pub_callback: impl Fn(H::Node) -> Result<NodeLinkingDirective<TN>, E>,
+) -> Result<NodeLinkingDirectives<H::Node, TN>, E> {
+    let mut queue = VecDeque::from_iter(starts);
+    let mut res = HashMap::new();
+    while let Some(n) = queue.pop_front() {
+        if res.contains_key(&n) {
+            continue;
+        }
+        let nld = match link_sig(h, n).unwrap() {
+            LinkSig::Private => NodeLinkingDirective::add(),
+            LinkSig::Public { .. } => pub_callback(n)?,
+        };
+
+        if matches!(nld, NodeLinkingDirective::Add { .. }) {
+            // Would be great to use a CallGraph here but that is in hugr-passes
+            // and we cannot have a cyclic dependency between crates !!
+            // Also call-graph does not deal with (potentially-module-level) Constants.
+            for d in h.descendants(n) {
+                if matches!(
+                    h.get_optype(d),
+                    OpType::LoadConstant(_) | OpType::LoadFunction(_) | OpType::Call(_)
+                ) {
+                    if let Some(static_) = h.static_source(d) {
+                        if h.get_parent(static_) == Some(h.module_root()) {
+                            queue.push_back(static_)
+                        }
+                    }
+                }
+            }
+        }
+
+        res.insert(n, nld);
+    }
+    Ok(res)
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
