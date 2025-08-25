@@ -175,33 +175,52 @@ pub trait HugrLinking: HugrMut {
     /// to resolve any public functions.
     ///
     /// `parent` is the parent node under which to insert the entrypoint.
-    /// `allow_new_pub` specifies whether new [Visibility::Public] [FuncDefn]s may be copied from `other`
+    ///
+    /// If `allow_new_names` is `None`, then any FuncDefn/FuncDecl in `other` and reachable
+    /// from the entrypoint, must have a matching name and signature with one in `self`;
+    /// if `Some(s)` then `s` details how to handle the case where the name matches but the
+    /// signature does not.
+    // Note the use of an Option here, rather than a bool and a separate SignatureConflictHandling,
+    // rules out raiseing an error on an entirely new name but *accepting* a new+conflicting
+    // signature for an existing name; the latter is an invalid Hugr and would have to result in
+    // one of the functions being renamed *OR MADE PRIVATE*, so the latter is a possible case.
+    // TODO: consider extending(+renaming?) SignatureConflictHandling with new variants
+    // (and eliding the option here):
+    // * RejectNewNames (i.e. the none here; more aggressive than any existing enum variant)
+    // * MakeAllNewNamesPrivate
+    // * MakeNewConflictsPrivate (i.e. when name exists but with different sig)
+    ///
+    /// If `allow_new_impls` is `None`, then any required [`FuncDefn`] in `other` is treated
+    ///  as a [`FuncDecl`] (either being linked with a function existing in `self`, or added if
+    /// `allow_new_names` is `Some`).
+    /// If `allow_new_impls` is Some, then that details how such a `FuncDefn` in `other`
+    /// may (be) override(/den) by another in `self`.
     ///
     /// # Errors
     ///
-    /// If other's entrypoint is its module-root (see [Self::link_hugr])
+    /// If other's entrypoint is its module-root (recommend using [Self::link_module] instead)
     ///
     /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
     /// (an exception is made if the called+containing function is public and there is already
     ///  an equivalent in `self` - to which the call is redirected).
     ///
-    /// If other's entrypoint calls a public function in `other` which does not yet exist in `self`
-    /// and `allow_new_pub` is false
+    /// If other's entrypoint calls a public function in `other` which
+    /// * has a name or signature different to any in `self`, and `allow_new_names` is `None`
+    /// * has a name equal to that in `self`, but a different signature, and `allow_new_names` is
+    ///   `Some(`[`SignatureConflictHandling::ErrorDontInsert`]`)`
+    ///
+    /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
+    /// and signature as a public [`FuncDefn`] in `self` and `allow_new_impls` is
+    /// `Some(`[`MultipleImplHandling::ErrorDontInsert`]`)`
+    ///
+    /// [`FuncDefn`]: crate::ops::FuncDefn
     fn insert_link_hugr(
         &mut self,
         parent: Self::Node,
         mut other: Hugr,
         allow_new_names: Option<SignatureConflictHandling>,
-        // allow_new = false, SigConflict::Error = error on new name, or same name w/ different sig
-        // allow_new = false, SigConflict::UseBoth = error on new name, allow same name w/different sig - WEIRD
-        // allow_new = true, SigConflict::Error = allow new name, but error if different sig
-        // allow_new = true, SigConflict::UseBoth = allow new name, even if different sig
         allow_new_impls: Option<MultipleImplHandling>,
     ) -> Result<InsertedForest<Node, Self::Node>, String> {
-        // Could extend NameLinkingPolicy with option on both?
-        // allow_new_names = None -> only adds new impls of existing names - prob. needs reachability
-        // allow_new_impls = None -> converts all incoming impls to decls
-        // but, makes no sense for both to be None, as does nothing...
         let entrypoint_func = {
             let mut n = other.entrypoint();
             loop {
@@ -320,7 +339,6 @@ pub enum NodeLinkingDirective<TN = Node> {
         /// to leave the newly-inserted node instead. (Typically, this `Vec` would contain
         /// at most one [FuncDefn], or perhaps-multiple, aliased, [FuncDecl]s.)
         ///
-        /// [FuncDecl]: crate::ops::FuncDecl
         /// [FuncDefn]: crate::ops::FuncDefn
         /// [EdgeKind::Const]: crate::types::EdgeKind::Const
         /// [EdgeKind::Function]: crate::types::EdgeKind::Function
@@ -494,33 +512,9 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        let pub_funcs = self.to_node_linking_public(target, source)?;
-        if self.filter_private {
-            find_reachable(source, pub_funcs.keys().copied(), |n| {
-                Ok(pub_funcs[&n].clone())
-            })
-        } else {
-            let mut res = pub_funcs;
-            for n in source.children(source.module_root()) {
-                if matches!(link_sig(source, n), Some(LinkSig::Private)) {
-                    let prev = res.insert(n, NodeLinkingDirective::add());
-                    debug_assert_eq!(prev, None);
-                }
-            }
-            Ok(res)
-        }
-    }
-
-    /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
-    /// source (inserted) and target (inserted-into) Hugr, for [Visibility::Public] functions only.
-    #[allow(clippy::type_complexity)]
-    fn to_node_linking_public<T: HugrView + ?Sized, S: HugrView + ?Sized>(
-        &self,
-        target: &T,
-        source: &S,
-    ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         let existing = gather_existing(target);
-        let mut res = NodeLinkingDirectives::new();
+        // If filter_private, then this is just the public functions, otherwise all:
+        let mut dirvs = NodeLinkingDirectives::new();
 
         let NameLinkingPolicy {
             sig_conflict,
@@ -529,7 +523,7 @@ impl NameLinkingPolicy {
         } = self;
         for n in source.children(source.module_root()) {
             let dirv = match link_sig(source, n) {
-                None | Some(LinkSig::Private) => continue,
+                Some(LinkSig::Private) if !self.filter_private => NodeLinkingDirective::add(),
                 Some(LinkSig::Public { name, is_defn, sig }) => {
                     if let Some((ex_ns, ex_sig)) = existing.get(name) {
                         match *sig_conflict {
@@ -549,11 +543,15 @@ impl NameLinkingPolicy {
                         NodeLinkingDirective::add()
                     }
                 }
+                _ => continue,
             };
-            res.insert(n, dirv);
+            dirvs.insert(n, dirv);
         }
-
-        Ok(res)
+        if self.filter_private {
+            find_reachable(source, dirvs.keys().copied(), |n| Ok(dirvs[&n].clone()))
+        } else {
+            Ok(dirvs)
+        }
     }
 }
 
