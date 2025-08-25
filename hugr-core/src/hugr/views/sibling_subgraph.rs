@@ -13,7 +13,7 @@ use portgraph::LinkView;
 use portgraph::algorithms::CreateConvexChecker;
 use portgraph::algorithms::convex::{LineIndex, LineIntervals, Position};
 use portgraph::boundary::Boundary;
-use portgraph::{Direction, PortView, view::Subgraph};
+use portgraph::{PortView, view::Subgraph};
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};
@@ -47,10 +47,11 @@ use super::root_checked::RootCheckable;
 /// No reference to the underlying graph is kept. Thus most of the subgraph
 /// methods expect a reference to the Hugr as an argument.
 ///
-/// At the moment we do not support state order edges at the subgraph boundary.
-/// The `boundary_port` and `signature` methods will panic if any are found.
-/// State order edges are also unsupported in replacements in
-/// `create_simple_replacement`.
+/// At the moment the only supported non-value edges at the subgraph boundary
+/// are static function calls. The existence of any other edges at the boundary
+/// will cause the fallible constructors to return an [`InvalidSubgraph`] error
+/// and will cause [`SiblingSubgraph::from_node`] and
+/// [`SiblingSubgraph::create_simple_replacement`] to panic.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SiblingSubgraph<N = Node> {
     /// The nodes of the induced subgraph.
@@ -69,7 +70,7 @@ pub struct SiblingSubgraph<N = Node> {
     ///
     /// Each port must be unique and belong to a node in `nodes`. Input ports of
     /// linear types will always appear as singleton vectors.
-    inputs: Vec<Vec<(N, IncomingPort)>>,
+    inputs: IncomingPorts<N>,
     /// The output ports of the subgraph.
     ///
     /// The types of the output ports define the output signature of the
@@ -77,7 +78,12 @@ pub struct SiblingSubgraph<N = Node> {
     /// copying a value of the subgraph multiple times.
     ///
     /// Every port must belong to a node in `nodes`.
-    outputs: Vec<(N, OutgoingPort)>,
+    outputs: OutgoingPorts<N>,
+    /// The function called in the subgraph but defined outside of it.
+    ///
+    /// The incoming ports of call nodes are grouped by the function definition
+    /// that is called.
+    function_calls: IncomingPorts<N>,
 }
 
 /// The type of the incoming boundary of [`SiblingSubgraph`].
@@ -116,19 +122,23 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
         let parent = HugrView::entrypoint(&dfg_graph);
         let nodes = dfg_graph.children(parent).skip(2).collect_vec();
-        let (inputs, outputs) = get_input_output_ports(dfg_graph);
-
-        validate_subgraph(dfg_graph, &nodes, &inputs, &outputs)?;
 
         if nodes.is_empty() {
-            Err(InvalidSubgraph::EmptySubgraph)
-        } else {
-            Ok(Self {
-                nodes,
-                inputs,
-                outputs,
-            })
+            return Err(InvalidSubgraph::EmptySubgraph);
         }
+
+        let (inputs, outputs) = get_input_output_ports(dfg_graph)?;
+        let non_local = get_non_local_edges(&nodes, &dfg_graph);
+        let function_calls = group_into_function_calls(non_local, &dfg_graph)?;
+
+        validate_subgraph(dfg_graph, &nodes, &inputs, &outputs, &function_calls)?;
+
+        Ok(Self {
+            nodes,
+            inputs,
+            outputs,
+            function_calls,
+        })
     }
 
     /// Create a new convex sibling subgraph from input and output boundaries.
@@ -190,7 +200,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// documentation.
     // TODO(breaking): generalize to any convex checker
     pub fn try_new_with_checker<H: HugrView<Node = N>>(
-        inputs: IncomingPorts<N>,
+        mut inputs: IncomingPorts<N>,
         outputs: OutgoingPorts<N>,
         hugr: &H,
         checker: &TopoConvexChecker<H>,
@@ -204,7 +214,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .nodes_iter()
             .map(|index| node_map.from_portgraph(index))
             .collect_vec();
-        validate_subgraph(hugr, &nodes, &inputs, &outputs)?;
+
+        let function_calls = drain_function_calls(&mut inputs, hugr);
+
+        validate_subgraph(hugr, &nodes, &inputs, &outputs, &function_calls)?;
 
         if nodes.len() > 1 && !subpg.is_convex_with_checker(checker) {
             return Err(InvalidSubgraph::NotConvex);
@@ -214,6 +227,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             nodes,
             inputs,
             outputs,
+            function_calls,
         })
     }
 
@@ -331,7 +345,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let outgoing_edges = nodes
             .iter()
             .flat_map(|&n| hugr.node_outputs(n).map(move |p| (n, p)));
-        let inputs = incoming_edges
+        let mut inputs = incoming_edges
             .filter(|&(n, p)| {
                 if !hugr.is_linked(n, p) {
                     return false;
@@ -348,11 +362,13 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                     .any(|(n1, _)| !nodes_set.contains(&n1))
             })
             .collect_vec();
+        let function_calls = drain_function_calls(&mut inputs, hugr);
 
         Ok(Self {
             nodes,
             inputs,
             outputs,
+            function_calls,
         })
     }
 
@@ -365,7 +381,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// If the node has incoming or outgoing state order edges.
     pub fn from_node(node: N, hugr: &impl HugrView<Node = N>) -> Self {
         let nodes = vec![node];
-        let inputs = hugr
+        let mut inputs = hugr
             .node_inputs(node)
             .filter(|&p| hugr.is_linked(node, p))
             .map(|p| vec![(node, p)])
@@ -383,6 +399,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 .then_some((node, p))
             })
             .collect_vec();
+        let function_calls = drain_function_calls(&mut inputs, hugr);
 
         let state_order_at_input = hugr
             .get_optype(node)
@@ -400,6 +417,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             nodes,
             inputs,
             outputs,
+            function_calls,
         }
     }
 
@@ -425,6 +443,13 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     #[must_use]
     pub fn outgoing_ports(&self) -> &OutgoingPorts<N> {
         &self.outputs
+    }
+
+    /// Return the static incoming ports of the subgraph that are calls to
+    /// functions defined outside of the subgraph.
+    #[must_use]
+    pub fn function_calls(&self) -> &IncomingPorts<N> {
+        &self.function_calls
     }
 
     /// The signature of the subgraph.
@@ -473,10 +498,16 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .iter()
             .map(|&(n, p)| (node_map(n), p))
             .collect_vec();
+        let function_calls = self
+            .function_calls
+            .iter()
+            .map(|calls| calls.iter().map(|&(n, p)| (node_map(n), p)).collect_vec())
+            .collect_vec();
         SiblingSubgraph {
             nodes,
             inputs,
             outputs,
+            function_calls,
         }
     }
 
@@ -596,6 +627,90 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         self.outputs = ports;
         Ok(())
     }
+}
+
+/// Remove all function calls from `inputs` and return them in a new vector.
+fn drain_function_calls<N: HugrNode, H: HugrView<Node = N>>(
+    inputs: &mut IncomingPorts<N>,
+    hugr: &H,
+) -> IncomingPorts<N> {
+    let mut function_calls = Vec::new();
+    inputs.retain_mut(|calls| {
+        let Some(&(n, p)) = calls.first() else {
+            return true;
+        };
+        let op = hugr.get_optype(n);
+        if op.static_input_port() == Some(p)
+            && op
+                .static_input()
+                .expect("static input exists")
+                .is_function()
+        {
+            function_calls.extend(mem::take(calls));
+            false
+        } else {
+            true
+        }
+    });
+
+    group_into_function_calls(function_calls.into_iter().map(|(n, p)| (n, p.into())), hugr)
+        .expect("valid function calls")
+}
+
+/// Group incoming ports by the function definition/declaration that they are
+/// connected to.
+///
+/// Fails if not all ports passed as incoming are of kind [EdgeKind::Function].
+fn group_into_function_calls<N: HugrNode>(
+    ports: impl IntoIterator<Item = (N, Port)>,
+    hugr: &impl HugrView<Node = N>,
+) -> Result<Vec<Vec<(N, IncomingPort)>>, InvalidSubgraph<N>> {
+    let incoming_ports: Vec<_> = ports
+        .into_iter()
+        .map(|(n, p)| {
+            let p = p
+                .as_incoming()
+                .map_err(|_| InvalidSubgraph::UnsupportedEdgeKind(n, p))?;
+            let op = hugr.get_optype(n);
+            if Some(p) != op.static_input_port() {
+                return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p.into()));
+            }
+            if !op
+                .static_input()
+                .expect("static input exists")
+                .is_function()
+            {
+                return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p.into()));
+            }
+            Ok::<_, InvalidSubgraph<N>>((n, p))
+        })
+        .try_collect()?;
+    let grouped_non_local = incoming_ports
+        .into_iter()
+        .into_group_map_by(|&(n, p)| hugr.single_linked_output(n, p).expect("valid dfg wire"));
+    Ok(grouped_non_local
+        .into_iter()
+        .sorted_unstable_by(|(n1, _), (n2, _)| n1.cmp(n2))
+        .map(|(_, v)| v)
+        .collect())
+}
+
+/// Returns an iterator over the non-local edges in `nodes`.
+///
+/// `nodes` must be non-empty and all nodes within must have the same parent
+fn get_non_local_edges<'a, N: HugrNode>(
+    nodes: &'a [N],
+    hugr: &'a impl HugrView<Node = N>,
+) -> impl Iterator<Item = (N, Port)> + 'a {
+    let parent = hugr.get_parent(nodes[0]);
+    let is_non_local = move |n, p| {
+        hugr.linked_ports(n, p)
+            .any(|(n, _)| hugr.get_parent(n) != parent)
+    };
+    nodes
+        .iter()
+        .flat_map(move |&n| hugr.all_node_ports(n).map(move |p| (n, p)))
+        .filter(move |&(n, p)| is_non_local(n, p))
 }
 
 /// Returns an iterator over the input ports.
@@ -901,6 +1016,7 @@ fn validate_subgraph<H: HugrView>(
     nodes: &[H::Node],
     inputs: &IncomingPorts<H::Node>,
     outputs: &OutgoingPorts<H::Node>,
+    function_calls: &IncomingPorts<H::Node>,
 ) -> Result<(), InvalidSubgraph<H::Node>> {
     // Copy of the nodes for fast lookup.
     let node_set = nodes.iter().copied().collect::<HashSet<_>>();
@@ -932,8 +1048,8 @@ fn validate_subgraph<H: HugrView>(
     }
 
     // Check there are no linked "other" ports
-    if iter_io(inputs, outputs).any(|(n, p)| is_order_edge(hugr, n, p)) {
-        unimplemented!("Connected order edges not supported at the boundary")
+    if let Some((n, p)) = iter_io(inputs, outputs).find(|&(n, p)| is_non_value_edge(hugr, n, p)) {
+        return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p));
     }
 
     let boundary_ports = iter_io(inputs, outputs).collect_vec();
@@ -951,12 +1067,16 @@ fn validate_subgraph<H: HugrView>(
 
     // Check that every incoming port of a node in the subgraph whose source is not in the subgraph
     // belongs to inputs.
-    if nodes.iter().any(|&n| {
-        hugr.node_inputs(n).any(|p| {
-            hugr.linked_ports(n, p).any(|(n1, _)| {
-                !node_set.contains(&n1) && !inputs.iter().any(|nps| nps.contains(&(n, p)))
-            })
-        })
+    let mut must_be_inputs = nodes
+        .iter()
+        .flat_map(|&n| hugr.node_inputs(n).map(move |p| (n, p)))
+        .filter(|&(n, p)| {
+            hugr.linked_ports(n, p)
+                .any(|(n1, _)| !node_set.contains(&n1))
+        });
+    if !must_be_inputs.all(|(n, p)| {
+        let mut all_inputs = inputs.iter().chain(function_calls);
+        all_inputs.any(|nps| nps.contains(&(n, p)))
     }) {
         return Err(InvalidSubgraph::NotConvex);
     }
@@ -1012,26 +1132,52 @@ fn validate_subgraph<H: HugrView>(
         Err(InvalidSubgraphBoundary::MismatchedTypes(i))?;
     }
 
+    // Check that all function calls are other ports of edge kind [EdgeKind::Function].
+    for calls in function_calls {
+        if !calls
+            .iter()
+            .map(|&(n, p)| hugr.single_linked_output(n, p))
+            .all_equal()
+        {
+            let (n, p) = calls[0];
+            return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p.into()));
+        }
+        for &(n, p) in calls {
+            let op = hugr.get_optype(n);
+            if op.static_input_port() != Some(p) {
+                return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p.into()));
+            }
+        }
+    }
+
     Ok(())
 }
 
+#[allow(clippy::type_complexity)]
 fn get_input_output_ports<H: HugrView>(
     hugr: &H,
-) -> (IncomingPorts<H::Node>, OutgoingPorts<H::Node>) {
+) -> Result<(IncomingPorts<H::Node>, OutgoingPorts<H::Node>), InvalidSubgraph<H::Node>> {
     let [inp, out] = hugr
         .get_io(HugrView::entrypoint(&hugr))
         .expect("invalid DFG");
-    if has_other_edge(hugr, inp, Direction::Outgoing) {
-        unimplemented!("Non-dataflow output not supported at input node")
+    if let Some(p) = hugr
+        .node_outputs(inp)
+        .find(|&p| is_non_value_edge(hugr, inp, p.into()))
+    {
+        return Err(InvalidSubgraph::UnsupportedEdgeKind(inp, p.into()));
     }
+    if let Some(p) = hugr
+        .node_inputs(out)
+        .find(|&p| is_non_value_edge(hugr, out, p.into()))
+    {
+        return Err(InvalidSubgraph::UnsupportedEdgeKind(out, p.into()));
+    }
+
     let dfg_inputs = HugrView::get_optype(&hugr, inp)
         .as_input()
         .unwrap()
         .signature()
         .output_ports();
-    if has_other_edge(hugr, out, Direction::Incoming) {
-        unimplemented!("Non-dataflow input not supported at output node")
-    }
     let dfg_outputs = HugrView::get_optype(&hugr, out)
         .as_output()
         .unwrap()
@@ -1055,19 +1201,15 @@ fn get_input_output_ports<H: HugrView>(
         .into_iter()
         .filter_map(|p| hugr.linked_outputs(out, p).find(|&(n, _)| n != inp))
         .collect();
-    (inputs, outputs)
+    Ok((inputs, outputs))
 }
 
-/// Whether a port is linked to a state order edge.
-fn is_order_edge<H: HugrView>(hugr: &H, node: H::Node, port: Port) -> bool {
+/// Whether a port is linked to a static or other edge (e.g. order edge).
+fn is_non_value_edge<H: HugrView>(hugr: &H, node: H::Node, port: Port) -> bool {
     let op = hugr.get_optype(node);
-    op.other_port(port.direction()) == Some(port) && hugr.is_linked(node, port)
-}
-
-/// Whether node has a non-df linked port in the given direction.
-fn has_other_edge<H: HugrView>(hugr: &H, node: H::Node, dir: Direction) -> bool {
-    let op = hugr.get_optype(node);
-    op.other_port_kind(dir).is_some() && hugr.is_linked(node, op.other_port(dir).unwrap())
+    let is_other = op.other_port(port.direction()) == Some(port) && hugr.is_linked(node, port);
+    let is_static = op.static_port(port.direction()) == Some(port) && hugr.is_linked(node, port);
+    is_other || is_static
 }
 
 impl<'a, 'c, G: HugrView, Checker: Clone> From<&'a ConvexChecker<'c, G, Checker>>
@@ -1142,6 +1284,9 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// The hugr region is not a dataflow graph.
     #[error("SiblingSubgraphs may only be defined on dataflow regions.")]
     NonDataflowRegion,
+    /// An outgoing non-local edge was found.
+    #[error("Unsupported edge kind at ({_0}, {_1:?}).")]
+    UnsupportedEdgeKind(N, Port),
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
@@ -1205,10 +1350,12 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
 #[cfg(test)]
 mod tests {
     use cool_asserts::assert_matches;
+    use rstest::{fixture, rstest};
 
-    use crate::builder::inout_sig;
+    use crate::builder::{endo_sig, inout_sig};
     use crate::hugr::Patch;
     use crate::ops::Const;
+    use crate::ops::handle::DataflowParentID;
     use crate::std_extensions::arithmetic::float_types::ConstF64;
     use crate::std_extensions::logic::LogicOp;
     use crate::type_row;
@@ -1242,6 +1389,7 @@ mod tests {
                     nodes,
                     inputs: Vec::new(),
                     outputs: Vec::new(),
+                    function_calls: Vec::new(),
                 })
             }
         }
@@ -1680,5 +1828,87 @@ mod tests {
         )
         .unwrap();
         assert_eq!(subgraph2, exp_subgraph);
+    }
+
+    #[fixture]
+    pub(crate) fn hugr_call_subgraph() -> Hugr {
+        let mut builder = ModuleBuilder::new();
+        let decl_node = builder.declare("test", endo_sig(bool_t()).into()).unwrap();
+        let mut main = builder.define_function("main", endo_sig(bool_t())).unwrap();
+        let [bool] = main.input_wires_arr();
+
+        let [bool] = main
+            .add_dataflow_op(LogicOp::Not, [bool])
+            .unwrap()
+            .outputs_arr();
+
+        // Chain two calls to the same function
+        let [bool] = main.call(&decl_node, &[], [bool]).unwrap().outputs_arr();
+        let [bool] = main.call(&decl_node, &[], [bool]).unwrap().outputs_arr();
+
+        let main_def = main.finish_with_outputs([bool]).unwrap();
+
+        let mut hugr = builder.finish_hugr().unwrap();
+        hugr.set_entrypoint(main_def.node());
+        hugr
+    }
+
+    #[rstest]
+    fn test_call_subgraph_from_dfg(hugr_call_subgraph: Hugr) {
+        let subg =
+            SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(&hugr_call_subgraph)
+                .unwrap();
+
+        assert_eq!(subg.function_calls.len(), 1);
+        assert_eq!(subg.function_calls[0].len(), 2);
+    }
+
+    #[rstest]
+    fn test_call_subgraph_from_nodes(hugr_call_subgraph: Hugr) {
+        let call_nodes = hugr_call_subgraph
+            .children(hugr_call_subgraph.entrypoint())
+            .filter(|&n| hugr_call_subgraph.get_optype(n).is_call())
+            .collect_vec();
+
+        let subg =
+            SiblingSubgraph::try_from_nodes(call_nodes.clone(), &hugr_call_subgraph).unwrap();
+        assert_eq!(subg.function_calls.len(), 1);
+        assert_eq!(subg.function_calls[0].len(), 2);
+
+        let subg =
+            SiblingSubgraph::try_from_nodes(call_nodes[0..1].to_owned(), &hugr_call_subgraph)
+                .unwrap();
+        assert_eq!(subg.function_calls.len(), 1);
+        assert_eq!(subg.function_calls[0].len(), 1);
+    }
+
+    #[rstest]
+    fn test_call_subgraph_from_boundary(hugr_call_subgraph: Hugr) {
+        let call_nodes = hugr_call_subgraph
+            .children(hugr_call_subgraph.entrypoint())
+            .filter(|&n| hugr_call_subgraph.get_optype(n).is_call())
+            .collect_vec();
+        let not_node = hugr_call_subgraph
+            .children(hugr_call_subgraph.entrypoint())
+            .filter(|&n| hugr_call_subgraph.get_optype(n) == &LogicOp::Not.into())
+            .exactly_one()
+            .ok()
+            .unwrap();
+
+        let subg = SiblingSubgraph::try_new(
+            vec![
+                vec![(not_node, IncomingPort::from(0))],
+                call_nodes
+                    .iter()
+                    .map(|&n| (n, IncomingPort::from(1)))
+                    .collect_vec(),
+            ],
+            vec![(call_nodes[1], OutgoingPort::from(0))],
+            &hugr_call_subgraph,
+        )
+        .unwrap();
+
+        assert_eq!(subg.function_calls.len(), 1);
+        assert_eq!(subg.function_calls[0].len(), 2);
     }
 }
