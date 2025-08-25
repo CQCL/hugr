@@ -126,7 +126,6 @@ pub trait HugrLinking: HugrMut {
     /// [Visibility::Public]: crate::Visibility::Public
     /// [FuncDefn]: crate::ops::FuncDefn
     /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
-    #[allow(clippy::type_complexity)]
     fn link_module(
         &mut self,
         other: Hugr,
@@ -833,6 +832,7 @@ mod test {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     fn list_decls_defns<H: HugrView>(h: &H) -> (HashMap<H::Node, &str>, HashMap<H::Node, &str>) {
         let mut decls = HashMap::new();
         let mut defns = HashMap::new();
@@ -849,10 +849,7 @@ mod test {
     fn call_targets<H: HugrView>(h: &H) -> HashMap<H::Node, H::Node> {
         h.nodes()
             .filter(|n| h.get_optype(*n).is_call())
-            .map(|n| {
-                let tgt = h.static_source(n).expect(format!("For node {n}").as_str());
-                (n, tgt)
-            })
+            .map(|n| (n, h.static_source(n).unwrap()))
             .collect()
     }
 
