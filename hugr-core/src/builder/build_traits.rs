@@ -1,6 +1,6 @@
 use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::linking::{LinkHugr, NodeLinkingDirective};
+use crate::hugr::linking::{HugrLinking, NodeLinkingDirective};
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};

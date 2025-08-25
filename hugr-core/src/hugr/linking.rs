@@ -15,7 +15,7 @@ use crate::{
 /// This is done by module-children from the inserted (source) Hugr replacing, or being replaced by,
 /// module-children already in the target Hugr; static edges from the replaced node,
 /// are transferred to come from the replacing node, and the replaced node(/subtree) then deleted.
-pub trait LinkHugr: HugrMut {
+pub trait HugrLinking: HugrMut {
     /// Copy nodes from another Hugr into this one, with linking directives specified by Node.
     ///
     /// If `parent` is non-None, then `other`'s entrypoint-subtree is copied under it.
@@ -107,10 +107,10 @@ pub trait LinkHugr: HugrMut {
     }
 }
 
-impl<T: HugrMut> LinkHugr for T {}
+impl<T: HugrMut> HugrLinking for T {}
 
-/// An error resulting from an [NodeLinkingDirective] passed to [LinkHugr::insert_hugr_link_nodes]
-/// or [LinkHugr::insert_from_view_link_nodes].
+/// An error resulting from an [NodeLinkingDirective] passed to [HugrLinking::insert_hugr_link_nodes]
+/// or [HugrLinking::insert_from_view_link_nodes].
 ///
 /// `SN` is the type of nodes in the source (inserted) Hugr; `TN` similarly for the target Hugr.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
@@ -184,7 +184,7 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
 /// target Hugr.
 ///
-/// For use with [LinkHugr::insert_hugr_link_nodes] and [LinkHugr::insert_from_view_link_nodes].
+/// For use with [HugrLinking::insert_hugr_link_nodes] and [HugrLinking::insert_from_view_link_nodes].
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
 /// Invariant: no SourceNode can be in both maps (by type of [NodeLinkingDirective])
@@ -247,7 +247,7 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     Ok(trns)
 }
 
-fn link_by_node<SN: HugrNode, TGT: LinkHugr + ?Sized>(
+fn link_by_node<SN: HugrNode, TGT: HugrLinking + ?Sized>(
     hugr: &mut TGT,
     transfers: Transfers<SN, TGT::Node>,
     node_map: &mut HashMap<SN, TGT::Node>,
@@ -284,7 +284,7 @@ mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
 
-    use super::{LinkHugr, NodeLinkingDirective, NodeLinkingError};
+    use super::{HugrLinking, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
     use crate::ops::{FuncDecl, OpTag, OpTrait, handle::NodeHandle};
