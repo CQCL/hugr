@@ -2,6 +2,7 @@
 
 use std::{
     collections::{HashMap, VecDeque},
+    convert::Infallible,
     fmt::Display,
 };
 
@@ -167,6 +168,88 @@ pub trait HugrLinking: HugrMut {
         let per_node = policy.to_node_linking(self, &other)?;
         Ok(self
             .add_view_link_nodes(None, other, per_node)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
+
+    /// Inserts the entrypoint-subtree of another Hugr into this one,
+    /// including copying any private functions it calls and using linking
+    /// to resolve any public functions.
+    ///
+    /// `parent` is the parent node under which to insert the entrypoint.
+    /// `allow_new_pub` specifies whether new [Visibility::Public] [FuncDefn]s may be copied from `other`
+    ///
+    /// # Errors
+    ///
+    /// If other's entrypoint is its module-root (see [Self::link_hugr])
+    ///
+    /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
+    /// (an exception is made if the called+containing function is public and there is already
+    ///  an equivalent in `self` - to which the call is redirected).
+    ///
+    /// If other's entrypoint calls a public function in `other` which does not yet exist in `self`
+    /// and `allow_new_pub` is false
+    fn insert_link_hugr(
+        &mut self,
+        parent: Self::Node,
+        other: Hugr,
+        // ALAN TODO: we should distinguish between "new names" (which we are more likely to want to avoid)
+        // and "new code" (i.e. new FuncDefns replacing existing FuncDecls) - of course we could convert
+        // these to call the existing *decls*
+        allow_new_pub: bool,
+    ) -> Result<InsertedForest<Node, Self::Node>, String> {
+        let entrypoint_func = {
+            let mut n = other.entrypoint();
+            loop {
+                let p = other.get_parent(n).ok_or("Entrypoint is module root")?;
+                if p == other.module_root() {
+                    break n;
+                };
+                n = p;
+            }
+        };
+        //if entrypoint_func == other.entrypoint() { // Do we need to check this? Ok if parent is self.module_root() ??
+        //    return Err(format!("Entrypoint is a top-level function"))
+        //}
+        let pub_funcs = NameLinkingPolicy {
+            sig_conflict: SignatureConflictHandling::UseBoth, // We may not *need* both, so don't error
+            multi_impls: MultipleImplHandling::UseExisting,
+            filter_private: true, // not used by to_node_linking_public
+        }
+        .to_node_linking_public(self, &other)
+        .map_err(|e| e.to_string())?;
+
+        let per_node = if allow_new_pub {
+            let Ok(dirvs) = find_reachable(&other, [other.entrypoint()], |n| {
+                Ok::<_, Infallible>(pub_funcs[&n].clone())
+            });
+            dirvs
+        } else {
+            let dirvs = find_reachable(&other, [other.entrypoint()], |n| match &pub_funcs[&n] {
+                NodeLinkingDirective::Add { .. } => Err(n),
+                ue @ NodeLinkingDirective::UseExisting(_) => Ok(ue.clone()),
+            })
+            .map_err(|n| {
+                format!("Node {n} is a (new-to-self) public function callable from the entrypoint")
+            })?;
+            debug_assert!(dirvs.iter().all(|(k, v)| {
+                !matches!(link_sig(&other, *k), Some(LinkSig::Public { .. }))
+                    || matches!(v, NodeLinkingDirective::UseExisting(_))
+            }));
+            dirvs
+        };
+
+        if entrypoint_func != other.entrypoint()
+            && matches!(
+                per_node.get(&entrypoint_func),
+                Some(NodeLinkingDirective::Add { .. })
+            )
+        {
+            return Err(format!(
+                "Would need to add function {entrypoint_func} which contains the entrypoint, avoiding double-copy"
+            ));
+        }
+        Ok(self
+            .add_hugr_link_nodes(Some(parent), other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 }
@@ -493,9 +576,11 @@ fn find_reachable<H: HugrView + ?Sized, TN, E>(
         if res.contains_key(&n) {
             continue;
         }
-        let nld = match link_sig(h, n).unwrap() {
-            LinkSig::Private => NodeLinkingDirective::add(),
-            LinkSig::Public { .. } => pub_callback(n)?,
+        debug_assert!(h.get_parent(n) == Some(h.module_root()) || n == h.entrypoint());
+        let nld = match link_sig(h, n) {
+            // This handles the case where `starts` includes the entrypoint.
+            None | Some(LinkSig::Private) => NodeLinkingDirective::add(),
+            Some(LinkSig::Public { .. }) => pub_callback(n)?,
         };
 
         if matches!(nld, NodeLinkingDirective::Add { .. }) {
