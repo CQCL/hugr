@@ -1,6 +1,9 @@
 //! Directives and errors relating to linking Hugrs.
 
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Display,
+};
 
 use itertools::{Either, Itertools};
 
@@ -249,7 +252,6 @@ impl<TN> NodeLinkingDirective<TN> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
     // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
-    // copy_private_funcs: bool, // TODO: allow filtering private funcs to only those reachable in callgraph
     /// How to handle cases where the same (public) name is present in both
     /// inserted and target Hugr but with different signatures.
     sig_conflict: SignatureConflictHandling,
@@ -257,6 +259,9 @@ pub struct NameLinkingPolicy {
     /// with the same name and signature.
     // TODO consider Set of names where to prefer new? Or optional map from name?
     multi_impls: MultipleImplHandling,
+    /// Whether to filter private functions down to only those required (reached from public)
+    /// false means just to copy all private functions.
+    filter_private: bool,
     // TODO Renames to apply to public functions in the inserted Hugr. These take effect
     // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
     // rename_map: HashMap<String, String>
@@ -343,6 +348,7 @@ impl NameLinkingPolicy {
         Self {
             multi_impls,
             sig_conflict: SignatureConflictHandling::ErrorDontInsert,
+            filter_private: false,
         }
     }
 
@@ -353,6 +359,7 @@ impl NameLinkingPolicy {
         Self {
             multi_impls: MultipleImplHandling::UseBoth,
             sig_conflict: SignatureConflictHandling::UseBoth,
+            filter_private: false,
         }
     }
 
@@ -378,17 +385,71 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        let pub_funcs = self.to_node_linking_public(target, source)?;
+        if self.filter_private {
+            let mut res = HashMap::new();
+            let mut queue = VecDeque::from_iter(pub_funcs.keys().copied());
+            while let Some(n) = queue.pop_front() {
+                if res.contains_key(&n) {
+                    continue;
+                }
+                let nld = match link_sig(source, n).unwrap() {
+                    LinkSig::Private => NodeLinkingDirective::add(),
+                    LinkSig::Public { .. } => pub_funcs[&n].clone(),
+                };
+
+                if matches!(nld, NodeLinkingDirective::Add { .. }) {
+                    // Would be great to use a CallGraph here but that is in hugr-passes
+                    // and we cannot have a cyclic dependency between crates !!
+                    // Also call-graph does not deal with (potentially-module-level) Constants.
+                    for d in source.descendants(n) {
+                        if matches!(
+                            source.get_optype(d),
+                            OpType::LoadConstant(_) | OpType::LoadFunction(_) | OpType::Call(_)
+                        ) {
+                            if let Some(static_) = source.static_source(d) {
+                                if source.get_parent(static_) == Some(source.module_root()) {
+                                    queue.push_back(static_)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                res.insert(n, nld);
+            }
+            Ok(res)
+        } else {
+            let mut res = pub_funcs;
+            for n in source.children(source.module_root()) {
+                if matches!(link_sig(source, n), Some(LinkSig::Private)) {
+                    let prev = res.insert(n, NodeLinkingDirective::add());
+                    debug_assert_eq!(prev, None);
+                }
+            }
+            Ok(res)
+        }
+    }
+
+    /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
+    /// source (inserted) and target (inserted-into) Hugr, for [Visibility::Public] functions only.
+    #[allow(clippy::type_complexity)]
+    fn to_node_linking_public<T: HugrView + ?Sized, S: HugrView + ?Sized>(
+        &self,
+        target: &T,
+        source: &S,
+    ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         let existing = gather_existing(target);
         let mut res = NodeLinkingDirectives::new();
 
         let NameLinkingPolicy {
             sig_conflict,
             multi_impls,
+            filter_private: _,
         } = self;
         for n in source.children(source.module_root()) {
             let dirv = match link_sig(source, n) {
-                None => continue,
-                Some(LinkSig::Private) => NodeLinkingDirective::add(),
+                None | Some(LinkSig::Private) => continue,
                 Some(LinkSig::Public { name, is_defn, sig }) => {
                     if let Some((ex_ns, ex_sig)) = existing.get(name) {
                         match *sig_conflict {
@@ -942,6 +1003,7 @@ mod test {
         let pol = NameLinkingPolicy {
             sig_conflict,
             multi_impls,
+            filter_private: false,
         };
         let mut target2 = target.clone();
 
@@ -1014,11 +1076,15 @@ mod test {
     }
 
     #[rstest]
-    #[case(MultipleImplHandling::UseNew, vec![11])]
-    #[case(MultipleImplHandling::UseExisting, vec![5])]
-    #[case(MultipleImplHandling::UseBoth, vec![5, 11])]
-    #[case(MultipleImplHandling::ErrorDontInsert, vec![])]
-    fn impl_conflict(#[case] multi_impls: MultipleImplHandling, #[case] expected: Vec<u64>) {
+    #[case(MultipleImplHandling::UseNew, vec![11], vec![5, 11])] // Existing constant is not removed
+    #[case(MultipleImplHandling::UseExisting, vec![5], vec![5])]
+    #[case(MultipleImplHandling::UseBoth, vec![5, 11], vec![5,11])]
+    #[case(MultipleImplHandling::ErrorDontInsert, vec![], vec![])]
+    fn impl_conflict(
+        #[case] multi_impls: MultipleImplHandling,
+        #[case] expect_used: Vec<u64>,
+        #[case] expect_exist: Vec<u64>,
+    ) {
         fn build_hugr(cst: u64) -> Hugr {
             let mut mb = ModuleBuilder::new();
             let cst = mb.add_constant(Value::from(ConstUsize::new(cst)));
@@ -1033,8 +1099,11 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let mut pol = NameLinkingPolicy::keep_both_invalid();
-        pol.on_multiple_impls(multi_impls);
+        let pol = NameLinkingPolicy {
+            sig_conflict: SignatureConflictHandling::ErrorDontInsert,
+            multi_impls,
+            filter_private: true,
+        };
         let res = host.link_module(inserted, &pol);
         if multi_impls == MultipleImplHandling::ErrorDontInsert {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
@@ -1063,14 +1132,13 @@ mod test {
                     .unwrap()
             })
             .collect_vec();
-        assert_eq!(func_consts, expected);
-        // At the moment we copy all the constants regardless of whether they are used:
+        assert_eq!(func_consts, expect_used);
         let all_consts: Vec<_> = host
             .children(host.module_root())
             .filter_map(|ch| host.get_optype(ch).as_const())
             .map(|c| c.get_custom_value::<ConstUsize>().unwrap().value())
             .sorted()
             .collect();
-        assert_eq!(all_consts, [5, 11]);
+        assert_eq!(all_consts, expect_exist);
     }
 }
