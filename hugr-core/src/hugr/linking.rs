@@ -2,7 +2,6 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    convert::Infallible,
     fmt::Display,
 };
 
@@ -12,7 +11,7 @@ use crate::{
     Hugr, HugrView, Node,
     core::HugrNode,
     hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
-    ops::OpType,
+    ops::{FuncDecl, OpType},
     types::PolyFuncType,
 };
 
@@ -191,12 +190,18 @@ pub trait HugrLinking: HugrMut {
     fn insert_link_hugr(
         &mut self,
         parent: Self::Node,
-        other: Hugr,
-        // ALAN TODO: we should distinguish between "new names" (which we are more likely to want to avoid)
-        // and "new code" (i.e. new FuncDefns replacing existing FuncDecls) - of course we could convert
-        // these to call the existing *decls*
-        allow_new_pub: bool,
+        mut other: Hugr,
+        allow_new_names: Option<SignatureConflictHandling>,
+        // allow_new = false, SigConflict::Error = error on new name, or same name w/ different sig
+        // allow_new = false, SigConflict::UseBoth = error on new name, allow same name w/different sig - WEIRD
+        // allow_new = true, SigConflict::Error = allow new name, but error if different sig
+        // allow_new = true, SigConflict::UseBoth = allow new name, even if different sig
+        allow_new_impls: Option<MultipleImplHandling>,
     ) -> Result<InsertedForest<Node, Self::Node>, String> {
+        // Could extend NameLinkingPolicy with option on both?
+        // allow_new_names = None -> only adds new impls of existing names - prob. needs reachability
+        // allow_new_impls = None -> converts all incoming impls to decls
+        // but, makes no sense for both to be None, as does nothing...
         let entrypoint_func = {
             let mut n = other.entrypoint();
             loop {
@@ -210,43 +215,64 @@ pub trait HugrLinking: HugrMut {
         //if entrypoint_func == other.entrypoint() { // Do we need to check this? Ok if parent is self.module_root() ??
         //    return Err(format!("Entrypoint is a top-level function"))
         //}
-        let pub_funcs = NameLinkingPolicy {
-            sig_conflict: SignatureConflictHandling::UseBoth, // We may not *need* both, so don't error
-            multi_impls: MultipleImplHandling::UseExisting,
-            filter_private: true, // not used by to_node_linking_public
-        }
-        .to_node_linking_public(self, &other)
-        .map_err(|e| e.to_string())?;
-
-        let per_node = if allow_new_pub {
-            let Ok(dirvs) = find_reachable(&other, [other.entrypoint()], |n| {
-                Ok::<_, Infallible>(pub_funcs[&n].clone())
-            });
-            dirvs
-        } else {
-            let dirvs = find_reachable(&other, [other.entrypoint()], |n| match &pub_funcs[&n] {
-                NodeLinkingDirective::Add { .. } => Err(n),
-                ue @ NodeLinkingDirective::UseExisting(_) => Ok(ue.clone()),
-            })
-            .map_err(|n| {
-                format!("Node {n} is a (new-to-self) public function callable from the entrypoint")
-            })?;
-            debug_assert!(dirvs.iter().all(|(k, v)| {
-                !matches!(link_sig(&other, *k), Some(LinkSig::Public { .. }))
-                    || matches!(v, NodeLinkingDirective::UseExisting(_))
-            }));
-            dirvs
-        };
-
-        if entrypoint_func != other.entrypoint()
-            && matches!(
-                per_node.get(&entrypoint_func),
-                Some(NodeLinkingDirective::Add { .. })
-            )
-        {
-            return Err(format!(
-                "Would need to add function {entrypoint_func} which contains the entrypoint, avoiding double-copy"
-            ));
+        let existing = gather_existing(self);
+        let mut defns_to_make_decls = Vec::new();
+        let per_node = find_reachable(&other, [other.entrypoint()], |n| {
+            if n == other.entrypoint() {
+                Ok(NodeLinkingDirective::add())
+            } else if n == entrypoint_func {
+                // ALAN TODO If there's a matching function in `self` then this is OK
+                Err(format!(
+                    "Adding function {entrypoint_func} would double-copy the entrypoint-subtree"
+                ))
+            } else {
+                Ok(match link_sig(&other, n).unwrap() {
+                    LinkSig::Private => NodeLinkingDirective::add(),
+                    LinkSig::Public { name, is_defn, sig } => match existing.get(name) {
+                        Some((defn_or_decl, ex_sig)) => {
+                            if sig == *ex_sig {
+                                match allow_new_impls.as_ref() {
+                                    None => NodeLinkingDirective::UseExisting(
+                                        *defn_or_decl.as_ref().left_or_else(|(n, _)| n),
+                                    ),
+                                    Some(multi_impls) => {
+                                        directive(name, n, is_defn, defn_or_decl, multi_impls)
+                                            .map_err(|e| e.to_string())?
+                                    }
+                                }
+                            } else {
+                                match allow_new_names {
+                                    None | Some(SignatureConflictHandling::ErrorDontInsert) => {
+                                        return Err(format!(
+                                            "Conflicting signature for function {name} callable from entrypoint"
+                                        ));
+                                    }
+                                    Some(SignatureConflictHandling::UseBoth) => {
+                                        NodeLinkingDirective::add()
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            if allow_new_names.is_none() {
+                                return Err(format!("New name {name}"));
+                            }
+                            if is_defn && allow_new_impls.is_none() {
+                                defns_to_make_decls.push(n)
+                            }
+                            NodeLinkingDirective::add()
+                        }
+                    },
+                })
+            }
+        })?;
+        for n in defns_to_make_decls {
+            while let Some(c) = other.first_child(n) {
+                other.remove_subtree(c)
+            }
+            let o = other.optype_mut(n);
+            let OpType::FuncDefn(fd) = o else { panic!() };
+            *o = FuncDecl::new(fd.func_name().clone(), fd.signature().clone()).into();
         }
         Ok(self
             .add_hugr_link_nodes(Some(parent), other, per_node)
@@ -568,7 +594,7 @@ fn directive<SN: Display, TN: HugrNode>(
 fn find_reachable<H: HugrView + ?Sized, TN, E>(
     h: &H,
     starts: impl IntoIterator<Item = H::Node>,
-    pub_callback: impl Fn(H::Node) -> Result<NodeLinkingDirective<TN>, E>,
+    mut pub_callback: impl FnMut(H::Node) -> Result<NodeLinkingDirective<TN>, E>,
 ) -> Result<NodeLinkingDirectives<H::Node, TN>, E> {
     let mut queue = VecDeque::from_iter(starts);
     let mut res = HashMap::new();
