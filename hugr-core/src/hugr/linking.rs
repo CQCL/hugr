@@ -456,7 +456,9 @@ fn link_sig<H: HugrView + ?Sized>(
     }
 }
 
-fn gather_existing<H: HugrView + ?Sized>(h: &H) -> HashMap<&String, PubFuncs<H::Node>> {
+fn gather_existing<'a, H: HugrView + ?Sized>(
+    h: &'a H,
+) -> HashMap<&'a String, PubFuncs<'a, H::Node>> {
     let left_if = |b| if b { Either::Left } else { Either::Right };
     h.children(h.module_root())
         .filter_map(|n| {
