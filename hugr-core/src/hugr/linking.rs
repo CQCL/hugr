@@ -117,13 +117,14 @@ pub trait HugrLinking: HugrMut {
     ///
     /// # Errors
     ///
-    /// * If [NameLinkingPolicy::error_on_conflicting_sig] is true and there are public
-    ///   functions with the same name but different signatures
+    /// * If [SignatureConflictHandling::ErrorDontInsert] is used and `self` and
+    ///   `other` have public functions with the same name but different signatures
     ///
-    /// * If [MultipleImplHandling::ErrorDontInsert] is used
-    ///   and both `self` and `other` have public [FuncDefn]s with the same name and signature
+    /// * If [MultipleImplHandling::ErrorDontInsert] is used and both `self`
+    ///   and `other` have public [FuncDefn]s with the same name and signature
     ///
     /// [Visibility::Public]: crate::Visibility::Public
+    /// [FuncDefn]: crate::ops::FuncDefn
     /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     #[allow(clippy::type_complexity)]
     fn link_hugr(
@@ -265,36 +266,6 @@ pub enum MultipleImplHandling {
     UseBoth,
 }
 
-impl NameLinkingPolicy {
-    pub fn err_on_conflict(multi_impls: MultipleImplHandling) -> Self {
-        Self {
-            multi_impls,
-            sig_conflict: SignatureConflictHandling::ErrorDontInsert,
-        }
-    }
-
-    pub fn keep_both_invalid() -> Self {
-        Self {
-            multi_impls: MultipleImplHandling::UseBoth,
-            sig_conflict: SignatureConflictHandling::UseBoth,
-        }
-    }
-
-    pub fn on_signature_conflict(&mut self, s: SignatureConflictHandling) {
-        self.sig_conflict = s;
-    }
-
-    pub fn on_multiple_impls(&mut self, mih: MultipleImplHandling) {
-        self.multi_impls = mih;
-    }
-}
-
-impl Default for NameLinkingPolicy {
-    fn default() -> Self {
-        Self::err_on_conflict(MultipleImplHandling::ErrorDontInsert)
-    }
-}
-
 /// An error in using names to determine how to link functions in source and target Hugrs.
 /// (SN = Source Node, TN = Target Node)
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
@@ -326,6 +297,41 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
+    /// Makes a new instance that specifies to
+    /// [raise an error on conflicting signatures](SignatureConflictHandling::ErrorDontInsert),
+    /// and to handle multiple [FuncDefn]s according to `multi_impls`.
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
+    pub fn err_on_conflict(multi_impls: MultipleImplHandling) -> Self {
+        Self {
+            multi_impls,
+            sig_conflict: SignatureConflictHandling::ErrorDontInsert,
+        }
+    }
+
+    /// Makes a new instance that specifies to keep both decls/defns when (for the same name)
+    /// they have different signatures or when both are defns. Thus, an error is never raised;
+    /// a (potentially-invalid) Hugr is always produced.
+    pub fn keep_both_invalid() -> Self {
+        Self {
+            multi_impls: MultipleImplHandling::UseBoth,
+            sig_conflict: SignatureConflictHandling::UseBoth,
+        }
+    }
+
+    /// Modifies this instance to handle conflicting signatures in the specified way.
+    pub fn on_signature_conflict(&mut self, s: SignatureConflictHandling) {
+        self.sig_conflict = s;
+    }
+
+    /// Modifies this instance to handle multiple implementations ([FuncDefn]s) in
+    /// the specified way.
+    ///
+    /// [FuncDefn]: crate::ops::FuncDefn
+    pub fn on_multiple_impls(&mut self, mih: MultipleImplHandling) {
+        self.multi_impls = mih;
+    }
+
     /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
     /// source (inserted) and target (inserted-into) Hugr.
     /// The map should be such that no [NodeLinkingError] will occur.
@@ -368,6 +374,12 @@ impl NameLinkingPolicy {
         }
 
         Ok(res)
+    }
+}
+
+impl Default for NameLinkingPolicy {
+    fn default() -> Self {
+        Self::err_on_conflict(MultipleImplHandling::ErrorDontInsert)
     }
 }
 
