@@ -108,6 +108,36 @@ pub trait HugrLinking: HugrMut {
         Ok(inserted)
     }
 
+    /// Insert module-children from another Hugr into this one according to a [NameLinkingPolicy].
+    ///
+    /// All [Visibility::Public] module-children are inserted, or linked, according to the
+    /// specified policy; private children will also be inserted, at least including all those
+    /// used by the copied public children.
+    // Yes at present we copy all private children, i.e. a safe over-approximation!
+    ///
+    /// # Errors
+    ///
+    /// * If [SignatureConflictHandling::ErrorDontInsert] is used and `self` and
+    ///   `other` have public functions with the same name but different signatures
+    ///
+    /// * If [MultipleImplHandling::ErrorDontInsert] is used and both `self`
+    ///   and `other` have public [FuncDefn]s with the same name and signature
+    ///
+    /// [Visibility::Public]: crate::Visibility::Public
+    /// [FuncDefn]: crate::ops::FuncDefn
+    /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
+    #[allow(clippy::type_complexity)]
+    fn link_module(
+        &mut self,
+        other: Hugr,
+        policy: NameLinkingPolicy,
+    ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
+        let per_node = policy.to_node_linking(self, &other)?;
+        Ok(self
+            .add_hugr_link_nodes(None, other, per_node)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
+
     /// Copy module-children from another Hugr into this one according to a [NameLinkingPolicy].
     ///
     /// All [Visibility::Public] module-children are copied, or linked, according to the
@@ -127,14 +157,14 @@ pub trait HugrLinking: HugrMut {
     /// [FuncDefn]: crate::ops::FuncDefn
     /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     #[allow(clippy::type_complexity)]
-    fn link_hugr(
+    fn link_module_view<H: HugrView>(
         &mut self,
-        other: Hugr,
+        other: &H,
         policy: NameLinkingPolicy,
-    ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
+    ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
         Ok(self
-            .add_hugr_link_nodes(None, other, per_node)
+            .add_view_link_nodes(None, other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 }
@@ -894,7 +924,7 @@ mod test {
                 };
                 let mut target = orig_target.clone();
 
-                target.link_hugr(inserted.clone(), pol).unwrap();
+                target.link_module(inserted.clone(), pol).unwrap();
                 target.validate().unwrap();
                 let (decls, defns) = list_decls_defns(&target);
                 assert_eq!(decls, HashMap::new());
@@ -937,7 +967,7 @@ mod test {
 
         let mut pol = NameLinkingPolicy::err_on_conflict(MultipleImplHandling::ErrorDontInsert);
         let mut host = orig_host.clone();
-        let res = host.link_hugr(inserted.clone(), pol.clone());
+        let res = host.link_module(inserted.clone(), pol.clone());
         assert_eq!(host, orig_host); // Did nothing
         assert_eq!(
             res.err(),
@@ -951,7 +981,7 @@ mod test {
         );
 
         pol.on_signature_conflict(SignatureConflictHandling::UseBoth);
-        let node_map = host.link_hugr(inserted, pol).unwrap().node_map;
+        let node_map = host.link_module(inserted, pol).unwrap().node_map;
         assert_eq!(
             host.validate(),
             Err(ValidationError::DuplicateExport {
@@ -982,7 +1012,7 @@ mod test {
 
         let mut pol = NameLinkingPolicy::keep_both_invalid();
         pol.on_multiple_impls(multi_impls);
-        let res = host.link_hugr(inserted, pol);
+        let res = host.link_module(inserted, pol);
         if multi_impls == MultipleImplHandling::ErrorDontInsert {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
             assert_eq!(host, backup);
