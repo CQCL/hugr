@@ -134,19 +134,22 @@ pub enum NodeLinkingError<SN: Display, TN: Display> {
     NodeMultiplyReplaced(TN, SN, SN),
 }
 
-/// Directive for how to treat a particular FuncDefn/FuncDecl in the source Hugr.
+/// Directive for how to treat a particular module-child in the source Hugr.
 /// (TN is a node in the target Hugr.)
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum NodeLinkingDirective<TN = Node> {
-    /// Insert the FuncDecl, or the FuncDefn and its subtree, into the target Hugr.
+    /// Insert the module-child (with subtree if any) into the target Hugr.
     Add {
         // TODO If non-None, change the name of the inserted function
         //rename: Option<String>,
         /// Existing/old nodes in the target which will be removed (with their subtrees),
-        /// and any ([EdgeKind::Function]) edges from them changed to leave the newly-inserted
-        /// node instead. (Typically, this `Vec` would contain at most one `FuncDefn`,
-        /// or perhaps-multiple, aliased, `FuncDecl`s.)
+        /// and any static ([EdgeKind::Function]/[EdgeKind::Const]) edges from them changed
+        /// to leave the newly-inserted node instead. (Typically, this `Vec` would contain
+        /// at most one [FuncDefn], or perhaps-multiple, aliased, [FuncDecl]s.)
         ///
+        /// [FuncDecl]: crate::ops::FuncDecl
+        /// [FuncDefn]: crate::ops::FuncDefn
+        /// [EdgeKind::Const]: crate::types::EdgeKind::Const
         /// [EdgeKind::Function]: crate::types::EdgeKind::Function
         replace: Vec<TN>,
     },
