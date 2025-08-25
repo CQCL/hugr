@@ -182,7 +182,7 @@ pub enum BuildError {
     #[error{"In inserting Hugr: {0}"}]
     HugrInsertionError(#[from] NodeLinkingError<Node, Node>),
 
-    /// From [Dataflow::add_hugr_view_with_wires_link_nodes].
+    /// From [Dataflow::add_view_with_wires_link_nodes].
     /// Note that because the type of node in the [NodeLinkingError] depends
     /// upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
@@ -364,8 +364,10 @@ pub(crate) mod test {
         hugr
     }
 
-    /// A DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
-    /// to a FuncDefn and a FuncDecl each bool_t->bool_t, and their handles.
+    /// Builds a DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
+    /// to a FuncDefn and a FuncDecl each bool_t->bool_t.
+    /// Returns the Hugr and both function handles.
+    #[fixture]
     pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
         let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
         let new_defn = {

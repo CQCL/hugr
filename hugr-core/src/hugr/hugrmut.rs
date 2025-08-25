@@ -180,11 +180,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert another hugr into this one, under a given parent node. Edges into the
     /// inserted subtree (i.e. nonlocal or static) will be disconnected in `self`.
-    /// (See [Self::insert_forest] for a way to insert sources of such edges as well.)
+    /// (See [Self::insert_forest] or trait [HugrLinking] for methods that can
+    /// preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
         let region = other.entrypoint();
         Self::insert_region(self, root, other, region)
@@ -192,13 +195,15 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert a subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_forest] for a way to preserve such edges by
-    /// inserting their sources as well.)
+    /// in `self`. (See [Self::insert_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// - If the root node is not in the graph.
     /// - If the `region` node is not in `other`.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_region(
         &mut self,
         root: Self::Node,
@@ -206,8 +211,9 @@ pub trait HugrMut: HugrMutInternals {
         region: Node,
     ) -> InsertionResult<Node, Self::Node> {
         let node_map = self
-            .insert_forest(other, HashMap::from([(region, root)]))
-            .expect("No errors possible for single subtree");
+            .insert_forest(other, [(region, root)])
+            .expect("No errors possible for single subtree")
+            .node_map;
         InsertionResult {
             inserted_entrypoint: node_map[&region],
             node_map,
@@ -216,12 +222,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copy the entrypoint subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_view_forest] for a way to insert sources of such edges
-    /// as well.)
+    /// in `self`. (See [Self::insert_view_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also copying their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
@@ -229,8 +237,9 @@ pub trait HugrMut: HugrMutInternals {
     ) -> InsertionResult<H::Node, Self::Node> {
         let ep = other.entrypoint();
         let node_map = self
-            .insert_view_forest(other, other.descendants(ep), HashMap::from([(ep, root)]))
-            .expect("No errors possible for single subtree");
+            .insert_view_forest(other, other.descendants(ep), [(ep, root)])
+            .expect("No errors possible for single subtree")
+            .node_map;
         InsertionResult {
             inserted_entrypoint: node_map[&ep],
             node_map,
@@ -260,61 +269,59 @@ pub trait HugrMut: HugrMutInternals {
         self.insert_view_forest(
             other,
             subgraph.nodes().iter().cloned(),
-            subgraph.nodes().iter().map(|n| (*n, root)).collect(),
+            subgraph.nodes().iter().map(|n| (*n, root)),
         )
         .expect("SiblingSubgraph nodes are a set")
+        .node_map
     }
 
     /// Insert a forest of nodes from another Hugr into this one.
     ///
-    /// `root_parents` maps from roots of regions in the other Hugr to insert,
-    /// to the node in this Hugr that shall be parent for that region.
-    /// If `root_parents` is empty, nothing is inserted.
+    /// `root_parents` contains pairs of
+    ///    * the root of a region in `other` to insert,
+    ///    * the node in `self` that shall be parent for that region.
     ///
-    /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
-    /// and where each value is the corresponding (new) node in `self`.
+    /// Later entries for the same region override earlier ones.
+    /// If `root_parents` is empty, nothing is inserted.
     ///
     /// # Errors
     ///
-    /// [InsertForestError::DoubleCopy] if the subtrees of the keys of `root_parents`
-    /// are not disjoint (the error indicates the root of the _inner_ subtree).
+    /// [InsertForestError::SubtreeAlreadyCopied] if the regions in `root_parents` are not disjoint
     ///
     /// # Panics
     ///
-    /// If any of the values in `roots` are not nodes in `self`.
+    /// If any of the keys in `root_parents` are not nodes in `other`,
+    /// or any of the values not in `self`.
     fn insert_forest(
         &mut self,
         other: Hugr,
-        root_parents: HashMap<Node, Self::Node>,
+        root_parents: impl IntoIterator<Item = (Node, Self::Node)>,
     ) -> InsertForestResult<Node, Self::Node>;
 
     /// Copy a forest of nodes from a view into this one.
     ///
-    ///  `nodes` enumerates all nodes in `other` to copy; every item must *either* be
-    /// present in `root_parents`, or follow its parent (in `other`) in the iteration order.
+    ///  `nodes` enumerates all nodes in `other` to copy.
     ///
-    ///  `root_parents` identifies those nodes in `nodes` which should be placed under
-    /// the given parent nodes in `self`. Note that unlike [Self::insert_forest] this
-    /// allows inserting most of a subtree in one location but with subparts of that
-    /// subtree placed elsewhere.
+    /// `root_parents` contains pairs of a node in `nodes` and the parent in `self` under which
+    /// it should be to placed. Later entries (for the same node) override earlier ones.
+    /// Note that unlike [Self::insert_forest] this allows inserting most of a subtree in one
+    /// location but with subparts of that subtree placed elsewhere.
     ///
-    /// Returns a [`HashMap`] whose keys are all the inserted nodes of `other`
-    /// and where each value is the corresponding (new) node in `self`.
+    /// Nodes in `nodes` which are not mentioned in `root_parents` and whose parent in `other`
+    /// is not in `nodes`, will have no parent in `self`.
     ///
     /// # Errors
     ///
-    /// [InsertForestError::DoubleCopy] if any node appears in `nodes` more than once
+    /// [InsertForestError::DuplicateNode] if any node appears in `nodes` more than once.
     ///
     /// # Panics
     ///
-    /// If any of the values in `roots` are not nodes in `self`.
-    ///
-    /// If `nodes` does not adhere to the ordering requirement above
+    /// If any of the keys in `root_parents` are not in `nodes`, or any of the values not nodes in `self`.
     fn insert_view_forest<H: HugrView>(
         &mut self,
         other: &H,
-        nodes: impl IntoIterator<Item = H::Node>,
-        roots: HashMap<H::Node, Self::Node>,
+        nodes: impl Iterator<Item = H::Node> + Clone,
+        root_parents: impl IntoIterator<Item = (H::Node, Self::Node)>,
     ) -> InsertForestResult<H::Node, Self::Node>;
 
     /// Applies a patch to the graph.
@@ -352,15 +359,28 @@ pub trait HugrMut: HugrMutInternals {
 ///
 /// On success, a map giving the new indices; or an error in the request.
 /// Used by [HugrMut::insert_forest] and [HugrMut::insert_view_forest].
-pub type InsertForestResult<SN, TN> = Result<HashMap<SN, TN>, InsertForestError<SN>>;
+pub type InsertForestResult<SN, TN> = Result<InsertedForest<SN, TN>, InsertForestError<SN>>;
 
-/// An error from [HugrMut::insert_forest] or [HugrMut::insert_view_forest]
+/// An error from [HugrMut::insert_forest] or [HugrMut::insert_view_forest].
+///
+/// `SN` is the type of nodes in the source Hugr
 #[derive(Clone, Debug, derive_more::Display, derive_more::Error, PartialEq)]
 #[non_exhaustive]
-pub enum InsertForestError<N: HugrNode = Node> {
-    /// The specified source node would be copied twice into the target
-    #[display("Node/subtree {_0} would be copied twice")]
-    DoubleCopy(N),
+pub enum InsertForestError<SN: HugrNode = Node> {
+    /// A source node was specified twice in a call to [HugrMut::insert_view_forest]
+    #[display("Node {_0} would be copied twice")]
+    DuplicateNode(SN),
+    /// A subtree would be copied twice (i.e. it is contained in another) in a call to
+    /// [HugrMut::insert_forest]
+    #[display(
+        "Subtree rooted at {subtree} is already being copied as part of that rooted at {parent}"
+    )]
+    SubtreeAlreadyCopied {
+        /// Root of the inner subtree
+        subtree: SN,
+        /// Root of the outer subtree that also contains the inner
+        parent: SN,
+    },
 }
 
 /// Records the result of inserting a Hugr or view via [`HugrMut::insert_hugr`],
@@ -377,6 +397,18 @@ pub struct InsertionResult<SourceN = Node, TargetN = Node> {
     pub inserted_entrypoint: TargetN,
     /// Map from nodes in the Hugr/view that was inserted, to their new
     /// positions in the Hugr into which said was inserted.
+    pub node_map: HashMap<SourceN, TargetN>,
+}
+
+/// Records the result of inserting a Hugr or view via [`HugrMut::insert_forest`]
+/// or [`HugrMut::insert_view_forest`].
+///
+/// Contains a map from the nodes in the source HUGR that were copied, to the
+/// corresponding nodes in the target HUGR, using the respective `Node` types.
+#[derive(Clone, Debug, Default)]
+pub struct InsertedForest<SourceN = Node, TargetN = Node> {
+    /// Map from the nodes from the source Hugr/view that were inserted,
+    /// to the corresponding nodes in the Hugr into which said was inserted.
     pub node_map: HashMap<SourceN, TargetN>,
 }
 
@@ -515,22 +547,23 @@ impl HugrMut for Hugr {
     fn insert_forest(
         &mut self,
         mut other: Hugr,
-        roots: HashMap<Node, Self::Node>,
-    ) -> Result<HashMap<Node, Self::Node>, InsertForestError> {
-        for &r in roots.keys() {
-            let mut n = r;
-            while let Some(p) = other.get_parent(n) {
-                if roots.contains_key(&p) {
-                    return Err(InsertForestError::DoubleCopy(r));
+        root_parents: impl IntoIterator<Item = (Node, Self::Node)>,
+    ) -> InsertForestResult<Node, Self::Node> {
+        let roots: HashMap<_, _> = root_parents.into_iter().collect();
+        for &subtree in roots.keys() {
+            let mut n = subtree;
+            while let Some(parent) = other.get_parent(n) {
+                if roots.contains_key(&parent) {
+                    return Err(InsertForestError::SubtreeAlreadyCopied { subtree, parent });
                 }
-                n = p;
+                n = parent;
             }
         }
-        let node_map = insert_hugr_internal(
+        let inserted = insert_forest_internal(
             self,
             &other,
             roots.keys().flat_map(|n| other.descendants(*n)),
-            |k| roots.get(k).cloned(),
+            roots.iter().map(|(r, p)| (*r, *p)),
         )
         .expect("Trees disjoint so no repeated nodes");
         // Merge the extension sets.
@@ -538,7 +571,7 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in &node_map {
+        for (&node, &new_node) in &inserted.node_map {
             let node_pg = node.into_portgraph();
             let new_node_pg = new_node.into_portgraph();
             let optype = other.op_types.take(node_pg);
@@ -546,23 +579,22 @@ impl HugrMut for Hugr {
             let meta = other.metadata.take(node_pg);
             self.metadata.set(new_node_pg, meta);
         }
-        Ok(node_map)
+        Ok(inserted)
     }
 
     fn insert_view_forest<H: HugrView>(
         &mut self,
         other: &H,
-        nodes: impl IntoIterator<Item = H::Node>,
-        roots: HashMap<H::Node, Self::Node>,
-    ) -> Result<HashMap<H::Node, Self::Node>, InsertForestError<H::Node>> {
-        let node_map =
-            insert_hugr_internal(self, other, nodes.into_iter(), |k| roots.get(k).cloned())?;
+        nodes: impl Iterator<Item = H::Node> + Clone,
+        root_parents: impl IntoIterator<Item = (H::Node, Self::Node)>,
+    ) -> InsertForestResult<H::Node, Self::Node> {
+        let inserted = insert_forest_internal(self, other, nodes, root_parents.into_iter())?;
         // Merge the extension sets.
         self.extensions.extend(other.extensions());
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
-        for (&node, &new_node) in &node_map {
+        for (&node, &new_node) in &inserted.node_map {
             let nodetype = other.get_optype(node);
             self.op_types
                 .set(new_node.into_portgraph(), nodetype.clone());
@@ -572,7 +604,7 @@ impl HugrMut for Hugr {
                     .set(new_node.into_portgraph(), Some(meta.clone()));
             }
         }
-        Ok(node_map)
+        Ok(inserted)
     }
 
     fn copy_descendants(
@@ -640,41 +672,29 @@ impl HugrMut for Hugr {
 /// - `hugr`: The hugr to insert into.
 /// - `other`: The other graph to insert from.
 /// - `other_nodes`: The nodes in the other graph to insert.
-/// - `reroot`: A function that returns the new parent for each inserted node.
-///   If `None`, the parent is set to the original parent after it has been inserted into `hugr`.
-///   If that is the case, the parent must come before the child in the `other_nodes` iterator.
-fn insert_hugr_internal<H: HugrView>(
+/// - `root_parents`: a list of pairs of (node in `other`, parent to assign in `hugr`)
+fn insert_forest_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
-    other_nodes: impl Iterator<Item = H::Node>,
-    reroot: impl Fn(&H::Node) -> Option<Node>,
-) -> Result<HashMap<H::Node, Node>, InsertForestError<H::Node>> {
+    other_nodes: impl Iterator<Item = H::Node> + Clone,
+    root_parents: impl Iterator<Item = (H::Node, Node)>,
+) -> InsertForestResult<H::Node, Node> {
     let new_node_count_hint = other_nodes.size_hint().1.unwrap_or_default();
 
     // Insert the nodes from the other graph into this one.
     let mut node_map = HashMap::with_capacity(new_node_count_hint);
     hugr.reserve(new_node_count_hint, 0);
 
-    for old in other_nodes {
+    for old in other_nodes.clone() {
         // We use a dummy optype here. The callers take care of updating the
         // correct optype, avoiding cloning if possible.
         let op = OpType::default();
         let new = hugr.add_node(op);
         if node_map.insert(old, new).is_some() {
-            return Err(InsertForestError::DoubleCopy(old));
+            return Err(InsertForestError::DuplicateNode(old));
         }
 
         hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
-
-        let new_parent = if let Some(new_parent) = reroot(&old) {
-            new_parent
-        } else {
-            let old_parent = other.get_parent(old).unwrap();
-            *node_map
-                .get(&old_parent)
-                .expect("Child node came before parent in `other_nodes` iterator")
-        };
-        hugr.set_parent(new, new_parent);
 
         // Reconnect the edges to the new node.
         for tgt in other.node_inputs(old) {
@@ -697,20 +717,32 @@ fn insert_hugr_internal<H: HugrView>(
             }
         }
     }
-    Ok(node_map)
+    for (r, p) in root_parents {
+        hugr.set_parent(node_map[&r], p);
+    }
+    for old in other_nodes {
+        let new = node_map[&old];
+        if hugr.get_parent(new).is_none() {
+            let old_parent = other.get_parent(old).unwrap();
+            let new_parent = node_map[&old_parent];
+            hugr.set_parent(new, new_parent);
+        }
+    }
+    Ok(InsertedForest { node_map })
 }
 
 #[cfg(test)]
 pub(super) mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
+    use rstest::rstest;
 
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
 
     use crate::extension::PRELUDE;
     use crate::extension::prelude::{Noop, usize_t};
     use crate::hugr::ValidationError;
-    use crate::ops::handle::NodeHandle;
+    use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
     use crate::types::Signature;
 
@@ -828,25 +860,24 @@ pub(super) mod test {
         assert_eq!(h.static_source(call2), tgt2);
     }
 
-    #[test]
-    fn test_insert_forest() {
-        // Specify which decls to transfer
-        for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
-            let mut h = simple_dfg_hugr();
-            let (insert, defn, decl) = dfg_calling_defn_decl();
-            let roots = HashMap::from_iter(
-                std::iter::once((insert.entrypoint(), h.entrypoint()))
-                    .chain(call1.then_some((defn.node(), h.module_root())).into_iter())
-                    .chain(call2.then_some((decl.node(), h.module_root())).into_iter()),
-            );
-            h.insert_forest(insert, roots).unwrap();
-            check_calls_defn_decl(&h, call1, call2);
-        }
+    #[rstest]
+    fn test_insert_forest(
+        dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>),
+        #[values(false, true)] copy_defn: bool,
+        #[values(false, true)] copy_decl: bool,
+    ) {
+        let (insert, defn, decl) = dfg_calling_defn_decl;
+        let mut h = simple_dfg_hugr();
+        let roots = std::iter::once((insert.entrypoint(), h.entrypoint()))
+            .chain(copy_defn.then_some((defn.node(), h.module_root())))
+            .chain(copy_decl.then_some((decl.node(), h.module_root())));
+        h.insert_forest(insert, roots).unwrap();
+        check_calls_defn_decl(&h, copy_defn, copy_decl);
     }
 
-    #[test]
-    fn test_insert_view_forest() {
-        let (insert, defn, decl) = dfg_calling_defn_decl();
+    #[rstest]
+    fn test_insert_view_forest(dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>)) {
+        let (insert, defn, decl) = dfg_calling_defn_decl;
         let mut h = simple_dfg_hugr();
 
         let mut roots = HashMap::from([
@@ -875,7 +906,8 @@ pub(super) mod test {
                 insert.entry_descendants().chain([defn.node(), decl.node()]),
                 roots.clone(),
             )
-            .unwrap();
+            .unwrap()
+            .node_map;
         assert_matches!(h.validate(),
             Err(ValidationError::ContainerWithoutChildren { node, optype: _ }) => assert_eq!(node, node_map[&defn.node()]));
 
@@ -889,7 +921,8 @@ pub(super) mod test {
         let mut h = simple_dfg_hugr();
         let node_map = h
             .insert_view_forest(&insert, insert.nodes().skip(1), roots)
-            .unwrap();
+            .unwrap()
+            .node_map;
         assert!(matches!(
             h.validate(),
             Err(ValidationError::InterGraphEdgeError(_))
@@ -911,26 +944,32 @@ pub(super) mod test {
         assert_eq!(h.input_neighbours(outp).next(), Some(inserted_ep));
     }
 
-    #[test]
-    fn bad_insert_forest() {
+    #[rstest]
+    fn bad_insert_forest(dfg_calling_defn_decl: (Hugr, FuncID<true>, FuncID<false>)) {
         let backup = simple_dfg_hugr();
         let mut h = backup.clone();
 
-        let (insert, _, _) = dfg_calling_defn_decl();
+        let (insert, _, _) = dfg_calling_defn_decl;
         let ep = insert.entrypoint();
         let epp = insert.get_parent(ep).unwrap();
-        let roots = HashMap::from([(epp, h.module_root()), (ep, h.entrypoint())]);
+        let roots = [(epp, h.module_root()), (ep, h.entrypoint())];
         let r = h.insert_view_forest(
             &insert,
             insert.descendants(epp).chain(insert.descendants(ep)),
-            roots.clone(),
+            roots,
         );
-        assert_eq!(r, Err(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(r.err(), Some(InsertForestError::DuplicateNode(ep)));
         assert!(h.validate().is_err());
 
         let mut h = backup.clone();
         let r = h.insert_forest(insert, roots);
-        assert_eq!(r, Err(InsertForestError::DoubleCopy(ep)));
+        assert_eq!(
+            r.err(),
+            Some(InsertForestError::SubtreeAlreadyCopied {
+                subtree: ep,
+                parent: epp
+            })
+        );
         // Here the error is detected in building `nodes` from `roots` so before any mutation
         assert_eq!(h, backup);
     }
