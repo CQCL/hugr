@@ -5,7 +5,7 @@ use std::{collections::HashMap, fmt::Display};
 use itertools::{Either, Itertools};
 
 use crate::{
-    Hugr, HugrView, Node, Visibility,
+    Hugr, HugrView, Node,
     core::HugrNode,
     hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
     ops::OpType,
@@ -381,28 +381,30 @@ impl NameLinkingPolicy {
             multi_impls,
         } = self;
         for n in source.children(source.module_root()) {
-            if let Some((name, is_defn, vis, sig)) = link_sig(source, n) {
-                let dirv = if let Some((ex_ns, ex_sig)) =
-                    vis.is_public().then(|| existing.get(name)).flatten()
-                {
-                    match *sig_conflict {
-                        _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_impls)?,
-                        SignatureConflictHandling::ErrorDontInsert => {
-                            return Err(NameLinkingError::SignatureConflict {
-                                name: name.clone(),
-                                src_node: n,
-                                src_sig: Box::new(sig.clone()),
-                                tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
-                                tgt_sig: Box::new((*ex_sig).clone()),
-                            });
+            let dirv = match link_sig(source, n) {
+                None => continue,
+                Some(LinkSig::Private) => NodeLinkingDirective::add(),
+                Some(LinkSig::Public { name, is_defn, sig }) => {
+                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
+                        match *sig_conflict {
+                            _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_impls)?,
+                            SignatureConflictHandling::ErrorDontInsert => {
+                                return Err(NameLinkingError::SignatureConflict {
+                                    name: name.clone(),
+                                    src_node: n,
+                                    src_sig: Box::new(sig.clone()),
+                                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
+                                    tgt_sig: Box::new((*ex_sig).clone()),
+                                });
+                            }
+                            SignatureConflictHandling::UseBoth => NodeLinkingDirective::add(),
                         }
-                        SignatureConflictHandling::UseBoth => NodeLinkingDirective::add(),
+                    } else {
+                        NodeLinkingDirective::add()
                     }
-                } else {
-                    NodeLinkingDirective::add()
-                };
-                res.insert(n, dirv);
-            }
+                }
+            };
+            res.insert(n, dirv);
         }
 
         Ok(res)
@@ -445,15 +447,27 @@ fn directive<SN: Display, TN: HugrNode>(
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
 
-fn link_sig<H: HugrView + ?Sized>(
-    h: &H,
-    n: H::Node,
-) -> Option<(&String, bool, &Visibility, &PolyFuncType)> {
-    match h.get_optype(n) {
-        OpType::FuncDecl(fd) => Some((fd.func_name(), false, fd.visibility(), fd.signature())),
-        OpType::FuncDefn(fd) => Some((fd.func_name(), true, fd.visibility(), fd.signature())),
-        _ => None,
-    }
+enum LinkSig<'a> {
+    Private,
+    Public {
+        name: &'a String,
+        is_defn: bool,
+        sig: &'a PolyFuncType,
+    },
+}
+
+fn link_sig<H: HugrView + ?Sized>(h: &H, n: H::Node) -> Option<LinkSig<'_>> {
+    let (name, is_defn, vis, sig) = match h.get_optype(n) {
+        OpType::FuncDecl(fd) => (fd.func_name(), false, fd.visibility(), fd.signature()),
+        OpType::FuncDefn(fd) => (fd.func_name(), true, fd.visibility(), fd.signature()),
+        OpType::Const(_) => return Some(LinkSig::Private),
+        _ => return None,
+    };
+    Some(if vis.is_public() {
+        LinkSig::Public { name, is_defn, sig }
+    } else {
+        LinkSig::Private
+    })
 }
 
 fn gather_existing<'a, H: HugrView + ?Sized>(
@@ -462,9 +476,9 @@ fn gather_existing<'a, H: HugrView + ?Sized>(
     let left_if = |b| if b { Either::Left } else { Either::Right };
     h.children(h.module_root())
         .filter_map(|n| {
-            link_sig(h, n).and_then(|(fname, is_defn, vis, sig)| {
-                vis.is_public()
-                    .then_some((fname, (left_if(is_defn)(n), sig)))
+            link_sig(h, n).and_then(|link_sig| match link_sig {
+                LinkSig::Public { name, is_defn, sig } => Some((name, (left_if(is_defn)(n), sig))),
+                LinkSig::Private => None,
             })
         })
         .into_grouping_map()
@@ -592,7 +606,8 @@ mod test {
     use super::{HugrLinking, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
-        Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
+        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
+        ModuleBuilder,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
@@ -600,7 +615,7 @@ mod test {
         MultipleImplHandling, NameLinkingError, NameLinkingPolicy, SignatureConflictHandling,
     };
     use crate::hugr::{ValidationError, hugrmut::HugrMut};
-    use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, handle::NodeHandle};
+    use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::{Hugr, HugrView, Visibility, types::Signature};
@@ -1001,10 +1016,11 @@ mod test {
     fn impl_conflict(#[case] multi_impls: MultipleImplHandling, #[case] expected: Vec<u64>) {
         fn build_hugr(cst: u64) -> Hugr {
             let mut mb = ModuleBuilder::new();
+            let cst = mb.add_constant(Value::from(ConstUsize::new(cst)));
             let mut fb = mb
                 .define_function_vis("foo", Signature::new(vec![], usize_t()), Visibility::Public)
                 .unwrap();
-            let c = fb.add_load_value(ConstUsize::new(cst));
+            let c = fb.load_const(&cst);
             fb.finish_with_outputs([c]).unwrap();
             mb.finish_hugr().unwrap()
         }
@@ -1034,7 +1050,8 @@ mod test {
             .filter(|n| host.get_optype(*n).is_func_defn())
             .map(|n| {
                 host.children(n)
-                    .filter_map(|ch| host.get_optype(ch).as_const())
+                    .filter_map(|ch| host.static_source(ch)) // LoadConstant's
+                    .map(|c| host.get_optype(c).as_const().unwrap())
                     .map(|c| c.get_custom_value::<ConstUsize>().unwrap().value())
                     .exactly_one()
                     .ok()
@@ -1042,5 +1059,13 @@ mod test {
             })
             .collect_vec();
         assert_eq!(func_consts, expected);
+        // At the moment we copy all the constants regardless of whether they are used:
+        let all_consts: Vec<_> = host
+            .children(host.module_root())
+            .filter_map(|ch| host.get_optype(ch).as_const())
+            .map(|c| c.get_custom_value::<ConstUsize>().unwrap().value())
+            .sorted()
+            .collect();
+        assert_eq!(all_consts, [5, 11]);
     }
 }
