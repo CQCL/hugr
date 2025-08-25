@@ -130,7 +130,7 @@ pub trait HugrLinking: HugrMut {
     fn link_module(
         &mut self,
         other: Hugr,
-        policy: NameLinkingPolicy,
+        policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
         Ok(self
@@ -160,7 +160,7 @@ pub trait HugrLinking: HugrMut {
     fn link_module_view<H: HugrView>(
         &mut self,
         other: &H,
-        policy: NameLinkingPolicy,
+        policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
         let per_node = policy.to_node_linking(self, &other)?;
         Ok(self
@@ -856,12 +856,25 @@ mod test {
             .collect()
     }
 
-    #[test]
-    fn combines_decls_defn() {
+    #[rstest]
+    fn combines_decls_defn(
+        #[values(
+            SignatureConflictHandling::ErrorDontInsert,
+            SignatureConflictHandling::UseBoth
+        )]
+        sig_conflict: SignatureConflictHandling,
+        #[values(
+            MultipleImplHandling::ErrorDontInsert,
+            MultipleImplHandling::UseNew,
+            MultipleImplHandling::UseExisting,
+            MultipleImplHandling::UseBoth
+        )]
+        multi_impls: MultipleImplHandling,
+    ) {
         let i64_t = || INT_TYPES[6].to_owned();
         let foo_sig = Signature::new_endo(i64_t());
         let bar_sig = Signature::new(vec![i64_t(); 2], i64_t());
-        let orig_target = {
+        let mut target = {
             let mut fb =
                 FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
             let mut mb = fb.module_root_builder();
@@ -907,37 +920,27 @@ mod test {
             h
         };
 
-        // Linking by name...neither of the looped-over params should make any difference:
-        for sig_conflict in [
-            SignatureConflictHandling::ErrorDontInsert,
-            SignatureConflictHandling::UseBoth,
-        ] {
-            for multi_impls in [
-                MultipleImplHandling::ErrorDontInsert,
-                MultipleImplHandling::UseNew,
-                MultipleImplHandling::UseExisting,
-                MultipleImplHandling::UseBoth,
-            ] {
-                let pol = NameLinkingPolicy {
-                    sig_conflict,
-                    multi_impls,
-                };
-                let mut target = orig_target.clone();
+        let pol = NameLinkingPolicy {
+            sig_conflict,
+            multi_impls,
+        };
+        let mut target2 = target.clone();
 
-                target.link_module(inserted.clone(), pol).unwrap();
-                target.validate().unwrap();
-                let (decls, defns) = list_decls_defns(&target);
-                assert_eq!(decls, HashMap::new());
-                assert_eq!(
-                    defns.values().copied().sorted().collect_vec(),
-                    ["bar", "foo", "main"]
-                );
-                let call_tgts = call_targets(&target);
-                for (defn, name) in defns {
-                    if name != "main" {
-                        // Defns now have two calls each (was one to each alias)
-                        assert_eq!(call_tgts.values().filter(|tgt| **tgt == defn).count(), 2);
-                    }
+        target.link_module_view(&inserted, &pol).unwrap();
+        target2.link_module(inserted, &pol).unwrap();
+        for tgt in [target, target2] {
+            tgt.validate().unwrap();
+            let (decls, defns) = list_decls_defns(&tgt);
+            assert_eq!(decls, HashMap::new());
+            assert_eq!(
+                defns.values().copied().sorted().collect_vec(),
+                ["bar", "foo", "main"]
+            );
+            let call_tgts = call_targets(&tgt);
+            for (defn, name) in defns {
+                if name != "main" {
+                    // Defns now have two calls each (was one to each alias)
+                    assert_eq!(call_tgts.values().filter(|tgt| **tgt == defn).count(), 2);
                 }
             }
         }
@@ -967,7 +970,7 @@ mod test {
 
         let mut pol = NameLinkingPolicy::err_on_conflict(MultipleImplHandling::ErrorDontInsert);
         let mut host = orig_host.clone();
-        let res = host.link_module(inserted.clone(), pol.clone());
+        let res = host.link_module_view(&inserted, &pol);
         assert_eq!(host, orig_host); // Did nothing
         assert_eq!(
             res.err(),
@@ -981,7 +984,7 @@ mod test {
         );
 
         pol.on_signature_conflict(SignatureConflictHandling::UseBoth);
-        let node_map = host.link_module(inserted, pol).unwrap().node_map;
+        let node_map = host.link_module(inserted, &pol).unwrap().node_map;
         assert_eq!(
             host.validate(),
             Err(ValidationError::DuplicateExport {
@@ -1012,20 +1015,20 @@ mod test {
 
         let mut pol = NameLinkingPolicy::keep_both_invalid();
         pol.on_multiple_impls(multi_impls);
-        let res = host.link_module(inserted, pol);
+        let res = host.link_module(inserted, &pol);
         if multi_impls == MultipleImplHandling::ErrorDontInsert {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
             assert_eq!(host, backup);
             return;
         }
         res.unwrap();
-        let res = host.validate();
+        let val_res = host.validate();
         if multi_impls == MultipleImplHandling::UseBoth {
             assert!(
-                matches!(res, Err(ValidationError::DuplicateExport { link_name, .. }) if link_name == "foo")
+                matches!(val_res, Err(ValidationError::DuplicateExport { link_name, .. }) if link_name == "foo")
             );
         } else {
-            res.unwrap();
+            val_res.unwrap();
         }
         let func_consts = host
             .children(host.module_root())
@@ -1033,12 +1036,10 @@ mod test {
             .map(|n| {
                 host.children(n)
                     .filter_map(|ch| host.get_optype(ch).as_const())
+                    .map(|c| c.get_custom_value::<ConstUsize>().unwrap().value())
                     .exactly_one()
                     .ok()
                     .unwrap()
-                    .get_custom_value::<ConstUsize>()
-                    .unwrap()
-                    .value()
             })
             .collect_vec();
         assert_eq!(func_consts, expected);
