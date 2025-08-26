@@ -70,7 +70,7 @@ pub enum PreserveNode {
 impl PreserveNode {
     /// A conservative default for a given node. Just examines the node's [`OpType`]:
     /// * Assumes all Calls must be preserved. (One could scan the called `FuncDefn`, but would
-    ///   also need to check for cycles in the [`CallGraph`](hugr_core::call_graph::CallGraph).)
+    ///   also need to check for cycles in the [`CallGraph`](super::call_graph::CallGraph).)
     /// * Assumes all CFGs must be preserved. (One could, for example, allow acyclic
     ///   CFGs to be removed.)
     /// * Assumes all `TailLoops` must be preserved. (One could, for example, use dataflow
