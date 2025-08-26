@@ -1,20 +1,16 @@
 //! Pass for removing statically-unreachable functions from a Hugr
-
 use std::collections::HashSet;
 
-use hugr_core::{
-    HugrView, Node,
-    hugr::hugrmut::HugrMut,
-    ops::{OpTag, OpTrait},
-};
 use petgraph::visit::{Dfs, Walker};
+
+use hugr_core::call_graph::{CallGraph, CallGraphNode};
+use hugr_core::ops::{OpTag, OpTrait};
+use hugr_core::{HugrView, Node, hugr::hugrmut::HugrMut};
 
 use crate::{
     ComposablePass,
     composable::{ValidatePassError, validate_if_test},
 };
-
-use super::call_graph::{CallGraph, CallGraphNode};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

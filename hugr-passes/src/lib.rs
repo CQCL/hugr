@@ -1,6 +1,5 @@
 //! Compilation passes acting on the HUGR program representation.
 
-pub mod call_graph;
 pub mod composable;
 pub use composable::ComposablePass;
 pub mod const_fold;

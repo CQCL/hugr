@@ -1,12 +1,12 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
 use std::collections::{HashSet, VecDeque};
 
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::patch::inline_call::InlineCall;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
-use crate::call_graph::{CallGraph, CallGraphNode};
+use hugr_core::call_graph::{CallGraph, CallGraphNode};
+use hugr_core::hugr::hugrmut::HugrMut;
+use hugr_core::hugr::patch::inline_call::InlineCall;
 
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
@@ -73,12 +73,11 @@ mod test {
     use itertools::Itertools;
     use petgraph::visit::EdgeRef;
 
-    use hugr_core::HugrView;
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
+    use hugr_core::call_graph::{CallGraph, CallGraphNode};
+    use hugr_core::{Hugr, HugrView, extension::prelude::qb_t, types::Signature};
     use rstest::rstest;
 
-    use crate::call_graph::{CallGraph, CallGraphNode};
     use crate::inline_funcs::inline_acyclic;
 
     ///          /->-\

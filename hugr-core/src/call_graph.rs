@@ -1,8 +1,9 @@
 //! Data structure for call graphs of a Hugr
 use std::collections::HashMap;
 
-use hugr_core::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::Graph;
+
+use crate::{HugrView, Node, core::HugrNode, ops::OpType};
 
 /// Weight for an edge in a [`CallGraph`]
 #[derive(Clone, Debug, PartialEq, Eq)]
