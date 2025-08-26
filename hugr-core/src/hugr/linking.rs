@@ -264,9 +264,10 @@ pub struct NameLinkingPolicy {
 
 /// What to do when both target and inserted Hugr have a
 /// [Visibility::Public] function with the same name but different signatures.
+///
+/// [Visibility::Public]: crate::Visibility::Public
 // ALAN Note: we *could* combine with MultipleImplHandling; the UseExisting/UseNew variants
 // would lead to invalid edges (between ports of different EdgeKind).
-
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum SignatureConflictHandling {
@@ -280,6 +281,8 @@ pub enum SignatureConflictHandling {
 
 /// What to do when both target and inserted Hugr
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
+///
+/// [Visibility::Public]: crate::Visibility::Public
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum MultipleImplHandling {
@@ -324,6 +327,8 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
     /// in a different place).
+    ///
+    /// [Visibility::Public]: crate::Visibility::Public
     #[error("The entrypoint is contained within function {_0} which will be added as {_1:?}")]
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
 }
