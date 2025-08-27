@@ -5,8 +5,8 @@ from collections.abc import Sequence
 from typing import Generic, TypeVar, cast
 
 import hugr.model as model
-from hugr.hugr.base import Hugr, Node
-from hugr.hugr.node_port import InPort, OutPort
+from hugr.hugr.base import Hugr
+from hugr.hugr.node_port import InPort, Node, OutPort
 from hugr.ops import (
     CFG,
     DFG,
