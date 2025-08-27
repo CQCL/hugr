@@ -1,6 +1,8 @@
+from itertools import groupby
+from typing import List
+from hugr.model.load import group_seq_parts
+from hugr.model.load import import_closed_list
 """HUGR edge kinds, types, type parameters and type arguments."""
-
-from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
@@ -258,7 +260,6 @@ class TypeTypeArg(TypeArg):
     def to_model(self) -> model.Term | model.Splice:
         return self.ty.to_model()
 
-
 @dataclass(frozen=True)
 class BoundedNatArg(TypeArg):
     """A type argument for a :class:`BoundedNatParam`."""
@@ -273,6 +274,7 @@ class BoundedNatArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Literal(self.n)
+
 
 
 @dataclass(frozen=True)
@@ -291,6 +293,7 @@ class StringArg(TypeArg):
         return model.Literal(self.value)
 
 
+
 @dataclass(frozen=True)
 class FloatArg(TypeArg):
     """A floating point type argument."""
@@ -305,6 +308,7 @@ class FloatArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Literal(self.value)
+
 
 
 @dataclass(frozen=True)
@@ -322,6 +326,7 @@ class BytesArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Literal(self.value)
+
 
 
 @dataclass(frozen=True)
@@ -364,6 +369,14 @@ class ListConcatArg(TypeArg):
             [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
         )
 
+    def flatten(self) -> TypeArg:
+        match self.lists:
+            case []:
+                return ListArg([])
+            case [item]:
+                return item
+            case _:
+                return self
 
 @dataclass(frozen=True)
 class TupleArg(TypeArg):
@@ -382,7 +395,6 @@ class TupleArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
-
 
 @dataclass(frozen=True)
 class TupleConcatArg(TypeArg):
@@ -404,6 +416,15 @@ class TupleConcatArg(TypeArg):
         return model.Tuple(
             [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
         )
+
+    def flatten(self) -> TypeArg:
+        match self.tuples:
+            case []:
+                return TupleArg([])
+            case [item]:
+                return item
+            case _:
+                return self
 
 
 @dataclass(frozen=True)

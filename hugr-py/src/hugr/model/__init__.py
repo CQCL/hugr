@@ -1,3 +1,5 @@
+from typing import Optional
+from typing import Generator
 """HUGR model data structures."""
 
 from collections.abc import Sequence
@@ -32,6 +34,26 @@ class Term(Protocol):
     def from_str(s: str) -> "Term":
         """Read the term from its string representation."""
         return rust.string_to_term(s)
+
+    def to_list_parts(self) -> Generator[SeqPart]:
+        if isinstance(self, List):
+            for part in self.parts:
+                if isinstance(part, Splice):
+                    yield from part.seq.to_list_parts()
+                else:
+                    yield part
+        else:
+            yield Splice(self)
+
+    def to_tuple_parts(self) -> Generator[SeqPart]:
+        if isinstance(self, Tuple):
+            for part in self.parts:
+                if isinstance(part, Splice):
+                    yield from part.seq.to_tuple_parts()
+                else:
+                    yield part
+        else:
+            yield Splice(self)
 
 
 @dataclass(frozen=True)
@@ -132,6 +154,10 @@ class Symbol:
 class Op(Protocol):
     """The operation of a node."""
 
+    def symbol_name(self) -> Optional[str]:
+        """Returns name of the symbol introduced by this node, if any."""
+        return None
+
 
 @dataclass(frozen=True)
 class InvalidOp(Op):
@@ -159,12 +185,18 @@ class DefineFunc(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareFunc(Op):
     """Function declaration."""
 
     symbol: Symbol
+
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
 
 
 @dataclass(frozen=True)
@@ -181,12 +213,18 @@ class DefineAlias(Op):
     symbol: Symbol
     value: Term
 
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareAlias(Op):
     """Alias declaration."""
 
     symbol: Symbol
+
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
 
 
 @dataclass(frozen=True)
@@ -205,6 +243,9 @@ class DeclareConstructor(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareOperation(Op):
@@ -212,12 +253,18 @@ class DeclareOperation(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> Optional[str]:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class Import(Op):
     """Import operation."""
 
     name: str
+
+    def symbol_name(self) -> Optional[str]:
+        return self.name
 
 
 @dataclass
