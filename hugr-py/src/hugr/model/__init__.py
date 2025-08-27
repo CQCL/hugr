@@ -1,9 +1,10 @@
 """HUGR model data structures."""
 
-from collections.abc import Sequence
+from abc import ABC
+from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Protocol
+from typing import Optional
 
 from semver import Version
 
@@ -21,7 +22,7 @@ def _current_version() -> Version:
 CURRENT_VERSION: Version = _current_version()
 
 
-class Term(Protocol):
+class Term(ABC):
     """A model term for static data such as types, constants and metadata."""
 
     def __str__(self) -> str:
@@ -32,6 +33,26 @@ class Term(Protocol):
     def from_str(s: str) -> "Term":
         """Read the term from its string representation."""
         return rust.string_to_term(s)
+
+    def to_list_parts(self) -> Generator["SeqPart"]:
+        if isinstance(self, List):
+            for part in self.parts:
+                if isinstance(part, Splice):
+                    yield from part.seq.to_list_parts()
+                else:
+                    yield part
+        else:
+            yield Splice(self)
+
+    def to_tuple_parts(self) -> Generator["SeqPart"]:
+        if isinstance(self, Tuple):
+            for part in self.parts:
+                if isinstance(part, Splice):
+                    yield from part.seq.to_tuple_parts()
+                else:
+                    yield part
+        else:
+            yield Splice(self)
 
 
 @dataclass(frozen=True)
@@ -129,8 +150,12 @@ class Symbol:
         return rust.string_to_symbol(s)
 
 
-class Op(Protocol):
+class Op(ABC):
     """The operation of a node."""
+
+    def symbol_name(self) -> str | None:
+        """Returns name of the symbol introduced by this node, if any."""
+        return None
 
 
 @dataclass(frozen=True)
@@ -159,12 +184,18 @@ class DefineFunc(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareFunc(Op):
     """Function declaration."""
 
     symbol: Symbol
+
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
 
 
 @dataclass(frozen=True)
@@ -181,12 +212,18 @@ class DefineAlias(Op):
     symbol: Symbol
     value: Term
 
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareAlias(Op):
     """Alias declaration."""
 
     symbol: Symbol
+
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
 
 
 @dataclass(frozen=True)
@@ -205,6 +242,9 @@ class DeclareConstructor(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class DeclareOperation(Op):
@@ -212,12 +252,18 @@ class DeclareOperation(Op):
 
     symbol: Symbol
 
+    def symbol_name(self) -> str | None:
+        return self.symbol.name
+
 
 @dataclass(frozen=True)
 class Import(Op):
     """Import operation."""
 
     name: str
+
+    def symbol_name(self) -> str | None:
+        return self.name
 
 
 @dataclass
