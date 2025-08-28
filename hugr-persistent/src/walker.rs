@@ -706,7 +706,7 @@ mod tests {
     ) {
         let (hugr, [base_commit, empty_commit], [not0, not1, not2]) = persistent_hugr_empty_child;
         let state_space = hugr.state_space();
-        let walker = Walker::from_pinned_node(not0, &state_space);
+        let walker = Walker::from_pinned_node(not0, state_space);
 
         let not0_outwire = walker.get_wire(not0, OutgoingPort::from(0));
         let expanded_wires = walker

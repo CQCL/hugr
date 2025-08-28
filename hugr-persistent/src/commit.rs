@@ -76,7 +76,7 @@ impl<'a> Commit<'a> {
     pub(crate) fn new_base(hugr: Hugr, state_space: &'a CommitStateSpace) -> Self {
         let commit = RelRc::new(CommitData::Base(hugr));
         commit
-            .try_register_in(&state_space.as_registry())
+            .try_register_in(state_space.as_registry())
             .expect("new node is not yet registered");
 
         Commit(commit, PhantomData)
@@ -119,7 +119,7 @@ impl<'a> Commit<'a> {
             return Err(InvalidCommit::NonUniqueBase(err.count()));
         }
 
-        rc.try_register_in(&state_space.as_registry())
+        rc.try_register_in(state_space.as_registry())
             .expect("new node is not yet registered");
 
         Ok(Self(rc, PhantomData))
