@@ -103,7 +103,7 @@ impl From<Registry<CommitData, ()>> for CommitStateSpace {
 
 impl From<Rc<RefCell<Registry<CommitData, ()>>>> for CommitStateSpace {
     fn from(registry: Rc<RefCell<Registry<CommitData, ()>>>) -> Self {
-        Self { registry: registry }
+        Self { registry }
     }
 }
 
@@ -111,6 +111,12 @@ impl<'a> From<&'a Rc<RefCell<Registry<CommitData, ()>>>> for &'a CommitStateSpac
     fn from(rc: &'a Rc<RefCell<Registry<CommitData, ()>>>) -> Self {
         // SAFETY: Commit is a transparent wrapper around the registry Rc
         unsafe { mem::transmute(rc) }
+    }
+}
+
+impl Default for CommitStateSpace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -129,7 +135,7 @@ impl CommitStateSpace {
         if !self.registry.borrow().is_empty() {
             return None;
         }
-        Some(Commit::new_base(hugr, &self))
+        Some(Commit::new_base(hugr, self))
     }
 
     /// Check if `commit` is in the commit state space.

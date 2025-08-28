@@ -59,11 +59,11 @@ impl Commit<'_> {
         return_invalid: BoundaryMode,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> + '_ {
         assert!(
-            self.has_boundary_edge_into(node, port, &child),
+            self.has_boundary_edge_into(node, port, child),
             "not a boundary edge"
         );
 
-        let parent_hugrs = ParentsView::from_commit(&child);
+        let parent_hugrs = ParentsView::from_commit(child);
         let repl = child.replacement().expect("valid child commit");
         let child_id = child.id();
         repl.linked_replacement_inputs(
@@ -100,7 +100,7 @@ impl Commit<'_> {
         child: &Commit,
         return_invalid: BoundaryMode,
     ) -> Option<(PatchNode, OutgoingPort)> {
-        let parent_hugrs = ParentsView::from_commit(&child);
+        let parent_hugrs = ParentsView::from_commit(child);
         let repl = child.replacement()?;
         match repl.linked_replacement_output(
             (self.to_patch_node(node), port),

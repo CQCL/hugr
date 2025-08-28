@@ -148,7 +148,7 @@ fn explore_state_space<'a>(
     let mut wire_queue = VecDeque::new();
     let mut added_patches = BTreeSet::new();
 
-    enqueue_all(&mut wire_queue, &all_commits, &state_space);
+    enqueue_all(&mut wire_queue, &all_commits, state_space);
 
     while let Some((wire, walker)) = wire_queue.pop_front() {
         if !walker.is_complete(&wire, None) {
@@ -202,7 +202,7 @@ fn explore_state_space<'a>(
             // enqueue new wires added by the replacement
             // (this will also add a lot of already visited wires, but they will
             // be deduplicated)
-            enqueue_all(&mut wire_queue, &all_commits, &state_space);
+            enqueue_all(&mut wire_queue, &all_commits, state_space);
         }
     }
 
