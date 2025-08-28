@@ -393,7 +393,7 @@ mod test {
     #[case::multi(multi_unpack(), 1, 2)]
     #[case::partial(partial_unpack(), 1, 3)]
     // TODO: Remove this once <https://github.com/CQCL/hugr/issues/1974>, and update the `UntuplePass` docs.
-    #[should_panic(expected = "Connected order edges not supported at the boundary")]
+    #[should_panic(expected = "UnsupportedEdgeKind(Node(7), Port(Incoming, 2))")]
     #[case::ordered(ordered_pack_unpack(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
