@@ -90,9 +90,9 @@ fn bench_insertion(c: &mut Criterion) {
                     (defn.node(), h.module_root()),
                     (decl.node(), h.module_root()),
                 ];
-                (h, insert, nodes, roots)
+                (h, &insert, nodes, roots)
             },
-            |(mut h, insert, nodes, roots)| black_box(h.insert_view_forest(&insert, nodes, roots)),
+            |(mut h, insert, nodes, roots)| black_box(h.insert_view_forest(insert, nodes, roots)),
             BatchSize::SmallInput,
         )
     });
