@@ -80,16 +80,21 @@ fn bench_insertion(c: &mut Criterion) {
         )
     });
     group.bench_function("insert_view_forest", |b| {
-        let mut h = simple_dfg_hugr();
         let (insert, decl, defn) = dfg_calling_defn_decl();
-        // Note it would be better to use iter_batched to avoid cloning nodes/roots.
-        let nodes = insert.entry_descendants().chain([defn.node(), decl.node()]);
-        let roots = [
-            (insert.entrypoint(), h.entrypoint()),
-            (defn.node(), h.module_root()),
-            (decl.node(), h.module_root()),
-        ];
-        b.iter(|| black_box(h.insert_view_forest(&insert, nodes.clone(), roots.iter().cloned())))
+        b.iter_batched(
+            || {
+                let h = simple_dfg_hugr();
+                let nodes = insert.entry_descendants().chain([defn.node(), decl.node()]);
+                let roots = [
+                    (insert.entrypoint(), h.entrypoint()),
+                    (defn.node(), h.module_root()),
+                    (decl.node(), h.module_root()),
+                ];
+                (h, &insert, nodes, roots)
+            },
+            |(mut h, insert, nodes, roots)| black_box(h.insert_view_forest(insert, nodes, roots)),
+            BatchSize::SmallInput,
+        )
     });
     group.bench_function("insert_forest", |b| {
         b.iter_batched(

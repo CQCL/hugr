@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.1) (2025-08-18)
+
+
+### Features
+
+* Add option to render a subgraph of a hugr. ([#2497](https://github.com/CQCL/hugr/issues/2497)) ([c3370fe](https://github.com/CQCL/hugr/commit/c3370fef70918ba30b0a7aeacd7737739f15b96e))
+* **py:** implement `Sequence` protocol for qsys results/shots ([#2524](https://github.com/CQCL/hugr/issues/2524)) ([b42e9df](https://github.com/CQCL/hugr/commit/b42e9dfebda0a6283bcad5cf51c16612a5487a54))
+* Type of constants in `core` `Term`s. ([#2411](https://github.com/CQCL/hugr/issues/2411)) ([2ba5764](https://github.com/CQCL/hugr/commit/2ba576495195be8c73d68dd4feb73fcc74719118))
+
 ## [0.13.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0rc1...hugr-py-v0.13.0) (2025-07-29)
 
 
