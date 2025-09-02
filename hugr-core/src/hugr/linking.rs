@@ -115,7 +115,7 @@ impl<T: HugrMut> HugrLinking for T {}
 /// `SN` is the type of nodes in the source (inserted) Hugr; `TN` similarly for the target Hugr.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
 #[non_exhaustive]
-pub enum NodeLinkingError<SN: Display, TN: Display> {
+pub enum NodeLinkingError<SN: Display = Node, TN: Display = Node> {
     /// Inserting the whole Hugr, yet also asked to insert some of its children
     /// (so the inserted Hugr's entrypoint was its module-root).
     #[error(
