@@ -65,11 +65,11 @@ pub(crate) use hidden::CommitData;
 ///
 /// A [`CommitStateSpace`] always has a unique base commit (the root of the
 /// graph). All other commits are [`PersistentReplacement`]s that apply on top
-/// of it. Commits are stored as [`RelRc`]s: they are reference-counted pointers
-/// to the patch data that also maintain strong references to the commit's
-/// parents. This means that commits can be cloned cheaply and dropped freely;
-/// the memory of a commit will be released whenever no other commit in scope
-/// depends on it.
+/// of it. Commits are stored as [`relrc::RelRc`]s: they are reference-counted
+/// pointers to the patch data that also maintain strong references to the
+/// commit's parents. This means that commits can be cloned cheaply and dropped
+/// freely; the memory of a commit will be released whenever no other commit in
+/// scope depends on it.
 ///
 /// Note that a [`CommitStateSpace`] only keeps weak references to commits, so
 /// it is invalid to keep commit IDs beyond the lifetime of the commit. IDs will

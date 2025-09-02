@@ -25,7 +25,7 @@ mod boundary;
 /// A single unit of change in a [`PersistentHugr`].
 ///
 /// Invariant: there is always a unique root commit (i.e. a commit with variant
-/// [`CommitData::Base`]) in the ancestors of a commit.
+/// `CommitData::Base`) in the ancestors of a commit.
 ///
 /// The data within a commit is a patch, representing a rewrite that can be
 /// performed on the Hugr defined by the ancestors of the commit. Currently,
@@ -41,9 +41,9 @@ mod boundary;
 /// ```ignore
 /// PersistentHugr -> CommitStateSpace -> Commit
 /// ```
-/// where `->` can be read as "is outlived by" (or "maintains a strong reference
-/// to"). Note that the dependencies are NOT valid in the other direction: a
-/// [`Commit`] only maintains a weak reference to its [`CommitStateSpace`].
+/// where `->` can be read as "is outlived by". Note that the dependencies are
+/// NOT valid in the other direction: a [`Commit`] only maintains a weak
+/// reference to its [`CommitStateSpace`].
 ///
 /// When a [`CommitStateSpace`] goes out of scope, all its commit become
 /// invalid. The implementation uses lifetimes to ensure at compile time that
