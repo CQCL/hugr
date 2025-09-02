@@ -669,16 +669,17 @@ impl HugrMut for Hugr {
 fn insert_forest_internal<H: HugrView>(
     hugr: &mut Hugr,
     other: &H,
-    other_nodes: impl Iterator<Item = H::Node> + Clone,
+    other_nodes: impl Iterator<Item = H::Node>,
     root_parents: impl Iterator<Item = (H::Node, Node)>,
 ) -> InsertForestResult<H::Node, Node> {
+    let reroot: HashMap<_, _> = root_parents.collect();
     let new_node_count_hint = other_nodes.size_hint().1.unwrap_or_default();
 
     // Insert the nodes from the other graph into this one.
     let mut node_map = HashMap::with_capacity(new_node_count_hint);
     hugr.reserve(new_node_count_hint, 0);
 
-    for old in other_nodes.clone() {
+    for old in other_nodes {
         // We use a dummy optype here. The callers take care of updating the
         // correct optype, avoiding cloning if possible.
         let op = OpType::default();
@@ -688,6 +689,16 @@ fn insert_forest_internal<H: HugrView>(
         }
 
         hugr.set_num_ports(new, other.num_inputs(old), other.num_outputs(old));
+
+        let new_parent = if let Some(new_parent) = reroot.get(&old) {
+            *new_parent
+        } else {
+            let old_parent = other.get_parent(old).unwrap();
+            *node_map
+                .get(&old_parent)
+                .expect("Child node came before parent in `other_nodes` iterator")
+        };
+        hugr.set_parent(new, new_parent);
 
         // Reconnect the edges to the new node.
         for tgt in other.node_inputs(old) {
@@ -708,17 +719,6 @@ fn insert_forest_internal<H: HugrView>(
                 };
                 hugr.connect(new, src, neigh, tgt);
             }
-        }
-    }
-    for (r, p) in root_parents {
-        hugr.set_parent(node_map[&r], p);
-    }
-    for old in other_nodes {
-        let new = node_map[&old];
-        if hugr.get_parent(new).is_none() {
-            let old_parent = other.get_parent(old).unwrap();
-            let new_parent = node_map[&old_parent];
-            hugr.set_parent(new, new_parent);
         }
     }
     Ok(InsertedForest { node_map })
