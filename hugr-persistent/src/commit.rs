@@ -24,17 +24,36 @@ mod boundary;
 
 /// A single unit of change in a [`PersistentHugr`].
 ///
-/// A commit remains valid as long as either a [`PersistentHugr`] or a
-/// [`CommitStateSpace`] containing it is alive. The implementation uses
-/// lifetimes in the public API to ensure at compile time that the commit is
-/// valid throughout its lifetime.
-///
 /// Invariant: there is always a unique root commit (i.e. a commit with variant
 /// [`CommitData::Base`]) in the ancestors of a commit.
 ///
 /// The data within a commit is a patch, representing a rewrite that can be
 /// performed on the Hugr defined by the ancestors of the commit. Currently,
 /// patches must be [`SimpleReplacement`]s.
+///
+/// # Lifetime of commits
+///
+/// A commit remains valid as long as the [`CommitStateSpace`] containing it is
+/// alive. Note that it is also sufficient that a [`PersistentHugr`] containing
+/// the commit is alive, given that the [`CommitStateSpace`] is guaranteed to
+/// be alive as long as any of its contained [`PersistentHugr`]s. In other
+/// words, the lifetime dependency is:
+/// ```ignore
+/// PersistentHugr -> CommitStateSpace -> Commit
+/// ```
+/// where `->` can be read as "is outlived by" (or "maintains a strong reference
+/// to"). Note that the dependencies are NOT valid in the other direction: a
+/// [`Commit`] only maintains a weak reference to its [`CommitStateSpace`].
+///
+/// When a [`CommitStateSpace`] goes out of scope, all its commit become
+/// invalid. The implementation uses lifetimes to ensure at compile time that
+/// the commit is valid throughout its lifetime. All constructors of [`Commit`]
+/// thus expect a reference to the state space that the commit should be added
+/// to, which fixes the lifetime of the commit.
+///
+/// Methods that directly modify the lifetime are marked as `unsafe`. It is up
+/// to the user to ensure that the commit is valid throughout its updated
+/// lifetime.
 ///
 /// [`PersistentHugr`]: crate::PersistentHugr
 /// [`SimpleReplacement`]: hugr_core::SimpleReplacement
