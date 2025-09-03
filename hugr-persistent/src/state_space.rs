@@ -177,6 +177,14 @@ impl CommitStateSpace {
         self.registry.clone()
     }
 
+    /// Get all commits in the state space as a vector.
+    pub fn all_commits(&self) -> Vec<(CommitId, Commit<'_>)> {
+        self.borrow()
+            .iter()
+            .map(|(id, rc)| (id, unsafe { Commit::from_relrc(rc) }))
+            .collect()
+    }
+
     /// Create a new [`PersistentHugr`] in this state space, consisting of
     /// `commits` and their ancestors.
     ///
@@ -200,6 +208,8 @@ impl CommitStateSpace {
     }
 
     /// Get the (unique) base commit of the state space.
+    ///
+    /// Return `None` if `self` is empty.
     pub(crate) fn base_commit<'a>(&'a self) -> Option<Commit<'a>> {
         // get any commit
         let (_, relrc) = self.borrow().iter().next()?;

@@ -45,7 +45,7 @@ mod boundary;
 /// NOT valid in the other direction: a [`Commit`] only maintains a weak
 /// reference to its [`CommitStateSpace`].
 ///
-/// When a [`CommitStateSpace`] goes out of scope, all its commit become
+/// When a [`CommitStateSpace`] goes out of scope, all its commits become
 /// invalid. The implementation uses lifetimes to ensure at compile time that
 /// the commit is valid throughout its lifetime. All constructors of [`Commit`]
 /// thus expect a reference to the state space that the commit should be added
@@ -176,11 +176,8 @@ impl<'a> Commit<'a> {
             .map(|cm: &Commit| unsafe { upgrade_lifetime(cm) })
     }
 
-    /// Get all commits that have `self` as parent.
-    pub(crate) fn children(
-        &self,
-        _state_space: &'a CommitStateSpace,
-    ) -> impl Iterator<Item = Self> + '_ {
+    /// Get all commits that have `self` as parent in `state_space`.
+    pub fn children(&self, _state_space: &'a CommitStateSpace) -> impl Iterator<Item = Self> + '_ {
         self.as_relrc()
             .all_children()
             // SAFETY: the children will be alive as long as the state space
