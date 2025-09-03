@@ -53,32 +53,32 @@ pub struct ImportError {
 }
 
 const UNSUPPORTED_HINT: &str = concat!(
-    "Hint: The import process encountered a `hugr-model` feature",
-    "that is currently unsupported in `hugr-core`.",
-    "As `hugr-core` evolves towards the same expressivity as `hugr-model`",
+    "Hint: The import process encountered a `hugr-model` feature ",
+    "that is currently unsupported in `hugr-core`. ",
+    "As `hugr-core` evolves towards the same expressivity as `hugr-model` ",
     "we expect that errors of this kind will be removed.",
 );
 
 const UNINFERRED_HINT: &str = concat!(
-    "Hint: The import process encountered implicit information in the `hugr-model`",
-    "package that it can not yet fill in.",
-    "Such implicit information can be signatures for nodes and regions,",
-    "wildcard terms or symbol applications with fewer arguments than the symbol has parameters.",
-    "Until more comprehensive inference is implemented, `hugr-model` packages will need to be very explicit.",
+    "Hint: The import process encountered implicit information in the `hugr-model` ",
+    "package that it can not yet fill in. ",
+    "Such implicit information can be signatures for nodes and regions, ",
+    "wildcard terms or symbol applications with fewer arguments than the symbol has parameters. ",
+    "Until more comprehensive inference is implemented, `hugr-model` packages will need to be very explicit. ",
     "To avoid this error, make sure to include as much information as possible when generating packages."
 );
 
 /// Error hint explaining the concept of a closed tuple.
 const CLOSED_TUPLE_HINT: &str = concat!(
-    "Hint: A tuple is closed if all of its items are known.",
-    "Closed tuples can contain spliced subtuples, as long as they can be recursively flattened",
+    "Hint: A tuple is closed if all of its items are known. ",
+    "Closed tuples can contain spliced subtuples, as long as they can be recursively flattened ",
     "into a tuple that only contains individual items."
 );
 
 /// Error hint explaining the concept of a closed list.
 const CLOSED_LIST_HINT: &str = concat!(
-    "Hint: A list is closed if all of its items are known.",
-    "Closed lists can contain spliced sublists, as long as they can be recursively flattened",
+    "Hint: A list is closed if all of its items are known. ",
+    "Closed lists can contain spliced sublists, as long as they can be recursively flattened ",
     "into a list that only contains individual items."
 );
 
@@ -450,7 +450,7 @@ impl<'a> Context<'a> {
                 _ => {
                     return Err(error_unsupported!(
                         concat!(
-                            "Link {:?} would require a hyperedge because it connects more",
+                            "Link {:?} would require a hyperedge because it connects more ",
                             "than one input port with more than one output port."
                         ),
                         link_id
@@ -533,7 +533,7 @@ impl<'a> Context<'a> {
             table::Operation::Invalid => {
                 return Err(error_invalid!(concat!(
                     "Tried to import an `invalid` operation.\n",
-                    "The `invalid` operation in `hugr-model` is a placeholder indicating a missing operation.",
+                    "The `invalid` operation in `hugr-model` is a placeholder indicating a missing operation. ",
                     "It currently has no equivalent in `hugr-core`."
                 )));
             }
@@ -1253,7 +1253,7 @@ impl<'a> Context<'a> {
                     return Err(error_unsupported!(
                         concat!(
                             "`{}` does not yet support passing a variable as the tag.\n",
-                            "The `hugr-core` builtin `Tag` operation expects a concrete value for the tag.",
+                            "The `hugr-core` builtin `Tag` operation expects a concrete value for the tag. ",
                             "Therefore we must insist on a tag given as a natural number literal on import.",
                         ),
                         model::CORE_MAKE_ADT
@@ -1378,8 +1378,8 @@ impl<'a> Context<'a> {
                     return Err(error_unsupported!(
                         concat!(
                             "Constraints other than `{}` can not yet be imported.\n",
-                            "`hugr-core` does not have support for arbitrary constraints yet,",
-                            "instead relying on operation-specific Rust code to compute and",
+                            "`hugr-core` does not have support for arbitrary constraints yet, ",
+                            "instead relying on operation-specific Rust code to compute and ",
                             "validate signatures of custom operations."
                         ),
                         model::CORE_NON_LINEAR
@@ -1973,7 +1973,7 @@ impl<'a> Context<'a> {
             table::Term::Wildcard => Err(error_uninferred!("wildcard")),
             table::Term::Var(_) => Err(error_unsupported!(concat!(
                 "Constant value containing a variable.\n",
-                "The constant system in `hugr-core` is not set up yet to support",
+                "The constant system in `hugr-core` is not set up yet to support ",
                 "constants that depend on variables.",
             ))),
 
@@ -1982,8 +1982,8 @@ impl<'a> Context<'a> {
                 Err(error_unsupported!(
                     concat!(
                         "Unknown custom constant constructor `{}`.\n",
-                        "Importing constants from `hugr-model` to `hugr-core` currently only supports a small",
-                        "and hard-coded list of constant constructors. To support JSON encoded constants",
+                        "Importing constants from `hugr-model` to `hugr-core` currently only supports a small ",
+                        "and hard-coded list of constant constructors. To support JSON encoded constants ",
                         "use the constant constructor `{}`."
                     ),
                     symbol_name,
