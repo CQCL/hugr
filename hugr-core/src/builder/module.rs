@@ -228,7 +228,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// `children` contains a map from the children of `other` to insert,
     /// to how they should be combined with the nodes in `self`. Note if
     /// this map is empty, nothing is added.
-    pub fn add_hugr_link_nodes(
+    pub fn link_hugr_by_node(
         &mut self,
         other: Hugr,
         children: NodeLinkingDirectives<Node, Node>,
@@ -242,7 +242,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
     /// `children` contains a map from the children of `other` to copy,
     /// to how they should be combined with the nodes in `self`. Note if
     /// this map is empty, nothing is added.
-    pub fn add_view_link_nodes<H: HugrView>(
+    pub fn link_view_by_node<H: HugrView>(
         &mut self,
         other: &H,
         children: NodeLinkingDirectives<H::Node, Node>,
@@ -321,11 +321,11 @@ mod test {
     }
 
     #[test]
-    fn add_link_nodes() {
+    fn link_by_node() {
         let mut mb = ModuleBuilder::new();
         let (dfg, defn, decl) = dfg_calling_defn_decl();
         let added = mb
-            .add_view_link_nodes(
+            .link_view_by_node(
                 &dfg,
                 HashMap::from([
                     (defn.node(), NodeLinkingDirective::add()),
@@ -347,7 +347,7 @@ mod test {
             dfg.get_optype(main).as_func_defn().unwrap().func_name(),
             "main"
         );
-        mb.add_hugr_link_nodes(
+        mb.link_hugr_by_node(
             dfg,
             HashMap::from([
                 (main, NodeLinkingDirective::add()),
