@@ -79,6 +79,12 @@ class RenderConfig:
     palette: Palette = field(default_factory=lambda: PALETTE["default"])
     #: If true prepend extension name to operation name.
     qualify_op_name: bool = False
+    #: If true display node metadata.
+    display_metadata: bool = True
+    #: If true display node numbering.
+    display_node_id: bool = False
+    #: If true display full type name on the edges.
+    display_link_label: bool = True
 
 
 class DotRenderer:
@@ -234,7 +240,7 @@ class DotRenderer:
     def _viz_node(self, node: Node, hugr: Hugr, graph: Digraph) -> None:
         """Render a (possibly nested) node to a graphviz graph."""
         meta = hugr[node].metadata
-        if len(meta) > 0:
+        if len(meta) > 0 and self.config.display_metadata:
             data = "<BR/><BR/>" + "<BR/>".join(
                 html.escape(key) + ": " + html.escape(str(value))
                 for key, value in meta.items()
@@ -258,11 +264,15 @@ class DotRenderer:
             op_name = op.op_def().name
         else:
             op_name = op.name()
+
         op_name = html.escape(op_name)
+        node_label = (
+            f"{op_name} <BR/>({node.idx}) " if self.config.display_node_id else op_name
+        )
 
         label_config = {
             "node_back_color": self.config.palette.node,
-            "node_label": op_name,
+            "node_label": node_label,
             "node_data": data,
             "inputs_row": inputs_row,
             "outputs_row": outputs_row,
@@ -310,7 +320,10 @@ class DotRenderer:
         label = ""
         match kind:
             case ValueKind(ty):
-                label = html.escape(str(ty))
+                if self.config.display_link_label:
+                    # TODO: Figure out why some nested types result in all type fields
+                    # being printed instead of just the `__str__` representation.
+                    label = html.escape(str(ty))
                 color = self.config.palette.edge
             case OrderKind():
                 color = self.config.palette.dark
