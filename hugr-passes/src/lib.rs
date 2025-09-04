@@ -1,6 +1,7 @@
 //! Compilation passes acting on the HUGR program representation.
 
-pub mod call_graph;
+#[deprecated(note = "Re-exported from hugr-core", since = "0.22.3")]
+pub use hugr_core::call_graph;
 pub mod composable;
 pub use composable::ComposablePass;
 pub mod const_fold;
