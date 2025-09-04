@@ -16,7 +16,7 @@ use crate::{
 /// module-children already in the target Hugr; static edges from the replaced node,
 /// are transferred to come from the replacing node, and the replaced node(/subtree) then deleted.
 pub trait HugrLinking: HugrMut {
-    /// Copy nodes from another Hugr into this one, with linking directives specified by Node.
+    /// Copy and link nodes from another Hugr into this one, with linking specified by Node.
     ///
     /// If `parent` is non-None, then `other`'s entrypoint-subtree is copied under it.
     /// `children` of the Module root of `other` may also be inserted with their
@@ -33,7 +33,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// If `parent` is `Some` but not in the graph.
     #[allow(clippy::type_complexity)]
-    fn add_view_link_nodes<H: HugrView>(
+    fn insert_link_view_by_node<H: HugrView>(
         &mut self,
         parent: Option<Self::Node>,
         other: &H,
@@ -62,7 +62,7 @@ pub trait HugrLinking: HugrMut {
         Ok(inserted)
     }
 
-    /// Insert another Hugr into this one, with linking directives specified by Node.
+    /// Insert and link another Hugr into this one, with linking specified by Node.
     ///
     /// If `parent` is non-None, then `other`'s entrypoint-subtree is placed under it.
     /// `children` of the Module root of `other` may also be inserted with their
@@ -77,7 +77,7 @@ pub trait HugrLinking: HugrMut {
     /// # Panics
     ///
     /// If `parent` is not in this graph.
-    fn add_hugr_link_nodes(
+    fn insert_link_hugr_by_node(
         &mut self,
         parent: Option<Self::Node>,
         mut other: Hugr,
@@ -317,12 +317,12 @@ mod test {
             );
 
             let mut h = simple_dfg_hugr();
-            h.add_view_link_nodes(Some(h.entrypoint()), &insert, mod_children.clone())
+            h.insert_link_view_by_node(Some(h.entrypoint()), &insert, mod_children.clone())
                 .unwrap();
             check_calls_defn_decl(&h, call1, call2);
 
             let mut h = simple_dfg_hugr();
-            h.add_hugr_link_nodes(Some(h.entrypoint()), insert, mod_children)
+            h.insert_link_hugr_by_node(Some(h.entrypoint()), insert, mod_children)
                 .unwrap();
             check_calls_defn_decl(&h, call1, call2);
         }
@@ -348,7 +348,7 @@ mod test {
                 replace: vec![defn.node(), decl.node()],
             },
         )]);
-        host.add_hugr_link_nodes(None, insert, dirvs).unwrap();
+        host.insert_link_hugr_by_node(None, insert, dirvs).unwrap();
         host.validate().unwrap();
         assert_eq!(
             host.children(host.module_root())
@@ -366,7 +366,7 @@ mod test {
         let (h, node_map) = {
             let mut h = simple_dfg_hugr();
             let res = h
-                .add_view_link_nodes(Some(h.entrypoint()), &insert, chmap.clone())
+                .insert_link_view_by_node(Some(h.entrypoint()), &insert, chmap.clone())
                 .unwrap();
             (h, res.node_map)
         };
@@ -386,7 +386,7 @@ mod test {
             ] {
                 chmap.insert(defn.node(), defn_mode.clone());
                 let mut h = h.clone();
-                h.add_hugr_link_nodes(Some(h.entrypoint()), insert.clone(), chmap.clone())
+                h.insert_link_hugr_by_node(Some(h.entrypoint()), insert.clone(), chmap.clone())
                     .unwrap();
                 h.validate().unwrap();
                 if defn_mode != NodeLinkingDirective::add() {
@@ -420,7 +420,7 @@ mod test {
         let (defn, decl) = (defn.node(), decl.node());
 
         let epp = insert.get_parent(insert.entrypoint()).unwrap();
-        let r = h.add_view_link_nodes(
+        let r = h.insert_link_view_by_node(
             Some(h.entrypoint()),
             &insert,
             HashMap::from([(epp, NodeLinkingDirective::add())]),
@@ -432,7 +432,7 @@ mod test {
         assert_eq!(h, backup);
 
         let [inp, _] = insert.get_io(defn).unwrap();
-        let r = h.add_view_link_nodes(
+        let r = h.insert_link_view_by_node(
             Some(h.entrypoint()),
             &insert,
             HashMap::from([(inp, NodeLinkingDirective::add())]),
@@ -442,7 +442,7 @@ mod test {
 
         let mut insert = insert;
         insert.set_entrypoint(defn);
-        let r = h.add_view_link_nodes(
+        let r = h.insert_link_view_by_node(
             Some(h.module_root()),
             &insert,
             HashMap::from([(
@@ -457,7 +457,7 @@ mod test {
         assert_eq!(h, backup);
 
         insert.set_entrypoint(insert.module_root());
-        let r = h.add_hugr_link_nodes(
+        let r = h.insert_link_hugr_by_node(
             Some(h.module_root()),
             insert,
             HashMap::from([(decl, NodeLinkingDirective::add())]),
@@ -473,7 +473,7 @@ mod test {
             .signature()
             .clone();
         let tmp = h.add_node_with_parent(h.module_root(), FuncDecl::new("replaced", sig));
-        let r = h.add_hugr_link_nodes(
+        let r = h.insert_link_hugr_by_node(
             Some(h.entrypoint()),
             insert,
             HashMap::from([
@@ -499,7 +499,7 @@ mod test {
 
         let (insert, defn, decl) = dfg_calling_defn_decl();
         let node_map = h
-            .add_hugr_link_nodes(
+            .insert_link_hugr_by_node(
                 Some(h.entrypoint()),
                 insert,
                 HashMap::from([

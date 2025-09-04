@@ -233,7 +233,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         other: Hugr,
         children: NodeLinkingDirectives<Node, Node>,
     ) -> Result<InsertedForest, NodeLinkingError> {
-        self.hugr_mut().add_hugr_link_nodes(None, other, children)
+        self.hugr_mut()
+            .insert_link_hugr_by_node(None, other, children)
     }
 
     /// Copies module-children from a HugrView to this module, with
@@ -247,7 +248,8 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         other: &H,
         children: NodeLinkingDirectives<H::Node, Node>,
     ) -> Result<InsertedForest<H::Node>, NodeLinkingError<H::Node>> {
-        self.hugr_mut().add_view_link_nodes(None, other, children)
+        self.hugr_mut()
+            .insert_link_view_by_node(None, other, children)
     }
 }
 
