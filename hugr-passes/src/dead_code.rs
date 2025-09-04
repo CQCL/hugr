@@ -1,6 +1,6 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
-use hugr_core::hugr::internal::HugrInternals;
+use hugr_core::hugr::internal::NodeType;
 use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
 use std::convert::Infallible;
 use std::fmt::{Debug, Formatter};
@@ -52,7 +52,7 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
 
 /// Callback that identifies nodes that must be preserved even if their
 /// results are not used. For example, (the default) [`PreserveNode::default_for`].
-pub type PreserveCallback<H> = dyn Fn(&H, <H as HugrInternals>::Node) -> PreserveNode;
+pub type PreserveCallback<H> = dyn Fn(&H, <H as NodeType>::Node) -> PreserveNode;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 /// Signal that a node must be preserved even when its result is not used

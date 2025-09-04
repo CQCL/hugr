@@ -7,7 +7,7 @@ use hugr_core::{
     extension::ExtensionRegistry,
     hugr::{
         self, Patch, SimpleReplacementError,
-        internal::HugrInternals,
+        internal::{HugrInternals, NodeType},
         views::{
             ExtractionResult,
             render::{self, MermaidFormatter, NodeLabel},
@@ -37,13 +37,15 @@ impl Patch<PersistentHugr> for PersistentReplacement {
     }
 }
 
+impl<R> NodeType for PersistentHugr<R> {
+    type Node = PatchNode;
+}
+
 impl<R> HugrInternals for PersistentHugr<R> {
     type RegionPortgraph<'p>
         = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
-
-    type Node = PatchNode;
 
     type RegionPortgraphNodes = HashMap<PatchNode, Node>;
 

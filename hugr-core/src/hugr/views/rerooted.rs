@@ -1,7 +1,7 @@
 //! A HUGR wrapper with a modified entrypoint node, returned by
 //! [`HugrView::with_entrypoint`] and [`HugrMut::with_entrypoint_mut`].
 
-use crate::hugr::internal::{HugrInternals, HugrMutInternals};
+use crate::hugr::internal::{HugrInternals, HugrMutInternals, NodeType};
 use crate::hugr::{HugrMut, hugrmut::InsertForestResult};
 
 use super::{HugrView, panic_invalid_node};
@@ -35,13 +35,15 @@ impl<H: HugrView> Rerooted<H> {
     }
 }
 
+impl<H: HugrView> NodeType for Rerooted<H> {
+    type Node = H::Node;
+}
+
 impl<H: HugrView> HugrInternals for Rerooted<H> {
     type RegionPortgraph<'p>
         = H::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = H::Node;
 
     type RegionPortgraphNodes = H::RegionPortgraphNodes;
 

@@ -3,7 +3,7 @@
 use std::{borrow::Cow, rc::Rc, sync::Arc};
 
 use super::HugrView;
-use crate::hugr::internal::{HugrInternals, HugrMutInternals};
+use crate::hugr::internal::{HugrInternals, HugrMutInternals, NodeType};
 use crate::hugr::{HugrMut, hugrmut::InsertForestResult};
 
 macro_rules! hugr_internal_methods {
@@ -125,13 +125,14 @@ macro_rules! hugr_mut_methods {
 pub(crate) use hugr_mut_methods;
 
 // -------- Immutable borrow
+impl<T: HugrView> NodeType for &T {
+    type Node = T::Node;
+}
 impl<T: HugrView> HugrInternals for &T {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
@@ -142,13 +143,14 @@ impl<T: HugrView> HugrView for &T {
 }
 
 // -------- Mutable borrow
+impl<T: HugrView> NodeType for &mut T {
+    type Node = T::Node;
+}
 impl<T: HugrView> HugrInternals for &mut T {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
@@ -165,13 +167,14 @@ impl<T: HugrMut> HugrMut for &mut T {
 }
 
 // -------- Rc
+impl<T: HugrView> NodeType for Rc<T> {
+    type Node = T::Node;
+}
 impl<T: HugrView> HugrInternals for Rc<T> {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
@@ -182,13 +185,14 @@ impl<T: HugrView> HugrView for Rc<T> {
 }
 
 // -------- Arc
+impl<T: HugrView> NodeType for Arc<T> {
+    type Node = T::Node;
+}
 impl<T: HugrView> HugrInternals for Arc<T> {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
@@ -199,13 +203,14 @@ impl<T: HugrView> HugrView for Arc<T> {
 }
 
 // -------- Box
+impl<T: HugrView> NodeType for Box<T> {
+    type Node = T::Node;
+}
 impl<T: HugrView> HugrInternals for Box<T> {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
@@ -222,13 +227,14 @@ impl<T: HugrMut> HugrMut for Box<T> {
 }
 
 // -------- Cow
+impl<T: HugrView + ToOwned> NodeType for Cow<'_, T> {
+    type Node = T::Node;
+}
 impl<T: HugrView + ToOwned> HugrInternals for Cow<'_, T> {
     type RegionPortgraph<'p>
         = T::RegionPortgraph<'p>
     where
         Self: 'p;
-
-    type Node = T::Node;
 
     type RegionPortgraphNodes = T::RegionPortgraphNodes;
 
