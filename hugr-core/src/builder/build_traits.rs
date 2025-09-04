@@ -256,7 +256,7 @@ pub trait Dataflow: Container {
     /// `input_wires` to the incoming ports of the resulting root node. `defns` may
     /// contain other children of the module root of `hugr`, which will be added to
     /// the module root being built.
-    fn add_hugr_with_wires_link_nodes(
+    fn add_link_hugr_by_node_with_wires(
         &mut self,
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
@@ -292,7 +292,7 @@ pub trait Dataflow: Container {
     /// Copy a Hugr, adding its entrypoint into the sibling graph and wiring up the
     /// `input_wires` to the incoming ports. `defns` may contain other children of
     /// the module root of `hugr`, which will be added to the module root being built.
-    fn add_view_with_wires_link_nodes<H: HugrView>(
+    fn add_link_view_by_node_with_wires<H: HugrView>(
         &mut self,
         hugr: &H,
         input_wires: impl IntoIterator<Item = Wire>,
