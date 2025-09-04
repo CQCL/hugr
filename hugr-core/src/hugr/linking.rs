@@ -109,8 +109,8 @@ pub trait HugrLinking: HugrMut {
 
 impl<T: HugrMut> HugrLinking for T {}
 
-/// An error resulting from an [NodeLinkingDirective] passed to [HugrLinking::add_hugr_link_nodes]
-/// or [HugrLinking::add_view_link_nodes].
+/// An error resulting from an [NodeLinkingDirective] passed to [HugrLinking::insert_link_hugr_by_node]
+/// or [HugrLinking::insert_link_view_by_node].
 ///
 /// `SN` is the type of nodes in the source (inserted) Hugr; `TN` similarly for the target Hugr.
 #[derive(Clone, Debug, PartialEq, thiserror::Error)]
@@ -187,7 +187,7 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Details, node-by-node, how module-children of a source Hugr should be inserted into a
 /// target Hugr.
 ///
-/// For use with [HugrLinking::add_hugr_link_nodes] and [HugrLinking::add_view_link_nodes].
+/// For use with [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
 /// Invariant: no SourceNode can be in both maps (by type of [NodeLinkingDirective])
