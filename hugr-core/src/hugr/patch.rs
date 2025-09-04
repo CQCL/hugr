@@ -13,6 +13,7 @@ pub mod simple_replace;
 
 use crate::HugrView;
 use crate::core::HugrNode;
+use crate::hugr::internal::NodeType;
 use itertools::Itertools;
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
@@ -68,7 +69,7 @@ pub trait PatchVerification {
 ///
 /// For patches that work on any `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
 /// will automatically implement this trait.
-pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
+pub trait Patch<H: NodeType>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 

@@ -15,21 +15,27 @@ use super::views::{panic_invalid_node, panic_invalid_non_entrypoint};
 use super::{NodeMetadataMap, OpType};
 use crate::ops::handle::NodeHandle;
 
+/// Base trait specifying the node type associated with Hugr implementations.
+///
+/// Base trait of [`HugrInternals`], and thus by transitivity of [`HugrView`],
+/// [`HugrMut`](crate::hugr::HugrMut) etc.
+pub trait NodeType {
+    /// The type of nodes in the Hugr.
+    type Node: HugrNode;
+}
+
 /// Trait for accessing the internals of a Hugr(View).
 ///
 /// Specifically, this trait provides access to the underlying portgraph
 /// view.
-pub trait HugrInternals {
+pub trait HugrInternals: NodeType {
     /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
     type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq, PortOffsetBase = u32> + Clone + 'p
     where
         Self: 'p;
 
-    /// The type of nodes in the Hugr.
-    type Node: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash;
-
-    /// A mapping between HUGR nodes and portgraph nodes in the graph returned by
-    /// [`HugrInternals::region_portgraph`].
+    /// A mapping between HUGR nodes and portgraph nodes in the graph returned
+    /// by [`HugrInternals::region_portgraph`].
     type RegionPortgraphNodes: PortgraphNodeMap<Self::Node>;
 
     /// Returns a flat portgraph view of a region in the HUGR, and a mapping between
@@ -107,13 +113,15 @@ impl<N: HugrNode> PortgraphNodeMap<N> for std::collections::HashMap<N, Node> {
     }
 }
 
+impl NodeType for Hugr {
+    type Node = Node;
+}
+
 impl HugrInternals for Hugr {
     type RegionPortgraph<'p>
         = &'p MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
-
-    type Node = Node;
 
     type RegionPortgraphNodes = DefaultPGNodeMap;
 

@@ -5,7 +5,7 @@ use hugr_core::{
     extension::ExtensionRegistry,
     hugr::{
         self,
-        internal::HugrInternals,
+        internal::{HugrInternals, NodeType},
         views::{ExtractionResult, render},
     },
     ops::OpType,
@@ -35,13 +35,15 @@ impl<'a> ParentsView<'a> {
     }
 }
 
+impl NodeType for ParentsView<'_> {
+    type Node = PatchNode;
+}
+
 impl HugrInternals for ParentsView<'_> {
     type RegionPortgraph<'p>
         = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
-
-    type Node = PatchNode;
 
     type RegionPortgraphNodes = HashMap<PatchNode, Node>;
 
