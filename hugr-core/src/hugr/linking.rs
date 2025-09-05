@@ -350,16 +350,16 @@ impl NameLinkingPolicy {
 
     /// Specifies how to behave when both target and inserted Hugr have a
     /// [Public] function with the same name but different signatures.
-    /// 
+    ///
     /// [Public]: crate::Visibility::Public
-    pub fn on_signature_conflict(&mut self, s: NewFuncHandling) {
-        self.sig_conflict = s;
+    pub fn on_signature_conflict(&mut self) -> &mut NewFuncHandling {
+        &mut self.sig_conflict
     }
 
     /// Specifies how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
-    pub fn on_multiple_impls(&mut self, mih: MultipleImplHandling) {
-        self.multi_impls = mih;
+    pub fn on_multiple_impls(&mut self) -> &mut MultipleImplHandling {
+        &mut self.multi_impls
     }
 
     /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
@@ -991,7 +991,7 @@ mod test {
             })
         );
 
-        pol.on_signature_conflict(NewFuncHandling::Add);
+        *pol.on_signature_conflict() = NewFuncHandling::Add;
         let node_map = host.link_module(inserted, &pol).unwrap().node_map;
         assert_eq!(
             host.validate(),
@@ -1023,7 +1023,7 @@ mod test {
         let inserted = build_hugr(11);
 
         let mut pol = NameLinkingPolicy::keep_both_invalid();
-        pol.on_multiple_impls(multi_impls);
+        *pol.on_multiple_impls() = multi_impls;
         let res = host.link_module(inserted, &pol);
         if multi_impls == NewFuncHandling::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
