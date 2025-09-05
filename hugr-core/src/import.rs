@@ -1147,17 +1147,18 @@ impl<'a> Context<'a> {
                     //
                     // This would be necessary to allow functions which take
                     // other functions as static parameters and then call them.
+                    // See #2301.
                     return Err(error_unsupported!(
                         "`{}` does not yet support function variables.",
                         model::CORE_CALL
                     ));
                 }
                 table::Term::Func(_) => {
-                    // TODO: Allow importing and calling anonoymous functions.
+                    // TODO: Allow importing and calling anonymous functions.
                     //
                     // This could be implemented in `hugr-core` by lifting the anonymous function
                     // into a function to be added into the containing module and then calling that
-                    // function.
+                    // function. See #2559.
                     return Err(error_unsupported!(
                         "`{}` does not yet support anonymous functions.",
                         model::CORE_CALL
