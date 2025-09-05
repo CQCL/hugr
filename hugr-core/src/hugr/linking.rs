@@ -282,8 +282,7 @@ pub trait HugrLinking: HugrMut {
         &mut self,
         parent: Self::Node,
         mut other: Hugr,
-        allow_new_names: Option<NewFuncHandling>,
-        allow_new_impls: Option<MultipleImplHandling>,
+        policy: &NameLinkingPolicy
     ) -> Result<InsertedForest<Node, Self::Node>, String> {
         let entrypoint_func = {
             let mut n = other.entrypoint();
@@ -443,11 +442,14 @@ impl<TN> NodeLinkingDirective<TN> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
     // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
+    new_names: NewFuncHandling, // ALAN default to Add for link_module but AddIfReached for insert_link....
     sig_conflict: NewFuncHandling,
     // TODO consider Set of names where to prefer new? Or optional map from name?
     multi_impls: MultipleImplHandling,
     /// Whether to filter private functions down to only those required (reached from public)
     /// false means just to copy all private functions.
+    // ALAN remove this? it's just to preserve behaviour of old link_module that was
+    // (explicitly) never guaranteed in the docs.
     filter_private: bool,
     // TODO Renames to apply to public functions in the inserted Hugr. These take effect
     // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
@@ -465,10 +467,21 @@ pub struct NameLinkingPolicy {
 pub enum NewFuncHandling {
     /// Do not link the Hugrs together; fail with a [NameLinkingError] instead.
     RaiseError,
+    /// If the new function is reachable, then error; otherwise, just skip it.
+    ErrorIfReached,
     /// Add the new function alongside the existing one in the target Hugr,
     /// preserving (separately) uses of both. (The Hugr will be invalid because
     /// of [duplicate names](crate::hugr::ValidationError::DuplicateExport).)
     Add,
+    /// If the new function is reachable, then add it (as per [Self::Add]);
+    /// otherwise, skip it.
+    AddIfReached,
+    /// If the new function is reachable, then add it but make it [Private];
+    /// otherwise, just skip it. (This always avoids making the Hugr invalid.)
+    /// 
+    /// [Private]: crate::Visibility::Private
+    // ALAN note this really is MakePrivateIfReached, but I don't see much point in the other.
+    MakePrivate
 }
 
 /// What to do when both target and inserted Hugr
@@ -590,7 +603,12 @@ impl NameLinkingPolicy {
                 Some(LinkSig::Public { name, is_defn, sig }) => {
                     if let Some((ex_ns, ex_sig)) = existing.get(name) {
                         match *sig_conflict {
-                            _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_impls)?,
+                            _ if sig == *ex_sig => {
+                                match directive(name, n, is_defn, ex_ns, multi_impls)? {
+                                    Some(dirv) => dirv,
+                                    None => continue
+                                }
+                            }
                             NewFuncHandling::RaiseError => {
                                 return Err(NameLinkingError::SignatureConflict {
                                     name: name.clone(),
@@ -630,8 +648,9 @@ fn directive<SN: Display, TN: HugrNode>(
     new_defn: bool,
     ex_ns: &Either<TN, (TN, Vec<TN>)>,
     multi_impls: &MultipleImplHandling,
-) -> Result<NodeLinkingDirective<TN>, NameLinkingError<SN, TN>> {
-    Ok(match (new_defn, ex_ns) {
+    reached: bool
+) -> Result<Option<NodeLinkingDirective<TN>>, NameLinkingError<SN, TN>> {
+    Ok(Some(match (new_defn, ex_ns) {
         (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
         (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
         (true, Either::Right((decl, decls))) => {
@@ -640,16 +659,24 @@ fn directive<SN: Display, TN: HugrNode>(
         (true, &Either::Left(defn)) => match multi_impls {
             MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(defn),
             MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
-            MultipleImplHandling::NewFunc(NewFuncHandling::RaiseError) => {
-                return Err(NameLinkingError::MultipleImpls(
-                    name.to_owned(),
-                    new_n,
-                    defn,
-                ));
-            }
-            MultipleImplHandling::NewFunc(NewFuncHandling::Add) => NodeLinkingDirective::add(),
+            MultipleImplHandling::NewFunc(nf) => {
+                if matches!(nf, NewFuncHandling::ErrorIfReached | NewFuncHandling::AddIfReached) && !reached {
+                    return Ok(None)
+                }
+                match nf {
+                    NewFuncHandling::RaiseError | NewFuncHandling::ErrorIfReached => {
+                        return Err(NameLinkingError::MultipleImpls(
+                            name.to_owned(),
+                            new_n,
+                            defn,
+                        ));
+                    }
+                    NewFuncHandling::Add | NewFuncHandling::AddIfReached => NodeLinkingDirective::add(),
+                    NewFuncHandling::MakePrivate => todo!("ALAN")
+                }
+            },
         },
-    })
+    }))
 }
 
 fn find_reachable<H: HugrView + ?Sized, TN, E>(
