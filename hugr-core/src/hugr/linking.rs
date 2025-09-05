@@ -117,15 +117,12 @@ pub trait HugrLinking: HugrMut {
     ///
     /// # Errors
     ///
-    /// * If [SignatureConflictHandling::ErrorDontInsert] is used and `self` and
-    ///   `other` have public functions with the same name but different signatures
-    ///
-    /// * If [MultipleImplHandling::ErrorDontInsert] is used and both `self`
-    ///   and `other` have public [FuncDefn]s with the same name and signature
+    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_impls]
+    /// are set to [NewFuncHandling::RaiseError], and the respective conflict occurs between
+    /// `self` and `other`.
     ///
     /// [Visibility::Public]: crate::Visibility::Public
     /// [FuncDefn]: crate::ops::FuncDefn
-    /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     fn link_module(
         &mut self,
         other: Hugr,
@@ -146,15 +143,12 @@ pub trait HugrLinking: HugrMut {
     ///
     /// # Errors
     ///
-    /// * If [SignatureConflictHandling::ErrorDontInsert] is used and `self` and
-    ///   `other` have public functions with the same name but different signatures
-    ///
-    /// * If [MultipleImplHandling::ErrorDontInsert] is used and both `self`
-    ///   and `other` have public [FuncDefn]s with the same name and signature
+    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_impls]
+    /// are set to [NewFuncHandling::RaiseError], and the respective conflict occurs between
+    /// `self` and `other`.
     ///
     /// [Visibility::Public]: crate::Visibility::Public
     /// [FuncDefn]: crate::ops::FuncDefn
-    /// [MultipleImplHandling::ErrorDontInsert]: crate::hugr::linking::MultipleImplHandling::ErrorDontInsert
     #[allow(clippy::type_complexity)]
     fn link_module_view<H: HugrView>(
         &mut self,
@@ -250,11 +244,7 @@ impl<TN> NodeLinkingDirective<TN> {
 pub struct NameLinkingPolicy {
     // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
     // copy_private_funcs: bool, // TODO: allow filtering private funcs to only those reachable in callgraph
-    /// How to handle cases where the same (public) name is present in both
-    /// inserted and target Hugr but with different signatures.
     sig_conflict: NewFuncHandling,
-    /// How to handle cases where both target and inserted Hugr have a FuncDefn
-    /// with the same name and signature.
     // TODO consider Set of names where to prefer new? Or optional map from name?
     multi_impls: MultipleImplHandling,
     // TODO Renames to apply to public functions in the inserted Hugr. These take effect
@@ -262,12 +252,11 @@ pub struct NameLinkingPolicy {
     // rename_map: HashMap<String, String>
 }
 
-/// What to do with a function; used
-/// * when both target and inserted Hugr have a [Visibility::Public] function
-///   with the same name but different signatures ([NameLinkingPolicy::on_signature_conflict])
-/// * when both target and inserted Hugr have [Visibility::Public] [FuncDefn]s
-///   with the same name and signatures - in [MultipleImplHandling::HandleFunc]
+/// Specifies what to do with a function in some situation - used in
+/// * [NameLinkingPolicy::on_signature_conflict]
+/// * [MultipleImplHandling::NewFunc]
 ///
+/// [FuncDefn]: crate::ops::FuncDefn
 /// [Visibility::Public]: crate::Visibility::Public
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive] // could consider e.g. disconnections
@@ -337,9 +326,9 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
-    /// Makes a new instance that specifies to
-    /// [raise an error on conflicting signatures](SignatureConflictHandling::ErrorDontInsert),
-    /// and to handle multiple [FuncDefn]s according to `multi_impls`.
+    /// Makes a new instance that specifies to handle
+    /// [signature conflicts](Self::on_signature_conflict) by failing with an error and
+    /// multiple [FuncDefn]s according to `multi_impls`.
     ///
     /// [FuncDefn]: crate::ops::FuncDefn
     pub fn err_on_conflict(multi_impls: impl Into<MultipleImplHandling>) -> Self {
@@ -359,15 +348,16 @@ impl NameLinkingPolicy {
         }
     }
 
-    /// Modifies this instance to handle conflicting signatures in the specified way.
+    /// Specifies how to behave when both target and inserted Hugr have a
+    /// [Public] function with the same name but different signatures.
+    /// 
+    /// [Public]: crate::Visibility::Public
     pub fn on_signature_conflict(&mut self, s: NewFuncHandling) {
         self.sig_conflict = s;
     }
 
-    /// Modifies this instance to handle multiple implementations ([FuncDefn]s) in
-    /// the specified way.
-    ///
-    /// [FuncDefn]: crate::ops::FuncDefn
+    /// Specifies how to behave when both target and inserted Hugr have a
+    /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
     pub fn on_multiple_impls(&mut self, mih: MultipleImplHandling) {
         self.multi_impls = mih;
     }
