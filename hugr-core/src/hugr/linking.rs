@@ -189,6 +189,76 @@ pub trait HugrLinking: HugrMut {
     // * RejectNewNames (i.e. the none here; more aggressive than any existing enum variant)
     // * MakeAllNewNamesPrivate
     // * MakeNewConflictsPrivate (i.e. when name exists but with different sig)
+
+    // there is already SigConfHand::ErrorDontInsert,UseBoth. So...
+    // NoNewNames(skip_unused: bool, make_private_or_error) (also same name but different sig)
+    // NewNames(if new type - skip unused: bool, make_private_or_error_or_invalid)
+
+    // skip_unreachable: bool, // can be new in this PR...no, maybe this is ALWAYS true for insert_link, and NEVER true for link?
+    // new_name: AllowOrHideOrError, // call this ConflictResolution, add this field and the Hide variant in this PR
+    // conflicting_sig: AllowOrHideOrError
+    // 
+    // currently have MultiImplHandling::UseNew, ::UseExisting, ::UseBoth, ::Error
+    // instead: NewImplHandling::ConvertToDecls**, PreferExisting, OverrideExisting, Both(ConflictResolution)
+    // ** doesn't make sense for link_hugr...unless new_name == Allow and that's all we're doing?
+
+    // enum NewMemberHandling {
+    //   Allow // bool skip_unreachable makes sense only for insert_link...but assume true iff insert_link
+    //   MakePrivate {skip_unreachable:bool}
+    //   ErrorDontInsert {skip_unreachable:bool}
+    // }
+
+    // implementation...
+    // * can build "what's there" in each Hugr
+    // * work out minimum FuncDefns to add: start with
+    //   - for link_hugr, consider all public functions (defns and decls)
+    //          if name is new -> bail if new_name==ErrorDontInsert, include if new_name==Allow, **skip if MakePrivate**
+    //          if name exists and sig conflicts, as previous for conflicting_sig
+    //                         and sig is same -> include if at least one is decl or new_impls==OverrideExisting or Both(Allow)
+    //                                            else, both are defns; error if Both(ErrorDontInsert)
+    //                                                                  ** skip if Both(MakePrivate)**
+    //                                                                  if new_impls==PreferExisting, need to record in NodeLinkingDirectives but NOT callgraph-start-points
+    //                                                  (insert_link_xxxx_by_node will mutate Hugr or ignore descendants according to xxxx)
+    //              **skip if**s add rather than skip if skip_(private_)unreachable is false, but it may never be
+    //   - for insert_link, just the entrypoint subtree
+    //  that's probably a mutable NodeLinkingDirectives, but also use to
+    //  walk the callgraph...for any node not in the dirvs
+    //    - check as previous, EXCEPT
+    //.          if name new and new_name==MakePrivate, or sig conflicts and conflicting_sig==MakePrivate, or an impl and Both(MakePrivate)
+    //           then don't skip, add.
+    
+    // So...function from starting points (either all pub funcs or just entrypoint subtree)
+    //    does above conditional skipping on MakePrivate but adding to Dfs otherwise
+    // then walks callgraph, doing above conditional including carrying on through MakePrivates :)
+    // results in NodeLinkingDirectives
+    //
+    // Ah, multiple meanings of skip_unreachable:
+    // * for link_hugr, applies to private functions (if false, include all of those)
+    //                  do we want to allow skipping unreachable new public names??
+    // * for insert_link, applies to all funcs private and public...but, separately?
+    //   Surely we should always skip private unreachable, as otherwise the entrypoint would have to be overridden by UseExisting (!)
+    // - So, could have 'skip_unreachable_new_public' (prob. wants to default to TRUE for insert_link and FALSE for link_hugr)
+    //   `skip_existing_public` would basically be ConvertNewToDecls but we *could* have an extra mode
+    //      where reachable public funcs are OverrideExisting but unreachable are PreferExisting
+    // - And, could have `skip_private` - def. wants to default to TRUE for insert_link, maybe *required* to be TRUE;
+    //    but could be an option for link_hugr OR we could quietly change behaviour.
+    // - Sounds like `skip_unreachable` applies only to new, public, functions
+    // But really this belongs in NewMemberHandling for new_names and conflicting_sig
+    //   --> NewMemberHandling::Allow(skip=true) is fine for insert_link, mildly odd for link_hugr
+    //       (but as long as link_hugr has no ConvertNewToDecls, only mildly odd, not totally pointless)
+    //       NewMemberHandling::Error(skip_unreachable=true) is new behaviour, similarly slightly odd
+    //       (and skip_unreachable=false would be odd for insert_link)
+    //       NewMemberHandling::MakePrivate doesn't need the flag, can be always true?
+    //       Consider Add, AddIfReached, Error, ErrorIfReached, MakePrivate(IfReached)
+    // CallGraph is not needed only if new_names == Add/Error, ConflictingSig==Add/Error, impls=Prefer/Override/Both(Add/Error)
+    // link_hugr with ConvertToDecls...does it make ANY sense?
+    //    new_names == Add, will add decls; AddIfReached==ErrorIfReached==MakePrivate(IfReached)==no-op; Error may error (so check); MakePrivateEvenIfNotReached might add private decls
+    //    conflicting_sig, similarly
+    //    so a lot of no-ops, but not inconsistent/impossible.
+
+    // WHAT ABOUT CALLBACKS RATHER THAN ALL OF THESE ????
+
+
     ///
     /// If `allow_new_impls` is `None`, then any required [`FuncDefn`] in `other` is treated
     ///  as a [`FuncDecl`] (either being linked with a function existing in `self`, or added if
