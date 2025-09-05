@@ -64,6 +64,19 @@
 //!   compatibility mechanism via the `compat.const_json` constant constructor but also allows
 //!   to declare custom constant constructors. Import/export has hard-coded support for a small
 //!   fixed set of these for now.
+//! - In `hugr-core` a constant is a `Value`, included in the hugr graph via a `Const` node.
+//!   A `LoadConst` node connects to the `Const` node via a static edge. `Value`s are separate
+//!   from `Term`s in `hugr-core` and can not refer to local variables or to function nodes.
+//!   In `hugr-model` the `Const` node is not needed: The `core.load_const` operation takes
+//!   the constant's description as a term argument. This enables `hugr-model` constants to
+//!   depend on local variables and to refer to functions in the module (removing the need
+//!   for a separate `LoadFunc` operation).
+//! - `Value`s in `hugr-core` have a single representation for every constant. The encoding
+//!   of constants as terms in `hugr-model` can use different constructors for the same type
+//!   of constant value. This can be useful for large constants by enabling efficient encodings.
+//!   For example, a constant array of integers could have a constructor taking a byte string
+//!   that consists of the integer values, which is significantly more economical than a generic
+//!   representation of arrays that has a term for every element.
 //! - The model does not have types with a copy bound as `hugr-core` does, and instead uses
 //!   a more general form of type constraints ([#1556]). Similarly, the model does not have
 //!   bounded naturals. We perform a conversion for compatibility where possible, but this does
