@@ -90,7 +90,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
