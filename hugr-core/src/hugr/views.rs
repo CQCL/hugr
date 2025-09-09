@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 mod impls;
+mod nodes_iter;
 pub mod petgraph;
 pub mod render;
 mod rerooted;
@@ -16,6 +17,7 @@ use std::collections::HashMap;
 pub use self::petgraph::PetgraphWrapper;
 #[allow(deprecated)]
 use self::render::{MermaidFormatter, RenderConfig};
+pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
