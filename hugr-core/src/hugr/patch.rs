@@ -23,7 +23,7 @@ use super::views::ExtractionResult;
 
 /// Verify that a patch application would succeed.
 // TODO: This trait should be parametrised on `H: NodesIter` to match the
-// generality of [`Patch`].
+// generality of [`Patch`], see https://github.com/CQCL/hugr/issues/2546.
 pub trait PatchVerification {
     /// The type of Error with which this Rewrite may fail
     type Error: std::error::Error;

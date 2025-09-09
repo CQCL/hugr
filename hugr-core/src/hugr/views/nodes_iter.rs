@@ -1,9 +1,6 @@
 use crate::{HugrView, core::HugrNode, hugr::views::SiblingSubgraph};
 
-/// A trait for iterating over nodes within a graph view (Hugr, SiblingSubgraph,
-/// etc).
-///
-/// Iterating over nodes within a graph view (Hugr, SiblingSubgraph, etc).
+/// Iterate over nodes within a graph view (Hugr, SiblingSubgraph, etc).
 pub trait NodesIter {
     /// The type of nodes in the graph.
     type Node;
