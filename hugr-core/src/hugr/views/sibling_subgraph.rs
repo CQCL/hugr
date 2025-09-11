@@ -311,16 +311,34 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &H,
         checker: &TopoConvexChecker<H>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        let nodes: Vec<N> = nodes.into();
+        let mut nodes: Vec<N> = nodes.into();
         let num_nodes = nodes.len();
 
         if nodes.is_empty() {
             return Err(InvalidSubgraph::EmptySubgraph);
         }
 
-        let (inputs, outputs) = get_boundary_from_nodes(hugr, nodes);
-        let subgraph = Self::try_new_with_checker(inputs, outputs, hugr, checker)?;
-        debug_assert_eq!(subgraph.nodes().len(), num_nodes);
+        let (inputs, outputs) = get_boundary_from_nodes(hugr, &mut nodes);
+
+        // If there are no input/output edges, the set is always convex so we can initialize the subgraph directly.
+        // If we called `try_new_with_checker` with no boundaries, we'd select every node in the region instead of the expected subset.
+        if inputs.is_empty() && outputs.is_empty() {
+            return Ok(Self {
+                nodes,
+                inputs,
+                outputs,
+                function_calls: vec![],
+            });
+        }
+
+        let mut subgraph = Self::try_new_with_checker(inputs, outputs, hugr, checker)?;
+
+        // If some nodes formed a fully component, they won't be included in the subgraph generated from the boundaries.
+        // We re-add them here.
+        if subgraph.node_count() < num_nodes {
+            subgraph.nodes = nodes;
+        }
+
         Ok(subgraph)
     }
 
@@ -733,13 +751,15 @@ fn make_pg_subgraph<'h, H: HugrView>(
     )
 }
 
+/// Returns the input and output boundary ports for a given set of nodes.
+///
+/// Removes duplicates in `nodes` while preserving the order.
 fn get_boundary_from_nodes<N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
-    nodes: impl Into<Vec<N>>,
+    nodes: &mut Vec<N>,
 ) -> (IncomingPorts<N>, OutgoingPorts<N>) {
     // remove duplicates in `nodes` while preserving the order
     // simultaneously build a set for fast lookup
-    let mut nodes = nodes.into();
     let mut nodes_set = FxHashSet::default();
     nodes.retain(|&n| nodes_set.insert(n));
 
@@ -1495,7 +1515,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use crate::builder::{endo_sig, inout_sig};
-    use crate::extension::prelude::MakeTuple;
+    use crate::extension::prelude::{MakeTuple, UnpackTuple};
     use crate::hugr::Patch;
     use crate::ops::Const;
     use crate::ops::handle::DataflowParentID;
