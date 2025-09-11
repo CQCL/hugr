@@ -333,7 +333,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
         let mut subgraph = Self::try_new_with_checker(inputs, outputs, hugr, checker)?;
 
-        // If some nodes formed a fully component, they won't be included in the subgraph generated from the boundaries.
+        // If some nodes formed a fully connected component, they won't be included in the subgraph generated from the boundaries.
         // We re-add them here.
         if subgraph.node_count() < num_nodes {
             subgraph.nodes = nodes;
