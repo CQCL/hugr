@@ -311,14 +311,17 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &H,
         checker: &TopoConvexChecker<H>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        let nodes = nodes.into();
+        let nodes: Vec<N> = nodes.into();
+        let num_nodes = nodes.len();
 
         if nodes.is_empty() {
             return Err(InvalidSubgraph::EmptySubgraph);
         }
 
         let (inputs, outputs) = get_boundary_from_nodes(hugr, nodes);
-        Self::try_new_with_checker(inputs, outputs, hugr, checker)
+        let subgraph = Self::try_new_with_checker(inputs, outputs, hugr, checker)?;
+        debug_assert_eq!(subgraph.nodes().len(), num_nodes);
+        Ok(subgraph)
     }
 
     /// Create a subgraph from a set of nodes, using a line convexity checker
@@ -343,7 +346,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             return Err(InvalidSubgraph::NotConvex);
         }
 
-        let nodes = nodes.into();
+        let nodes: Vec<N> = nodes.into();
         let hugr = line_checker.hugr();
 
         if nodes.is_empty() {
@@ -1492,6 +1495,7 @@ mod tests {
     use rstest::{fixture, rstest};
 
     use crate::builder::{endo_sig, inout_sig};
+    use crate::extension::prelude::MakeTuple;
     use crate::hugr::Patch;
     use crate::ops::Const;
     use crate::ops::handle::DataflowParentID;
@@ -1880,6 +1884,71 @@ mod tests {
         assert_eq!(
             subg.signature(&h).io(),
             Signature::new(vec![bool_t()], vec![]).io()
+        );
+    }
+
+    /// Test the behaviour of the sibling subgraph when built from a single
+    /// node with no inputs or outputs.
+    #[test]
+    fn singleton_disconnected_subgraph() {
+        // A hugr with some empty MakeTuple operations.
+        let op = MakeTuple::new(type_row![]);
+
+        let mut b = DFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
+        let _mk_tuple_1 = b.add_dataflow_op(op.clone(), []).unwrap();
+        let mk_tuple_2 = b.add_dataflow_op(op.clone(), []).unwrap();
+        let _mk_tuple_3 = b.add_dataflow_op(op, []).unwrap();
+        // Unconnected output, discarded
+        let h = b.finish_hugr_with_outputs([]).unwrap();
+
+        // When built with `try_from_nodes`, the subgraph's signature is the same as the
+        // node's. (empty input, tuple output)
+        let subg = SiblingSubgraph::from_node(mk_tuple_2.node(), &h);
+        assert_eq!(subg.nodes().len(), 1);
+        assert_eq!(
+            subg.signature(&h).io(),
+            Signature::new(type_row![], vec![Type::new_tuple(type_row![])]).io()
+        );
+
+        // `from_nodes` is different, is it only uses incoming and outgoing edges to
+        // compute the signature. In this case, the output is disconnected, so
+        // it is not part of the subgraph signature.
+        let subg = SiblingSubgraph::try_from_nodes([mk_tuple_2.node()], &h).unwrap();
+        assert_eq!(subg.nodes().len(), 1);
+        assert_eq!(
+            subg.signature(&h).io(),
+            Signature::new_endo(type_row![]).io()
+        );
+    }
+
+    /// Run `try_from_nodes` including some complete graph components.
+    #[test]
+    fn partially_connected_subgraph() {
+        // A hugr with some empty MakeTuple operations.
+        let tuple_op = MakeTuple::new(type_row![]);
+        let untuple_op = UnpackTuple::new(type_row![]);
+        let tuple_t = Type::new_tuple(type_row![]);
+
+        let mut b = DFGBuilder::new(Signature::new(type_row![], vec![tuple_t.clone()])).unwrap();
+        let mk_tuple_1 = b.add_dataflow_op(tuple_op.clone(), []).unwrap();
+        let untuple_1 = b
+            .add_dataflow_op(untuple_op.clone(), [mk_tuple_1.out_wire(0)])
+            .unwrap();
+        let mk_tuple_2 = b.add_dataflow_op(tuple_op.clone(), []).unwrap();
+        let _mk_tuple_3 = b.add_dataflow_op(tuple_op, []).unwrap();
+        // Output the 2nd tuple output
+        let h = b
+            .finish_hugr_with_outputs([mk_tuple_2.out_wire(0)])
+            .unwrap();
+
+        let subgraph_nodes = [mk_tuple_1.node(), mk_tuple_2.node(), untuple_1.node()];
+
+        // `try_from_nodes` uses incoming and outgoing edges to compute the signature.
+        let subg = SiblingSubgraph::try_from_nodes(subgraph_nodes, &h).unwrap();
+        assert_eq!(subg.nodes().len(), 3);
+        assert_eq!(
+            subg.signature(&h).io(),
+            Signature::new(type_row![], vec![tuple_t]).io()
         );
     }
 
