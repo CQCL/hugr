@@ -10,6 +10,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod builder;
+pub mod call_graph;
 pub mod core;
 pub mod envelope;
 pub mod export;
