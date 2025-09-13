@@ -9,6 +9,7 @@ use itertools::{Either, Itertools};
 
 use crate::{
     Hugr, HugrView, Node,
+    call_graph::CallGraph,
     core::HugrNode,
     hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
     ops::{FuncDecl, OpType},
@@ -191,7 +192,7 @@ pub trait HugrLinking: HugrMut {
     // skip_unreachable: bool, // can be new in this PR...no, maybe this is ALWAYS true for insert_link, and NEVER true for link?
     // new_name: AllowOrHideOrError, // call this ConflictResolution, add this field and the Hide variant in this PR
     // conflicting_sig: AllowOrHideOrError
-    // 
+    //
     // currently have MultiImplHandling::UseNew, ::UseExisting, ::UseBoth, ::Error
     // instead: NewImplHandling::ConvertToDecls**, PreferExisting, OverrideExisting, Both(ConflictResolution)
     // ** doesn't make sense for link_hugr...unless new_name == Allow and that's all we're doing?
@@ -220,7 +221,7 @@ pub trait HugrLinking: HugrMut {
     //    - check as previous, EXCEPT
     //.          if name new and new_name==MakePrivate, or sig conflicts and conflicting_sig==MakePrivate, or an impl and Both(MakePrivate)
     //           then don't skip, add.
-    
+
     // So...function from starting points (either all pub funcs or just entrypoint subtree)
     //    does above conditional skipping on MakePrivate but adding to Dfs otherwise
     // then walks callgraph, doing above conditional including carrying on through MakePrivates :)
@@ -252,7 +253,6 @@ pub trait HugrLinking: HugrMut {
 
     // WHAT ABOUT CALLBACKS RATHER THAN ALL OF THESE ????
 
-
     ///
     /// If `allow_new_impls` is `None`, then any required [`FuncDefn`] in `other` is treated
     ///  as a [`FuncDecl`] (either being linked with a function existing in `self`, or added if
@@ -282,7 +282,7 @@ pub trait HugrLinking: HugrMut {
         &mut self,
         parent: Self::Node,
         mut other: Hugr,
-        policy: &NameLinkingPolicy
+        policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, String> {
         let entrypoint_func = {
             let mut n = other.entrypoint();
@@ -329,9 +329,7 @@ pub trait HugrLinking: HugrMut {
                                             "Conflicting signature for function {name} callable from entrypoint"
                                         ));
                                     }
-                                    Some(NewFuncHandling::Add) => {
-                                        NodeLinkingDirective::add()
-                                    }
+                                    Some(NewFuncHandling::Add) => NodeLinkingDirective::add(),
                                 }
                             }
                         }
@@ -478,10 +476,10 @@ pub enum NewFuncHandling {
     AddIfReached,
     /// If the new function is reachable, then add it but make it [Private];
     /// otherwise, just skip it. (This always avoids making the Hugr invalid.)
-    /// 
+    ///
     /// [Private]: crate::Visibility::Private
     // ALAN note this really is MakePrivateIfReached, but I don't see much point in the other.
-    MakePrivate
+    MakePrivate,
 }
 
 /// What to do when both target and inserted Hugr
@@ -531,6 +529,8 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
         tgt_node: TN,
         tgt_sig: Box<PolyFuncType>,
     },
+    #[error("Node {src_node} adds new name {name} which was specified to be an error")]
+    NoNewNames { name: String, src_node: SN },
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
     /// in a different place).
@@ -548,6 +548,7 @@ impl NameLinkingPolicy {
     /// [FuncDefn]: crate::ops::FuncDefn
     pub fn err_on_conflict(multi_impls: impl Into<MultipleImplHandling>) -> Self {
         Self {
+            new_names: NewFuncHandling::Add,
             multi_impls: multi_impls.into(),
             sig_conflict: NewFuncHandling::RaiseError,
             filter_private: false,
@@ -559,9 +560,10 @@ impl NameLinkingPolicy {
     /// a (potentially-invalid) Hugr is always produced.
     pub fn keep_both_invalid() -> Self {
         Self {
+            new_names: NewFuncHandling::Add,
             multi_impls: MultipleImplHandling::NewFunc(NewFuncHandling::Add),
             sig_conflict: NewFuncHandling::Add,
-            filter_private: false
+            filter_private: false,
         }
     }
 
@@ -588,11 +590,101 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        self.to_node_linking_for(target, source, false)
+    }
+
+    // TODO return Result<NodeLinkingDirective,> ? Does NLD::add mean, traverse, but NLD::use_ex mean, don't traverse?
+    // TODO(2): add NodeLinkingDirective::MakePrivate?? What about ConvertToDecl ??
+    fn process<SN: Display, TN: Copy + Display + std::fmt::Debug>(
+        &self,
+        existing: &HashMap<&String, PubFuncs<TN>>,
+        sn: SN,
+        new: LinkSig,
+        reached: bool,
+    ) -> Result<bool, NameLinkingError<SN, TN>> {
+        let (nfh, err) = match new {
+            LinkSig::Private => return Ok(reached),
+            LinkSig::Public {
+                name,
+                is_defn: new_is_defn,
+                sig: new_sig,
+            } => match existing.get(name) {
+                None => (
+                    self.new_names,
+                    NameLinkingError::NoNewNames {
+                        name: name.clone(),
+                        src_node: sn,
+                    },
+                ),
+                Some((existing, ex_sig)) => match (*ex_sig == new_sig, existing) {
+                    (false, ex) => (
+                        self.sig_conflict,
+                        NameLinkingError::SignatureConflict {
+                            name: name.clone(),
+                            src_node: sn,
+                            src_sig: new_sig.clone().into(),
+                            tgt_node: *ex.as_ref().left_or_else(|(n, _)| n),
+                            tgt_sig: (*ex_sig).clone().into(),
+                        },
+                    ),
+                    (true, Either::Left(n)) => match (new_is_defn, self.multi_impls) {
+                        (false, _) => return Ok(false), // but add to dirvs
+                        (true, MultipleImplHandling::NewFunc(nfh)) => {
+                            (nfh, NameLinkingError::MultipleImpls(name.clone(), sn, *n))
+                        }
+                        (true, MultipleImplHandling::UseExisting) => return Ok(false), // do not traverse into new body, ignore. TODO need to record somehow that we must NodeLinkingDirective::UseExisting.
+                        (true, MultipleImplHandling::UseNew) => return Ok(true),
+                    },
+                    (true, Either::Right((n, _ns))) => return Ok(true), //if decl, just add to dirvs
+                },
+            },
+        };
+        match nfh {
+            NewFuncHandling::RaiseError => Err(err),
+            NewFuncHandling::ErrorIfReached if reached => Err(err),
+            NewFuncHandling::Add => Ok(true),
+            NewFuncHandling::AddIfReached | NewFuncHandling::MakePrivate if reached => Ok(true), // TODO and record MakePrivate
+            _ => Ok(false),
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    pub fn to_node_linking_for<T: HugrView + ?Sized, S: HugrView + ?Sized>(
+        &self,
+        target: &T,
+        source: &S,
+        use_entrypoint: bool,
+    ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        let mut source_funcs = source_funcs.into_iter();
         let existing = gather_existing(target);
-        // If filter_private, then this is just the public functions, otherwise all:
+        let cg = CallGraph::new(&source);
+        // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
+        // and we need to maintain our own `visited` map anyway
+        let mut to_visit = VecDeque::from_iter(use_entrypoint.then_some(source.entrypoint()));
         let mut dirvs = NodeLinkingDirectives::new();
+        for sn in source.children(source.module_root()) {
+            if let Some(ls) = link_sig(source, sn) {
+                if self.process(&existing, ls, false) {
+                    to_visit.push_back(sn);
+                }
+            }
+        }
+
+        while let Some(sn) = to_visit.pop_front() {
+            let Entry::Vacant(ve) = dirvs.entry(sn) else {
+                continue;
+            };
+            // Hmmm, this will skip consts, we could consider as private
+            let Some(ls) = link_sig(source, sn) else {
+                continue;
+            };
+            if self.process(&existing, ls, true) {
+                ve.insert(something);
+            }
+        }
 
         let NameLinkingPolicy {
+            new_names,
             sig_conflict,
             multi_impls,
             filter_private: _,
@@ -606,7 +698,7 @@ impl NameLinkingPolicy {
                             _ if sig == *ex_sig => {
                                 match directive(name, n, is_defn, ex_ns, multi_impls)? {
                                     Some(dirv) => dirv,
-                                    None => continue
+                                    None => continue,
                                 }
                             }
                             NewFuncHandling::RaiseError => {
@@ -648,7 +740,7 @@ fn directive<SN: Display, TN: HugrNode>(
     new_defn: bool,
     ex_ns: &Either<TN, (TN, Vec<TN>)>,
     multi_impls: &MultipleImplHandling,
-    reached: bool
+    reached: bool,
 ) -> Result<Option<NodeLinkingDirective<TN>>, NameLinkingError<SN, TN>> {
     Ok(Some(match (new_defn, ex_ns) {
         (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
@@ -660,8 +752,12 @@ fn directive<SN: Display, TN: HugrNode>(
             MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(defn),
             MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
             MultipleImplHandling::NewFunc(nf) => {
-                if matches!(nf, NewFuncHandling::ErrorIfReached | NewFuncHandling::AddIfReached) && !reached {
-                    return Ok(None)
+                if matches!(
+                    nf,
+                    NewFuncHandling::ErrorIfReached | NewFuncHandling::AddIfReached
+                ) && !reached
+                {
+                    return Ok(None);
                 }
                 match nf {
                     NewFuncHandling::RaiseError | NewFuncHandling::ErrorIfReached => {
@@ -671,10 +767,12 @@ fn directive<SN: Display, TN: HugrNode>(
                             defn,
                         ));
                     }
-                    NewFuncHandling::Add | NewFuncHandling::AddIfReached => NodeLinkingDirective::add(),
-                    NewFuncHandling::MakePrivate => todo!("ALAN")
+                    NewFuncHandling::Add | NewFuncHandling::AddIfReached => {
+                        NodeLinkingDirective::add()
+                    }
+                    NewFuncHandling::MakePrivate => todo!("ALAN"),
                 }
-            },
+            }
         },
     }))
 }
