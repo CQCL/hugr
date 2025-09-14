@@ -128,9 +128,9 @@ pub trait HugrLinking: HugrMut {
         other: Hugr,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
-        let per_node = policy.to_node_linking(self, &other)?;
+        let LinkerActions { directives } = policy.to_node_linking(self, &other)?;
         Ok(self
-            .insert_link_hugr_by_node(None, other, per_node)
+            .insert_link_hugr_by_node(None, other, directives)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 
@@ -155,9 +155,9 @@ pub trait HugrLinking: HugrMut {
         other: &H,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
-        let per_node = policy.to_node_linking(self, &other)?;
+        let LinkerActions { directives } = policy.to_node_linking(self, &other)?;
         Ok(self
-            .insert_link_view_by_node(None, other, per_node)
+            .insert_link_view_by_node(None, other, directives)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 }
@@ -379,15 +379,15 @@ impl NameLinkingPolicy {
         self.multi_impls
     }
 
-    /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
-    /// source (inserted) and target (inserted-into) Hugr.
-    /// The map should be such that no [NodeLinkingError] will occur.
+    /// Computes how this policy will act on a specified source (inserted) and target
+    /// (host) Hugr.
+    /// The [LinkerActions::directives] should be such that no [NodeLinkingError] will occur.
     #[allow(clippy::type_complexity)]
     pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView + ?Sized>(
         &self,
         target: &T,
         source: &S,
-    ) -> Result<NodeLinkingDirectives<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+    ) -> Result<LinkerActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         let existing = gather_existing(target);
         let mut res = NodeLinkingDirectives::new();
 
@@ -422,7 +422,7 @@ impl NameLinkingPolicy {
             res.insert(n, dirv);
         }
 
-        Ok(res)
+        Ok(LinkerActions { directives: res })
     }
 }
 
@@ -519,6 +519,28 @@ fn gather_existing<'a, H: HugrView + ?Sized>(
 ///
 /// For use with [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
 pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
+
+/// Details the concrete actions to link a specific source Hugr into a specific target Hugr.
+///
+/// Computed from a [NameLinkingPolicy] and contains all actions required to implement
+/// that policy (for those specific Hugrs).
+// Note: this is an extension point, i.e. to allow a NameLinkingPolicy to in the future
+// do things that cannot be done by the low-level insert_link_(hugr/view)_by_node. The alternative
+// would be to make NodeLinkingDirective non-exhaustive; that is perhaps a neater interface
+// (this is more factored, will probably require multiple maps with overlapping keys)
+// but would require insert_link_(hugr/view)_by_node to handle all required actions/new `Directive`s.
+// This way keeps the ..._by_node methods simple.
+pub struct LinkerActions<SN, TN> {
+    directives: NodeLinkingDirectives<SN, TN>,
+}
+
+impl<SN, TN> LinkerActions<SN, TN> {
+    /// Gets the directives to pass to [HugrLinking::insert_link_hugr_by_node]
+    /// or [HugrLinking::insert_link_view_by_node].
+    pub fn directives(&self) -> &NodeLinkingDirectives<SN, TN> {
+        &self.directives
+    }
+}
 
 /// Invariant: no SourceNode can be in both maps (by type of [NodeLinkingDirective])
 /// TargetNodes can be (in RHS of multiple directives)
