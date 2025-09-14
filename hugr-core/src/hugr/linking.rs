@@ -348,18 +348,34 @@ impl NameLinkingPolicy {
         }
     }
 
-    /// Specifies how to behave when both target and inserted Hugr have a
+    /// Sets how to behave when both target and inserted Hugr have a
     /// [Public] function with the same name but different signatures.
     ///
     /// [Public]: crate::Visibility::Public
-    pub fn on_signature_conflict(&mut self) -> &mut NewFuncHandling {
-        &mut self.sig_conflict
+    pub fn on_signature_conflict(mut self, sc: NewFuncHandling) -> Self {
+        self.sig_conflict = sc;
+        self
     }
 
-    /// Specifies how to behave when both target and inserted Hugr have a
+    /// Tells how to behave when both target and inserted Hugr have a
+    /// [Public] function with the same name but different signatures.
+    ///
+    /// [Public]: crate::Visibility::Public
+    pub fn get_signature_conflict(&self) -> NewFuncHandling {
+        self.sig_conflict
+    }
+
+    /// Sets how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
-    pub fn on_multiple_impls(&mut self) -> &mut MultipleImplHandling {
-        &mut self.multi_impls
+    pub fn on_multiple_impls(mut self, mih: MultipleImplHandling) -> Self {
+        self.multi_impls = mih;
+        self
+    }
+
+    /// Tells how to behave when both target and inserted Hugr have a
+    /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
+    pub fn get_multiple_impls(&self) -> MultipleImplHandling {
+        self.multi_impls
     }
 
     /// Builds an explicit map of [NodeLinkingDirective]s that implements this policy for a given
@@ -976,7 +992,7 @@ mod test {
         let new_sig = Signature::new_endo(INT_TYPES[3].clone());
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        let mut pol = NameLinkingPolicy::err_on_conflict(NewFuncHandling::RaiseError);
+        let pol = NameLinkingPolicy::err_on_conflict(NewFuncHandling::RaiseError);
         let mut host = orig_host.clone();
         let res = host.link_module_view(&inserted, &pol);
         assert_eq!(host, orig_host); // Did nothing
@@ -991,7 +1007,7 @@ mod test {
             })
         );
 
-        *pol.on_signature_conflict() = NewFuncHandling::Add;
+        let pol = pol.on_signature_conflict(NewFuncHandling::Add);
         let node_map = host.link_module(inserted, &pol).unwrap().node_map;
         assert_eq!(
             host.validate(),
@@ -1022,8 +1038,7 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let mut pol = NameLinkingPolicy::keep_both_invalid();
-        *pol.on_multiple_impls() = multi_impls;
+        let pol = NameLinkingPolicy::keep_both_invalid().on_multiple_impls(multi_impls);
         let res = host.link_module(inserted, &pol);
         if multi_impls == NewFuncHandling::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
