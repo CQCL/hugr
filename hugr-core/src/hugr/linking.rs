@@ -137,6 +137,7 @@ pub enum NodeLinkingError<SN: Display = Node, TN: Display = Node> {
 /// Directive for how to treat a particular module-child in the source Hugr.
 /// (TN is a node in the target Hugr.)
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NodeLinkingDirective<TN = Node> {
     /// Insert the module-child (with subtree if any) into the target Hugr.
     Add {
