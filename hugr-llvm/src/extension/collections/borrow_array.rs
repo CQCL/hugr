@@ -8,21 +8,23 @@
 //! the offset instead of mutating the pointer. This way, we can still free the original
 //! pointer when the array is discarded after a pop.
 //!
-//! We provide utility functions [`array_fat_pointer_ty`], [`build_array_fat_pointer`], and
-//! [`decompose_array_fat_pointer`] to work with array fat pointers.
+//! We provide utility functions [`array_fat_pointer_ty`], [`build_barray_fat_pointer`], and
+//! [`decompose_barray_fat_pointer`] to work with array fat pointers.
 //!
-//! The [`DefaultArrayCodegen`] extension allocates all arrays on the heap using the
+//! The [`DefaultBorrowArrayCodegen`] extension allocates all arrays on the heap using the
 //! standard libc `malloc` and `free` functions. This behaviour can be customised
-//! by providing a different implementation for [`ArrayCodegen::emit_allocate_array`]
-//! and [`ArrayCodegen::emit_free_array`].
+//! by providing a different implementation for [`BorrowArrayCodegen::emit_allocate_array`]
+//! and [`BorrowArrayCodegen::emit_free_array`].
 use std::iter;
 
 use anyhow::{Ok, Result, anyhow};
 use hugr_core::extension::prelude::{option_type, usize_t};
 use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
 use hugr_core::ops::DataflowOpTrait;
-use hugr_core::std_extensions::collections::array::{
-    self, ArrayClone, ArrayDiscard, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan, array_type,
+use hugr_core::std_extensions::collections::array;
+use hugr_core::std_extensions::collections::borrow_array::{
+    self, BArrayClone, BArrayDiscard, BArrayOp, BArrayOpDef, BArrayRepeat, BArrayScan,
+    borrow_array_type,
 };
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
@@ -44,17 +46,17 @@ use crate::{
 };
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [`ArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
+    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
     /// as the implementation.
     #[must_use]
-    pub fn add_default_array_extensions(self) -> Self {
-        self.add_array_extensions(DefaultArrayCodegen)
+    pub fn add_default_borrow_array_extensions(self) -> Self {
+        self.add_borrow_array_extensions(DefaultBorrowArrayCodegen)
     }
 
-    /// Add a [`ArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
-    /// [`DefaultArrayCodegen`] as the implementation.
-    pub fn add_array_extensions(self, ccg: impl ArrayCodegen + 'a) -> Self {
-        self.add_extension(ArrayCodegenExtension::from(ccg))
+    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultBorrowArrayCodegen`] as the implementation.
+    pub fn add_borrow_array_extensions(self, ccg: impl BorrowArrayCodegen + 'a) -> Self {
+        self.add_extension(BorrowArrayCodegenExtension::from(ccg))
     }
 }
 
@@ -71,9 +73,9 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 ///
 /// By default, all arrays are allocated on the heap using the standard libc `malloc`
 /// and `free` functions. This behaviour can be customised by providing a different
-/// implementation for [`ArrayCodegen::emit_allocate_array`] and
-/// [`ArrayCodegen::emit_free_array`].
-pub trait ArrayCodegen: Clone {
+/// implementation for [`BorrowArrayCodegen::emit_allocate_array`] and
+/// [`BorrowArrayCodegen::emit_free_array`].
+pub trait BorrowArrayCodegen: Clone {
     /// Emit an allocation of `size` bytes and return the corresponding pointer.
     ///
     /// The default implementation allocates on the heap by emitting a call to the
@@ -98,73 +100,73 @@ pub trait ArrayCodegen: Clone {
         emit_libc_free(ctx, ptr.into())
     }
 
-    /// Return the llvm type of [`hugr_core::std_extensions::collections::array::ARRAY_TYPENAME`].
+    /// Return the llvm type of [`hugr_core::std_extensions::collections::borrow_array::BORROW_ARRAY_TYPENAME`].
     fn array_type<'c>(
         &self,
         session: &TypingSession<'c, '_>,
         elem_ty: BasicTypeEnum<'c>,
         _size: u64,
     ) -> impl BasicType<'c> {
-        array_fat_pointer_ty(session, elem_ty)
+        barray_fat_pointer_ty(session, elem_ty)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayValue`].
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayValue`].
     fn emit_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        value: &array::ArrayValue,
+        value: &borrow_array::BArrayValue,
     ) -> Result<BasicValueEnum<'c>> {
-        emit_array_value(self, ctx, value)
+        emit_barray_value(self, ctx, value)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayOp`].
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayOp`].
     fn emit_array_op<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayOp,
+        op: BArrayOp,
         inputs: Vec<BasicValueEnum<'c>>,
         outputs: RowPromise<'c>,
     ) -> Result<()> {
-        emit_array_op(self, ctx, op, inputs, outputs)
+        emit_barray_op(self, ctx, op, inputs, outputs)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayClone`] operation.
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayClone`] operation.
     fn emit_array_clone<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayClone,
+        op: BArrayClone,
         array_v: BasicValueEnum<'c>,
     ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
         emit_clone_op(self, ctx, op, array_v)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayDiscard`] operation.
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayDiscard`] operation.
     fn emit_array_discard<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayDiscard,
+        op: BArrayDiscard,
         array_v: BasicValueEnum<'c>,
     ) -> Result<()> {
         emit_array_discard(self, ctx, op, array_v)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayRepeat`] op.
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayRepeat`] op.
     fn emit_array_repeat<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayRepeat,
+        op: BArrayRepeat,
         func: BasicValueEnum<'c>,
     ) -> Result<BasicValueEnum<'c>> {
         emit_repeat_op(self, ctx, op, func)
     }
 
-    /// Emit a [`hugr_core::std_extensions::collections::array::ArrayScan`] op.
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayScan`] op.
     ///
     /// Returns the resulting array and the final values of the accumulators.
     fn emit_array_scan<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        op: ArrayScan,
+        op: BArrayScan,
         src_array: BasicValueEnum<'c>,
         func: BasicValueEnum<'c>,
         initial_accs: &[BasicValueEnum<'c>],
@@ -180,29 +182,29 @@ pub trait ArrayCodegen: Clone {
     }
 }
 
-/// A trivial implementation of [`ArrayCodegen`] which passes all methods
+/// A trivial implementation of [`BorrowArrayCodegen`] which passes all methods
 /// through to their default implementations.
 #[derive(Default, Clone)]
-pub struct DefaultArrayCodegen;
+pub struct DefaultBorrowArrayCodegen;
 
-impl ArrayCodegen for DefaultArrayCodegen {}
+impl BorrowArrayCodegen for DefaultBorrowArrayCodegen {}
 
 #[derive(Clone, Debug, Default)]
-pub struct ArrayCodegenExtension<CCG>(CCG);
+pub struct BorrowArrayCodegenExtension<CCG>(CCG);
 
-impl<CCG: ArrayCodegen> ArrayCodegenExtension<CCG> {
+impl<CCG: BorrowArrayCodegen> BorrowArrayCodegenExtension<CCG> {
     pub fn new(ccg: CCG) -> Self {
         Self(ccg)
     }
 }
 
-impl<CCG: ArrayCodegen> From<CCG> for ArrayCodegenExtension<CCG> {
+impl<CCG: BorrowArrayCodegen> From<CCG> for BorrowArrayCodegenExtension<CCG> {
     fn from(ccg: CCG) -> Self {
         Self::new(ccg)
     }
 }
 
-impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
+impl<CCG: BorrowArrayCodegen> CodegenExtension for BorrowArrayCodegenExtension<CCG> {
     fn add_extension<'a, H: HugrView<Node = Node> + 'a>(
         self,
         builder: CodegenExtsBuilder<'a, H>,
@@ -211,65 +213,72 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
         Self: 'a,
     {
         builder
-            .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
-                let ccg = self.0.clone();
-                move |ts, hugr_type| {
-                    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
-                        return Err(anyhow!("Invalid type args for array type"));
-                    };
-                    let elem_ty = ts.llvm_type(ty)?;
-                    Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
-                }
-            })
-            .custom_const::<array::ArrayValue>({
+            .custom_type(
+                (
+                    borrow_array::EXTENSION_ID,
+                    borrow_array::BORROW_ARRAY_TYPENAME,
+                ),
+                {
+                    let ccg = self.0.clone();
+                    move |ts, hugr_type| {
+                        let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args()
+                        else {
+                            return Err(anyhow!("Invalid type args for array type"));
+                        };
+                        let elem_ty = ts.llvm_type(ty)?;
+                        Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
+                    }
+                },
+            )
+            .custom_const::<borrow_array::BArrayValue>({
                 let ccg = self.0.clone();
                 move |context, k| ccg.emit_array_value(context, k)
             })
-            .simple_extension_op::<ArrayOpDef>({
+            .simple_extension_op::<BArrayOpDef>({
                 let ccg = self.0.clone();
                 move |context, args, _| {
                     ccg.emit_array_op(
                         context,
-                        ArrayOp::from_extension_op(args.node().as_ref())?,
+                        BArrayOp::from_extension_op(args.node().as_ref())?,
                         args.inputs,
                         args.outputs,
                     )
                 }
             })
-            .extension_op(array::EXTENSION_ID, array::ARRAY_CLONE_OP_ID, {
+            .extension_op(borrow_array::EXTENSION_ID, array::ARRAY_CLONE_OP_ID, {
                 let ccg = self.0.clone();
                 move |context, args| {
                     let arr = args.inputs[0];
-                    let op = ArrayClone::from_extension_op(args.node().as_ref())?;
+                    let op = BArrayClone::from_extension_op(args.node().as_ref())?;
                     let (arr1, arr2) = ccg.emit_array_clone(context, op, arr)?;
                     args.outputs.finish(context.builder(), [arr1, arr2])
                 }
             })
-            .extension_op(array::EXTENSION_ID, array::ARRAY_DISCARD_OP_ID, {
+            .extension_op(borrow_array::EXTENSION_ID, array::ARRAY_DISCARD_OP_ID, {
                 let ccg = self.0.clone();
                 move |context, args| {
                     let arr = args.inputs[0];
-                    let op = ArrayDiscard::from_extension_op(args.node().as_ref())?;
+                    let op = BArrayDiscard::from_extension_op(args.node().as_ref())?;
                     ccg.emit_array_discard(context, op, arr)?;
                     args.outputs.finish(context.builder(), [])
                 }
             })
-            .extension_op(array::EXTENSION_ID, array::ARRAY_REPEAT_OP_ID, {
+            .extension_op(borrow_array::EXTENSION_ID, array::ARRAY_REPEAT_OP_ID, {
                 let ccg = self.0.clone();
                 move |context, args| {
                     let func = args.inputs[0];
-                    let op = ArrayRepeat::from_extension_op(args.node().as_ref())?;
+                    let op = BArrayRepeat::from_extension_op(args.node().as_ref())?;
                     let arr = ccg.emit_array_repeat(context, op, func)?;
                     args.outputs.finish(context.builder(), [arr])
                 }
             })
-            .extension_op(array::EXTENSION_ID, array::ARRAY_SCAN_OP_ID, {
+            .extension_op(borrow_array::EXTENSION_ID, array::ARRAY_SCAN_OP_ID, {
                 let ccg = self.0.clone();
                 move |context, args| {
                     let src_array = args.inputs[0];
                     let func = args.inputs[1];
                     let initial_accs = &args.inputs[2..];
-                    let op = ArrayScan::from_extension_op(args.node().as_ref())?;
+                    let op = BArrayScan::from_extension_op(args.node().as_ref())?;
                     let (tgt_array, final_accs) =
                         ccg.emit_array_scan(context, op, src_array, func, initial_accs)?;
                     args.outputs
@@ -285,9 +294,9 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
         .into_int_type()
 }
 
-/// Returns the LLVM representation of an array value as a fat pointer.
+/// Returns the LLVM representation of a borrow array value as a fat pointer.
 #[must_use]
-pub fn array_fat_pointer_ty<'c>(
+pub fn barray_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
     elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
@@ -301,13 +310,13 @@ pub fn array_fat_pointer_ty<'c>(
     )
 }
 
-/// Constructs an array fat pointer value.
-pub fn build_array_fat_pointer<'c, H: HugrView<Node = Node>>(
+/// Constructs a borrow array fat pointer value.
+pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ptr: PointerValue<'c>,
     offset: IntValue<'c>,
 ) -> Result<StructValue<'c>> {
-    let array_ty = array_fat_pointer_ty(
+    let array_ty = barray_fat_pointer_ty(
         &ctx.typing_session(),
         ptr.get_type().get_element_type().try_into().unwrap(),
     );
@@ -321,8 +330,8 @@ pub fn build_array_fat_pointer<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into_struct_value())
 }
 
-/// Returns the underlying pointer and offset stored in a fat array pointer.
-pub fn decompose_array_fat_pointer<'c>(
+/// Returns the underlying pointer and offset stored in a fat borrow array pointer.
+pub fn decompose_barray_fat_pointer<'c>(
     builder: &Builder<'c>,
     array_v: BasicValueEnum<'c>,
 ) -> Result<(PointerValue<'c>, IntValue<'c>)> {
@@ -335,14 +344,14 @@ pub fn decompose_array_fat_pointer<'c>(
     ))
 }
 
-/// Helper function to allocate a fat array pointer.
+/// Helper function to allocate a fat borrow array pointer.
 ///
 /// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
 /// is of type `elem_ty.ptr_type()`). The struct is the fat pointer of the that stores an additional
 /// offset (initialised to be 0).
-pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
+pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    ccg: &impl ArrayCodegen,
+    ccg: &impl BorrowArrayCodegen,
     elem_ty: BasicTypeEnum<'c>,
     size: u64,
 ) -> Result<(PointerValue<'c>, StructValue<'c>)> {
@@ -357,7 +366,7 @@ pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
         .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
     let offset = usize_t.const_zero();
-    let array_v = build_array_fat_pointer(ctx, elem_ptr, offset)?;
+    let array_v = build_barray_fat_pointer(ctx, elem_ptr, offset)?;
     Ok((elem_ptr, array_v))
 }
 
@@ -403,16 +412,16 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     Ok(val)
 }
 
-/// Emits an [`array::ArrayValue`].
-pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+/// Emits an [`borrow_array::BArrayValue`].
+pub fn emit_barray_value<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    value: &array::ArrayValue,
+    value: &borrow_array::BArrayValue,
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let elem_ty = ts.llvm_type(value.get_element_type())?;
     let (elem_ptr, array_v) =
-        build_array_alloc(ctx, ccg, elem_ty, value.get_contents().len() as u64)?;
+        build_barray_alloc(ctx, ccg, elem_ty, value.get_contents().len() as u64)?;
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
         let idx = ts.iw_context().i32_type().const_int(i as u64, true);
@@ -422,11 +431,11 @@ pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into())
 }
 
-/// Emits an [`ArrayOp`].
-pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+/// Emits an [`BArrayOp`].
+pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    op: ArrayOp,
+    op: BArrayOp,
     inputs: Vec<BasicValueEnum<'c>>,
     outputs: RowPromise<'c>,
 ) -> Result<()> {
@@ -438,15 +447,15 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
         .unwrap()
         .signature()
         .into_owned();
-    let ArrayOp {
+    let BArrayOp {
         def,
         elem_ty: ref hugr_elem_ty,
         size,
     } = op;
     let elem_ty = ts.llvm_type(hugr_elem_ty)?;
     match def {
-        ArrayOpDef::new_array => {
-            let (elem_ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, size)?;
+        BArrayOpDef::new_array => {
+            let (elem_ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size)?;
             let usize_t = usize_ty(&ctx.typing_session());
             for (i, v) in inputs.into_iter().enumerate() {
                 let idx = usize_t.const_int(i as u64, true);
@@ -455,11 +464,11 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             }
             outputs.finish(ctx.builder(), [array_v.into()])
         }
-        ArrayOpDef::unpack => {
+        BArrayOpDef::unpack => {
             let [array_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::unpack expects one argument"))?;
-            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
+                .map_err(|_| anyhow!("BArrayOpDef::unpack expects one argument"))?;
+            let (array_ptr, array_offset) = decompose_barray_fat_pointer(builder, array_v)?;
 
             let mut result = Vec::with_capacity(size as usize);
             let usize_t = usize_ty(&ctx.typing_session());
@@ -473,20 +482,20 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
 
             outputs.finish(ctx.builder(), result)
         }
-        ArrayOpDef::get => {
+        BArrayOpDef::get => {
             let [array_v, index_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::get expects two arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
+                .map_err(|_| anyhow!("BArrayOpDef::get expects two arguments"))?;
+            let (array_ptr, array_offset) = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
             let res_hugr_ty = sig
                 .output()
                 .get(0)
-                .ok_or(anyhow!("ArrayOp::get has no outputs"))?;
+                .ok_or(anyhow!("BArrayOp::get has no outputs"))?;
 
             let res_sum_ty = {
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
-                    Err(anyhow!("ArrayOp::get output is not a sum type"))?
+                    Err(anyhow!("BArrayOp::get output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
             };
@@ -533,21 +542,21 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             builder.position_at_end(exit_block);
             Ok(())
         }
-        ArrayOpDef::set => {
+        BArrayOpDef::set => {
             let [array_v, index_v, value_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::set expects three arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
+                .map_err(|_| anyhow!("BArrayOpDef::set expects three arguments"))?;
+            let (array_ptr, array_offset) = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
 
             let res_hugr_ty = sig
                 .output()
                 .get(0)
-                .ok_or(anyhow!("ArrayOp::set has no outputs"))?;
+                .ok_or(anyhow!("BArrayOp::set has no outputs"))?;
 
             let res_sum_ty = {
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
-                    Err(anyhow!("ArrayOp::set output is not a sum type"))?
+                    Err(anyhow!("BArrayOp::set output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
             };
@@ -594,22 +603,22 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             builder.position_at_end(exit_block);
             Ok(())
         }
-        ArrayOpDef::swap => {
+        BArrayOpDef::swap => {
             let [array_v, index1_v, index2_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::swap expects three arguments"))?;
-            let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v)?;
+                .map_err(|_| anyhow!("BArrayOpDef::swap expects three arguments"))?;
+            let (array_ptr, array_offset) = decompose_barray_fat_pointer(builder, array_v)?;
             let index1_v = index1_v.into_int_value();
             let index2_v = index2_v.into_int_value();
 
             let res_hugr_ty = sig
                 .output()
                 .get(0)
-                .ok_or(anyhow!("ArrayOp::swap has no outputs"))?;
+                .ok_or(anyhow!("BArrayOp::swap has no outputs"))?;
 
             let res_sum_ty = {
                 let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
-                    Err(anyhow!("ArrayOp::swap output is not a sum type"))?
+                    Err(anyhow!("BArrayOp::swap output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
             };
@@ -678,10 +687,10 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             builder.position_at_end(exit_block);
             Ok(())
         }
-        ArrayOpDef::pop_left => {
+        BArrayOpDef::pop_left => {
             let [array_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::pop_left expects one argument"))?;
+                .map_err(|_| anyhow!("BArrayOpDef::pop_left expects one argument"))?;
             let r = emit_pop_op(
                 ctx,
                 hugr_elem_ty.clone(),
@@ -691,10 +700,10 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             )?;
             outputs.finish(ctx.builder(), [r])
         }
-        ArrayOpDef::pop_right => {
+        BArrayOpDef::pop_right => {
             let [array_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::pop_right expects one argument"))?;
+                .map_err(|_| anyhow!("BArrayOpDef::pop_right expects one argument"))?;
             let r = emit_pop_op(
                 ctx,
                 hugr_elem_ty.clone(),
@@ -704,11 +713,11 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             )?;
             outputs.finish(ctx.builder(), [r])
         }
-        ArrayOpDef::discard_empty => {
+        BArrayOpDef::discard_empty => {
             let [array_v] = inputs
                 .try_into()
-                .map_err(|_| anyhow!("ArrayOpDef::discard_empty expects one argument"))?;
-            let (ptr, _) = decompose_array_fat_pointer(builder, array_v)?;
+                .map_err(|_| anyhow!("BArrayOpDef::discard_empty expects one argument"))?;
+            let (ptr, _) = decompose_barray_fat_pointer(builder, array_v)?;
             ccg.emit_free_array(ctx, ptr)?;
             outputs.finish(ctx.builder(), [])
         }
@@ -716,16 +725,16 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
     }
 }
 
-/// Emits an [`ArrayClone`] op.
+/// Emits an [`BArrayClone`] op.
 pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    op: ArrayClone,
+    op: BArrayClone,
     array_v: BasicValueEnum<'c>,
 ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (array_ptr, array_offset) = decompose_array_fat_pointer(ctx.builder(), array_v)?;
-    let (other_ptr, other_array_v) = build_array_alloc(ctx, ccg, elem_ty, op.size)?;
+    let (array_ptr, array_offset) = decompose_barray_fat_pointer(ctx.builder(), array_v)?;
+    let (other_ptr, other_array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size)?;
     let src_ptr = unsafe {
         ctx.builder()
             .build_in_bounds_gep(array_ptr, &[array_offset], "")?
@@ -760,11 +769,11 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     Ok((array_v, other_array_v.into()))
 }
 
-/// Emits an [`ArrayDiscard`] op.
+/// Emits an [`BArrayDiscard`] op.
 pub fn emit_array_discard<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    _op: ArrayDiscard,
+    _op: BArrayDiscard,
     array_v: BasicValueEnum<'c>,
 ) -> Result<()> {
     let array_ptr =
@@ -774,7 +783,7 @@ pub fn emit_array_discard<'c, H: HugrView<Node = Node>>(
     Ok(())
 }
 
-/// Emits the [`ArrayOpDef::pop_left`] and [`ArrayOpDef::pop_right`] operations.
+/// Emits the [`BArrayOpDef::pop_left`] and [`BArrayOpDef::pop_right`] operations.
 fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     elem_ty: HugrType,
@@ -784,10 +793,10 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let builder = ctx.builder();
-    let (array_ptr, array_offset) = decompose_array_fat_pointer(builder, array_v.into())?;
+    let (array_ptr, array_offset) = decompose_barray_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         elem_ty.clone(),
-        array_type(size.saturating_add_signed(-1), elem_ty),
+        borrow_array_type(size.saturating_add_signed(-1), elem_ty),
     ]))?;
     if size == 0 {
         return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());
@@ -812,32 +821,32 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
         }
     };
     let elem_v = builder.build_load(elem_ptr, "")?;
-    let new_array_v = build_array_fat_pointer(ctx, array_ptr, new_array_offset)?;
+    let new_array_v = build_barray_fat_pointer(ctx, array_ptr, new_array_offset)?;
 
     Ok(ret_ty
         .build_tag(ctx.builder(), 1, vec![elem_v, new_array_v.into()])?
         .into())
 }
 
-/// Emits an [`ArrayRepeat`] op.
+/// Emits an [`BArrayRepeat`] op.
 pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    op: ArrayRepeat,
+    op: BArrayRepeat,
     func: BasicValueEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, op.size)?;
+    let (ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
+            .map_err(|()| anyhow!("BArrayOpDef::repeat expects a function pointer"))?;
         let v = builder
             .build_call(func_ptr, &[], "")?
             .try_as_basic_value()
             .left()
-            .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
+            .ok_or(anyhow!("BArrayOpDef::repeat function must return a value"))?;
         let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
         Ok(())
@@ -845,22 +854,22 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into())
 }
 
-/// Emits an [`ArrayScan`] op.
+/// Emits an [`BArrayScan`] op.
 ///
 /// Returns the resulting array and the final values of the accumulators.
 pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
-    ccg: &impl ArrayCodegen,
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    op: ArrayScan,
+    op: BArrayScan,
     src_array_v: StructValue<'c>,
     func: BasicValueEnum<'c>,
     initial_accs: &[BasicValueEnum<'c>],
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
-    let (src_ptr, src_offset) = decompose_array_fat_pointer(ctx.builder(), src_array_v.into())?;
+    let (src_ptr, src_offset) = decompose_barray_fat_pointer(ctx.builder(), src_array_v.into())?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
     // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
     // from `src` instead of allocating a fresh array
-    let (tgt_ptr, tgt_array_v) = build_array_alloc(ctx, ccg, tgt_elem_ty, op.size)?;
+    let (tgt_ptr, tgt_array_v) = build_barray_alloc(ctx, ccg, tgt_elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let acc_tys: Vec<_> = op
         .acc_tys
@@ -879,7 +888,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
+            .map_err(|()| anyhow!("BArrayOpDef::scan expects a function pointer"))?;
         let src_idx = builder.build_int_add(idx, src_offset, "")?;
         let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[src_idx], "")? };
         let src_elem = builder.build_load(src_elem_addr, "")?;
@@ -912,9 +921,9 @@ mod test {
     use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::STD_REG;
-    use hugr_core::std_extensions::collections::array::op_builder::build_all_array_ops;
-    use hugr_core::std_extensions::collections::array::{
-        self, ArrayOpBuilder, ArrayRepeat, ArrayScan, array_type,
+    use hugr_core::std_extensions::collections::array::op_builder::build_all_borrow_array_ops;
+    use hugr_core::std_extensions::collections::borrow_array::{
+        self, BArrayOpBuilder, BArrayRepeat, BArrayScan, borrow_array_type,
     };
     use hugr_core::types::Type;
     use hugr_core::{
@@ -949,14 +958,14 @@ mod test {
         let hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
-                build_all_array_ops(builder.dfg_builder_endo([]).unwrap())
+                build_all_borrow_array_ops(builder.dfg_builder_endo([]).unwrap())
                     .finish_sub_container()
                     .unwrap();
                 builder.finish_hugr().unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -968,14 +977,16 @@ mod test {
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
-                let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
-                let (_, arr) = builder.add_array_get(usize_t(), 2, arr, us1).unwrap();
-                builder.add_array_discard(usize_t(), 2, arr).unwrap();
+                let arr = builder.add_new_borrow_array(usize_t(), [us1, us2]).unwrap();
+                let (_, arr) = builder
+                    .add_borrow_array_get(usize_t(), 2, arr, us1)
+                    .unwrap();
+                builder.add_borrow_array_discard(usize_t(), 2, arr).unwrap();
                 builder.finish_hugr_with_outputs([]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -987,15 +998,19 @@ mod test {
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
-                let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
-                let (arr1, arr2) = builder.add_array_clone(usize_t(), 2, arr).unwrap();
-                builder.add_array_discard(usize_t(), 2, arr1).unwrap();
-                builder.add_array_discard(usize_t(), 2, arr2).unwrap();
+                let arr = builder.add_new_borrow_array(usize_t(), [us1, us2]).unwrap();
+                let (arr1, arr2) = builder.add_borrow_array_clone(usize_t(), 2, arr).unwrap();
+                builder
+                    .add_borrow_array_discard(usize_t(), 2, arr1)
+                    .unwrap();
+                builder
+                    .add_borrow_array_discard(usize_t(), 2, arr2)
+                    .unwrap();
                 builder.finish_hugr_with_outputs([]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -1004,15 +1019,15 @@ mod test {
     fn emit_array_value(mut llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
-            .with_outs(vec![array_type(2, usize_t())])
+            .with_outs(vec![borrow_array_type(2, usize_t())])
             .finish(|mut builder| {
                 let vs = vec![ConstUsize::new(1).into(), ConstUsize::new(2).into()];
-                let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), vs));
+                let arr = builder.add_load_value(borrow_array::BArrayValue::new(usize_t(), vs));
                 builder.finish_hugr_with_outputs([arr]).unwrap()
             });
         llvm_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
         });
         check_emission!(hugr, llvm_ctx);
     }
@@ -1028,7 +1043,7 @@ mod test {
     //         .finish(|mut builder| {
     //             // Create an array with the test values
     //             let values = vec![ConstUsize::new(a).into(), ConstUsize::new(b).into()];
-    //             let arr = builder.add_load_value(array::ArrayValue::new(usize_t(), values));
+    //             let arr = builder.add_load_value(borrow_array::BArrayValue::new(usize_t(), values));
 
     //             // Unpack the array
     //             let [val_a, val_b] = builder.add_array_unpack(usize_t(), 2, arr).unwrap().try_into().unwrap();
@@ -1046,7 +1061,7 @@ mod test {
     //         });
     //     exec_ctx.add_extensions(|cge| {
     //         cge.add_default_prelude_extensions()
-    //             .add_default_array_extensions()
+    //             .add_default_borrow_array_extensions()
     //             .add_default_int_extensions()
     //     });
     //     assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1058,7 +1073,7 @@ mod test {
             int_ops::EXTENSION.to_owned(),
             logic::EXTENSION.to_owned(),
             prelude::PRELUDE.to_owned(),
-            array::EXTENSION.to_owned(),
+            borrow_array::EXTENSION.to_owned(),
         ])
     }
 
@@ -1079,10 +1094,10 @@ mod test {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let us2 = builder.add_load_value(ConstUsize::new(2));
-                let arr = builder.add_new_array(usize_t(), [us1, us2]).unwrap();
+                let arr = builder.add_new_borrow_array(usize_t(), [us1, us2]).unwrap();
                 let i = builder.add_load_value(ConstUsize::new(index));
-                let (get_r, arr) = builder.add_array_get(usize_t(), 2, arr, i).unwrap();
-                builder.add_array_discard(usize_t(), 2, arr).unwrap();
+                let (get_r, arr) = builder.add_borrow_array_get(usize_t(), 2, arr, i).unwrap();
+                builder.add_borrow_array_discard(usize_t(), 2, arr).unwrap();
                 let r = {
                     let ot = option_type(usize_t());
                     let variants = (0..ot.num_variants())
@@ -1106,7 +1121,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
@@ -1140,15 +1155,17 @@ mod test {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let i1 = builder.add_load_value(ConstInt::new_u(3, 1).unwrap());
                 let i2 = builder.add_load_value(ConstInt::new_u(3, 2).unwrap());
-                let arr = builder.add_new_array(int_ty.clone(), [i1, i2]).unwrap();
+                let arr = builder
+                    .add_new_borrow_array(int_ty.clone(), [i1, i2])
+                    .unwrap();
                 let index = builder.add_load_value(ConstUsize::new(index));
                 let value = builder.add_load_value(ConstInt::new_u(3, value).unwrap());
                 let get_r = builder
-                    .add_array_set(int_ty.clone(), 2, arr, index, value)
+                    .add_borrow_array_set(int_ty.clone(), 2, arr, index, value)
                     .unwrap();
                 let r = {
                     let res_sum_ty = {
-                        let row = vec![int_ty.clone(), array_type(2, int_ty.clone())];
+                        let row = vec![int_ty.clone(), borrow_array_type(2, int_ty.clone())];
                         either_type(row.clone(), row)
                     };
                     let variants = (0..res_sum_ty.num_variants())
@@ -1173,11 +1190,15 @@ mod test {
                             builder.add_load_value(ConstInt::new_u(3, expected_arr[0]).unwrap());
                         let expected_arr_1 =
                             builder.add_load_value(ConstInt::new_u(3, expected_arr[1]).unwrap());
-                        let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
+                        let (r, arr) = builder
+                            .add_borrow_array_get(int_ty.clone(), 2, arr, us0)
+                            .unwrap();
                         let [arr_0] = builder
                             .build_unwrap_sum(1, option_type(int_ty.clone()), r)
                             .unwrap();
-                        let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
+                        let (r, arr) = builder
+                            .add_borrow_array_get(int_ty.clone(), 2, arr, us1)
+                            .unwrap();
                         let [arr_1] = builder
                             .build_unwrap_sum(1, option_type(int_ty.clone()), r)
                             .unwrap();
@@ -1186,7 +1207,9 @@ mod test {
                         let arr_1_eq = builder.add_ieq(3, arr_1, expected_arr_1).unwrap();
                         let r = builder.add_and(elem_eq, arr_0_eq).unwrap();
                         let r = builder.add_and(r, arr_1_eq).unwrap();
-                        builder.add_array_discard(int_ty.clone(), 2, arr).unwrap();
+                        builder
+                            .add_borrow_array_discard(int_ty.clone(), 2, arr)
+                            .unwrap();
                         builder.finish_with_outputs([r]).unwrap();
                     }
                     builder.finish_sub_container().unwrap().out_wire(0)
@@ -1211,7 +1234,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1240,7 +1263,7 @@ mod test {
         //  - The swap operation succeeded iff `expected_succeeded`
 
         let int_ty = int_type(3);
-        let arr_ty = array_type(2, int_ty.clone());
+        let arr_ty = borrow_array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
             .with_outs(usize_t())
             .with_extensions(exec_registry())
@@ -1249,12 +1272,14 @@ mod test {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
                 let i1 = builder.add_load_value(ConstInt::new_u(3, 1).unwrap());
                 let i2 = builder.add_load_value(ConstInt::new_u(3, 2).unwrap());
-                let arr = builder.add_new_array(int_ty.clone(), [i1, i2]).unwrap();
+                let arr = builder
+                    .add_new_borrow_array(int_ty.clone(), [i1, i2])
+                    .unwrap();
 
                 let index1 = builder.add_load_value(ConstUsize::new(index1));
                 let index2 = builder.add_load_value(ConstUsize::new(index2));
                 let r = builder
-                    .add_array_swap(int_ty.clone(), 2, arr, index1, index2)
+                    .add_borrow_array_swap(int_ty.clone(), 2, arr, index1, index2)
                     .unwrap();
                 let [arr, was_expected_success] = {
                     let mut conditional = builder
@@ -1281,11 +1306,15 @@ mod test {
                     }
                     conditional.finish_sub_container().unwrap().outputs_arr()
                 };
-                let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
+                let (r, arr) = builder
+                    .add_borrow_array_get(int_ty.clone(), 2, arr, us0)
+                    .unwrap();
                 let elem_0 = builder
                     .build_unwrap_sum::<1>(1, option_type(int_ty.clone()), r)
                     .unwrap()[0];
-                let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
+                let (r, arr) = builder
+                    .add_borrow_array_get(int_ty.clone(), 2, arr, us1)
+                    .unwrap();
                 let elem_1 = builder
                     .build_unwrap_sum::<1>(1, option_type(int_ty.clone()), r)
                     .unwrap()[0];
@@ -1313,12 +1342,14 @@ mod test {
                         .unwrap();
                     conditional.finish_sub_container().unwrap().out_wire(0)
                 };
-                builder.add_array_discard(int_ty.clone(), 2, arr).unwrap();
+                builder
+                    .add_borrow_array_discard(int_ty.clone(), 2, arr)
+                    .unwrap();
                 builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1336,7 +1367,7 @@ mod test {
         // - Returns the unchanged element of the cloned array
 
         let int_ty = int_type(3);
-        let arr_ty = array_type(2, int_ty.clone());
+        let arr_ty = borrow_array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
             .with_outs(int_ty.clone())
             .with_extensions(exec_registry())
@@ -1345,11 +1376,15 @@ mod test {
                 let i1 = builder.add_load_value(ConstInt::new_u(3, 1).unwrap());
                 let i2 = builder.add_load_value(ConstInt::new_u(3, 2).unwrap());
                 let inew = builder.add_load_value(ConstInt::new_u(3, new_v).unwrap());
-                let arr = builder.add_new_array(int_ty.clone(), [i1, i2]).unwrap();
+                let arr = builder
+                    .add_new_borrow_array(int_ty.clone(), [i1, i2])
+                    .unwrap();
 
-                let (arr, arr_clone) = builder.add_array_clone(int_ty.clone(), 2, arr).unwrap();
+                let (arr, arr_clone) = builder
+                    .add_borrow_array_clone(int_ty.clone(), 2, arr)
+                    .unwrap();
                 let r = builder
-                    .add_array_set(int_ty.clone(), 2, arr, idx, inew)
+                    .add_borrow_array_set(int_ty.clone(), 2, arr, idx, inew)
                     .unwrap();
                 let [_, arr] = builder
                     .build_unwrap_sum(
@@ -1362,20 +1397,22 @@ mod test {
                     )
                     .unwrap();
                 let (r, arr_clone) = builder
-                    .add_array_get(int_ty.clone(), 2, arr_clone, idx)
+                    .add_borrow_array_get(int_ty.clone(), 2, arr_clone, idx)
                     .unwrap();
                 let [elem] = builder
                     .build_unwrap_sum(1, option_type(int_ty.clone()), r)
                     .unwrap();
-                builder.add_array_discard(int_ty.clone(), 2, arr).unwrap();
                 builder
-                    .add_array_discard(int_ty.clone(), 2, arr_clone)
+                    .add_borrow_array_discard(int_ty.clone(), 2, arr)
+                    .unwrap();
+                builder
+                    .add_borrow_array_discard(int_ty.clone(), 2, arr_clone)
                     .unwrap();
                 builder.finish_hugr_with_outputs([elem]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
                 .add_logic_extensions()
         });
@@ -1408,17 +1445,17 @@ mod test {
                     .map(|&i| builder.add_load_value(ConstInt::new_u(6, i).unwrap()))
                     .collect_vec();
                 let mut arr = builder
-                    .add_new_array(int_ty.clone(), new_array_args)
+                    .add_new_borrow_array(int_ty.clone(), new_array_args)
                     .unwrap();
                 for (i, left) in from_left.iter().enumerate() {
                     let array_size = (array_contents.len() - i) as u64;
                     let pop_res = if *left {
                         builder
-                            .add_array_pop_left(int_ty.clone(), array_size, arr)
+                            .add_borrow_array_pop_left(int_ty.clone(), array_size, arr)
                             .unwrap()
                     } else {
                         builder
-                            .add_array_pop_right(int_ty.clone(), array_size, arr)
+                            .add_borrow_array_pop_right(int_ty.clone(), array_size, arr)
                             .unwrap()
                     };
                     let [elem, new_arr] = builder
@@ -1426,7 +1463,7 @@ mod test {
                             1,
                             option_type(vec![
                                 int_ty.clone(),
-                                array_type(array_size - 1, int_ty.clone()),
+                                borrow_array_type(array_size - 1, int_ty.clone()),
                             ]),
                             pop_res,
                         )
@@ -1435,7 +1472,7 @@ mod test {
                     r = builder.add_iadd(6, r, elem).unwrap();
                 }
                 builder
-                    .add_array_discard(
+                    .add_borrow_array_discard(
                         int_ty.clone(),
                         (array_contents.len() - from_left.len()) as u64,
                         arr,
@@ -1445,7 +1482,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1470,7 +1507,7 @@ mod test {
             .with_outs(int_ty.clone())
             .with_extensions(exec_registry())
             .finish(|mut builder| {
-                let array = array::ArrayValue::new(
+                let array = borrow_array::BArrayValue::new(
                     int_ty.clone(),
                     array_contents
                         .iter()
@@ -1479,7 +1516,7 @@ mod test {
                 );
                 let array = builder.add_load_value(array);
                 let unpacked = builder
-                    .add_array_unpack(int_ty.clone(), array_contents.len() as u64, array)
+                    .add_borrow_array_unpack(int_ty.clone(), array_contents.len() as u64, array)
                     .unwrap();
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for elem in unpacked {
@@ -1490,7 +1527,7 @@ mod test {
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
         });
         assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1525,26 +1562,26 @@ mod test {
                 let v = func.add_load_value(ConstInt::new_u(6, value).unwrap());
                 let func_id = func.finish_with_outputs(vec![v]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let repeat = ArrayRepeat::new(int_ty.clone(), size);
+                let repeat = BArrayRepeat::new(int_ty.clone(), size);
                 let arr = builder
                     .add_dataflow_op(repeat, vec![func_v])
                     .unwrap()
                     .out_wire(0);
                 let idx_v = builder.add_load_value(ConstUsize::new(idx));
                 let (get_res, arr) = builder
-                    .add_array_get(int_ty.clone(), size, arr, idx_v)
+                    .add_borrow_array_get(int_ty.clone(), size, arr, idx_v)
                     .unwrap();
                 let [elem] = builder
                     .build_unwrap_sum(1, option_type(vec![int_ty.clone()]), get_res)
                     .unwrap();
                 builder
-                    .add_array_discard(int_ty.clone(), size, arr)
+                    .add_borrow_array_discard(int_ty.clone(), size, arr)
                     .unwrap();
                 builder.finish_hugr_with_outputs([elem]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
         });
         assert_eq!(value, exec_ctx.exec_hugr_u64(hugr, "main"));
@@ -1570,7 +1607,7 @@ mod test {
                     .map(|i| builder.add_load_value(ConstInt::new_u(6, i).unwrap()))
                     .collect_vec();
                 let arr = builder
-                    .add_new_array(int_ty.clone(), new_array_args)
+                    .add_new_borrow_array(int_ty.clone(), new_array_args)
                     .unwrap();
 
                 let mut mb = builder.module_root_builder();
@@ -1585,7 +1622,7 @@ mod test {
                 let out = func.add_iadd(6, elem, delta).unwrap();
                 let func_id = func.finish_with_outputs(vec![out]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let scan = ArrayScan::new(int_ty.clone(), int_ty.clone(), vec![], size);
+                let scan = BArrayScan::new(int_ty.clone(), int_ty.clone(), vec![], size);
                 let mut arr = builder
                     .add_dataflow_op(scan, [arr, func_v])
                     .unwrap()
@@ -1594,14 +1631,14 @@ mod test {
                 for i in 0..size {
                     let array_size = size - i;
                     let pop_res = builder
-                        .add_array_pop_left(int_ty.clone(), array_size, arr)
+                        .add_borrow_array_pop_left(int_ty.clone(), array_size, arr)
                         .unwrap();
                     let [elem, new_arr] = builder
                         .build_unwrap_sum(
                             1,
                             option_type(vec![
                                 int_ty.clone(),
-                                array_type(array_size - 1, int_ty.clone()),
+                                borrow_array_type(array_size - 1, int_ty.clone()),
                             ]),
                             pop_res,
                         )
@@ -1610,13 +1647,13 @@ mod test {
                     r = builder.add_iadd(6, r, elem).unwrap();
                 }
                 builder
-                    .add_array_discard_empty(int_ty.clone(), arr)
+                    .add_borrow_array_discard_empty(int_ty.clone(), arr)
                     .unwrap();
                 builder.finish_hugr_with_outputs([r]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
         });
         let expected: u64 = (inc..size + inc).sum();
@@ -1641,7 +1678,7 @@ mod test {
                     .map(|i| builder.add_load_value(ConstInt::new_u(6, i).unwrap()))
                     .collect_vec();
                 let arr = builder
-                    .add_new_array(int_ty.clone(), new_array_args)
+                    .add_new_borrow_array(int_ty.clone(), new_array_args)
                     .unwrap();
 
                 let mut mb = builder.module_root_builder();
@@ -1662,18 +1699,20 @@ mod test {
                     .out_wire(0);
                 let func_id = func.finish_with_outputs(vec![unit, acc]).unwrap();
                 let func_v = builder.load_func(func_id.handle(), &[]).unwrap();
-                let scan = ArrayScan::new(int_ty.clone(), Type::UNIT, vec![int_ty.clone()], size);
+                let scan = BArrayScan::new(int_ty.clone(), Type::UNIT, vec![int_ty.clone()], size);
                 let zero = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 let [arr, sum] = builder
                     .add_dataflow_op(scan, [arr, func_v, zero])
                     .unwrap()
                     .outputs_arr();
-                builder.add_array_discard(Type::UNIT, size, arr).unwrap();
+                builder
+                    .add_borrow_array_discard(Type::UNIT, size, arr)
+                    .unwrap();
                 builder.finish_hugr_with_outputs([sum]).unwrap()
             });
         exec_ctx.add_extensions(|cge| {
             cge.add_default_prelude_extensions()
-                .add_default_array_extensions()
+                .add_default_borrow_array_extensions()
                 .add_default_int_extensions()
         });
         let expected: u64 = (0..size).sum();
