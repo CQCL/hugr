@@ -612,7 +612,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         elem_ty: Type,
         input: Wire,
     ) -> Result<(), BuildError> {
-        self.add_generic_array_discard_empty::<Array>(elem_ty, input)
+        self.add_generic_array_discard_empty::<BorrowArray>(elem_ty, input)
     }
 
     /// Adds a borrow array borrow operation to the dataflow graph.
