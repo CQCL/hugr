@@ -70,7 +70,7 @@ smallvec = "1.15.1"
 smol_str = "0.3.1"
 static_assertions = "1.1.0"
 strum = "0.27.2"
-tempfile = "3.21"
+tempfile = "3.22"
 thiserror = "2.0.16"
 typetag = "0.2.20"
 clap = { version = "4.5.47" }
