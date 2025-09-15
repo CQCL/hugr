@@ -610,10 +610,10 @@ pub(crate) mod test {
             (ins_decl.node(), decl_mode),
         ]);
         let inserted = if view {
-            fb.add_view_with_wires_link_nodes(&insert, [], link_spec)
+            fb.add_link_view_by_node_with_wires(&insert, [], link_spec)
                 .unwrap()
         } else {
-            fb.add_hugr_with_wires_link_nodes(insert, [], link_spec)
+            fb.add_link_hugr_by_node_with_wires(insert, [], link_spec)
                 .unwrap()
         };
         let h = fb.finish_hugr_with_outputs(inserted.outputs()).unwrap();

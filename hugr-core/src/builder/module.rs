@@ -4,13 +4,14 @@ use super::{
     dataflow::{DFGBuilder, FunctionBuilder},
 };
 
-use crate::hugr::internal::HugrMutInternals;
-use crate::hugr::views::HugrView;
+use crate::hugr::linking::{HugrLinking, NodeLinkingDirectives, NodeLinkingError};
+use crate::hugr::{
+    ValidationError, hugrmut::InsertedForest, internal::HugrMutInternals, views::HugrView,
+};
 use crate::ops;
 use crate::ops::handle::{AliasID, FuncID, NodeHandle};
 use crate::types::{PolyFuncType, Type, TypeBound};
-use crate::{Hugr, Node, Visibility};
-use crate::{hugr::ValidationError, ops::FuncDefn};
+use crate::{Hugr, Node, Visibility, ops::FuncDefn};
 
 use smol_str::SmolStr;
 
@@ -220,17 +221,48 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
         Ok(AliasID::new(node, name, bound))
     }
+
+    /// Adds some module-children of another Hugr to this module, with
+    /// linking directives specified explicitly by [Node].
+    ///
+    /// `children` contains a map from the children of `other` to insert,
+    /// to how they should be combined with the nodes in `self`. Note if
+    /// this map is empty, nothing is added.
+    pub fn link_hugr_by_node(
+        &mut self,
+        other: Hugr,
+        children: NodeLinkingDirectives<Node, Node>,
+    ) -> Result<InsertedForest, NodeLinkingError> {
+        self.hugr_mut()
+            .insert_link_hugr_by_node(None, other, children)
+    }
+
+    /// Copies module-children from a HugrView to this module, with
+    /// linking directives specified explicitly by [Node].
+    ///
+    /// `children` contains a map from the children of `other` to copy,
+    /// to how they should be combined with the nodes in `self`. Note if
+    /// this map is empty, nothing is added.
+    pub fn link_view_by_node<H: HugrView>(
+        &mut self,
+        other: &H,
+        children: NodeLinkingDirectives<H::Node, Node>,
+    ) -> Result<InsertedForest<H::Node>, NodeLinkingError<H::Node>> {
+        self.hugr_mut()
+            .insert_link_view_by_node(None, other, children)
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::{HashMap, HashSet};
+
     use cool_asserts::assert_matches;
 
+    use crate::builder::test::dfg_calling_defn_decl;
+    use crate::builder::{Dataflow, DataflowSubContainer, test::n_identity};
     use crate::extension::prelude::usize_t;
-    use crate::{
-        builder::{Dataflow, DataflowSubContainer, test::n_identity},
-        types::Signature,
-    };
+    use crate::{hugr::linking::NodeLinkingDirective, ops::OpType, types::Signature};
 
     use super::*;
     #[test]
@@ -288,5 +320,50 @@ mod test {
         hugr.validate()?;
 
         Ok(())
+    }
+
+    #[test]
+    fn link_by_node() {
+        let mut mb = ModuleBuilder::new();
+        let (dfg, defn, decl) = dfg_calling_defn_decl();
+        let added = mb
+            .link_view_by_node(
+                &dfg,
+                HashMap::from([
+                    (defn.node(), NodeLinkingDirective::add()),
+                    (decl.node(), NodeLinkingDirective::add()),
+                ]),
+            )
+            .unwrap();
+        let n_defn = added.node_map[&defn.node()];
+        let n_decl = added.node_map[&decl.node()];
+        let h = mb.hugr();
+        assert_eq!(h.children(h.module_root()).count(), 2);
+        h.validate().unwrap();
+        let old_name = match mb.hugr_mut().optype_mut(n_defn) {
+            OpType::FuncDefn(fd) => std::mem::replace(fd.func_name_mut(), "new".to_string()),
+            _ => panic!(),
+        };
+        let main = dfg.get_parent(dfg.entrypoint()).unwrap();
+        assert_eq!(
+            dfg.get_optype(main).as_func_defn().unwrap().func_name(),
+            "main"
+        );
+        mb.link_hugr_by_node(
+            dfg,
+            HashMap::from([
+                (main, NodeLinkingDirective::add()),
+                (decl.node(), NodeLinkingDirective::UseExisting(n_defn)),
+                (defn.node(), NodeLinkingDirective::replace([n_decl])),
+            ]),
+        )
+        .unwrap();
+        let h = mb.finish_hugr().unwrap();
+        assert_eq!(
+            h.children(h.module_root())
+                .map(|n| h.get_optype(n).as_func_defn().unwrap().func_name().as_str())
+                .collect::<HashSet<_>>(),
+            HashSet::from(["main", "new", old_name.as_str()])
+        );
     }
 }
