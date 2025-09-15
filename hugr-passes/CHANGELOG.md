@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.2...hugr-passes-v0.22.3) - 2025-09-11
+
+### New Features
+
+- SiblingSubgraph supports function calls ([#2528](https://github.com/CQCL/hugr/pull/2528))
+
 ## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.0...hugr-passes-v0.22.1) - 2025-07-28
 
 ### New Features
