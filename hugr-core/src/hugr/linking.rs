@@ -607,7 +607,9 @@ impl NameLinkingPolicy {
                 let LinkAction::LinkNode(dirv) = &act;
                 if let NodeLinkingDirective::Add { .. } = dirv {
                     to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
-                        CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
+                        CallGraphNode::FuncDecl(n)
+                        | CallGraphNode::FuncDefn(n)
+                        | CallGraphNode::Const(n) => *n,
                         CallGraphNode::NonFuncEntrypoint => unreachable!("cannot call non-func"),
                     }));
                 }
@@ -1204,11 +1206,9 @@ mod test {
 
     #[rstest]
     #[case(MultipleImplHandling::UseNew, vec![11], false, vec![5, 11])] // Existing constant is not removed
-    #[should_panic] // ALAN TODO FIX - UnconnectedPort as Const not copied
     #[case(MultipleImplHandling::UseNew, vec![11], true, vec![5, 11])]
     #[case(MultipleImplHandling::UseExisting, vec![5], true, vec![5])]
     #[case(MultipleImplHandling::UseExisting, vec![5], false, vec![5, 11])]
-    #[should_panic] // ALAN TODO FIX
     #[case(NewFuncHandling::Add.into(), vec![5, 11], true, vec![5,11])]
     #[case(NewFuncHandling::Add.into(), vec![5, 11], false, vec![5,11])]
     #[case(NewFuncHandling::RaiseError.into(), vec![], true, vec![])] // filter_private ignored

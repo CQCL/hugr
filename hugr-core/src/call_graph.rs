@@ -12,6 +12,8 @@ pub enum CallGraphEdge<N = Node> {
     Call(N),
     /// Edge corresponds to a [`LoadFunction`](OpType::LoadFunction) node (specified) in the Hugr
     LoadFunction(N),
+    /// Edge corresponds to a [LoadConstant](OpType::LoadConstant) node (specified) in the Hugr
+    LoadConstant(N),
 }
 
 /// Weight for a petgraph-node in a [`CallGraph`]
@@ -24,6 +26,9 @@ pub enum CallGraphNode<N = Node> {
     /// a [`FuncDefn`](OpType::FuncDefn). Note that it will not be a [Module](OpType::Module)
     /// either, as such a node could not have edges, so is not represented in the petgraph.
     NonFuncEntrypoint,
+    /// petgraph-node corresponds to a constant; will have no outgoing edges, and incoming
+    /// edges will be [CallGraphEdge::Const]
+    Const(N),
 }
 
 /// Details the [`Call`]s and [`LoadFunction`]s in a Hugr.
@@ -55,6 +60,7 @@ impl<N: HugrNode> CallGraph<N> {
                 let weight = match hugr.get_optype(n) {
                     OpType::FuncDecl(_) => CallGraphNode::FuncDecl(n),
                     OpType::FuncDefn(_) => CallGraphNode::FuncDefn(n),
+                    OpType::Const(_) => CallGraphNode::Const(n),
                     _ => return None,
                 };
                 Some((n, g.add_node(weight)))
@@ -77,17 +83,21 @@ impl<N: HugrNode> CallGraph<N> {
             node_to_g: &HashMap<N, petgraph::graph::NodeIndex<u32>>,
         ) {
             for ch in h.children(node) {
-                if h.get_optype(ch).is_func_defn() {
-                    continue;
-                }
                 traverse(h, enclosing_func, ch, g, node_to_g);
                 let weight = match h.get_optype(ch) {
                     OpType::Call(_) => CallGraphEdge::Call(ch),
                     OpType::LoadFunction(_) => CallGraphEdge::LoadFunction(ch),
+                    OpType::LoadConstant(_) => CallGraphEdge::LoadConstant(ch),
                     _ => continue,
                 };
                 if let Some(target) = h.static_source(ch) {
-                    g.add_edge(enclosing_func, *node_to_g.get(&target).unwrap(), weight);
+                    if h.get_parent(target) == Some(h.module_root()) {
+                        g.add_edge(enclosing_func, node_to_g[&target], weight);
+                    } else {
+                        assert!(!node_to_g.contains_key(&target));
+                        assert!(h.get_optype(ch).is_load_constant());
+                        assert!(h.get_optype(target).is_const());
+                    }
                 }
             }
         }
