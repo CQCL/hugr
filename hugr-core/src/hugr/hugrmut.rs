@@ -180,11 +180,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert another hugr into this one, under a given parent node. Edges into the
     /// inserted subtree (i.e. nonlocal or static) will be disconnected in `self`.
-    /// (See [Self::insert_forest] for a way to insert sources of such edges as well.)
+    /// (See [Self::insert_forest] or trait [HugrLinking] for methods that can
+    /// preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_hugr(&mut self, root: Self::Node, other: Hugr) -> InsertionResult<Node, Self::Node> {
         let region = other.entrypoint();
         Self::insert_region(self, root, other, region)
@@ -192,13 +195,15 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Insert a subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_forest] for a way to preserve such edges by
-    /// inserting their sources as well.)
+    /// in `self`. (See [Self::insert_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also inserting their sources.)
     ///
     /// # Panics
     ///
     /// - If the root node is not in the graph.
     /// - If the `region` node is not in `other`.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_region(
         &mut self,
         root: Self::Node,
@@ -217,12 +222,14 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Copy the entrypoint subtree of another hugr into this one, under a given parent node.
     /// Edges into the inserted subtree (i.e. nonlocal or static) will be disconnected
-    /// in `self`. (See [Self::insert_view_forest] for a way to insert sources of such edges
-    /// as well.)
+    /// in `self`. (See [Self::insert_view_forest] or trait [HugrLinking] for methods that
+    /// can preserve such edges by also copying their sources.)
     ///
     /// # Panics
     ///
     /// If the root node is not in the graph.
+    ///
+    /// [HugrLinking]: super::linking::HugrLinking
     fn insert_from_view<H: HugrView>(
         &mut self,
         root: Self::Node,
@@ -725,15 +732,15 @@ fn insert_forest_internal<H: HugrView>(
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use cool_asserts::assert_matches;
     use itertools::Itertools;
-    use rstest::{fixture, rstest};
+    use rstest::rstest;
 
-    use crate::builder::test::simple_dfg_hugr;
-    use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder};
+    use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
+
     use crate::extension::PRELUDE;
-    use crate::extension::prelude::{Noop, bool_t, usize_t};
+    use crate::extension::prelude::{Noop, usize_t};
     use crate::hugr::ValidationError;
     use crate::ops::handle::{FuncID, NodeHandle};
     use crate::ops::{self, FuncDefn, Input, Output, dataflow::IOTrait};
@@ -817,35 +824,40 @@ mod test {
         assert_eq!(hugr.num_nodes(), 1);
     }
 
-    /// Builds a DFG-entrypoint Hugr (no inputs, one bool_t output) containing two calls,
-    /// to a FuncDefn and a FuncDecl each bool_t->bool_t.
-    /// Returns the Hugr and both function handles.
-    #[fixture]
-    pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
-        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
-        let new_defn = {
-            let mut mb = dfb.module_root_builder();
-            let fb = mb
-                .define_function("helper_id", Signature::new_endo(bool_t()))
-                .unwrap();
-            let [f_inp] = fb.input_wires_arr();
-            fb.finish_with_outputs([f_inp]).unwrap()
-        };
-        let new_decl = dfb
-            .module_root_builder()
-            .declare("helper2", Signature::new_endo(bool_t()).into())
+    pub(in crate::hugr) fn check_calls_defn_decl(h: &Hugr, call1_defn: bool, call2_decl: bool) {
+        if call1_defn && call2_decl {
+            h.validate().unwrap();
+        } else {
+            assert!(matches!(
+                h.validate(),
+                Err(ValidationError::UnconnectedPort { .. })
+            ));
+        }
+        assert_eq!(
+            h.children(h.module_root()).count(),
+            1 + (call1_defn as usize) + (call2_decl as usize)
+        );
+        let [call1, call2] = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_call())
+            .collect_array()
             .unwrap();
-        let cst = dfb.add_load_value(ops::Value::true_val());
-        let [c1] = dfb
-            .call(new_defn.handle(), &[], [cst])
-            .unwrap()
-            .outputs_arr();
-        let [c2] = dfb.call(&new_decl, &[], [c1]).unwrap().outputs_arr();
-        (
-            dfb.finish_hugr_with_outputs([c2]).unwrap(),
-            *new_defn.handle(),
-            new_decl,
-        )
+
+        let tgt1 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_defn()
+                .is_some_and(|fd| fd.func_name() == "helper_id")
+        });
+        assert_eq!(tgt1.is_some(), call1_defn);
+        assert_eq!(h.static_source(call1), tgt1);
+
+        let tgt2 = h.nodes().find(|n| {
+            h.get_optype(*n)
+                .as_func_decl()
+                .is_some_and(|fd| fd.func_name() == "helper2")
+        });
+        assert_eq!(tgt2.is_some(), call2_decl);
+        assert_eq!(h.static_source(call2), tgt2);
     }
 
     #[rstest]
@@ -860,37 +872,7 @@ mod test {
             .chain(copy_defn.then_some((defn.node(), h.module_root())))
             .chain(copy_decl.then_some((decl.node(), h.module_root())));
         h.insert_forest(insert, roots).unwrap();
-        if copy_defn && copy_decl {
-            h.validate().unwrap();
-        } else {
-            assert!(matches!(
-                h.validate(),
-                Err(ValidationError::UnconnectedPort { .. })
-            ));
-        }
-        let expected_mod_children = 1 + (copy_defn as usize) + (copy_decl as usize);
-        assert_eq!(h.children(h.module_root()).count(), expected_mod_children);
-        let [calln1, calln2] = h
-            .nodes()
-            .filter(|n| h.get_optype(*n).is_call())
-            .collect_array()
-            .unwrap();
-
-        let tgt1 = h.nodes().find(|n| {
-            h.get_optype(*n)
-                .as_func_defn()
-                .is_some_and(|fd| fd.func_name() == "helper_id")
-        });
-        assert_eq!(tgt1.is_some(), copy_defn);
-        assert_eq!(h.static_source(calln1), tgt1);
-
-        let tgt2 = h.nodes().find(|n| {
-            h.get_optype(*n)
-                .as_func_decl()
-                .is_some_and(|fd| fd.func_name() == "helper2")
-        });
-        assert_eq!(tgt2.is_some(), copy_decl);
-        assert_eq!(h.static_source(calln2), tgt2);
+        check_calls_defn_decl(&h, copy_defn, copy_decl);
     }
 
     #[rstest]
