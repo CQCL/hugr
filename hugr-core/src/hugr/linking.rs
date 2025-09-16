@@ -581,7 +581,7 @@ impl NameLinkingPolicy {
         sn: SN,
         new: LinkSig,
     ) -> (Result<LinkAction<TN>, NameLinkingError<SN, TN>>, bool) {
-        let just_add = LinkAction::LinkNode(NodeLinkingDirective::add());
+        let just_add = NodeLinkingDirective::add().into();
         let (nfh, err) = match new {
             LinkSig::Private => return (Ok(just_add), self.filter_private),
             LinkSig::Public {
@@ -600,32 +600,22 @@ impl NameLinkingPolicy {
                     if *ex_sig == new_sig {
                         match (existing, new_is_defn, self.multi_impls) {
                             (Either::Left(n), false, _) => {
-                                return (
-                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::UseExisting(*n))),
-                                    false,
-                                );
+                                return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
                             }
                             (Either::Left(n), true, MultipleImplHandling::NewFunc(nfh)) => {
                                 (nfh, NameLinkingError::MultipleImpls(name.clone(), sn, *n))
                             }
                             (Either::Left(n), true, MultipleImplHandling::UseExisting) => {
-                                return (
-                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::UseExisting(*n))),
-                                    false,
-                                );
+                                return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
                             }
                             (Either::Left(n), true, MultipleImplHandling::UseNew) => {
-                                return (
-                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::replace([*n]))),
-                                    false,
-                                );
+                                return (Ok(NodeLinkingDirective::replace([*n]).into()), false);
                             }
                             (Either::Right((n, ns)), _, _) => {
                                 // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
                                 return (
-                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::replace(
-                                        once(n).chain(ns).copied(),
-                                    ))),
+                                    Ok(NodeLinkingDirective::replace(once(n).chain(ns).copied())
+                                        .into()),
                                     false,
                                 );
                             }
@@ -811,11 +801,11 @@ pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 /// A separate enum from [NodeLinkingDirective] to allow [NameLinkingPolicy::to_node_linking]
 /// to specify a greater range of actions than that supported by
 /// [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive]
 pub enum LinkAction<TN> {
     /// Just apply the specified [NodeLinkingDirective].
-    LinkNode(NodeLinkingDirective<TN>),
+    LinkNode(#[from] NodeLinkingDirective<TN>),
 }
 
 /// Details the concrete actions to implement a specific source Hugr into a specific target Hugr.
