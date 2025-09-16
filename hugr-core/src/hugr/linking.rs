@@ -5,7 +5,7 @@ use std::{collections::HashMap, fmt::Display};
 use itertools::{Either, Itertools};
 
 use crate::{
-    Hugr, HugrView, Node,
+    Hugr, HugrView, Node, Visibility,
     core::HugrNode,
     hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
     ops::OpType,
@@ -485,10 +485,9 @@ fn link_sig<H: HugrView + ?Sized>(h: &H, n: H::Node) -> Option<LinkSig<'_>> {
         OpType::Const(_) => return Some(LinkSig::Private),
         _ => return None,
     };
-    Some(if vis.is_public() {
-        LinkSig::Public { name, is_defn, sig }
-    } else {
-        LinkSig::Private
+    Some(match vis {
+        Visibility::Public => LinkSig::Public { name, is_defn, sig },
+        Visibility::Private => LinkSig::Private,
     })
 }
 
