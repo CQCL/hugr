@@ -384,7 +384,7 @@ impl NameLinkingPolicy {
     /// Computes how this policy will act on a specified source (inserted) and target
     /// (host) Hugr.
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView + ?Sized>(
+    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
