@@ -282,7 +282,7 @@ pub enum NewFuncHandling {
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 ///
 /// [Visibility::Public]: crate::Visibility::Public
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum MultipleImplHandling {
     /// Keep the implementation already in the target Hugr. (Edges in the source
@@ -293,13 +293,7 @@ pub enum MultipleImplHandling {
     /// function in the target Hugr will be removed.)
     UseNew,
     /// Proceed as per the specified [NewFuncHandling].
-    NewFunc(NewFuncHandling),
-}
-
-impl From<NewFuncHandling> for MultipleImplHandling {
-    fn from(value: NewFuncHandling) -> Self {
-        Self::NewFunc(value)
-    }
+    NewFunc(#[from] NewFuncHandling),
 }
 
 /// An error in using names to determine how to link functions in source and target Hugrs.
