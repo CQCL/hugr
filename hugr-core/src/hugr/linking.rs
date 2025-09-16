@@ -608,7 +608,7 @@ impl NameLinkingPolicy {
                 if let NodeLinkingDirective::Add { .. } = dirv {
                     to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
                         CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
-                        CallGraphNode::NonFuncRoot => unreachable!("cannot call non-func"),
+                        CallGraphNode::NonFuncEntrypoint => unreachable!("cannot call non-func"),
                     }));
                 }
                 ve.insert(act);
