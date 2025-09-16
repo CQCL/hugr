@@ -1,20 +1,16 @@
 //! Directives and errors relating to linking Hugrs.
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, VecDeque, hash_map::Entry},
     fmt::Display,
+    iter::once,
 };
 
 use itertools::{Either, Itertools};
 
-use crate::{
-    Hugr, HugrView, Node,
-    call_graph::CallGraph,
-    core::HugrNode,
-    hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
-    ops::{FuncDecl, OpType},
-    types::PolyFuncType,
-};
+use crate::call_graph::{CallGraph, CallGraphNode};
+use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
+use crate::{Hugr, HugrView, Node, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// Methods that merge Hugrs, adding static edges between old and inserted nodes.
 ///
@@ -289,7 +285,7 @@ pub trait HugrLinking: HugrMut {
     fn insert_link_hugr(
         &mut self,
         parent: Self::Node,
-        mut other: Hugr,
+        other: Hugr,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, String> {
         let entrypoint_func = {
@@ -305,65 +301,25 @@ pub trait HugrLinking: HugrMut {
         //if entrypoint_func == other.entrypoint() { // Do we need to check this? Ok if parent is self.module_root() ??
         //    return Err(format!("Entrypoint is a top-level function"))
         //}
-        let existing = gather_existing(self);
-        let mut defns_to_make_decls = Vec::new();
-        let per_node = find_reachable(&other, [other.entrypoint()], |n| {
-            if n == other.entrypoint() {
-                Ok(NodeLinkingDirective::add())
-            } else if n == entrypoint_func {
-                // ALAN TODO If there's a matching function in `self` then this is OK
-                Err(format!(
-                    "Adding function {entrypoint_func} would double-copy the entrypoint-subtree"
-                ))
-            } else {
-                Ok(match link_sig(&other, n).unwrap() {
-                    LinkSig::Private => NodeLinkingDirective::add(),
-                    LinkSig::Public { name, is_defn, sig } => match existing.get(name) {
-                        Some((defn_or_decl, ex_sig)) => {
-                            if sig == *ex_sig {
-                                match allow_new_impls.as_ref() {
-                                    None => NodeLinkingDirective::UseExisting(
-                                        *defn_or_decl.as_ref().left_or_else(|(n, _)| n),
-                                    ),
-                                    Some(multi_impls) => {
-                                        directive(name, n, is_defn, defn_or_decl, multi_impls)
-                                            .map_err(|e| e.to_string())?
-                                    }
-                                }
-                            } else {
-                                match allow_new_names {
-                                    None | Some(NewFuncHandling::RaiseError) => {
-                                        return Err(format!(
-                                            "Conflicting signature for function {name} callable from entrypoint"
-                                        ));
-                                    }
-                                    Some(NewFuncHandling::Add) => NodeLinkingDirective::add(),
-                                }
-                            }
-                        }
-                        None => {
-                            if allow_new_names.is_none() {
-                                return Err(format!("New name {name}"));
-                            }
-                            if is_defn && allow_new_impls.is_none() {
-                                defns_to_make_decls.push(n)
-                            }
-                            NodeLinkingDirective::add()
-                        }
-                    },
-                })
+        let pol = policy
+            .to_node_linking_for(&*self, &other, true)
+            .map_err(|e| e.to_string())?;
+        if matches!(
+            pol.get(&entrypoint_func),
+            Some(LinkAction::LinkNode(NodeLinkingDirective::Add { .. }))
+        ) {
+            if entrypoint_func != other.entrypoint() {
+                return Err(format!(
+                    "Entrypoint is contained in function {entrypoint_func} which would be inserted"
+                ));
             }
-        })?;
-        for n in defns_to_make_decls {
-            while let Some(c) = other.first_child(n) {
-                other.remove_subtree(c)
-            }
-            let o = other.optype_mut(n);
-            let OpType::FuncDefn(fd) = o else { panic!() };
-            *o = FuncDecl::new(fd.func_name().clone(), fd.signature().clone()).into();
         }
+        let per_node = pol
+            .into_iter()
+            .map(|(k, LinkAction::LinkNode(v))| (k, v))
+            .collect();
         Ok(self
-            .add_hugr_link_nodes(Some(parent), other, per_node)
+            .insert_link_hugr_by_node(Some(parent), other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 }
@@ -483,12 +439,12 @@ pub enum NewFuncHandling {
     /// If the new function is reachable, then add it (as per [Self::Add]);
     /// otherwise, skip it.
     AddIfReached,
-    /// If the new function is reachable, then add it but make it [Private];
-    /// otherwise, just skip it. (This always avoids making the Hugr invalid.)
-    ///
-    /// [Private]: crate::Visibility::Private
+    // /// If the new function is reachable, then add it but make it [Private];
+    // /// otherwise, just skip it. (This always avoids making the Hugr invalid.)
+    // ///
+    // /// [Private]: crate::Visibility::Private
     // ALAN note this really is MakePrivateIfReached, but I don't see much point in the other.
-    MakePrivate,
+    // MakePrivate,
 }
 
 /// What to do when both target and inserted Hugr
@@ -617,17 +573,16 @@ impl NameLinkingPolicy {
         self.to_node_linking_for(target, source, false)
     }
 
-    // TODO return Result<NodeLinkingDirective,> ? Does NLD::add mean, traverse, but NLD::use_ex mean, don't traverse?
-    // TODO(2): add NodeLinkingDirective::MakePrivate?? What about ConvertToDecl ??
     fn process<SN: Display, TN: Copy + Display + std::fmt::Debug>(
         &self,
         existing: &HashMap<&String, PubFuncs<TN>>,
         sn: SN,
         new: LinkSig,
         reached: bool,
-    ) -> Result<bool, NameLinkingError<SN, TN>> {
+    ) -> Result<Option<LinkAction<TN>>, NameLinkingError<SN, TN>> {
+        let just_add = LinkAction::LinkNode(NodeLinkingDirective::add());
         let (nfh, err) = match new {
-            LinkSig::Private => return Ok(reached),
+            LinkSig::Private => return Ok(reached.then_some(just_add)),
             LinkSig::Public {
                 name,
                 is_defn: new_is_defn,
@@ -640,35 +595,57 @@ impl NameLinkingPolicy {
                         src_node: sn,
                     },
                 ),
-                Some((existing, ex_sig)) => match (*ex_sig == new_sig, existing) {
-                    (false, ex) => (
-                        self.sig_conflict,
-                        NameLinkingError::SignatureConflict {
-                            name: name.clone(),
-                            src_node: sn,
-                            src_sig: new_sig.clone().into(),
-                            tgt_node: *ex.as_ref().left_or_else(|(n, _)| n),
-                            tgt_sig: (*ex_sig).clone().into(),
-                        },
-                    ),
-                    (true, Either::Left(n)) => match (new_is_defn, self.multi_impls) {
-                        (false, _) => return Ok(false), // but add to dirvs
-                        (true, MultipleImplHandling::NewFunc(nfh)) => {
-                            (nfh, NameLinkingError::MultipleImpls(name.clone(), sn, *n))
+                Some((existing, ex_sig)) => {
+                    if *ex_sig == new_sig {
+                        match (existing, new_is_defn, self.multi_impls) {
+                            (Either::Left(n), false, _) => {
+                                return Ok(Some(LinkAction::LinkNode(
+                                    NodeLinkingDirective::UseExisting(*n),
+                                )));
+                            }
+                            (Either::Left(n), true, MultipleImplHandling::NewFunc(nfh)) => {
+                                (nfh, NameLinkingError::MultipleImpls(name.clone(), sn, *n))
+                            }
+                            (Either::Left(n), true, MultipleImplHandling::UseExisting) => {
+                                return Ok(Some(LinkAction::LinkNode(
+                                    NodeLinkingDirective::UseExisting(*n),
+                                )));
+                            }
+                            (Either::Left(n), true, MultipleImplHandling::UseNew) => {
+                                return Ok(Some(LinkAction::LinkNode(
+                                    NodeLinkingDirective::replace([*n]),
+                                )));
+                            }
+                            (Either::Right((n, ns)), _, _) => {
+                                return Ok(Some(
+                                    // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
+                                    LinkAction::LinkNode(NodeLinkingDirective::replace(
+                                        once(n).chain(ns).copied(),
+                                    )),
+                                ));
+                            }
                         }
-                        (true, MultipleImplHandling::UseExisting) => return Ok(false), // do not traverse into new body, ignore. TODO need to record somehow that we must NodeLinkingDirective::UseExisting.
-                        (true, MultipleImplHandling::UseNew) => return Ok(true),
-                    },
-                    (true, Either::Right((n, _ns))) => return Ok(true), //if decl, just add to dirvs
-                },
+                    } else {
+                        (
+                            self.sig_conflict,
+                            NameLinkingError::SignatureConflict {
+                                name: name.clone(),
+                                src_node: sn,
+                                src_sig: new_sig.clone().into(),
+                                tgt_node: *existing.as_ref().left_or_else(|(n, _)| n),
+                                tgt_sig: (*ex_sig).clone().into(),
+                            },
+                        )
+                    }
+                }
             },
         };
         match nfh {
             NewFuncHandling::RaiseError => Err(err),
             NewFuncHandling::ErrorIfReached if reached => Err(err),
-            NewFuncHandling::Add => Ok(true),
-            NewFuncHandling::AddIfReached | NewFuncHandling::MakePrivate if reached => Ok(true), // TODO and record MakePrivate
-            _ => Ok(false),
+            NewFuncHandling::AddIfReached if !reached => Ok(None),
+            //NewFuncHandling::MakePrivate if reached => Ok(true), // TODO and record MakePrivate
+            _ => Ok(Some(just_add)),
         }
     }
 
@@ -688,67 +665,32 @@ impl NameLinkingPolicy {
         let mut dirvs = LinkActions::new();
         for sn in source.children(source.module_root()) {
             if let Some(ls) = link_sig(source, sn) {
-                if self.process(&existing, sn, ls, false)? {
+                if self.process(&existing, sn, ls, false)?.is_some() {
                     to_visit.push_back(sn);
                 }
             }
         }
-
+        // Note: we could optimize the case where self.filter_private is false,
+        // by adding directly to results above, skipping this reachability traversal
         while let Some(sn) = to_visit.pop_front() {
             let Entry::Vacant(ve) = dirvs.entry(sn) else {
                 continue;
             };
             // Hmmm, this will skip consts, we could consider as private
-            let Some(ls) = link_sig(source, sn) else {
-                continue;
-            };
-            if self.process(&existing, sn, ls, true)? {
-                ve.insert(something);
+            if let Some(ls) = link_sig(source, sn) {
+                let Some(act) = self.process(&existing, sn, ls, true)? else {
+                    unreachable!("process never returns `None` when given reached==true")
+                };
+                let LinkAction::LinkNode(dirv) = act; // for now
+                if let NodeLinkingDirective::Add { .. } = dirv {
+                    to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
+                        CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
+                        CallGraphNode::NonFuncRoot => unreachable!("cannot call non-func"),
+                    }));
+                }
             }
         }
-
-        let NameLinkingPolicy {
-            new_names,
-            sig_conflict,
-            multi_impls,
-            filter_private: _,
-        } = self;
-        for n in source.children(source.module_root()) {
-            let dirv = match link_sig(source, n) {
-                Some(LinkSig::Private) if !self.filter_private => NodeLinkingDirective::add(),
-                Some(LinkSig::Public { name, is_defn, sig }) => {
-                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
-                        match *sig_conflict {
-                            _ if sig == *ex_sig => {
-                                match directive(name, n, is_defn, ex_ns, multi_impls)? {
-                                    Some(dirv) => dirv,
-                                    None => continue,
-                                }
-                            }
-                            NewFuncHandling::RaiseError => {
-                                return Err(NameLinkingError::SignatureConflict {
-                                    name: name.clone(),
-                                    src_node: n,
-                                    src_sig: Box::new(sig.clone()),
-                                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
-                                    tgt_sig: Box::new((*ex_sig).clone()),
-                                });
-                            }
-                            NewFuncHandling::Add => NodeLinkingDirective::add(),
-                        }
-                    } else {
-                        NodeLinkingDirective::add()
-                    }
-                }
-                _ => continue,
-            };
-            dirvs.insert(n, LinkAction::LinkNode(dirv));
-        }
-        if self.filter_private {
-            find_reachable(source, dirvs.keys().copied(), |n| Ok(dirvs[&n].clone()))
-        } else {
-            Ok(dirvs)
-        }
+        Ok(dirvs)
     }
 }
 
@@ -793,53 +735,11 @@ fn directive<SN: Display, TN: HugrNode>(
                     }
                     NewFuncHandling::Add | NewFuncHandling::AddIfReached => {
                         NodeLinkingDirective::add()
-                    }
-                    NewFuncHandling::MakePrivate => todo!("ALAN"),
+                    } //NewFuncHandling::MakePrivate => todo!("ALAN"),
                 }
             }
         },
     }))
-}
-
-fn find_reachable<H: HugrView + ?Sized, TN, E>(
-    h: &H,
-    starts: impl IntoIterator<Item = H::Node>,
-    mut pub_callback: impl FnMut(H::Node) -> Result<NodeLinkingDirective<TN>, E>,
-) -> Result<NodeLinkingDirectives<H::Node, TN>, E> {
-    let mut queue = VecDeque::from_iter(starts);
-    let mut res = HashMap::new();
-    while let Some(n) = queue.pop_front() {
-        if res.contains_key(&n) {
-            continue;
-        }
-        debug_assert!(h.get_parent(n) == Some(h.module_root()) || n == h.entrypoint());
-        let nld = match link_sig(h, n) {
-            // This handles the case where `starts` includes the entrypoint.
-            None | Some(LinkSig::Private) => NodeLinkingDirective::add(),
-            Some(LinkSig::Public { .. }) => pub_callback(n)?,
-        };
-
-        if matches!(nld, NodeLinkingDirective::Add { .. }) {
-            // Would be great to use a CallGraph here but that is in hugr-passes
-            // and we cannot have a cyclic dependency between crates !!
-            // Also call-graph does not deal with (potentially-module-level) Constants.
-            for d in h.descendants(n) {
-                if matches!(
-                    h.get_optype(d),
-                    OpType::LoadConstant(_) | OpType::LoadFunction(_) | OpType::Call(_)
-                ) {
-                    if let Some(static_) = h.static_source(d) {
-                        if h.get_parent(static_) == Some(h.module_root()) {
-                            queue.push_back(static_)
-                        }
-                    }
-                }
-            }
-        }
-
-        res.insert(n, nld);
-    }
-    Ok(res)
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);

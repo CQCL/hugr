@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 
 use crate::{HugrView, Node, core::HugrNode, ops::OpType};
-use petgraph::Graph;
+use petgraph::{Graph, visit::EdgeRef};
 
 /// Weight for an edge in a [`CallGraph`]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -102,5 +102,17 @@ impl<N: HugrNode> CallGraph<N> {
     /// [`FuncDecl`](OpType::FuncDecl) or the [HugrView::entrypoint].
     pub fn node_index(&self, n: N) -> Option<petgraph::graph::NodeIndex<u32>> {
         self.node_to_g.get(&n).copied()
+    }
+
+    pub fn callees(&self, n: N) -> impl Iterator<Item = (&CallGraphEdge<N>, &CallGraphNode<N>)> {
+        let g = self.graph();
+        self.node_index(n).into_iter().flat_map(move |n| {
+            self.graph().edges(n).map(|e| {
+                (
+                    g.edge_weight(e.id()).unwrap(),
+                    g.node_weight(e.target()).unwrap(),
+                )
+            })
+        })
     }
 }
