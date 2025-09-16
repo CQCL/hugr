@@ -420,7 +420,7 @@ impl NameLinkingPolicy {
                     }
                 }
             };
-            res.insert(n, LinkAction::LinkNode(dirv));
+            res.insert(n, dirv.into());
         }
 
         Ok(res)
@@ -525,11 +525,11 @@ pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 /// A separate enum from [NodeLinkingDirective] to allow [NameLinkingPolicy::to_node_linking]
 /// to specify a greater range of actions than that supported by
 /// [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive]
 pub enum LinkAction<TN> {
     /// Just apply the specified [NodeLinkingDirective].
-    LinkNode(NodeLinkingDirective<TN>),
+    LinkNode(#[from] NodeLinkingDirective<TN>),
 }
 
 /// Details the concrete actions to implement a specific source Hugr into a specific target Hugr.
