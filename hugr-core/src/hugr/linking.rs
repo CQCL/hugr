@@ -10,7 +10,7 @@ use itertools::{Either, Itertools};
 
 use crate::call_graph::{CallGraph, CallGraphNode};
 use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
-use crate::{Hugr, HugrView, Node, core::HugrNode, ops::OpType, types::PolyFuncType};
+use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// Methods that merge Hugrs, adding static edges between old and inserted nodes.
 ///
@@ -364,7 +364,7 @@ pub enum NewFuncHandling {
 /// have a [Visibility::Public] FuncDefn with the same name and signature.
 ///
 /// [Visibility::Public]: crate::Visibility::Public
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum MultipleImplHandling {
     /// Keep the implementation already in the target Hugr. (Edges in the source
@@ -375,13 +375,7 @@ pub enum MultipleImplHandling {
     /// function in the target Hugr will be removed.)
     UseNew,
     /// Proceed as per the specified [NewFuncHandling].
-    NewFunc(NewFuncHandling),
-}
-
-impl From<NewFuncHandling> for MultipleImplHandling {
-    fn from(value: NewFuncHandling) -> Self {
-        Self::NewFunc(value)
-    }
+    NewFunc(#[from] NewFuncHandling),
 }
 
 /// An error in using names to determine how to link functions in source and target Hugrs.
@@ -407,7 +401,10 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
         tgt_node: TN,
         tgt_sig: Box<PolyFuncType>,
     },
+    /// The source Hugr contained names not in the target and this was requested
+    /// to be an error (via [NameLinkingPolicy::on_new_name]([NewFuncHandling::RaiseError]))
     #[error("Node {src_node} adds new name {name} which was specified to be an error")]
+    #[allow(missing_docs)]
     NoNewNames { name: String, src_node: SN },
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint (which needs to be added
@@ -475,10 +472,23 @@ impl NameLinkingPolicy {
         self.multi_impls
     }
 
+    /// Sets how to behave when the source Hugr adds a ([Visibility::Public])
+    /// name not already in the target.
+    pub fn on_new_names(mut self, nn: NewFuncHandling) -> Self {
+        self.new_names = nn;
+        self
+    }
+
+    /// Tells how to behave when the source Hugr adds a ([Visibility::Public])
+    /// name not already in the target.
+    pub fn get_new_names(self) -> NewFuncHandling {
+        self.new_names
+    }
+
     /// Computes how this policy will act on a specified source (inserted) and target
-    /// (host) Hugr.
+    /// (host) Hugr when *not* inserting the entrypoint.
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView + ?Sized>(
+    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
@@ -553,12 +563,17 @@ impl NameLinkingPolicy {
             NewFuncHandling::ErrorIfReached => (Err(err), true),
             NewFuncHandling::Add => (Ok(just_add), false),
             NewFuncHandling::AddIfReached => (Ok(just_add), true),
-            //NewFuncHandling::MakePrivate if reached => Ok(true), // TODO and record MakePrivate
+            //NewFuncHandling::MakePrivate if reached => (Ok(LinkAction::MakePrivate), true)
         }
     }
 
+    /// Computes how this policy will act on a specified source (inserted) and target
+    /// (host) Hugr.
+    ///
+    /// `use_entrypoint` tells whether the entrypoint subtree will be inserted (alongside
+    /// any linking).
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking_for<T: HugrView + ?Sized, S: HugrView + ?Sized>(
+    pub fn to_node_linking_for<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
@@ -570,7 +585,7 @@ impl NameLinkingPolicy {
         // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
         // and we need to maintain our own `visited` map anyway
         let mut to_visit = VecDeque::from_iter(use_entrypoint.then_some(source.entrypoint()));
-        let mut dirvs = LinkActions::new();
+        let mut res = LinkActions::new();
         for sn in source.children(source.module_root()) {
             if let Some(ls) = link_sig(source, sn) {
                 // Note we'll call process() again below, so a bit inefficient
@@ -583,21 +598,23 @@ impl NameLinkingPolicy {
         // Note: we could optimize the case where self.filter_private is false,
         // by adding directly to results above, skipping this reachability traversal
         while let Some(sn) = to_visit.pop_front() {
-            let Entry::Vacant(ve) = dirvs.entry(sn) else {
+            let Entry::Vacant(ve) = res.entry(sn) else {
                 continue;
             };
             // Hmmm, this will skip consts, we could consider as private
             if let Some(ls) = link_sig(source, sn) {
-                let LinkAction::LinkNode(dirv) = self.process(&existing, sn, ls).0?;
+                let act = self.process(&existing, sn, ls).0?;
+                let LinkAction::LinkNode(dirv) = &act;
                 if let NodeLinkingDirective::Add { .. } = dirv {
                     to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
                         CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
                         CallGraphNode::NonFuncRoot => unreachable!("cannot call non-func"),
                     }));
                 }
+                ve.insert(act);
             }
         }
-        Ok(dirvs)
+        Ok(res)
     }
 }
 
@@ -605,48 +622,6 @@ impl Default for NameLinkingPolicy {
     fn default() -> Self {
         Self::err_on_conflict(NewFuncHandling::RaiseError)
     }
-}
-
-fn directive<SN: Display, TN: HugrNode>(
-    name: &str,
-    new_n: SN,
-    new_defn: bool,
-    ex_ns: &Either<TN, (TN, Vec<TN>)>,
-    multi_impls: &MultipleImplHandling,
-    reached: bool,
-) -> Result<Option<NodeLinkingDirective<TN>>, NameLinkingError<SN, TN>> {
-    Ok(Some(match (new_defn, ex_ns) {
-        (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
-        (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
-        (true, Either::Right((decl, decls))) => {
-            NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
-        }
-        (true, &Either::Left(defn)) => match multi_impls {
-            MultipleImplHandling::UseExisting => NodeLinkingDirective::UseExisting(defn),
-            MultipleImplHandling::UseNew => NodeLinkingDirective::replace([defn]),
-            MultipleImplHandling::NewFunc(nf) => {
-                if matches!(
-                    nf,
-                    NewFuncHandling::ErrorIfReached | NewFuncHandling::AddIfReached
-                ) && !reached
-                {
-                    return Ok(None);
-                }
-                match nf {
-                    NewFuncHandling::RaiseError | NewFuncHandling::ErrorIfReached => {
-                        return Err(NameLinkingError::MultipleImpls(
-                            name.to_owned(),
-                            new_n,
-                            defn,
-                        ));
-                    }
-                    NewFuncHandling::Add | NewFuncHandling::AddIfReached => {
-                        NodeLinkingDirective::add()
-                    } //NewFuncHandling::MakePrivate => todo!("ALAN"),
-                }
-            }
-        },
-    }))
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
@@ -667,10 +642,9 @@ fn link_sig<H: HugrView + ?Sized>(h: &H, n: H::Node) -> Option<LinkSig<'_>> {
         OpType::Const(_) => return Some(LinkSig::Private),
         _ => return None,
     };
-    Some(if vis.is_public() {
-        LinkSig::Public { name, is_defn, sig }
-    } else {
-        LinkSig::Private
+    Some(match vis {
+        Visibility::Public => LinkSig::Public { name, is_defn, sig },
+        Visibility::Private => LinkSig::Private,
     })
 }
 
@@ -1153,6 +1127,7 @@ mod test {
         };
 
         let pol = NameLinkingPolicy {
+            new_names: NewFuncHandling::RaiseError,
             sig_conflict,
             multi_impls,
             filter_private: false,

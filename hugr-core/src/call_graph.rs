@@ -104,6 +104,9 @@ impl<N: HugrNode> CallGraph<N> {
         self.node_to_g.get(&n).copied()
     }
 
+    /// Returns an iterator over the out-edges from the given Node.
+    ///
+    /// (If the node is not recognised as a function or the entrypoint, iterator will be empty.)
     pub fn callees(&self, n: N) -> impl Iterator<Item = (&CallGraphEdge<N>, &CallGraphNode<N>)> {
         let g = self.graph();
         self.node_index(n).into_iter().flat_map(move |n| {

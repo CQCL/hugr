@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.2...hugr-cli-v0.22.3) - 2025-09-11
+
+### New Features
+
+- *(hugr-cli)* CliError::validate helper ([#2507](https://github.com/CQCL/hugr/pull/2507))
+
 ## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.1...hugr-cli-v0.22.2) - 2025-08-06
 
 ### New Features
