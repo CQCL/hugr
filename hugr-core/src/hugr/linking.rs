@@ -1236,7 +1236,7 @@ mod test {
             new_names: NewFuncHandling::RaiseError,
             sig_conflict: NewFuncHandling::RaiseError,
             multi_impls,
-            filter_private
+            filter_private,
         };
         let res = host.link_module(inserted, &pol);
         if multi_impls == NewFuncHandling::RaiseError.into() {
