@@ -573,16 +573,17 @@ impl NameLinkingPolicy {
         self.to_node_linking_for(target, source, false)
     }
 
+    /// The result is Ok((action, bool)) where the bool being true
+    /// means the action is ONLY needed if the function is reached.
     fn process<SN: Display, TN: Copy + Display + std::fmt::Debug>(
         &self,
         existing: &HashMap<&String, PubFuncs<TN>>,
         sn: SN,
         new: LinkSig,
-        reached: bool,
-    ) -> Result<Option<LinkAction<TN>>, NameLinkingError<SN, TN>> {
+    ) -> (Result<LinkAction<TN>, NameLinkingError<SN, TN>>, bool) {
         let just_add = LinkAction::LinkNode(NodeLinkingDirective::add());
         let (nfh, err) = match new {
-            LinkSig::Private => return Ok(reached.then_some(just_add)),
+            LinkSig::Private => return (Ok(just_add), self.filter_private),
             LinkSig::Public {
                 name,
                 is_defn: new_is_defn,
@@ -599,30 +600,34 @@ impl NameLinkingPolicy {
                     if *ex_sig == new_sig {
                         match (existing, new_is_defn, self.multi_impls) {
                             (Either::Left(n), false, _) => {
-                                return Ok(Some(LinkAction::LinkNode(
-                                    NodeLinkingDirective::UseExisting(*n),
-                                )));
+                                return (
+                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::UseExisting(*n))),
+                                    false,
+                                );
                             }
                             (Either::Left(n), true, MultipleImplHandling::NewFunc(nfh)) => {
                                 (nfh, NameLinkingError::MultipleImpls(name.clone(), sn, *n))
                             }
                             (Either::Left(n), true, MultipleImplHandling::UseExisting) => {
-                                return Ok(Some(LinkAction::LinkNode(
-                                    NodeLinkingDirective::UseExisting(*n),
-                                )));
+                                return (
+                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::UseExisting(*n))),
+                                    false,
+                                );
                             }
                             (Either::Left(n), true, MultipleImplHandling::UseNew) => {
-                                return Ok(Some(LinkAction::LinkNode(
-                                    NodeLinkingDirective::replace([*n]),
-                                )));
+                                return (
+                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::replace([*n]))),
+                                    false,
+                                );
                             }
                             (Either::Right((n, ns)), _, _) => {
-                                return Ok(Some(
-                                    // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
-                                    LinkAction::LinkNode(NodeLinkingDirective::replace(
+                                // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
+                                return (
+                                    Ok(LinkAction::LinkNode(NodeLinkingDirective::replace(
                                         once(n).chain(ns).copied(),
-                                    )),
-                                ));
+                                    ))),
+                                    false,
+                                );
                             }
                         }
                     } else {
@@ -641,11 +646,11 @@ impl NameLinkingPolicy {
             },
         };
         match nfh {
-            NewFuncHandling::RaiseError => Err(err),
-            NewFuncHandling::ErrorIfReached if reached => Err(err),
-            NewFuncHandling::AddIfReached if !reached => Ok(None),
+            NewFuncHandling::RaiseError => (Err(err), false),
+            NewFuncHandling::ErrorIfReached => (Err(err), true),
+            NewFuncHandling::Add => (Ok(just_add), false),
+            NewFuncHandling::AddIfReached => (Ok(just_add), true),
             //NewFuncHandling::MakePrivate if reached => Ok(true), // TODO and record MakePrivate
-            _ => Ok(Some(just_add)),
         }
     }
 
@@ -665,7 +670,9 @@ impl NameLinkingPolicy {
         let mut dirvs = LinkActions::new();
         for sn in source.children(source.module_root()) {
             if let Some(ls) = link_sig(source, sn) {
-                if self.process(&existing, sn, ls, false)?.is_some() {
+                // Note we'll call process() again below, so a bit inefficient
+                let (_, only_if_reached) = self.process(&existing, sn, ls);
+                if !only_if_reached {
                     to_visit.push_back(sn);
                 }
             }
@@ -678,10 +685,7 @@ impl NameLinkingPolicy {
             };
             // Hmmm, this will skip consts, we could consider as private
             if let Some(ls) = link_sig(source, sn) {
-                let Some(act) = self.process(&existing, sn, ls, true)? else {
-                    unreachable!("process never returns `None` when given reached==true")
-                };
-                let LinkAction::LinkNode(dirv) = act; // for now
+                let LinkAction::LinkNode(dirv) = self.process(&existing, sn, ls).0?;
                 if let NodeLinkingDirective::Add { .. } = dirv {
                     to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
                         CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
