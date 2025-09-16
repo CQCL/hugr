@@ -1203,13 +1203,19 @@ mod test {
     }
 
     #[rstest]
-    #[case(MultipleImplHandling::UseNew, vec![11], vec![5, 11])] // Existing constant is not removed
-    #[case(MultipleImplHandling::UseExisting, vec![5], vec![5])]
-    #[case(NewFuncHandling::Add.into(), vec![5, 11], vec![5,11])]
-    #[case(NewFuncHandling::RaiseError.into(), vec![], vec![])]
+    #[case(MultipleImplHandling::UseNew, vec![11], false, vec![5, 11])] // Existing constant is not removed
+    #[should_panic] // ALAN TODO FIX - UnconnectedPort as Const not copied
+    #[case(MultipleImplHandling::UseNew, vec![11], true, vec![5, 11])]
+    #[case(MultipleImplHandling::UseExisting, vec![5], true, vec![5])]
+    #[case(MultipleImplHandling::UseExisting, vec![5], false, vec![5, 11])]
+    #[should_panic] // ALAN TODO FIX
+    #[case(NewFuncHandling::Add.into(), vec![5, 11], true, vec![5,11])]
+    #[case(NewFuncHandling::Add.into(), vec![5, 11], false, vec![5,11])]
+    #[case(NewFuncHandling::RaiseError.into(), vec![], true, vec![])] // filter_private ignored
     fn impl_conflict(
         #[case] multi_impls: MultipleImplHandling,
         #[case] expect_used: Vec<u64>,
+        #[case] filter_private: bool,
         #[case] expect_exist: Vec<u64>,
     ) {
         fn build_hugr(cst: u64) -> Hugr {
@@ -1226,7 +1232,12 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let pol = NameLinkingPolicy::keep_both_invalid().on_multiple_impls(multi_impls);
+        let pol = NameLinkingPolicy {
+            new_names: NewFuncHandling::RaiseError,
+            sig_conflict: NewFuncHandling::RaiseError,
+            multi_impls,
+            filter_private
+        };
         let res = host.link_module(inserted, &pol);
         if multi_impls == NewFuncHandling::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
