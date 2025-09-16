@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-v0.22.2...hugr-v0.22.3) - 2025-09-11
+
+### Bug Fixes
+
+- SiblingSubgraph::try_from_nodes not including disconnected components ([#2549](https://github.com/CQCL/hugr/pull/2549))
+
+### Documentation
+
+- Clarify docs for SiblingSubgraph::{inputs, outputs} ([#2508](https://github.com/CQCL/hugr/pull/2508))
+
+### New Features
+
+- SiblingSubgraph supports function calls ([#2528](https://github.com/CQCL/hugr/pull/2528))
+- Add unchecked constructor for SiblingSubgraph ([#2526](https://github.com/CQCL/hugr/pull/2526))
+- Add extend_inputs function for DFGs ([#2536](https://github.com/CQCL/hugr/pull/2536))
+- Loosen bound on Patch trait ([#2545](https://github.com/CQCL/hugr/pull/2545))
+- Add HugrMut::insert(_view)_forest ([#2518](https://github.com/CQCL/hugr/pull/2518))
+
 ## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-v0.22.1...hugr-v0.22.2) - 2025-08-06
 
 ### New Features

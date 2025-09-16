@@ -222,7 +222,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         Ok(AliasID::new(node, name, bound))
     }
 
-    /// Adds some module-children of another Hugr to this module, with
+    /// Add some module-children of another Hugr to this module, with
     /// linking directives specified explicitly by [Node].
     ///
     /// `children` contains a map from the children of `other` to insert,
@@ -237,7 +237,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
             .insert_link_hugr_by_node(None, other, children)
     }
 
-    /// Copies module-children from a HugrView to this module, with
+    /// Copy module-children from a HugrView into this module, with
     /// linking directives specified explicitly by [Node].
     ///
     /// `children` contains a map from the children of `other` to copy,
