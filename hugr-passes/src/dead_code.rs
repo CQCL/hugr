@@ -107,6 +107,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
+            assert!(h.contains_node(n));
             if !needed.insert(n) {
                 continue;
             }
