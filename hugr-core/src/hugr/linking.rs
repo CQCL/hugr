@@ -598,22 +598,27 @@ impl NameLinkingPolicy {
         // Note: we could optimize the case where self.filter_private is false,
         // by adding directly to results above, skipping this reachability traversal
         while let Some(sn) = to_visit.pop_front() {
-            let Entry::Vacant(ve) = res.entry(sn) else {
-                continue;
-            };
-            if let Some(ls) = link_sig(source, sn) {
-                let act = self.process(&existing, sn, ls).0?;
-                let LinkAction::LinkNode(dirv) = &act;
-                if let NodeLinkingDirective::Add { .. } = dirv {
-                    to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
-                        CallGraphNode::FuncDecl(n)
-                        | CallGraphNode::FuncDefn(n)
-                        | CallGraphNode::Const(n) => *n,
-                        CallGraphNode::NonFuncEntrypoint => unreachable!("cannot call non-func"),
-                    }));
+            if !(use_entrypoint && sn == source.entrypoint()) {
+                let Entry::Vacant(ve) = res.entry(sn) else {
+                    continue;
+                };
+                if let Some(ls) = link_sig(source, sn) {
+                    let act = self.process(&existing, sn, ls).0?;
+                    let LinkAction::LinkNode(dirv) = &act;
+                    let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
+                    ve.insert(act);
+                    if !traverse {
+                        continue;
+                    }
                 }
-                ve.insert(act);
             }
+            // For entrypoint, *just* traverse
+            to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
+                CallGraphNode::FuncDecl(n)
+                | CallGraphNode::FuncDefn(n)
+                | CallGraphNode::Const(n) => *n,
+                CallGraphNode::NonFuncEntrypoint => unreachable!("cannot call non-func"),
+            }));
         }
         Ok(res)
     }
