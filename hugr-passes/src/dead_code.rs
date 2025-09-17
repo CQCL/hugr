@@ -350,7 +350,7 @@ mod test {
         let outs = dfb.add_dataflow_op(gate, q).unwrap().outputs();
         let mut h = dfb.finish_hugr_with_outputs(outs).unwrap();
         DeadCodeElimPass::default().run(&mut h).unwrap();
-        // This was failing:
+        // This was failing before https://github.com/CQCL/hugr/pull/2560:
         h.validate().unwrap();
 
         // Remove one new and free, keep both gates (cannot remove the other gate + free even tho results not needed)
