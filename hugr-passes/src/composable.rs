@@ -275,10 +275,8 @@ mod test {
         let hugr = mb.finish_hugr().unwrap();
 
         let dce = DeadCodeElimPass::default().with_entry_points([id1.node()]);
-        let some_input = || ConstUsize::new(2).into();
-        let cfold = ConstantFoldPass::default()
-            .with_inputs(id1.node(), [(0, some_input())])
-            .with_inputs(id2.node(), [(0, some_input())]);
+        let cfold =
+            ConstantFoldPass::default().with_inputs(id2.node(), [(0, ConstUsize::new(2).into())]);
 
         cfold.run(&mut hugr.clone()).unwrap();
 
