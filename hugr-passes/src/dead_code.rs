@@ -133,6 +133,14 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                 // BBs are reachable above.
                 q.push_back(src);
             }
+            // Also keep consumers of any linear outputs
+            for (tgt_n, tgt_port) in h.all_linked_inputs(n) {
+                if h.signature(tgt_n)
+                    .is_some_and(|sig| sig.in_port_type(tgt_port).is_some_and(|t| !t.copyable()))
+                {
+                    q.push_back(tgt_n);
+                }
+            }
         }
         needed
     }
@@ -174,11 +182,16 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::Hugr;
-    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{ConstUsize, usize_t};
+    use hugr_core::builder::{
+        CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder,
+    };
+    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
+    use hugr_core::extension::{ExtensionId, Version};
+    use hugr_core::ops::ExtensionOp;
     use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
     use hugr_core::types::Signature;
+    use hugr_core::{Extension, Hugr};
     use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
@@ -300,5 +313,55 @@ mod test {
                 [OpTag::Input, OpTag::Output, OpTag::LoadConst]
             );
         }
+    }
+
+    #[test]
+    fn preserve_linear() {
+        // A simple linear new/free. Note we do *not* model ordering among allocations for this test.
+        let test_ext = Extension::new_arc(
+            ExtensionId::new_unchecked("test_qext"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                e.add_op("new".into(), "".into(), Signature::new(vec![], qb_t()), w)
+                    .unwrap();
+                e.add_op("gate".into(), "".into(), Signature::new_endo(qb_t()), w)
+                    .unwrap();
+                e.add_op("free".into(), "".into(), Signature::new(qb_t(), vec![]), w)
+                    .unwrap();
+            },
+        );
+        let [new, gate, free] = ["new", "gate", "free"]
+            .map(|n| ExtensionOp::new(test_ext.get_op(n).unwrap().clone(), []).unwrap());
+        let mut dfb = DFGBuilder::new(Signature::new_endo(qb_t())).unwrap();
+        // Unused new...free
+        let qn = dfb.add_dataflow_op(new.clone(), []).unwrap().outputs();
+        let [] = dfb.add_dataflow_op(free.clone(), qn).unwrap().outputs_arr();
+
+        // Free the input, so not connected to the output
+        let [q_in] = dfb.input_wires_arr();
+        let [h_in] = dfb
+            .add_dataflow_op(gate.clone(), [q_in])
+            .unwrap()
+            .outputs_arr();
+        let [] = dfb.add_dataflow_op(free, [h_in]).unwrap().outputs_arr();
+
+        // Alloc a new qubit and output that
+        let q = dfb.add_dataflow_op(new, []).unwrap().outputs();
+        let outs = dfb.add_dataflow_op(gate, q).unwrap().outputs();
+        let mut h = dfb.finish_hugr_with_outputs(outs).unwrap();
+        DeadCodeElimPass::default().run(&mut h).unwrap();
+        // This was failing:
+        h.validate().unwrap();
+
+        // Remove one new and free, keep both gates (cannot remove the other gate + free even tho results not needed)
+        // (And removing the gate because the result is 'freed' is beyond current DeadCodeElim)
+        let ext_ops = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op())
+            .map(ExtensionOp::unqualified_id);
+        assert_eq!(
+            ext_ops.sorted().collect_vec(),
+            ["free", "gate", "gate", "new"]
+        );
     }
 }
