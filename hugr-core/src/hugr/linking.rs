@@ -601,7 +601,6 @@ impl NameLinkingPolicy {
             let Entry::Vacant(ve) = res.entry(sn) else {
                 continue;
             };
-            // Hmmm, this will skip consts, we could consider as private
             if let Some(ls) = link_sig(source, sn) {
                 let act = self.process(&existing, sn, ls).0?;
                 let LinkAction::LinkNode(dirv) = &act;
