@@ -134,11 +134,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                 q.push_back(src);
             }
             // Also keep consumers of any linear outputs
-            for (tgt_n, tgt_port) in h.all_linked_inputs(n) {
-                if h.signature(tgt_n)
-                    .is_some_and(|sig| sig.in_port_type(tgt_port).is_some_and(|t| !t.copyable()))
-                {
-                    q.push_back(tgt_n);
+            if let Some(sig) = h.signature(n) {
+                for op in sig.output_ports() {
+                    if !sig.out_port_type(op).unwrap().copyable() {
+                        q.extend(h.linked_inputs(n, op).map(|(n, _inp)| n))
+                    }
                 }
             }
         }
