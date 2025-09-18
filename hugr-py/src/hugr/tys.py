@@ -1,7 +1,5 @@
 """HUGR edge kinds, types, type parameters and type arguments."""
 
-from __future__ import annotations
-
 import base64
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
@@ -364,6 +362,15 @@ class ListConcatArg(TypeArg):
             [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
         )
 
+    def flatten(self) -> TypeArg:
+        match self.lists:
+            case []:
+                return ListArg([])
+            case [item]:
+                return item
+            case _:
+                return self
+
 
 @dataclass(frozen=True)
 class TupleArg(TypeArg):
@@ -404,6 +411,15 @@ class TupleConcatArg(TypeArg):
         return model.Tuple(
             [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
         )
+
+    def flatten(self) -> TypeArg:
+        match self.tuples:
+            case []:
+                return TupleArg([])
+            case [item]:
+                return item
+            case _:
+                return self
 
 
 @dataclass(frozen=True)
