@@ -8,6 +8,7 @@ use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
+use crate::ops::handle::NodeHandle;
 use crate::ops::{self, DataflowParent, FuncDefn, Input, OpParent, Output};
 use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
@@ -26,7 +27,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     ///
     /// Sets up the input and output nodes of the region. If `parent` already has
     /// input and output nodes, use [`DFGBuilder::create`] instead.
-    pub(super) fn create_with_io(
+    pub fn create_with_io(
         mut base: T,
         parent: Node,
         signature: Signature,
@@ -58,7 +59,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
     ///
     /// If `parent` doesn't have input and output nodes, use
     /// [`DFGBuilder::create_with_io`] instead.
-    pub(super) fn create(base: T, parent: Node) -> Result<Self, BuildError> {
+    pub fn create(base: T, parent: Node) -> Result<Self, BuildError> {
         let sig = base
             .as_ref()
             .get_optype(parent)
@@ -137,9 +138,18 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> Dataflow for DFGBuilder<T> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct DFGWrapper<B, T>(DFGBuilder<B>, PhantomData<T>);
 
-impl<B, T> DFGWrapper<B, T> {
-    pub(super) fn from_dfg_builder(db: DFGBuilder<B>) -> Self {
+impl<B, T: NodeHandle> DFGWrapper<B, T> {
+    /// Wrap a [`DFGBuilder`] into a [`DFGWrapper`], with the given handle type.
+    ///
+    /// The caller must ensure that the DFGBuilder's parent node has the correct
+    /// handle type given by `T::TAG`.
+    pub fn from_dfg_builder(db: DFGBuilder<B>) -> Self {
         Self(db, PhantomData)
+    }
+
+    /// Unwrap the [`DFGWrapper`] into a [`DFGBuilder`].
+    pub fn into_dfg_builder(self) -> DFGBuilder<B> {
+        self.0
     }
 }
 
