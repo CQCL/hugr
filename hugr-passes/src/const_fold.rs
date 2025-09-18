@@ -19,7 +19,7 @@ use crate::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
 };
-use crate::dead_code::{DeadCodeElimPass, PreserveNode};
+use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
 use crate::{ComposablePass, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
@@ -179,7 +179,11 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 })
             })
             .run(hugr)
-            .map_err(|inf| match inf {})?; // TODO use into_ok when available
+            .map_err(|e| match e {
+                DeadCodeElimError::NodeNotFound(_) => {
+                    panic!("ConstFoldError::MissingEntrypoint not raised above")
+                }
+            })?;
         Ok(())
     }
 }
