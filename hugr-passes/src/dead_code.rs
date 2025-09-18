@@ -107,7 +107,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
-            if !needed.insert(n) {
+            if !h.contains_node(n) || !needed.insert(n) {
                 continue;
             }
             for ch in h.children(n) {
@@ -132,6 +132,14 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                 // Following ControlFlow edges backwards is harmless, we've already assumed all
                 // BBs are reachable above.
                 q.push_back(src);
+            }
+            // Also keep consumers of any linear outputs
+            if let Some(sig) = h.signature(n) {
+                for op in sig.output_ports() {
+                    if !sig.out_port_type(op).unwrap().copyable() {
+                        q.extend(h.linked_inputs(n, op).map(|(n, _inp)| n))
+                    }
+                }
             }
         }
         needed
@@ -174,11 +182,16 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::Hugr;
-    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{ConstUsize, usize_t};
+    use hugr_core::builder::{
+        CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, endo_sig, inout_sig,
+    };
+    use hugr_core::extension::prelude::{ConstUsize, bool_t, qb_t, usize_t};
+    use hugr_core::extension::{ExtensionId, Version};
+    use hugr_core::ops::ExtensionOp;
     use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
     use hugr_core::types::Signature;
+    use hugr_core::{Extension, Hugr};
     use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
@@ -300,5 +313,63 @@ mod test {
                 [OpTag::Input, OpTag::Output, OpTag::LoadConst]
             );
         }
+    }
+
+    #[test]
+    fn preserve_linear() {
+        // A simple linear alloc/measure. Note we do *not* model ordering among allocations for this test.
+        let test_ext = Extension::new_arc(
+            ExtensionId::new_unchecked("test_qext"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                e.add_op("new".into(), "".into(), inout_sig(vec![], qb_t()), w)
+                    .unwrap();
+                e.add_op("gate".into(), "".into(), endo_sig(qb_t()), w)
+                    .unwrap();
+                e.add_op("measure".into(), "".into(), inout_sig(qb_t(), bool_t()), w)
+                    .unwrap();
+                e.add_op("not".into(), "".into(), endo_sig(bool_t()), w)
+                    .unwrap();
+            },
+        );
+        let [new, gate, measure, not] = ["new", "gate", "measure", "not"]
+            .map(|n| ExtensionOp::new(test_ext.get_op(n).unwrap().clone(), []).unwrap());
+        let mut dfb = DFGBuilder::new(endo_sig(qb_t())).unwrap();
+        // Unused new...measure, can be removed
+        let qn = dfb.add_dataflow_op(new.clone(), []).unwrap().outputs();
+        let [_] = dfb
+            .add_dataflow_op(measure.clone(), qn)
+            .unwrap()
+            .outputs_arr();
+
+        // Free (measure) the input, so not connected to the output
+        let [q_in] = dfb.input_wires_arr();
+        let [h_in] = dfb
+            .add_dataflow_op(gate.clone(), [q_in])
+            .unwrap()
+            .outputs_arr();
+        let [b] = dfb.add_dataflow_op(measure, [h_in]).unwrap().outputs_arr();
+        // Operate on the bool only, can be removed as not linear:
+        dfb.add_dataflow_op(not, [b]).unwrap();
+
+        // Alloc a new qubit and output that
+        let q = dfb.add_dataflow_op(new, []).unwrap().outputs();
+        let outs = dfb.add_dataflow_op(gate, q).unwrap().outputs();
+        let mut h = dfb.finish_hugr_with_outputs(outs).unwrap();
+        DeadCodeElimPass::default().run(&mut h).unwrap();
+        // This was failing before https://github.com/CQCL/hugr/pull/2560:
+        h.validate().unwrap();
+
+        // Remove one new and measure, and a "not"; keep both gates
+        // (cannot remove the other gate or measure even tho results not needed).
+        // Removing the gate because the measure-result is not used is beyond (current) DeadCodeElim.
+        let ext_ops = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op())
+            .map(ExtensionOp::unqualified_id);
+        assert_eq!(
+            ext_ops.sorted().collect_vec(),
+            ["gate", "gate", "measure", "new"]
+        );
     }
 }
