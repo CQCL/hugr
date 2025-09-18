@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.3...hugr-core-v0.22.4) - 2025-09-18
+
+### New Features
+
+- add trait+funcs for linking Hugrs explicitly by Node ([#2521](https://github.com/CQCL/hugr/pull/2521))
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.2...hugr-core-v0.22.3) - 2025-09-11
 
 ### Bug Fixes
