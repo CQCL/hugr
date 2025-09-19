@@ -675,10 +675,10 @@ class LocalVarData:
 
 @dataclass
 class RegionOrderHints:
-    input_keys: list[int] = field(default = [])
-    output_keys: list[int] = field(default = [])
-    edges: List[Tuple[int, int]] = field(default = [])
-    key_to_node: Dict[int, Node] = field(default = {})
+    input_keys: list[int] = field(default_factory=list)
+    output_keys: list[int] = field(default_factory=list)
+    edges: List[Tuple[int, int]] = field(default_factory=list)
+    key_to_node: Dict[int, Node] = field(default_factory=dict)
 
     def add_node_keys(self, node: Node, keys: Iterable[int]):
         for key in keys:
