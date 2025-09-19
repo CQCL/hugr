@@ -1,10 +1,9 @@
 //! A version of the standard fixed-length array extension that includes unsafe
 //! operations for borrowing and returning that may panic.
 
-use std::sync::{self, Arc};
+use std::sync::{self, Arc, LazyLock};
 
 use delegate::delegate;
-use lazy_static::lazy_static;
 
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
@@ -287,32 +286,43 @@ impl MakeRegisteredOp for BArrayUnsafeOp {
     }
 }
 
-lazy_static! {
-    /// Extension for borrow array operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_type(
-                    BORROW_ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
-                    "Fixed-length borrow array".into(),
-                    // Borrow array is linear, even if the elements are copyable.
-                    TypeDefBound::any(),
-                    extension_ref,
-                )
-                .unwrap();
+/// Extension for borrow array operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                BORROW_ARRAY_TYPENAME,
+                vec![TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                "Fixed-length borrow array".into(),
+                // Borrow array is linear, even if the elements are copyable.
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
 
-            BArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            BArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+        BArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+        BArrayCloneDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayDiscardDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayRepeatDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayScanDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayToArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayFromArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
 
-            BArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+        BArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 #[typetag::serde(name = "BArrayValue")]
 impl CustomConst for BArrayValue {

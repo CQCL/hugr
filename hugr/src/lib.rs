@@ -48,8 +48,7 @@
 //!         Extension,
 //!     };
 //!
-//!     use std::sync::Arc;
-//!     use lazy_static::lazy_static;
+//!     use std::sync::{Arc, LazyLock};
 //!
 //!     fn one_qb_func() -> PolyFuncTypeRV {
 //!         FuncValueType::new_endo(vec![qb_t()]).into()
@@ -79,10 +78,9 @@
 //!         })
 //!     }
 //!
-//!     lazy_static! {
-//!         /// Quantum extension definition.
-//!         pub static ref EXTENSION: Arc<Extension> = extension();
-//!     }
+//!     /// Quantum extension definition.
+//!     pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
+//!
 //!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
 //!         EXTENSION
 //!             .instantiate_extension_op(&gate_name.into(), [])

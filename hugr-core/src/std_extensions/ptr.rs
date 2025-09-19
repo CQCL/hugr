@@ -1,6 +1,6 @@
 //! Pointer type and operations.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -21,7 +21,6 @@ use crate::{
     type_row,
     types::type_param::{TypeArg, TypeParam},
 };
-use lazy_static::lazy_static;
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
 #[allow(missing_docs)]
 #[non_exhaustive]
@@ -109,10 +108,8 @@ fn extension() -> Arc<Extension> {
     })
 }
 
-lazy_static! {
-    /// Reference to the pointer Extension.
-    pub static ref EXTENSION: Arc<Extension> = extension();
-}
+/// Reference to the pointer Extension.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
 /// Integer type of a given bit width (specified by the `TypeArg`).  Depending on
 /// the operation, the semantic interpretation may be unsigned integer, signed

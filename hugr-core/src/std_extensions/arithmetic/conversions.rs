@@ -1,6 +1,6 @@
 //! Conversions between integer and floating-point values.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -17,7 +17,6 @@ use crate::types::{TypeArg, TypeRV};
 
 use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
-use lazy_static::lazy_static;
 mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
@@ -171,14 +170,12 @@ impl MakeExtensionOp for ConvertOpType {
     }
 }
 
-lazy_static! {
-    /// Extension for conversions between integers and floats.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            ConvertOpDef::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+/// Extension for conversions between integers and floats.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        ConvertOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 impl MakeRegisteredOp for ConvertOpType {
     fn extension_id(&self) -> ExtensionId {

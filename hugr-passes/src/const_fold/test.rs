@@ -1,10 +1,11 @@
-use std::collections::HashSet;
-use std::collections::hash_map::RandomState;
+use std::{
+    collections::{HashSet, hash_map::RandomState},
+    sync::LazyLock,
+};
 
 use hugr_core::ops::Const;
 use hugr_core::ops::handle::NodeHandle;
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use rstest::rstest;
 
 use hugr_core::builder::{
@@ -421,12 +422,10 @@ fn test_fold_inarrow<I: Copy, C: Into<Value>, E: std::fmt::Debug>(
         .unwrap();
     let mut h = build.finish_hugr_with_outputs(x1.outputs()).unwrap();
     constant_fold_pass(&mut h);
-    lazy_static! {
-        static ref INARROW_ERROR_VALUE: ConstError = ConstError {
-            signal: 0,
-            message: "Integer too large to narrow".to_string(),
-        };
-    }
+    static INARROW_ERROR_VALUE: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+        signal: 0,
+        message: "Integer too large to narrow".to_string(),
+    });
     let expected = if succeeds {
         const_ok(mk_const(to_log_width, val).unwrap().into(), error_type())
     } else {

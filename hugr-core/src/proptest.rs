@@ -2,8 +2,8 @@
 
 use ::proptest::collection::vec;
 use ::proptest::prelude::*;
-use lazy_static::lazy_static;
 use smol_str::SmolStr;
+use std::sync::LazyLock;
 
 use crate::Hugr;
 
@@ -74,46 +74,49 @@ where
     }
 }
 
-lazy_static! {
-    /// A strategy for a [String] suitable for an [IdentList].
-    /// Shrinks to contain only ASCII letters.
-    static ref ANY_IDENT_STRING: SBoxedStrategy<String> = {
-        use proptest::string::string_regex;
-        prop_oneof![
-            // we shrink to more readable (i.e. :alpha:) names
-            string_regex(r"[[:alpha:]]+").unwrap(),
-            string_regex(crate::hugr::ident::PATH_COMPONENT_REGEX_STR).unwrap(),
-        ].sboxed()
-    };
+/// A strategy for a [String] suitable for an [IdentList].
+/// Shrinks to contain only ASCII letters.
+static ANY_IDENT_STRING: LazyLock<SBoxedStrategy<String>> = LazyLock::new(|| {
+    use proptest::string::string_regex;
+    prop_oneof![
+        // we shrink to more readable (i.e. :alpha:) names
+        string_regex(r"[[:alpha:]]+").unwrap(),
+        string_regex(crate::hugr::ident::PATH_COMPONENT_REGEX_STR).unwrap(),
+    ]
+    .sboxed()
+});
 
-    /// A strategy for an arbitrary nonempty [String].
-    /// Shrinks to contain only ASCII letters.
-    static ref ANY_NONEMPTY_STRING: SBoxedStrategy<String> = {
-        use proptest::string::string_regex;
-        prop_oneof![
-            // we shrink to more readable (i.e. :alpha:) names
-            string_regex(r"[[:alpha:]]+").unwrap(),
-            string_regex(r".+").unwrap(),
-        ].sboxed()
-    };
+/// A strategy for an arbitrary nonempty [String].
+/// Shrinks to contain only ASCII letters.
+static ANY_NONEMPTY_STRING: LazyLock<SBoxedStrategy<String>> = LazyLock::new(|| {
+    use proptest::string::string_regex;
+    prop_oneof![
+        // we shrink to more readable (i.e. :alpha:) names
+        string_regex(r"[[:alpha:]]+").unwrap(),
+        string_regex(r".+").unwrap(),
+    ]
+    .sboxed()
+});
 
-    /// A strategy for an arbitrary [String].
-    /// Shrinks to contain only ASCII letters.
-    static ref ANY_STRING: SBoxedStrategy<String> = {
-        use proptest::string::string_regex;
-        prop_oneof![
-            // we shrink to more readable (i.e. :alpha:) names
-            string_regex(r"[[:alpha:]]*").unwrap(),
-            string_regex(r".*").unwrap(),
-        ].sboxed()
-    };
+/// A strategy for an arbitrary [String].
+/// Shrinks to contain only ASCII letters.
+static ANY_STRING: LazyLock<SBoxedStrategy<String>> = LazyLock::new(|| {
+    use proptest::string::string_regex;
+    prop_oneof![
+        // we shrink to more readable (i.e. :alpha:) names
+        string_regex(r"[[:alpha:]]*").unwrap(),
+        string_regex(r".*").unwrap(),
+    ]
+    .sboxed()
+});
 
-    /// A strategy for an arbitrary non-recursive [serde_json::Value].
-    /// In particular, no `Array` or `Object`
-    ///
-    /// This is used as the base strategy for the general
-    /// [recursive](Strategy::prop_recursive) strategy.
-    static ref ANY_SERDE_JSON_VALUE_LEAF: SBoxedStrategy<serde_json::Value> = {
+/// A strategy for an arbitrary non-recursive [serde_json::Value].
+/// In particular, no `Array` or `Object`
+///
+/// This is used as the base strategy for the general
+/// [recursive](Strategy::prop_recursive) strategy.
+static ANY_SERDE_JSON_VALUE_LEAF: LazyLock<SBoxedStrategy<serde_json::Value>> =
+    LazyLock::new(|| {
         use serde_json::value::Value;
         prop_oneof![
             Just(Value::Null),
@@ -124,20 +127,18 @@ lazy_static! {
             // any::<f64>().prop_map_into(),
             Just(Value::Number(3.into())),
             any_string().prop_map_into(),
-        ].sboxed()
-    };
+        ]
+        .sboxed()
+    });
 
-    /// A strategy that returns one of a fixed number of example [Hugr]s.
-    static ref ANY_HUGR: SBoxedStrategy<Hugr>= {
-        // TODO we need more examples
-        // This is currently used for Value::Function
-        // With more uses we may need variants that return more constrained
-        // HUGRs.
-        prop_oneof![
-            Just(crate::builder::test::simple_dfg_hugr()),
-        ].sboxed()
-    };
-}
+/// A strategy that returns one of a fixed number of example [Hugr]s.
+static ANY_HUGR: LazyLock<SBoxedStrategy<Hugr>> = LazyLock::new(|| {
+    // TODO we need more examples
+    // This is currently used for Value::Function
+    // With more uses we may need variants that return more constrained
+    // HUGRs.
+    prop_oneof![Just(crate::builder::test::simple_dfg_hugr()),].sboxed()
+});
 
 /// A strategy for generating an arbitrary nonempty [String].
 pub fn any_nonempty_string() -> SBoxedStrategy<String> {

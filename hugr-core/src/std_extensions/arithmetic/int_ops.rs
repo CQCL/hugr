@@ -1,6 +1,6 @@
 //! Basic integer operations.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use super::int_types::{LOG_WIDTH_TYPE_PARAM, get_log_width, int_tv};
 use crate::extension::prelude::{bool_t, sum_with_error};
@@ -19,7 +19,6 @@ use crate::{
     types::{Type, type_param::TypeArg},
 };
 
-use lazy_static::lazy_static;
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
 mod const_fold;
@@ -251,14 +250,12 @@ fn iunop_sig() -> PolyFuncTypeRV {
     int_polytype(1, vec![int_type_var.clone()], vec![int_type_var])
 }
 
-lazy_static! {
-    /// Extension for basic integer operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            IntOpDef::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+/// Extension for basic integer operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        IntOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 impl HasConcrete for IntOpDef {
     type Concrete = ConcreteIntOp;

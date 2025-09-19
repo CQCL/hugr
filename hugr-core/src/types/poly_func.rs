@@ -159,11 +159,10 @@ pub(crate) mod test {
     use std::sync::Arc;
 
     use cool_asserts::assert_matches;
-    use lazy_static::lazy_static;
 
     use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::extension::{ExtensionId, ExtensionRegistry, PRELUDE, SignatureError, TypeDefBound};
+    use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound};
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
@@ -173,11 +172,6 @@ pub(crate) mod test {
     };
 
     use super::PolyFuncTypeBase;
-
-    lazy_static! {
-        static ref REGISTRY: ExtensionRegistry =
-            ExtensionRegistry::new([PRELUDE.to_owned(), list::EXTENSION.to_owned()]);
-    }
 
     impl<RV: MaybeRV> PolyFuncTypeBase<RV> {
         fn new_validated(

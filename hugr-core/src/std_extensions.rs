@@ -3,6 +3,7 @@
 //! These may be moved to other crates in the future, or dropped altogether.
 
 use crate::extension::ExtensionRegistry;
+use std::sync::LazyLock;
 
 pub mod arithmetic;
 pub mod collections;
@@ -32,7 +33,5 @@ pub fn std_reg() -> ExtensionRegistry {
     reg
 }
 
-lazy_static::lazy_static! {
-    /// Standard extension registry.
-    pub static ref STD_REG: ExtensionRegistry = std_reg();
-}
+/// Standard extension registry.
+pub static STD_REG: LazyLock<ExtensionRegistry> = LazyLock::new(std_reg);

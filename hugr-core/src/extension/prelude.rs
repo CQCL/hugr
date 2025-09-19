@@ -1,10 +1,9 @@
 //! Prelude extension - available in all contexts, defining common types,
 //! operations and constants.
 use std::str::FromStr;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use itertools::Itertools;
-use lazy_static::lazy_static;
 
 use crate::extension::const_fold::fold_out_row;
 use crate::extension::simple_op::{
@@ -40,93 +39,108 @@ pub mod generic;
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
 pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
-lazy_static! {
-    /// Prelude extension, containing common types and operations.
-    pub static ref PRELUDE: Arc<Extension> = {
-        Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
+/// Prelude extension, containing common types and operations.
+pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
+        // Construct the list and error types using the passed extension
+        // reference.
+        //
+        // If we tried to use `string_type()` or `error_type()` directly it
+        // would try to access the `PRELUDE` lazy static recursively,
+        // causing a deadlock.
+        let string_type: Type = string_custom_type(extension_ref).into();
+        let usize_type: Type = usize_custom_t(extension_ref).into();
+        let error_type: CustomType = error_custom_type(extension_ref);
 
-            // Construct the list and error types using the passed extension
-            // reference.
-            //
-            // If we tried to use `string_type()` or `error_type()` directly it
-            // would try to access the `PRELUDE` lazy static recursively,
-            // causing a deadlock.
-            let string_type: Type = string_custom_type(extension_ref).into();
-            let usize_type: Type = usize_custom_t(extension_ref).into();
-            let error_type: CustomType = error_custom_type(extension_ref);
-
-            prelude
-                .add_type(
-                    TypeName::new_inline("usize"),
-                    vec![],
-                    "usize".into(),
-                    TypeDefBound::copyable(),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude.add_type(
-                    STRING_TYPE_NAME,
-                    vec![],
-                    "string".into(),
-                    TypeDefBound::copyable(),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude.add_op(
-                    PRINT_OP_ID,
-                    "Print the string to standard output".to_string(),
-                    Signature::new(vec![string_type.clone()], type_row![]),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude
-                .add_type(
-                    TypeName::new_inline("qubit"),
-                    vec![],
-                    "qubit".into(),
-                    TypeDefBound::any(),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude
-                .add_type(
-                    ERROR_TYPE_NAME,
-                    vec![],
-                    "Simple opaque error type.".into(),
-                    TypeDefBound::copyable(),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude
-                .add_op(
-                    MAKE_ERROR_OP_ID,
-                    "Create an error value".to_string(),
-                    Signature::new(vec![usize_type, string_type], vec![error_type.clone().into()]),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude
-                .add_op(
-                    PANIC_OP_ID,
-                    "Panic with input error".to_string(),
-                    PolyFuncTypeRV::new(
-                        [TypeParam::new_list_type(TypeBound::Linear), TypeParam::new_list_type(TypeBound::Linear)],
-                        FuncValueType::new(
-                            vec![TypeRV::new_extension(error_type.clone()), TypeRV::new_row_var_use(0, TypeBound::Linear)],
-                            vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                        ),
+        prelude
+            .add_type(
+                TypeName::new_inline("usize"),
+                vec![],
+                "usize".into(),
+                TypeDefBound::copyable(),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_type(
+                STRING_TYPE_NAME,
+                vec![],
+                "string".into(),
+                TypeDefBound::copyable(),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_op(
+                PRINT_OP_ID,
+                "Print the string to standard output".to_string(),
+                Signature::new(vec![string_type.clone()], type_row![]),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_type(
+                TypeName::new_inline("qubit"),
+                vec![],
+                "qubit".into(),
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_type(
+                ERROR_TYPE_NAME,
+                vec![],
+                "Simple opaque error type.".into(),
+                TypeDefBound::copyable(),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_op(
+                MAKE_ERROR_OP_ID,
+                "Create an error value".to_string(),
+                Signature::new(
+                    vec![usize_type, string_type],
+                    vec![error_type.clone().into()],
+                ),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
+            .add_op(
+                PANIC_OP_ID,
+                "Panic with input error".to_string(),
+                PolyFuncTypeRV::new(
+                    [
+                        TypeParam::new_list_type(TypeBound::Linear),
+                        TypeParam::new_list_type(TypeBound::Linear),
+                    ],
+                    FuncValueType::new(
+                        vec![
+                            TypeRV::new_extension(error_type.clone()),
+                            TypeRV::new_row_var_use(0, TypeBound::Linear),
+                        ],
+                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
                     ),
-                    extension_ref,
-                )
-                .unwrap();
-            prelude
+                ),
+                extension_ref,
+            )
+            .unwrap();
+        prelude
             .add_op(
                 EXIT_OP_ID,
                 "Exit with input error".to_string(),
                 PolyFuncTypeRV::new(
-                    [TypeParam::new_list_type(TypeBound::Linear), TypeParam::new_list_type(TypeBound::Linear)],
+                    [
+                        TypeParam::new_list_type(TypeBound::Linear),
+                        TypeParam::new_list_type(TypeBound::Linear),
+                    ],
                     FuncValueType::new(
-                        vec![TypeRV::new_extension(error_type), TypeRV::new_row_var_use(0, TypeBound::Linear)],
+                        vec![
+                            TypeRV::new_extension(error_type),
+                            TypeRV::new_row_var_use(0, TypeBound::Linear),
+                        ],
                         vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
                     ),
                 ),
@@ -134,16 +148,18 @@ lazy_static! {
             )
             .unwrap();
 
-            TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
-            NoopDef.add_to_extension(prelude, extension_ref).unwrap();
-            BarrierDef.add_to_extension(prelude, extension_ref).unwrap();
-            generic::LoadNatDef.add_to_extension(prelude, extension_ref).unwrap();
-        })
-    };
+        TupleOpDef::load_all_ops(prelude, extension_ref).unwrap();
+        NoopDef.add_to_extension(prelude, extension_ref).unwrap();
+        BarrierDef.add_to_extension(prelude, extension_ref).unwrap();
+        generic::LoadNatDef
+            .add_to_extension(prelude, extension_ref)
+            .unwrap();
+    })
+});
 
-    /// An extension registry containing only the prelude
-    pub static ref PRELUDE_REGISTRY: ExtensionRegistry = ExtensionRegistry::new([PRELUDE.clone()]);
-}
+/// An extension registry containing only the prelude
+pub static PRELUDE_REGISTRY: LazyLock<ExtensionRegistry> =
+    LazyLock::new(|| ExtensionRegistry::new([PRELUDE.clone()]));
 
 pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
     CustomType::new(

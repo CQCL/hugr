@@ -10,10 +10,9 @@ mod array_scan;
 mod array_value;
 pub mod op_builder;
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use delegate::delegate;
-use lazy_static::lazy_static;
 
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
@@ -90,28 +89,35 @@ pub type ArrayScan = GenericArrayScan<Array>;
 /// An array extension value.
 pub type ArrayValue = GenericArrayValue<Array>;
 
-lazy_static! {
-    /// Extension for array operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_type(
-                    ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
-                    "Fixed-length array".into(),
-                    // Default array is linear, even if the elements are copyable
-                    TypeDefBound::any(),
-                    extension_ref,
-                )
-                .unwrap();
+/// Extension for array operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                ARRAY_TYPENAME,
+                vec![TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                "Fixed-length array".into(),
+                // Default array is linear, even if the elements are copyable
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
 
-            ArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            ArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            ArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
-        })
-    };
-}
+        ArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+        ArrayCloneDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        ArrayDiscardDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        ArrayRepeatDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        ArrayScanDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+    })
+});
 
 impl ArrayValue {
     /// Name of the constructor for creating constant arrays.

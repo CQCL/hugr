@@ -1,18 +1,17 @@
-use std::borrow::Borrow;
+use std::{borrow::Borrow, sync::LazyLock};
 
 use derive_more::Display;
-use lazy_static::lazy_static;
 use regex::Regex;
 use smol_str::SmolStr;
 use thiserror::Error;
 
 pub static PATH_COMPONENT_REGEX_STR: &str = r"[\w--\d]\w*";
-lazy_static! {
-    pub static ref PATH_REGEX: Regex = Regex::new(&format!(
+pub static PATH_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!(
         r"^{PATH_COMPONENT_REGEX_STR}(\.{PATH_COMPONENT_REGEX_STR})*$"
     ))
-    .unwrap();
-}
+    .unwrap()
+});
 
 #[derive(
     Clone,

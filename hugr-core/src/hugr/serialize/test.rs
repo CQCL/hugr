@@ -25,10 +25,10 @@ use crate::types::{
     TypeRV,
 };
 use crate::{OutgoingPort, Visibility, type_row};
+use std::sync::LazyLock;
 
 use itertools::Itertools;
 use jsonschema::{Draft, Validator};
-use lazy_static::lazy_static;
 use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
 
@@ -90,8 +90,8 @@ impl NamedSchema {
 
 macro_rules! include_schema {
     ($name:ident, $path:literal) => {
-        lazy_static! {
-            static ref $name: NamedSchema =
+        static $name: LazyLock<NamedSchema> =
+            LazyLock::new(|| {
                 NamedSchema::new(stringify!($name), {
                     let schema_val: serde_json::Value = serde_json::from_str(include_str!(
                         concat!("../../../../specification/schema/", $path, "_live.json")
@@ -101,8 +101,8 @@ macro_rules! include_schema {
                         .with_draft(Draft::Draft7)
                         .build(&schema_val)
                         .expect("Schema is invalid.")
-                });
-        }
+                })
+            });
     };
 }
 

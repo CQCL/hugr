@@ -37,7 +37,6 @@ bench = false
 
 [dev-dependencies]
 rstest.workspace = true
-lazy_static.workspace = true
 semver.workspace = true
 serde_with.workspace = true
 insta.workspace = true

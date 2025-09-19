@@ -306,7 +306,7 @@ impl<T: MakeRegisteredOp> From<T> for OpType {
 
 #[cfg(test)]
 mod test {
-    use std::sync::Arc;
+    use std::sync::{Arc, LazyLock};
 
     use crate::{
         const_extension_ids, type_row,
@@ -314,7 +314,6 @@ mod test {
     };
 
     use super::*;
-    use lazy_static::lazy_static;
     use strum::{EnumIter, EnumString, IntoStaticStr};
 
     #[derive(Clone, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -359,15 +358,14 @@ mod test {
         const EXT_ID: ExtensionId = "DummyExt";
     }
 
-    lazy_static! {
-        static ref EXT: Arc<Extension> = {
-            Extension::new_test_arc(EXT_ID.clone(), |ext, extension_ref| {
-                DummyEnum::Dumb
-                    .add_to_extension(ext, extension_ref)
-                    .unwrap();
-            })
-        };
-    }
+    static EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+        Extension::new_test_arc(EXT_ID.clone(), |ext, extension_ref| {
+            DummyEnum::Dumb
+                .add_to_extension(ext, extension_ref)
+                .unwrap();
+        })
+    });
+
     impl MakeRegisteredOp for DummyEnum {
         fn extension_id(&self) -> ExtensionId {
             EXT_ID.clone()
