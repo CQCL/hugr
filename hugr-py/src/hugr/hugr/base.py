@@ -1106,6 +1106,15 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         return read_envelope_hugr_str(envelope)
 
+    @staticmethod
+    def from_model(module: model.Module) -> Hugr:
+        """Import from the hugr model format."""
+        from hugr.model.load import ModelImport
+        # TODO
+        loader = ModelImport(module=module)
+        return loader.hugr
+
+
     def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the HUGR into an envelope byte string.
 
