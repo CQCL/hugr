@@ -44,7 +44,6 @@ fxhash.workspace = true
 html-escape = { workspace = true }
 indexmap.workspace = true
 itertools = { workspace = true }
-lazy_static = { workspace = true }
 paste = { workspace = true }
 petgraph = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
