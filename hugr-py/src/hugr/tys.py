@@ -1,5 +1,7 @@
 """HUGR edge kinds, types, type parameters and type arguments."""
 
+from __future__ import annotations
+
 import base64
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
