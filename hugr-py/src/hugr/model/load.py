@@ -264,7 +264,9 @@ class ModelImport:
                 parent,
             )
 
-        def import_cfg() -> Node: ...
+        def import_cfg() -> Node:
+            # TODO
+            return Node(0)
 
         def import_conditional() -> Node:
             match node.signature:
