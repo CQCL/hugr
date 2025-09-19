@@ -107,14 +107,14 @@ class ModelImport:
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
-        link_ports_in = self.link_ports_in[len(self.link_ports_in) - 1]
+        link_ports_in = self.link_ports_in[-1]
 
         for offset, link in enumerate(links):
             in_port = InPort(node=node, offset=offset)
             link_ports_in.setdefault(link, []).append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
-        link_ports_out = self.link_ports_out[len(self.link_ports_out) - 1]
+        link_ports_out = self.link_ports_out[-1]
 
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
@@ -122,8 +122,8 @@ class ModelImport:
 
 
     def link_ports(self):
-        link_ports_in = self.link_ports_in[len(self.link_ports_in) - 1]
-        link_ports_out = self.link_ports_out[len(self.link_ports_out) - 1]
+        link_ports_in = self.link_ports_in[-1]
+        link_ports_out = self.link_ports_out[-1]
 
         links = link_ports_in.keys() | link_ports_out.keys()
 
