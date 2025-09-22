@@ -329,7 +329,7 @@ class ModelImport:
                 error = "Unexpected node in DFG region."
                 raise ModelImportError(error, node)
 
-    def import_node_in_module(self, node: model.Node, parent: Node) -> Node | None:
+    def import_node_in_module(self, node: model.Node) -> Node | None:
         def import_declare_func(symbol: model.Symbol) -> Node:
             title = self.import_meta_title(node)
             f_name = symbol.name if title is None else title
@@ -339,7 +339,7 @@ class ModelImport:
                 FuncDecl(
                     f_name=f_name, signature=signature, visibility=symbol.visibility
                 ),
-                parent,
+                self.hugr.module_root,
             )
             self.exit_symbol()
             return node_id
@@ -357,7 +357,7 @@ class ModelImport:
                     params=signature.params,
                     visibility=symbol.visibility,
                 ),
-                parent,
+                self.hugr.module_root,
             )
 
             match node.regions:
