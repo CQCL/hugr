@@ -1113,6 +1113,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         loader = ModelImport(module=module)
         for node in module.root.children:
             loader.import_node_in_module(node)
+        loader.link_ports()
+        loader.link_static_ports()
         return loader.hugr
 
 
