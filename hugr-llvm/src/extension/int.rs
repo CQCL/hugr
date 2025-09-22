@@ -16,7 +16,7 @@ use inkwell::{
     types::{BasicType, BasicTypeEnum, IntType},
     values::{BasicValue, BasicValueEnum, IntValue},
 };
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
 
 use crate::{
     CodegenExtension,
@@ -67,24 +67,22 @@ impl<CCG: PreludeCodegen> CodegenExtension for IntCodegenExtension<CCG> {
     }
 }
 
-lazy_static! {
-    static ref ERR_NARROW: ConstError = ConstError {
-        signal: 2,
-        message: "Can't narrow into bounds".to_string(),
-    };
-    static ref ERR_IU_TO_S: ConstError = ConstError {
-        signal: 2,
-        message: "iu_to_s argument out of bounds".to_string(),
-    };
-    static ref ERR_IS_TO_U: ConstError = ConstError {
-        signal: 2,
-        message: "is_to_u called on negative value".to_string(),
-    };
-    static ref ERR_DIV_0: ConstError = ConstError {
-        signal: 2,
-        message: "Attempted division by 0".to_string(),
-    };
-}
+static ERR_NARROW: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Can't narrow into bounds".to_string(),
+});
+static ERR_IU_TO_S: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "iu_to_s argument out of bounds".to_string(),
+});
+static ERR_IS_TO_U: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "is_to_u called on negative value".to_string(),
+});
+static ERR_DIV_0: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Attempted division by 0".to_string(),
+});
 
 #[derive(Debug, Eq, PartialEq)]
 enum DivOrMod {

@@ -1,6 +1,6 @@
 //! Basic logical operations.
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -19,7 +19,6 @@ use crate::{
     types::type_param::TypeArg,
     utils::sorted_consts,
 };
-use lazy_static::lazy_static;
 /// Name of extension false value.
 pub const FALSE_NAME: ValueName = ValueName::new_inline("FALSE");
 /// Name of extension true value.
@@ -131,10 +130,8 @@ fn extension() -> Arc<Extension> {
     })
 }
 
-lazy_static! {
-    /// Reference to the logic Extension.
-    pub static ref EXTENSION: Arc<Extension> = extension();
-}
+/// Reference to the logic Extension.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
 impl MakeRegisteredOp for LogicOp {
     fn extension_id(&self) -> ExtensionId {

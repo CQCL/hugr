@@ -120,7 +120,7 @@ pub enum Never {}
 
 #[cfg(test)]
 pub(crate) mod test_quantum_extension {
-    use std::sync::Arc;
+    use std::sync::{Arc, LazyLock};
 
     use crate::ops::{OpName, OpNameRef};
     use crate::std_extensions::arithmetic::float_ops;
@@ -137,8 +137,6 @@ pub(crate) mod test_quantum_extension {
         type_row,
         types::{PolyFuncTypeRV, Signature},
     };
-
-    use lazy_static::lazy_static;
 
     fn one_qb_func() -> PolyFuncTypeRV {
         FuncValueType::new_endo(qb_t()).into()
@@ -206,20 +204,19 @@ pub(crate) mod test_quantum_extension {
         })
     }
 
-    lazy_static! {
-        /// Quantum extension definition.
-        pub static ref EXTENSION: Arc<Extension> = extension();
+    /// Quantum extension definition.
+    pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
-        /// A registry with all necessary extensions to run tests internally, including the test quantum extension.
-        pub static ref REG: ExtensionRegistry = ExtensionRegistry::new([
+    /// A registry with all necessary extensions to run tests internally, including the test quantum extension.
+    pub static REG: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
+        ExtensionRegistry::new([
             EXTENSION.clone(),
             PRELUDE.clone(),
             float_types::EXTENSION.clone(),
             float_ops::EXTENSION.clone(),
-            logic::EXTENSION.clone()
-        ]);
-
-    }
+            logic::EXTENSION.clone(),
+        ])
+    });
 
     fn get_gate(gate_name: &OpNameRef) -> ExtensionOp {
         EXTENSION.instantiate_extension_op(gate_name, []).unwrap()
