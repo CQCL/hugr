@@ -69,7 +69,7 @@ class ModelImportError(Exception):
 class ModelImport:
     local_vars: dict[str, "LocalVarData"]
     current_symbol: str | None
-    link_ports: list[tuple[dict[str, list[InPort]], dict[str, list[OutPort]]]]
+    linked_ports: list[tuple[dict[str, list[InPort]], dict[str, list[OutPort]]]]
     static_edges: list[tuple[Node, Node]]
 
     module: model.Module
@@ -82,7 +82,7 @@ class ModelImport:
         self.module = module
         self.symbols = {}
         self.hugr = Hugr()
-        self.link_ports = []
+        self.linked_ports = []
         self.static_edges = []
 
         for node in module.root.children:
@@ -107,20 +107,20 @@ class ModelImport:
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
-        if not self.link_ports:
+        if not self.linked_ports:
             return
 
-        link_ports_in = self.link_ports[-1][0]
+        link_ports_in = self.linked_ports[-1][0]
 
         for offset, link in enumerate(links):
             in_port = InPort(node=node, offset=offset)
             link_ports_in.setdefault(link, []).append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
-        if not self.link_ports:
+        if not self.linked_ports:
             return
 
-        link_ports_out = self.link_ports[-1][1]
+        link_ports_out = self.linked_ports[-1][1]
 
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
@@ -128,7 +128,7 @@ class ModelImport:
 
 
     def link_ports(self):
-        link_ports_in, link_ports_out = self.link_ports[-1]
+        link_ports_in, link_ports_out = self.linked_ports[-1]
 
         links = link_ports_in.keys() | link_ports_out.keys()
 
@@ -163,7 +163,7 @@ class ModelImport:
         self, region: model.Region, parent: Node, isolated: bool = False
     ):
         if isolated:
-            self.link_ports.append(({}, {}))
+            self.linked_ports.append(({}, {}))
 
         signature = self.import_signature(region.signature)
 
@@ -188,7 +188,7 @@ class ModelImport:
             self.hugr.add_order_link(src_node, tgt_node)
 
         if isolated:
-            self.link_ports.pop()
+            self.linked_ports.pop()
 
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
         def import_dfg_node() -> Node:
