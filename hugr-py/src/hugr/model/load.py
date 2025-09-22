@@ -102,6 +102,8 @@ class ModelImport:
         node_id = self.hugr.add_node(operation, parent, metadata = metadata)
         self.record_in_links(node_id, node.inputs)
         self.record_out_links(node_id, node.outputs)
+        if model.Apply("core.entrypoint") in node.meta:
+            self.hugr.entrypoint = node_id
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
