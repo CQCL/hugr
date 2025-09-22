@@ -11,11 +11,11 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
-    module::Module,
+    module::{Linkage, Module},
     types::{BasicType, BasicTypeEnum, FunctionType},
     values::{BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
-use itertools::zip_eq;
+use itertools::{Itertools, zip_eq};
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
@@ -356,6 +356,58 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     let right = either_ty.build_tag(builder, 1, vec![ok_value])?;
     let either = builder.build_select(is_ok, right, left, "")?;
     Ok(either)
+}
+
+/// Helper to outline LLVM IR into a function call instead of inlining it every time.
+///
+/// The first time this helper is called with a given function name, a function is built
+/// using the provided closure. Future invocations with the same name will just emit calls
+/// to this function.
+pub fn outline_into_function<'c, H: HugrView<Node = Node>, const N: usize>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    func_name: &str,
+    args: [BasicValueEnum<'c>; N],
+    go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, [BasicValueEnum<'c>; N]) -> Result<()>,
+) -> Result<()> {
+    let func = ctx
+        .get_current_module()
+        .get_function(func_name)
+        .map(Ok::<_, anyhow::Error>)
+        .unwrap_or_else(|| {
+            let arg_tys = args.iter().map(|v| v.get_type().into()).collect_vec();
+            let sig = ctx.iw_context().void_type().fn_type(&arg_tys, false);
+            let func =
+                ctx.get_current_module()
+                    .add_function(func_name, sig, Some(Linkage::Internal));
+            let bb = ctx.iw_context().append_basic_block(func, "");
+            let args = (0..N)
+                .map(|i| func.get_nth_param(i as u32).unwrap())
+                .collect_array()
+                .unwrap();
+
+            let curr_bb = ctx.builder().get_insert_block().unwrap();
+            let curr_func = ctx.func;
+
+            ctx.builder().position_at_end(bb);
+            ctx.func = func;
+            go(ctx, args)?;
+            if ctx
+                .builder()
+                .get_insert_block()
+                .unwrap()
+                .get_terminator()
+                .is_none()
+            {
+                ctx.builder().build_return(None)?;
+            }
+
+            ctx.builder().position_at_end(curr_bb);
+            ctx.func = curr_func;
+            Ok(func)
+        })?;
+    ctx.builder()
+        .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
+    Ok(())
 }
 
 #[cfg(test)]
