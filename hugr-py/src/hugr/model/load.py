@@ -105,6 +105,9 @@ class ModelImport:
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
+        if not self.link_ports:
+            return
+
         link_ports_in = self.link_ports[-1][0]
 
         for offset, link in enumerate(links):
@@ -112,6 +115,9 @@ class ModelImport:
             link_ports_in.setdefault(link, []).append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
+        if not self.link_ports:
+            return
+
         link_ports_out = self.link_ports[-1][1]
 
         for offset, link in enumerate(links):
