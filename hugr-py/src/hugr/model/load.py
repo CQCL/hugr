@@ -167,10 +167,10 @@ class ModelImport:
 
         signature = self.import_signature(region.signature)
 
-        input_node = self.hugr.add_node(Input(signature.input))
+        input_node = self.hugr.add_node(Input(signature.input), parent=parent)
         self.record_out_links(input_node, region.sources)
 
-        output_node = self.hugr.add_node(Output(signature.output))
+        output_node = self.hugr.add_node(Output(signature.output), parent=parent)
         self.record_in_links(output_node, region.targets)
 
         order_data = self.import_meta_order_region(region)
