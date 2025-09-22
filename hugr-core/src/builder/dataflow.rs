@@ -1,3 +1,5 @@
+//! Builders for dataflow regions.
+
 use itertools::Itertools;
 
 use super::build_traits::{HugrBuilder, SubContainer};
@@ -9,7 +11,7 @@ use std::marker::PhantomData;
 use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::{HugrView, ValidationError};
 use crate::ops::handle::NodeHandle;
-use crate::ops::{self, DataflowParent, FuncDefn, Input, OpParent, Output};
+use crate::ops::{self, DFG, FuncDefn, NamedOp, OpParent, OpType};
 use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
 
@@ -20,6 +22,18 @@ pub struct DFGBuilder<T> {
     pub(crate) dfg_node: Node,
     pub(crate) num_in_wires: usize,
     pub(crate) num_out_wires: usize,
+}
+
+/// Error returned by [`DFGBuilder::add_input`] and [`DFGBuilder::add_output`].
+#[derive(Debug, Clone, PartialEq, derive_more::Display, derive_more::Error)]
+#[non_exhaustive]
+pub enum DFGAddPortError {
+    /// The parent optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot update its signature.
+    #[display("Adding port to an optype {op} is not supported.")]
+    ParentOpNotSupported {
+        /// The name of the unsupported operation.
+        op: String,
+    },
 }
 
 impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
@@ -75,6 +89,154 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
             num_out_wires,
         })
     }
+
+    /// Add a new input to the dataflow being constructed.
+    ///
+    /// Updates the parent's optype to include the new input type.
+    ///
+    /// # Returns
+    ///
+    /// - The new wire from the input node.
+    ///
+    /// # Errors
+    ///
+    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an input.
+    ///   In this case, the Hugr will not be updated.
+    pub fn add_input(&mut self, input_type: Type) -> Result<Wire, DFGAddPortError> {
+        let [inp_node, _] = self.io();
+
+        // Update the parent's root type
+        if !self.update_parent_signature(|mut s| {
+            s.input.to_mut().push(input_type.clone());
+            s
+        }) {
+            return Err(DFGAddPortError::ParentOpNotSupported {
+                op: self
+                    .hugr()
+                    .get_optype(self.container_node())
+                    .name()
+                    .to_string(),
+            });
+        }
+
+        // Update the inner input node
+        let OpType::Input(inp) = self.hugr_mut().optype_mut(inp_node) else {
+            panic!("Input node {inp_node} is not an Input");
+        };
+        inp.types.to_mut().push(input_type);
+
+        let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
+        let new_port = new_port.next().unwrap();
+
+        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
+        let new_value_port: OutgoingPort = (new_port - 1).into();
+        let new_order_port: OutgoingPort = new_port.into();
+        let order_edge_targets = self
+            .hugr()
+            .linked_inputs(inp_node, new_value_port)
+            .collect_vec();
+        self.hugr_mut().disconnect(inp_node, new_value_port);
+        for (tgt_node, tgt_port) in order_edge_targets {
+            self.hugr_mut()
+                .connect(inp_node, new_order_port, tgt_node, tgt_port);
+        }
+
+        // Update the builder metadata
+        self.num_in_wires += 1;
+
+        Ok(self.input_wires().next_back().unwrap())
+    }
+
+    /// Add a new output to the function being constructed.
+    ///
+    /// Updates the parent's optype to include the new input type, if possible.
+    /// If the container optype is not a [`FuncDefn`], [`DFG`], or dataflow
+    /// block, the optype will not be updated.
+    ///
+    /// # Errors
+    ///
+    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an input.
+    ///   In this case, the Hugr will not be updated.
+    pub fn add_output(&mut self, output_type: Type) -> Result<(), DFGAddPortError> {
+        let [_, out_node] = self.io();
+
+        // Update the parent's root type
+        if !self.update_parent_signature(|mut s| {
+            s.output.to_mut().push(output_type.clone());
+            s
+        }) {
+            return Err(DFGAddPortError::ParentOpNotSupported {
+                op: self
+                    .hugr()
+                    .get_optype(self.container_node())
+                    .name()
+                    .to_string(),
+            });
+        }
+
+        // Update the inner input node
+        let OpType::Output(out) = self.hugr_mut().optype_mut(out_node) else {
+            panic!("Output node {out_node} is not an Output");
+        };
+        out.types.to_mut().push(output_type);
+
+        let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
+        let new_port = new_port.next().unwrap();
+
+        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
+        let new_value_port: IncomingPort = (new_port - 1).into();
+        let new_order_port: IncomingPort = new_port.into();
+        let order_edge_sources = self
+            .hugr()
+            .linked_outputs(out_node, new_value_port)
+            .collect_vec();
+        self.hugr_mut().disconnect(out_node, new_value_port);
+        for (src_node, src_port) in order_edge_sources {
+            self.hugr_mut()
+                .connect(src_node, src_port, out_node, new_order_port);
+        }
+
+        // Update the builder metadata
+        self.num_out_wires += 1;
+
+        Ok(())
+    }
+
+    /// Update the container's parent signature, if it is a function definition, DFG region, or dataflow block.
+    ///
+    /// Internal function used in [`add_input`] and [`add_output`].
+    ///
+    /// Does not update the input and output nodes.
+    ///
+    /// # Returns
+    ///
+    /// - `true` if the parent signature was updated.
+    /// - `false` if the parent optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot update the signature.
+    fn update_parent_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> bool {
+        let parent = self.container_node();
+
+        match self.hugr_mut().optype_mut(parent) {
+            ops::OpType::FuncDefn(fd) => {
+                let mut sig = std::mem::take(fd.signature_mut());
+                let body = std::mem::take(sig.body_mut());
+                *sig.body_mut() = f(body);
+                *fd.signature_mut() = sig;
+            }
+            ops::OpType::DFG(dfg) => {
+                let sig = std::mem::take(&mut dfg.signature);
+                dfg.signature = f(sig);
+            }
+            ops::OpType::DataflowBlock(dfb) => {
+                let inp = std::mem::take(&mut dfb.inputs);
+                let other_outputs = std::mem::take(&mut dfb.other_outputs);
+                let sig = f(Signature::new(inp, other_outputs));
+                dfb.inputs = sig.input;
+                dfb.other_outputs = sig.output;
+            }
+            _ => return false,
+        }
+        true
+    }
 }
 
 impl DFGBuilder<Hugr> {
@@ -85,7 +247,7 @@ impl DFGBuilder<Hugr> {
     ///
     /// Error in adding DFG child nodes.
     pub fn new(signature: Signature) -> Result<DFGBuilder<Hugr>, BuildError> {
-        let dfg_op = ops::DFG {
+        let dfg_op: DFG = ops::DFG {
             signature: signature.clone(),
         };
         let base = Hugr::new_with_entrypoint(dfg_op).expect("DFG entrypoint should be valid");
@@ -153,12 +315,54 @@ impl<B, T: NodeHandle> DFGWrapper<B, T> {
     }
 }
 
+impl<B: AsMut<Hugr> + AsRef<Hugr>, T> DFGWrapper<B, T> {
+    /// Add a new input to the dataflow being constructed.
+    ///
+    /// Updates the parent's optype to include the new input type, if possible.
+    /// If the container optype is not a [`FuncDefn`] or a [`DFG`], the optype
+    /// will not be updated.
+    ///
+    /// # Returns
+    ///
+    /// - The new wire from the region's input node.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parent optype cannot be updated to include the new input type.
+    /// See [DFGAddPortError::ParentOpNotSupported] for more details.
+    ///
+    // TODO(breaking): Change return type to Result<Wire, DFGAddPortError>
+    pub fn add_input(&mut self, input_type: Type) -> Wire {
+        self.0
+            .add_input(input_type)
+            .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Add a new output to the dataflow being constructed.
+    ///
+    /// Updates the parent's optype to include the new output type, if possible.
+    /// If the container optype is not a [`FuncDefn`] or a [`DFG`], the optype
+    /// will not be updated.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the parent optype cannot be updated to include the new input type.
+    /// See [DFGAddPortError::ParentOpNotSupported] for more details
+    ///
+    // TODO(breaking): Change return type to Result<Wire, DFGAddPortError>
+    pub fn add_output(&mut self, output_type: Type) {
+        self.0
+            .add_output(output_type)
+            .unwrap_or_else(|e| panic!("{e}"));
+    }
+}
+
 /// Builder for a [`ops::FuncDefn`] node
 pub type FunctionBuilder<B> = DFGWrapper<B, BuildHandle<FuncID<true>>>;
 
 impl FunctionBuilder<Hugr> {
-    /// Initialize a builder for a [`FuncDefn`](ops::FuncDefn)-rooted HUGR;
-    /// the function will be private. (See also [Self::new_vis].)
+    /// Initialize a builder for a [`FuncDefn`]-rooted HUGR; the function will
+    /// be private. (See also [Self::new_vis].)
     ///
     /// # Errors
     ///
@@ -218,93 +422,6 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> FunctionBuilder<B> {
         let db = DFGBuilder::create_with_io(hugr, func, body)?;
         Ok(Self::from_dfg_builder(db))
     }
-
-    /// Add a new input to the function being constructed.
-    ///
-    /// Returns the new wire from the input node.
-    pub fn add_input(&mut self, input_type: Type) -> Wire {
-        let [inp_node, _] = self.io();
-
-        // Update the parent's root type
-        let new_optype = self.update_fn_signature(|mut s| {
-            s.input.to_mut().push(input_type);
-            s
-        });
-
-        // Update the inner input node
-        let types = new_optype.signature().body().input.clone();
-        self.hugr_mut().replace_op(inp_node, Input { types });
-        let mut new_port = self.hugr_mut().add_ports(inp_node, Direction::Outgoing, 1);
-        let new_port = new_port.next().unwrap();
-
-        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: OutgoingPort = (new_port - 1).into();
-        let new_order_port: OutgoingPort = new_port.into();
-        let order_edge_targets = self
-            .hugr()
-            .linked_inputs(inp_node, new_value_port)
-            .collect_vec();
-        self.hugr_mut().disconnect(inp_node, new_value_port);
-        for (tgt_node, tgt_port) in order_edge_targets {
-            self.hugr_mut()
-                .connect(inp_node, new_order_port, tgt_node, tgt_port);
-        }
-
-        // Update the builder metadata
-        self.0.num_in_wires += 1;
-
-        self.input_wires().next_back().unwrap()
-    }
-
-    /// Add a new output to the function being constructed.
-    pub fn add_output(&mut self, output_type: Type) {
-        let [_, out_node] = self.io();
-
-        // Update the parent's root type
-        let new_optype = self.update_fn_signature(|mut s| {
-            s.output.to_mut().push(output_type);
-            s
-        });
-
-        // Update the inner input node
-        let types = new_optype.signature().body().output.clone();
-        self.hugr_mut().replace_op(out_node, Output { types });
-        let mut new_port = self.hugr_mut().add_ports(out_node, Direction::Incoming, 1);
-        let new_port = new_port.next().unwrap();
-
-        // The last port in an input/output node is an order edge port, so we must shift any connections to it.
-        let new_value_port: IncomingPort = (new_port - 1).into();
-        let new_order_port: IncomingPort = new_port.into();
-        let order_edge_sources = self
-            .hugr()
-            .linked_outputs(out_node, new_value_port)
-            .collect_vec();
-        self.hugr_mut().disconnect(out_node, new_value_port);
-        for (src_node, src_port) in order_edge_sources {
-            self.hugr_mut()
-                .connect(src_node, src_port, out_node, new_order_port);
-        }
-
-        // Update the builder metadata
-        self.0.num_out_wires += 1;
-    }
-
-    /// Update the function builder's parent signature.
-    ///
-    /// Internal function used in [`add_input`] and [`add_output`].
-    ///
-    /// Does not update the input and output nodes.
-    ///
-    /// Returns a reference to the new optype.
-    fn update_fn_signature(&mut self, f: impl FnOnce(Signature) -> Signature) -> &ops::FuncDefn {
-        let parent = self.container_node();
-
-        let ops::OpType::FuncDefn(fd) = self.hugr_mut().optype_mut(parent) else {
-            panic!("FunctionBuilder node must be a FuncDefn")
-        };
-        *fd.signature_mut() = f(fd.inner_signature().into_owned()).into();
-        &*fd
-    }
 }
 
 impl<B: AsMut<Hugr> + AsRef<Hugr>, T> Container for DFGWrapper<B, T> {
@@ -355,7 +472,8 @@ pub(crate) mod test {
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::{
-        BuilderWiringError, DataflowSubContainer, ModuleBuilder, endo_sig, inout_sig,
+        BuilderWiringError, CFGBuilder, DataflowSubContainer, ModuleBuilder, TailLoopBuilder,
+        endo_sig, inout_sig,
     };
     use crate::extension::SignatureError;
     use crate::extension::prelude::Noop;
@@ -487,39 +605,68 @@ pub(crate) mod test {
         assert_matches!(builder(), Ok(_));
     }
 
-    #[test]
-    fn add_inputs_outputs() {
-        let builder = || -> Result<(Hugr, Node), BuildError> {
-            let mut f_build =
-                FunctionBuilder::new("main", Signature::new(vec![bool_t()], vec![bool_t()]))?;
-            let f_node = f_build.container_node();
+    #[rstest]
+    #[case::function(|sig| FunctionBuilder::new("main", sig).unwrap().into_dfg_builder())]
+    #[case::dfg(|sig| DFGBuilder::new(sig).unwrap())]
+    #[case::df_block(|sig: Signature| {
+        let outs = sig.output.clone();
+        let mut h = CFGBuilder::new(sig).unwrap();
+        let entry_node = h.entry_builder([], outs).unwrap().finish_sub_container().unwrap().node();
+        let hugr = std::mem::take(h.hugr_mut());
+        DFGBuilder::create(hugr, entry_node).unwrap()
+    })]
+    fn add_inputs_outputs(#[case] builder: impl FnOnce(Signature) -> DFGBuilder<Hugr>) {
+        let builder = || -> Result<(Hugr, Node, Signature), BuildError> {
+            let mut dfg = builder(Signature::new(vec![bool_t()], vec![bool_t()]));
+            let dfg_node = dfg.container_node();
 
-            let [i0] = f_build.input_wires_arr();
-            let noop0 = f_build.add_dataflow_op(Noop(bool_t()), [i0])?;
+            // Initial inner signature, before any inputs or outputs are added
+            let initial_sig = dfg
+                .hugr()
+                .get_optype(dfg_node)
+                .inner_function_type()
+                .unwrap()
+                .into_owned();
+
+            let [i0] = dfg.input_wires_arr();
+            let noop0 = dfg.add_dataflow_op(Noop(bool_t()), [i0])?;
 
             // Some some order edges
-            f_build.set_order(&f_build.io()[0], &noop0.node());
-            f_build.set_order(&noop0.node(), &f_build.io()[1]);
+            dfg.set_order(&dfg.io()[0], &noop0.node());
+            dfg.set_order(&noop0.node(), &dfg.io()[1]);
 
             // Add a new input and output, and connect them with a noop in between
-            f_build.add_output(qb_t());
-            let i1 = f_build.add_input(qb_t());
-            let noop1 = f_build.add_dataflow_op(Noop(qb_t()), [i1])?;
+            dfg.add_output(qb_t()).unwrap();
+            let i1 = dfg.add_input(qb_t()).unwrap();
+            let noop1 = dfg.add_dataflow_op(Noop(qb_t()), [i1])?;
 
-            let hugr = f_build.finish_hugr_with_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
-            Ok((hugr, f_node))
+            // Do not validate the final hugr, as it may have disconnected inputs.
+            dfg.set_outputs([noop0.out_wire(0), noop1.out_wire(0)])?;
+            let hugr = std::mem::take(dfg.hugr_mut());
+            Ok((hugr, dfg_node, initial_sig))
         };
 
-        let (hugr, f_node) = builder().unwrap_or_else(|e| panic!("{e}"));
+        let (hugr, dfg_node, initial_sig) = builder().unwrap_or_else(|e| panic!("{e}"));
 
-        let func_sig = hugr.get_optype(f_node).inner_function_type().unwrap();
+        let container_sig = hugr.get_optype(dfg_node).inner_function_type().unwrap();
+        let mut expected_sig = initial_sig;
+        expected_sig.input.to_mut().push(qb_t());
+        expected_sig.output.to_mut().push(qb_t());
         assert_eq!(
-            func_sig.io(),
-            (
-                &vec![bool_t(), qb_t()].into(),
-                &vec![bool_t(), qb_t()].into()
-            )
+            container_sig.io(),
+            (&expected_sig.input, &expected_sig.output),
+            "Got signature: {container_sig}, expected: {expected_sig}",
         );
+    }
+
+    #[rstest]
+    #[case::tail_loop(|sig: Signature| TailLoopBuilder::new(sig.input, vec![], sig.output).unwrap().into_dfg_builder())]
+    fn add_inputs_outputs_unsupported(#[case] builder: impl FnOnce(Signature) -> DFGBuilder<Hugr>) {
+        let mut dfg = builder(Signature::new(vec![bool_t()], vec![bool_t()]));
+
+        // Add a new input and output, and connect them with a noop in between
+        assert!(dfg.add_output(qb_t()).is_err());
+        assert!(dfg.add_input(qb_t()).is_err());
     }
 
     #[test]

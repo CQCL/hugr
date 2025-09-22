@@ -104,7 +104,7 @@ pub use build_traits::{
     Container, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer,
 };
 
-mod dataflow;
+pub mod dataflow;
 pub use dataflow::{DFGBuilder, DFGWrapper, FunctionBuilder};
 
 mod module;
