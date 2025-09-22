@@ -1110,8 +1110,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def from_model(module: model.Module) -> Hugr:
         """Import from the hugr model format."""
         from hugr.model.load import ModelImport
-        # TODO
         loader = ModelImport(module=module)
+        for node in module.root.children:
+            loader.import_node_in_module(node)
         return loader.hugr
 
 
