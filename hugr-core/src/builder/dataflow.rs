@@ -324,18 +324,15 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T> DFGWrapper<B, T> {
     ///
     /// # Returns
     ///
-    /// - The new wire from the region's input node.
+    /// - The new wire from the input node.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the parent optype cannot be updated to include the new input type.
-    /// See [DFGAddPortError::ParentOpNotSupported] for more details.
-    ///
-    // TODO(breaking): Change return type to Result<Wire, DFGAddPortError>
-    pub fn add_input(&mut self, input_type: Type) -> Wire {
-        self.0
-            .add_input(input_type)
-            .unwrap_or_else(|e| panic!("{e}"))
+    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is
+    ///   not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an
+    ///   input. In this case, the Hugr will not be updated.
+    pub fn add_input(&mut self, input_type: Type) -> Result<Wire, DFGAddPortError> {
+        self.0.add_input(input_type)
     }
 
     /// Add a new output to the dataflow being constructed.
@@ -344,16 +341,13 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T> DFGWrapper<B, T> {
     /// If the container optype is not a [`FuncDefn`] or a [`DFG`], the optype
     /// will not be updated.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the parent optype cannot be updated to include the new input type.
-    /// See [DFGAddPortError::ParentOpNotSupported] for more details
-    ///
-    // TODO(breaking): Change return type to Result<Wire, DFGAddPortError>
-    pub fn add_output(&mut self, output_type: Type) {
-        self.0
-            .add_output(output_type)
-            .unwrap_or_else(|e| panic!("{e}"));
+    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is
+    ///   not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an
+    ///   input. In this case, the Hugr will not be updated.
+    pub fn add_output(&mut self, output_type: Type) -> Result<(), DFGAddPortError> {
+        self.0.add_output(output_type)
     }
 }
 
