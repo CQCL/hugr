@@ -196,7 +196,7 @@ impl TestContext {
     /// panic message, or an empty string if no panic ocurred.
     ///
     /// For this to work, [`Emission::exec_panicking`] must be used together with the
-    /// [`UnwindingPreludeCodegen`] that takes care of initiating an unwind on panic.
+    /// [`crate::emit::test::PanicTestPreludeCodegen`].
     pub fn exec_hugr_panicking(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> String {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
         emission.verify().unwrap();

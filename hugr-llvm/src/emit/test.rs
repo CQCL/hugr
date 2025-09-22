@@ -263,8 +263,6 @@ fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
 }
 
 /// Prelude codegen that exits the current thread on panic instead of aborting.
-///
-/// Also writes the panic message into the [`PANIC_MSG_BUFFER`] LLVM global.
 #[derive(Clone)]
 pub struct PanicTestPreludeCodegen;
 
