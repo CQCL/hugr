@@ -40,14 +40,14 @@ derive_more = { workspace = true, features = [
 ] }
 downcast-rs = { workspace = true }
 enum_dispatch = { workspace = true }
-fxhash.workspace = true
 html-escape = { workspace = true }
 indexmap.workspace = true
 itertools = { workspace = true }
-paste = { workspace = true }
+pastey = { workspace = true }
 petgraph = { workspace = true }
 portgraph = { workspace = true, features = ["serde", "petgraph"] }
 regex = { workspace = true }
+rustc-hash.workspace = true
 # Rc used here for Extension, but unfortunately we must turn the feature on globally
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }

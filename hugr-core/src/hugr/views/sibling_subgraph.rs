@@ -8,13 +8,13 @@ use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
 
-use fxhash::FxHashSet;
 use itertools::Itertools;
 use portgraph::LinkView;
 use portgraph::PortView;
 use portgraph::algorithms::CreateConvexChecker;
 use portgraph::algorithms::convex::{LineIndex, LineIntervals, Position};
 use portgraph::boundary::Boundary;
+use rustc_hash::FxHashSet;
 use thiserror::Error;
 
 use crate::builder::{Container, FunctionBuilder};

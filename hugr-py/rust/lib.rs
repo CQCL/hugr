@@ -5,7 +5,7 @@ use pyo3::{exceptions::PyValueError, prelude::*};
 
 macro_rules! syntax_to_and_from_string {
     ($name:ident, $ty:ty) => {
-        paste::paste! {
+        pastey::paste! {
             #[pyfunction]
             fn [<$name _to_string>](ob: ast::$ty) -> PyResult<String> {
                 Ok(format!("{}", ob))

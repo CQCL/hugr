@@ -1246,7 +1246,6 @@ dependencies = [
  "derive_more 1.0.0",
  "downcast-rs",
  "enum_dispatch",
- "fxhash",
  "html-escape",
  "hugr",
  "hugr-model",
@@ -1255,7 +1254,7 @@ dependencies = [
  "itertools 0.14.0",
  "jsonschema",
  "ordered-float",
- "paste",
+ "pastey",
  "petgraph 0.8.2",
  "portgraph",
  "proptest",
@@ -1263,6 +1262,7 @@ dependencies = [
  "regex",
  "relrc",
  "rstest",
+ "rustc-hash",
  "semver",
  "serde",
  "serde_json",
@@ -1304,7 +1304,6 @@ dependencies = [
  "bumpalo",
  "capnp",
  "derive_more 1.0.0",
- "fxhash",
  "indexmap 2.11.3",
  "insta",
  "itertools 0.14.0",
@@ -1316,6 +1315,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "pyo3",
+ "rustc-hash",
  "semver",
  "smol_str",
  "thiserror 2.0.16",
@@ -1329,7 +1329,7 @@ dependencies = [
  "derive_more 1.0.0",
  "hugr-core",
  "itertools 0.14.0",
- "paste",
+ "pastey",
  "petgraph 0.8.2",
  "portgraph",
  "proptest",
@@ -1366,7 +1366,7 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "hugr-model",
- "paste",
+ "pastey",
  "pyo3",
 ]
 
@@ -2043,6 +2043,12 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pastey"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
 
 [[package]]
 name = "percent-encoding"
