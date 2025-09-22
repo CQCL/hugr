@@ -41,3 +41,6 @@ lazy_static.workspace = true
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }
+
+[build-dependencies]
+cc = "1.2.38"

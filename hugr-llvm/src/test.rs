@@ -188,6 +188,21 @@ impl TestContext {
 
         emission.exec_f64(entry_point).unwrap()
     }
+
+    /// Lower `hugr` to LLVM, then JIT and execute the function named `entry_point` in the
+    /// inner module.
+    ///
+    /// Takes care of safely handling panics ocurring in the program and returns the produced
+    /// panic message, or an empty string if no panic ocurred.
+    ///
+    /// For this to work, [`Emission::exec_panicking`] must be used together with the
+    /// [`UnwindingPreludeCodegen`] that takes care of initiating an unwind on panic.
+    pub fn exec_hugr_panicking(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> String {
+        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+        emission.verify().unwrap();
+
+        emission.exec_panicking(entry_point).unwrap()
+    }
 }
 
 #[fixture]

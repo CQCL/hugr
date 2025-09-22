@@ -1,3 +1,8 @@
+use inkwell::execution_engine::ExecutionEngine;
+use std::ffi::CStr;
+
+use crate::emit::EmitFuncContext;
+use crate::extension::PreludeCodegen;
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
 use anyhow::{Result, anyhow};
@@ -6,11 +11,14 @@ use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView, Node};
-use inkwell::module::Module;
+use inkwell::AddressSpace;
+use inkwell::module::{Linkage, Module};
 use inkwell::passes::PassManager;
-use inkwell::values::GenericValue;
+use inkwell::values::{BasicValueEnum, GenericValue, GlobalValue, PointerValue};
 
 use super::EmitHugr;
+
+mod panic_runtime;
 
 #[allow(clippy::upper_case_acronyms)]
 pub type DFGW = DFGWrapper<Hugr, BuildHandle<FuncID<true>>>;
@@ -102,6 +110,65 @@ impl<'c> Emission<'c> {
         let fv = ee.get_function_value(entry.as_ref())?;
         Ok(unsafe { ee.run_function(fv, &[]) })
     }
+
+    /// JIT and execute the function named `entry` in the inner module.
+    ///
+    /// Safely handles panics ocurring in the program and returns the produced
+    /// panic message, or an empty string if no panic ocurred.
+    ///
+    /// For this to work, [`Emission::exec_panicking`] must be used together with the
+    /// [`PanicTestPreludeCodegen`].
+    pub fn exec_panicking(&self, entry: impl AsRef<str>) -> Result<String> {
+        // The default lowering for `panic` ops in `DefaultPreludeCodegen` just aborts.
+        // This kills the entire process and cannot be caught, so we have to use something
+        // else when trying to test panic behaviour. Unfortunately, we also cannot rely
+        // on Rust's builtin panic mechanism since we cannot unwind through JIT frames.
+        // Thus, we need to roll our own panic runtime for testing. See the `panic_runtime`
+        // module for details.
+        let entry_fv = self
+            .module
+            .get_function(entry.as_ref())
+            .ok_or_else(|| anyhow!("Function {} not found in module", entry.as_ref()))?;
+        entry_fv.set_linkage(inkwell::module::Linkage::External);
+        assert_eq!(
+            entry_fv.get_type().count_param_types(),
+            0,
+            "Entry not allowed to take arguments"
+        );
+
+        // Set up JIT execution engine
+        self.module.verify().unwrap();
+        let ee = self
+            .module
+            .create_jit_execution_engine(inkwell::OptimizationLevel::None)
+            .map_err(|err| anyhow!("Failed to create execution engine: {err}"))?;
+
+        // Create buffers for SJLJ jumping and for the panic message and link them
+        // to the execution engine
+        let jum_buf_size = unsafe { panic_runtime::jmp_buf_size() };
+        let mut panic_jmp_buf =
+            alloc_shared_buffer(PANIC_JMP_BUFFER, jum_buf_size, &self.module, &ee);
+        let mut panic_msg_buf =
+            alloc_shared_buffer(PANIC_MSG_BUFFER, PANIC_MSG_BUFFER_LEN, &self.module, &ee);
+
+        // Link the `panic_exit` function into the execution engine
+        let panic_exit_func = self
+            .module
+            .get_function(PANIC_EXIT)
+            .ok_or_else(|| anyhow!("exec_panicking requires using UnwindingPreludeCodegen"))?;
+        ee.add_global_mapping(&panic_exit_func, panic_runtime::panic_exit as usize);
+
+        // Invoke the entry function using the panic runtime trampoline
+        let entry_ptr = unsafe { ee.get_function(entry.as_ref()).unwrap() };
+        unsafe {
+            panic_runtime::trampoline(panic_jmp_buf.as_mut_ptr().cast(), Some(entry_ptr.as_raw()));
+        }
+
+        // Read panic message from buffer
+        panic_msg_buf[PANIC_MSG_BUFFER_LEN - 1] = 0;
+        let panic_msg = CStr::from_bytes_until_nul(&panic_msg_buf).unwrap();
+        Ok(panic_msg.to_string_lossy().to_string())
+    }
 }
 
 impl SimpleHugrConfig {
@@ -142,6 +209,105 @@ impl SimpleHugrConfig {
 impl Default for SimpleHugrConfig {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Name of the LLVM global that holds the buffer to write panic messages.
+const PANIC_MSG_BUFFER: &str = "__panic_msg_buf";
+
+/// Name of the LLVM global that holds the buffer for the panic runtime
+const PANIC_JMP_BUFFER: &str = "__panic_jmp_buf";
+
+/// Name of the LLVM function that is linked to [`panic_runtime::panic_exit`]
+/// to exit the program.
+const PANIC_EXIT: &str = "__panic_exit";
+
+/// Length of the panic message buffer.
+const PANIC_MSG_BUFFER_LEN: usize = 1024;
+
+/// Retrieves a named global buffer from an LLVM module or creates one
+/// if it doesn't exist yet.
+fn get_global_buffer<'c>(name: &str, size: usize, module: &Module<'c>) -> GlobalValue<'c> {
+    module.get_global(name).unwrap_or_else(|| {
+        module.add_global(
+            module.get_context().i8_type().array_type(size as u32),
+            None,
+            name,
+        )
+    })
+}
+
+/// Allocates a buffer and links it to a global variable with the given name
+/// in the execution engine.
+fn alloc_shared_buffer(name: &str, size: usize, module: &Module, ee: &ExecutionEngine) -> Vec<u8> {
+    let mut buf = vec![0; size];
+    let global = get_global_buffer(name, size, module);
+    global.set_linkage(Linkage::External);
+    ee.add_global_mapping(&global, buf.as_mut_ptr() as usize);
+    buf
+}
+
+/// Builds an `i8*` [`PointerValue`] to a global buffer with the given name.
+fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
+    name: &str,
+    size: usize,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+) -> Result<PointerValue<'c>> {
+    let global = get_global_buffer(name, size, ctx.get_current_module());
+    let ptr = ctx.builder().build_bit_cast(
+        global.as_pointer_value(),
+        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
+        "",
+    )?;
+    Ok(ptr.into_pointer_value())
+}
+
+/// Prelude codegen that exits the current thread on panic instead of aborting.
+///
+/// Also writes the panic message into the [`PANIC_MSG_BUFFER`] LLVM global.
+#[derive(Clone)]
+pub struct PanicTestPreludeCodegen;
+
+impl PreludeCodegen for PanicTestPreludeCodegen {
+    fn emit_panic<H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<H>,
+        err: BasicValueEnum,
+    ) -> Result<()> {
+        // Emit a `panic_exit(jmp_buf, msg_buf, msg, msg_buf_len)` runtime call
+        let usize_ty = self.usize_type(&ctx.typing_session());
+        let i8_ptr_ty = ctx.iw_context().i8_type().ptr_type(AddressSpace::default());
+        let sig = ctx.iw_context().void_type().fn_type(
+            &[
+                i8_ptr_ty.into(),
+                i8_ptr_ty.into(),
+                i8_ptr_ty.into(),
+                usize_ty.into(),
+            ],
+            false,
+        );
+        let panic_exit = ctx.get_extern_func(PANIC_EXIT, sig)?;
+
+        let jmp_buf_size = unsafe { panic_runtime::jmp_buf_size() };
+        let jmp_buf_ptr = get_buffer_ptr(PANIC_JMP_BUFFER, jmp_buf_size, ctx)?;
+        let msg_buf_ptr = get_buffer_ptr(PANIC_MSG_BUFFER, PANIC_MSG_BUFFER_LEN, ctx)?;
+        let msg_ptr = ctx
+            .builder()
+            .build_extract_value(err.into_struct_value(), 1, "")?
+            .into_pointer_value();
+        let msg_buf_len = usize_ty.const_int(PANIC_MSG_BUFFER_LEN as u64, false);
+
+        ctx.builder().build_call(
+            panic_exit,
+            &[
+                jmp_buf_ptr.into(),
+                msg_buf_ptr.into(),
+                msg_ptr.into(),
+                msg_buf_len.into(),
+            ],
+            "",
+        )?;
+        Ok(())
     }
 }
 
@@ -215,9 +381,10 @@ mod test_fns {
 
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
     use hugr_core::builder::{DataflowHugr, DataflowSubContainer};
-    use hugr_core::extension::PRELUDE_REGISTRY;
-    use hugr_core::extension::prelude::{ConstUsize, bool_t, usize_t};
+    use hugr_core::extension::prelude::{ConstError, ConstUsize, EXIT_OP_ID, bool_t, usize_t};
+    use hugr_core::extension::{PRELUDE, PRELUDE_REGISTRY};
     use hugr_core::ops::constant::CustomConst;
+    use hugr_core::types::Term;
 
     use hugr_core::ops::{CallIndirect, Tag, Value};
     use hugr_core::std_extensions::STD_REG;
@@ -673,5 +840,31 @@ mod test_fns {
             });
         exec_ctx.add_extensions(CodegenExtsBuilder::add_default_prelude_extensions);
         assert_eq!(42, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    #[case::basic("Basic panic message")]
+    #[case::empty("")]
+    #[case::unicode("We ❤️ ünîçödè ( ͡° ͜ʖ ͡°)")]
+    #[case::long(&"x".repeat(PANIC_MSG_BUFFER_LEN + 100))]
+    fn test_exec_panic(mut exec_ctx: TestContext, #[case] msg: &str) {
+        let panic_op = PRELUDE
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(PRELUDE_REGISTRY.to_owned())
+            .finish(|mut builder: DFGW| {
+                let err = builder.add_load_value(ConstError::new(2, msg));
+                builder.add_dataflow_op(panic_op, [err]).unwrap();
+                builder.finish_hugr_with_outputs([]).unwrap()
+            });
+        exec_ctx.add_extensions(|b| b.add_prelude_extensions(PanicTestPreludeCodegen));
+        let msg_trunc = if msg.len() >= PANIC_MSG_BUFFER_LEN {
+            &msg[..PANIC_MSG_BUFFER_LEN - 1]
+        } else {
+            msg
+        };
+        assert_eq!(exec_ctx.exec_hugr_panicking(hugr, "main"), msg_trunc);
     }
 }
