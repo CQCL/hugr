@@ -24,7 +24,7 @@ portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 itertools = { workspace = true }
-paste = { workspace = true }
+pastey = { workspace = true }
 thiserror = { workspace = true }
 petgraph = { workspace = true }
 strum = { workspace = true }

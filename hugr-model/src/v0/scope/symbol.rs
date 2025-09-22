@@ -1,7 +1,7 @@
 use std::{borrow::Cow, hash::BuildHasherDefault};
 
-use fxhash::FxHasher;
 use indexmap::IndexMap;
+use rustc_hash::FxHasher;
 use thiserror::Error;
 
 use crate::v0::table::{NodeId, RegionId};

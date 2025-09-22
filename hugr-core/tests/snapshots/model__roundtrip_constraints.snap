@@ -6,17 +6,17 @@ expression: ast
 
 (mod)
 
-(import collections.array.array)
-
-(import core.nat)
-
-(import core.nonlinear)
-
-(import core.type)
-
 (import core.fn)
 
 (import core.title)
+
+(import core.nonlinear)
+
+(import core.nat)
+
+(import core.type)
+
+(import collections.array.array)
 
 (declare-func
   private

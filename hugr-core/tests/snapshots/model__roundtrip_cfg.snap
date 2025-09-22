@@ -10,11 +10,11 @@ expression: ast
 
 (import core.ctrl)
 
+(import core.adt)
+
 (import core.type)
 
 (import core.fn)
-
-(import core.adt)
 
 (define-func public example.cfg_loop (param ?0 core.type) (core.fn [?0] [?0])
   (dfg [%0] [%1]

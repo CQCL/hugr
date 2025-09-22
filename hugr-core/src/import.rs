@@ -29,10 +29,10 @@ use crate::{
         type_row::TypeRowBase,
     },
 };
-use fxhash::FxHashMap;
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};
 use itertools::{Either, Itertools};
+use rustc_hash::FxHashMap;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
 
