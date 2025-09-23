@@ -1,6 +1,5 @@
 //! Merge BBs along control-flow edges where the source BB has no other successors
 //! and the target BB has no other predecessors.
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
@@ -13,7 +12,7 @@ use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output};
-use hugr_core::{Hugr, HugrView, Node, OutgoingPort, PortIndex};
+use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
@@ -92,63 +91,14 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         .unwrap();
     let entry_blk = cfg.get_optype(entry).as_dataflow_block().unwrap();
     let cfg_parent = cfg.get_parent(cfg.entrypoint()).unwrap();
-    // Note the spec says the entry block is distinct from the exit block
-    // 1. If the entry block has only one successor and that is the exit block, the CFG can be removed.
-    // (It does not matter if the entry block has other predecessors: they are not reachable!)
-    if cfg.output_neighbours(entry).exactly_one().ok() == Some(exit) {
-        // 1a. If that successor is the exit block, the CFG can be removed
-        assert_eq!(
-            &Signature::new(
-                entry_blk.inputs.clone(),
-                entry_blk.successor_input(0).unwrap()
-            ),
-            cfg.signature(cfg.entrypoint()).unwrap().as_ref()
-        );
-
-        let (mut repl, [], dfgs) = mk_rep2(
-            cfg,
-            OpType::DFG(DFG {
-                signature: Signature::new_endo(vec![]),
-            }),
-            [],
-            entry,
-            exit,
-            Cow::Owned(Signature::new_endo(
-                cfg.get_optype(exit)
-                    .as_exit_block()
-                    .unwrap()
-                    .cfg_outputs
-                    .clone(),
-            )),
-        );
-        {
-            let [exit_inp, exit_out] = repl.replacement.get_io(dfgs[1]).unwrap();
-            for p in cfg.node_outputs(exit_inp) {
-                repl.replacement.connect(exit_inp, p, exit_out, p.index());
-            }
-            repl.removal = vec![cfg.entrypoint()];
-        }
-        let node_map = cfg.apply_patch(repl).unwrap();
-        for dfg_id in dfgs {
-            let n_id = *node_map.get(&dfg_id).unwrap();
-            cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
-        }
-        // This has replaced the entire CFG with a DFG...or should we just inline that??
-        return Ok(NormalizeCFGResult::CFGRemoved);
-    }
-    // 2. If the entry block has a single successor (and no predecessor DataflowBlocks)...
+    // 1. If the entry block has only one successor, and no predecessors, then move contents
+    // outside/before CFG.
     let mut entry_changed = false;
-    if let Some(succ) = cfg
-        .output_neighbours(entry)
-        .exactly_one()
-        .ok()
-        .filter(|_| cfg.input_neighbours(entry).next().is_none())
-    {
-        // Turn the entry block into a DFG outside/before the CFG; the successor becomes the entry block.
+    if let Some(succ) = can_elide_entry(cfg, entry, entry_blk, exit) {
+        // Move contents of entry block outside/before the CFG; the successor becomes the entry block.
         // Note if the entry block has multiple successors, but no predecessors, we could move its
         // contents outside (before) the CFG, but would need to keep an empty/identity entry block
         // - we do not do this here
-        assert!(cfg.input_neighbours(succ).count() > 1);
         let [entry_input, entry_output] = cfg.get_io(entry).unwrap();
         let tuple_elems = entry_blk
             .sum_rows
@@ -156,6 +106,8 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             .into_iter()
             .exactly_one()
             .unwrap();
+        let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
+        // Inputs to CFG go directly to consumers of the entry block's Input node
         for inp in cfg.node_inputs(cfg.entrypoint()).collect::<Vec<_>>() {
             // TODO order edges?? Might need to generalize beyond single_linked...
             let src = cfg.single_linked_output(cfg.entrypoint(), inp).unwrap();
@@ -168,6 +120,17 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             }
         }
         cfg.remove_node(entry_input);
+
+        // Update input ports
+        let OpType::CFG(cfg_ty) = cfg.optype_mut(cfg.entrypoint()) else {
+            panic!()
+        };
+        let inputs_to_add = new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
+        cfg_ty.signature.input = new_cfg_inputs;
+        cfg.add_ports(cfg.entrypoint(), Direction::Incoming, inputs_to_add);
+
+        // Inputs to entry block Output node go instead to CFG
+        // TODO order edges again
         let entry_results = cfg
             .in_value_types(entry_output)
             .enumerate()
@@ -180,11 +143,40 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         while let Some(n) = cfg.first_child(entry) {
             cfg.set_parent(n, cfg_parent);
         }
+        if succ == exit {
+            // 1a. CFG must have distinct entry/exit; but we are left with a no-op
+            let tys = cfg
+                .get_optype(exit)
+                .as_exit_block()
+                .unwrap()
+                .cfg_outputs
+                .clone();
+            let opty = cfg.optype_mut(cfg.entrypoint());
+            let OpType::CFG(cfg_ty) = std::mem::take(opty) else {
+                panic!()
+            };
+            assert_eq!(cfg_ty.signature.input, tys);
+            assert_eq!(cfg_ty.signature.output, tys);
+            *opty = OpType::DFG(DFG {
+                signature: cfg_ty.signature,
+            });
+            while let Some(c) = cfg.first_child(cfg.entrypoint()) {
+                cfg.remove_subtree(c);
+            }
+            let inp = cfg.add_node_with_parent(cfg.entrypoint(), Input { types: tys.clone() });
+            let out = cfg.add_node_with_parent(cfg.entrypoint(), Input { types: tys.clone() });
+            for p in cfg.node_outputs(inp).collect_vec() {
+                cfg.connect(inp, p, out, p.index());
+            }
+            // This has replaced the entire CFG with an empty DFG...should we just inline/remove that??
+            return Ok(NormalizeCFGResult::CFGRemoved);
+        }
+        // 1b. else, old entry-node's successor is the new entry node, move into place
         cfg.move_before_sibling(succ, entry);
         cfg.remove_node(entry);
         entry_changed = true;
     }
-    // 3. If the exit node has a single predecessor and that predecessor has no other successors...
+    // 2. If the exit node has a single predecessor and that predecessor has no other successors...
     let mut exit_changed = false;
     if let Some(pred) = cfg
         .input_neighbours(exit)
@@ -209,7 +201,8 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             cfg_outputs: new_cfg_outs.clone(),
         }
         .into();
-        // TODO update number of input ports
+        cfg.set_num_ports(pred, cfg.num_ports(pred, Direction::Incoming), 0);
+
         cfg.move_before_sibling(pred, exit);
         cfg.remove_node(exit);
         // Move contents into new DFG
@@ -260,6 +253,28 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
     })
 }
 
+fn can_elide_entry<H: HugrView>(
+    h: &H,
+    entry: H::Node,
+    entry_blk: &DataflowBlock,
+    exit: H::Node,
+) -> Option<H::Node> {
+    let succ = h.output_neighbours(entry).exactly_one().ok()?;
+    if succ == exit {
+        // Any other predecessors are unreachable!
+        assert_eq!(
+            &Signature::new(
+                entry_blk.inputs.clone(),
+                entry_blk.successor_input(0).unwrap()
+            ),
+            h.signature(h.entrypoint()).unwrap().as_ref()
+        );
+    } else if h.input_neighbours(entry).count() > 1 {
+        return None;
+    }
+    Some(succ)
+}
+
 fn mk_rep<H: HugrView>(
     cfg: &H,
     pred: H::Node,
@@ -269,41 +284,16 @@ fn mk_rep<H: HugrView>(
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
 
-    let opty = DataflowBlock {
-        inputs: pred_ty.inputs.clone(),
-        ..succ_ty.clone()
-    };
-    let (repl, [merged], dfgs) = mk_rep2(
-        cfg,
-        cfg.entrypoint_optype().clone(),
-        [opty.into()],
-        pred,
-        succ,
-        succ_sig,
-    );
-    (repl, merged, dfgs)
-}
-
-fn mk_rep2<H: HugrView, const N: usize>(
-    cfg: &H,
-    root_opty: OpType,
-    parent_optys: [OpType; N],
-    pred: H::Node,
-    succ: H::Node,
-    succ_sig: Cow<Signature>,
-) -> (Replacement<H::Node>, [Node; N], [Node; 2]) {
-    let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
-
     // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement =
-        Hugr::new_with_entrypoint(root_opty).expect("Replacement should have a CFG entrypoint");
+    let mut replacement: Hugr = Hugr::new_with_entrypoint(cfg.entrypoint_optype().clone())
+        .expect("Replacement should have a CFG entrypoint");
 
-    let mut merged = replacement.entrypoint();
-    let nested_blocks = parent_optys.map(|opty| {
-        merged = replacement.add_node_with_parent(merged, opty);
-        merged
+    let merged = replacement.add_node_with_parent(replacement.entrypoint(), {
+        DataflowBlock {
+            inputs: pred_ty.inputs.clone(),
+            ..succ_ty.clone()
+        }
     });
-
     let input = replacement.add_node_with_parent(
         merged,
         Input {
@@ -386,7 +376,7 @@ fn mk_rep2<H: HugrView, const N: usize>(
             .collect(),
         mu_new: vec![],
     };
-    (rep, nested_blocks, [dfg1, dfg2])
+    (rep, merged, [dfg1, dfg2])
 }
 
 fn add_unpack<H: HugrMut>(
