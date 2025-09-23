@@ -3,36 +3,37 @@
 //! and deleting the DFG along with its Input + Output
 
 use super::{PatchHugrMut, PatchVerification};
+use crate::core::HugrNode;
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 /// Structure identifying an `InlineDFG` rewrite from the spec
-pub struct InlineDFG(pub DfgID);
+pub struct InlineDFG<N>(pub DfgID<N>);
 
 /// Errors from an [`InlineDFG`] rewrite.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
-pub enum InlineDFGError {
+pub enum InlineDFGError<N = Node> {
     /// Node to inline was not a DFG. (E.g. node has been overwritten since the `DfgID` originated.)
     #[error("{node} was not a DFG")]
     NotDFG {
         /// The node we tried to inline
-        node: Node,
+        node: N,
     },
     /// The DFG node is the hugr entrypoint
     #[error("Cannot inline the entrypoint node, {node}")]
     CantInlineEntrypoint {
         /// The node we tried to inline
-        node: Node,
+        node: N,
     },
 }
 
-impl PatchVerification for InlineDFG {
-    type Error = InlineDFGError;
+impl<N: HugrNode> PatchVerification for InlineDFG<N> {
+    type Error = InlineDFGError<N>;
 
-    type Node = Node;
+    type Node = N;
 
-    fn verify(&self, h: &impl crate::HugrView<Node = Node>) -> Result<(), Self::Error> {
+    fn verify(&self, h: &impl crate::HugrView<Node = N>) -> Result<(), Self::Error> {
         let n = self.0.node();
         if h.get_optype(n).as_dfg().is_none() {
             return Err(InlineDFGError::NotDFG { node: n });
@@ -51,15 +52,15 @@ impl PatchVerification for InlineDFG {
     }
 }
 
-impl PatchHugrMut for InlineDFG {
+impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     /// The removed nodes: the DFG, and its Input and Output children.
-    type Outcome = [Node; 3];
+    type Outcome = [N; 3];
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn apply_hugr_mut(
         self,
-        h: &mut impl crate::hugr::HugrMut<Node = Node>,
+        h: &mut impl crate::hugr::HugrMut<Node = N>,
     ) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
