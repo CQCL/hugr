@@ -279,7 +279,7 @@ mod test {
         let not_a_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().map(Node::index).max().unwrap() + 1,
         ));
-        assert_eq!(hugr.contains_node(not_a_node), false);
+        assert!(!hugr.contains_node(not_a_node));
         let dce = DeadCodeElimPass::default().with_entry_points([not_a_node]);
         let cfold = ConstantFoldPass::default().with_inputs(id2.node(), [(0, c_usz.clone())]);
 
