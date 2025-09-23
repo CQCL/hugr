@@ -294,8 +294,9 @@ impl<'a> Commit<'a> {
     /// Change the lifetime of the commit.
     ///
     /// This is unsafe because it cannot be guaranteed that the commit will
-    /// live as long as the lifetime 'b.
-    pub(crate) unsafe fn upgrade_lifetime<'b>(self) -> Commit<'b> {
+    /// live as long as the lifetime 'b. The user must guuarantee that the
+    /// rewrite space of `self` is valid as long as the lifetime 'b.
+    pub unsafe fn upgrade_lifetime<'b>(self) -> Commit<'b> {
         Commit(self.0, PhantomData)
     }
 }

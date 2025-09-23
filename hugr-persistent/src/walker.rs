@@ -496,6 +496,14 @@ impl From<InvalidCommit> for PinNodeError {
     }
 }
 
+impl<'w> hugr_core::hugr::views::NodesIter for Walker<'w> {
+    type Node = PatchNode;
+
+    fn nodes(&self) -> impl Iterator<Item = Self::Node> + '_ {
+        <PersistentHugr as HugrView>::nodes(self.as_hugr_view())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;

@@ -355,7 +355,6 @@ impl PersistentHugr {
     pub fn apply_all(&self) -> (Hugr, HashMap<PatchNode, Node>) {
         let mut hugr = self.base_hugr().clone();
         let mut node_map = HashMap::from_iter(hugr.nodes().map(|n| (PatchNode(self.base(), n), n)));
-        println!("\n\nstart apply_all");
         for commit_id in self.toposort_commits() {
             let Some(repl) = self.get_commit(commit_id).replacement() else {
                 continue;

@@ -16,17 +16,19 @@ use hugr_core::{
     ops::OpType,
 };
 
+use crate::CommitId;
+
 use super::{
     InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement, state_space::CommitData,
 };
 
 impl Patch<PersistentHugr> for PersistentReplacement {
-    type Outcome = ();
+    type Outcome = CommitId;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn apply(self, h: &mut PersistentHugr) -> Result<Self::Outcome, Self::Error> {
         match h.try_add_replacement(self) {
-            Ok(_) => Ok(()),
+            Ok(commit) => Ok(commit),
             Err(
                 InvalidCommit::UnknownParent(_)
                 | InvalidCommit::IncompatibleHistory(_, _)

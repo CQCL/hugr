@@ -210,7 +210,7 @@ impl CommitStateSpace {
     /// Get the (unique) base commit of the state space.
     ///
     /// Return `None` if `self` is empty.
-    pub(crate) fn base_commit<'a>(&'a self) -> Option<Commit<'a>> {
+    pub fn base_commit<'a>(&'a self) -> Option<Commit<'a>> {
         // get any commit
         let (_, relrc) = self.borrow().iter().next()?;
         // SAFETY: commit will be alive as long as the state space
