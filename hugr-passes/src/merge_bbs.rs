@@ -16,9 +16,15 @@ use hugr_core::{Hugr, HugrView, Node};
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
-pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID>)
+///
+/// # Panics
+///
+/// If the [HugrMut::entrypoint] of `cfg` is not an [OpType::CFG]
+///
+/// [OpType::CFG]: hugr_core::ops::OpType::CFG
+pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>)
 where
-    H: 'h + HugrMut<Node = Node>,
+    H: 'h + HugrMut,
 {
     let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
     let cfg = checked.into_hugr();
@@ -49,11 +55,11 @@ where
     }
 }
 
-fn mk_rep(
-    cfg: &impl HugrView<Node = Node>,
-    pred: Node,
-    succ: Node,
-) -> (Replacement, Node, [Node; 2]) {
+fn mk_rep<H: HugrView>(
+    cfg: &H,
+    pred: H::Node,
+    succ: H::Node,
+) -> (Replacement<H::Node>, Node, [Node; 2]) {
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
