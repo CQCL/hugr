@@ -4,16 +4,16 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::views::RootCheckable;
+use hugr_core::hugr::views::{RootCheckable, RootChecked};
+use hugr_core::hugr::{HugrError, hugrmut::HugrMut};
 use hugr_core::types::{Signature, TypeRow};
 use itertools::Itertools;
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, OpType, Output};
-use hugr_core::{Hugr, HugrView, Node, OutgoingPort};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output};
+use hugr_core::{Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
@@ -24,6 +24,7 @@ use hugr_core::{Hugr, HugrView, Node, OutgoingPort};
 /// If the [HugrMut::entrypoint] of `cfg` is not an [OpType::CFG]
 ///
 /// [OpType::CFG]: hugr_core::ops::OpType::CFG
+#[deprecated(note = "Use normalize_cfg")]
 pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>)
 where
     H: 'h + HugrMut,
@@ -55,6 +56,208 @@ where
         }
         worklist.push(merged_bb);
     }
+}
+
+#[derive(Clone, Debug, thiserror::Error)]
+pub enum NormalizeCFGError {
+    /// The requested node was not a CFG. ALAN note this could just be [hugr_core::hugr::HugrError]??
+    #[error("Requested node was not a CFG but {_0}")]
+    NotCFG(OpTag),
+}
+
+pub enum NormalizeCFGResult {
+    CFGRemoved,
+    CFGPreserved {
+        entry_changed: bool,
+        exit_changed: bool,
+    },
+}
+
+#[allow(deprecated)]
+pub fn normalize_cfg<H: HugrMut<Node = Node>>(
+    mut cfg: &mut H,
+) -> Result<NormalizeCFGResult, NormalizeCFGError> {
+    let checked: RootChecked<_, CfgID<H::Node>> =
+        RootChecked::<_, CfgID<H::Node>>::try_new(&mut cfg).map_err(|e| match e {
+            HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
+            _ => unreachable!(),
+        })?;
+    merge_basic_blocks(checked);
+
+    // Further normalizations with effects outside the CFG
+    let [entry, exit] = cfg
+        .children(cfg.entrypoint())
+        .take(2)
+        .collect_array()
+        .unwrap();
+    let entry_blk = cfg.get_optype(entry).as_dataflow_block().unwrap();
+    let cfg_parent = cfg.get_parent(cfg.entrypoint()).unwrap();
+    // Note the spec says the entry block is distinct from the exit block
+    // 1. If the entry block has only one successor and that is the exit block, the CFG can be removed.
+    // (It does not matter if the entry block has other predecessors: they are not reachable!)
+    if cfg.output_neighbours(entry).exactly_one().ok() == Some(exit) {
+        // 1a. If that successor is the exit block, the CFG can be removed
+        assert_eq!(
+            &Signature::new(
+                entry_blk.inputs.clone(),
+                entry_blk.successor_input(0).unwrap()
+            ),
+            cfg.signature(cfg.entrypoint()).unwrap().as_ref()
+        );
+
+        let (mut repl, [], dfgs) = mk_rep2(
+            cfg,
+            OpType::DFG(DFG {
+                signature: Signature::new_endo(vec![]),
+            }),
+            [],
+            entry,
+            exit,
+            Cow::Owned(Signature::new_endo(
+                cfg.get_optype(exit)
+                    .as_exit_block()
+                    .unwrap()
+                    .cfg_outputs
+                    .clone(),
+            )),
+        );
+        {
+            let [exit_inp, exit_out] = repl.replacement.get_io(dfgs[1]).unwrap();
+            for p in cfg.node_outputs(exit_inp) {
+                repl.replacement.connect(exit_inp, p, exit_out, p.index());
+            }
+            repl.removal = vec![cfg.entrypoint()];
+        }
+        let node_map = cfg.apply_patch(repl).unwrap();
+        for dfg_id in dfgs {
+            let n_id = *node_map.get(&dfg_id).unwrap();
+            cfg.apply_patch(InlineDFG(n_id.into())).unwrap();
+        }
+        // This has replaced the entire CFG with a DFG...or should we just inline that??
+        return Ok(NormalizeCFGResult::CFGRemoved);
+    }
+    // 2. If the entry block has a single successor (and no predecessor DataflowBlocks)...
+    let mut entry_changed = false;
+    if let Some(succ) = cfg
+        .output_neighbours(entry)
+        .exactly_one()
+        .ok()
+        .filter(|_| cfg.input_neighbours(entry).next().is_none())
+    {
+        // Turn the entry block into a DFG outside/before the CFG; the successor becomes the entry block.
+        // Note if the entry block has multiple successors, but no predecessors, we could move its
+        // contents outside (before) the CFG, but would need to keep an empty/identity entry block
+        // - we do not do this here
+        assert!(cfg.input_neighbours(succ).count() > 1);
+        let [entry_input, entry_output] = cfg.get_io(entry).unwrap();
+        let tuple_elems = entry_blk
+            .sum_rows
+            .clone()
+            .into_iter()
+            .exactly_one()
+            .unwrap();
+        for inp in cfg.node_inputs(cfg.entrypoint()).collect::<Vec<_>>() {
+            // TODO order edges?? Might need to generalize beyond single_linked...
+            let src = cfg.single_linked_output(cfg.entrypoint(), inp).unwrap();
+            cfg.disconnect(cfg.entrypoint(), inp);
+            for tgt in cfg
+                .linked_inputs(entry_input, inp.index())
+                .collect::<Vec<_>>()
+            {
+                cfg.connect(src.0, src.1, tgt.0, tgt.1);
+            }
+        }
+        cfg.remove_node(entry_input);
+        let entry_results = cfg
+            .in_value_types(entry_output)
+            .enumerate()
+            .map(|(i, _)| cfg.single_linked_output(entry_output, i).unwrap())
+            .collect::<Vec<_>>();
+
+        add_unpack(cfg, entry_results, tuple_elems, cfg.entrypoint());
+        cfg.remove_node(entry_output);
+        // Transfer remaining entry children - including any used to compute the predicate
+        while let Some(n) = cfg.first_child(entry) {
+            cfg.set_parent(n, cfg_parent);
+        }
+        cfg.move_before_sibling(succ, entry);
+        cfg.remove_node(entry);
+        entry_changed = true;
+    }
+    // 3. If the exit node has a single predecessor and that predecessor has no other successors...
+    let mut exit_changed = false;
+    if let Some(pred) = cfg
+        .input_neighbours(exit)
+        .exactly_one()
+        .ok()
+        .filter(|pred| cfg.output_neighbours(*pred).count() == 1)
+    {
+        // Code in that predecessor can be moved outside (after the CFG), and the predecessor deleted
+        let [_, output] = cfg.get_io(pred).unwrap();
+        let pred_blk = cfg.get_optype(pred).as_dataflow_block().unwrap();
+        let new_cfg_outs = pred_blk.inner_signature().into_owned().input;
+        let [tuple_tys] = pred_blk.sum_rows.iter().cloned().collect_array().unwrap();
+
+        // new CFG result type and exit block
+        let OpType::CFG(cfg_ty) = cfg.optype_mut(cfg.entrypoint()) else {
+            panic!()
+        };
+        let result_tys = std::mem::replace(&mut cfg_ty.signature.output, new_cfg_outs.clone());
+        // TODO update number of CFG outports
+
+        *cfg.optype_mut(pred) = ExitBlock {
+            cfg_outputs: new_cfg_outs.clone(),
+        }
+        .into();
+        // TODO update number of input ports
+        cfg.move_before_sibling(pred, exit);
+        cfg.remove_node(exit);
+        // Move contents into new DFG
+        let dfg = cfg.add_node_with_parent(
+            cfg_parent,
+            DFG {
+                signature: Signature::new(new_cfg_outs, result_tys.clone()),
+            },
+        );
+        while let Some(n) = cfg.first_child(pred) {
+            cfg.set_parent(n, dfg);
+        }
+        // Add tuple-unpack inside the DFG
+        let result_srcs = cfg
+            .node_inputs(output)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|p| {
+                let src = cfg.single_linked_output(output, p).unwrap();
+                cfg.disconnect(output, p);
+                src
+            })
+            .collect::<Vec<_>>();
+        let OpType::Output(ou) = cfg.optype_mut(output) else {
+            panic!()
+        };
+        ou.types = result_tys;
+        // TODO update number of input ports
+
+        add_unpack(cfg, result_srcs, tuple_tys, output);
+        // Move output edges.
+        // TODO result_tys is almost this, but we want to move Order edges too
+        for p in cfg.node_outputs(cfg.entrypoint()).collect_vec() {
+            let tgts = cfg.linked_inputs(cfg.entrypoint(), p).collect_vec();
+            cfg.disconnect(cfg.entrypoint(), p);
+            for tgt in tgts {
+                cfg.connect(dfg, p, tgt.0, tgt.1)
+            }
+        }
+        for p in cfg.node_inputs(dfg).collect_vec() {
+            cfg.connect(cfg.entrypoint(), p.index(), dfg, p);
+        }
+        exit_changed = true;
+    }
+    Ok(NormalizeCFGResult::CFGPreserved {
+        entry_changed,
+        exit_changed,
+    })
 }
 
 fn mk_rep<H: HugrView>(
