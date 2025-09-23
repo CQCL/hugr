@@ -6,14 +6,14 @@ use std::collections::HashMap;
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::RootCheckable;
-use hugr_core::types::Signature;
+use hugr_core::types::{Signature, TypeRow};
 use itertools::Itertools;
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, OpType, Output};
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::{Hugr, HugrView, Node, OutgoingPort};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
@@ -136,15 +136,13 @@ fn mk_rep2<H: HugrView, const N: usize>(
 
     // At the junction, must unpack the first (tuple, branch predicate) output
     let tuple_elems = pred_ty.sum_rows.clone().into_iter().exactly_one().unwrap();
-    let unp = replacement.add_node_with_parent(merged, UnpackTuple::new(tuple_elems.clone()));
-    replacement.connect(dfg1, 0, unp, 0);
-    let other_start = tuple_elems.len();
-    for (i, _) in tuple_elems.iter().enumerate() {
-        replacement.connect(unp, i, dfg2, i);
-    }
-    for (i, _) in pred_ty.other_outputs.iter().enumerate() {
-        replacement.connect(dfg1, i + 1, dfg2, i + other_start);
-    }
+    let dfg1_outs = replacement
+        .out_value_types(dfg1)
+        .enumerate()
+        .map(|(i, _)| (dfg1, i.into()))
+        .collect::<Vec<_>>();
+    add_unpack(&mut replacement, dfg1_outs, tuple_elems, dfg2);
+
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
     for (_, src_pos) in cfg.all_linked_outputs(pred).filter(|(src, _)| *src == succ) {
@@ -186,6 +184,27 @@ fn mk_rep2<H: HugrView, const N: usize>(
         mu_new: vec![],
     };
     (rep, nested_blocks, [dfg1, dfg2])
+}
+
+fn add_unpack<H: HugrMut>(
+    h: &mut H,
+    srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
+    tuple_tys: TypeRow,
+    dst: H::Node,
+) {
+    let parent = h.get_parent(dst).unwrap();
+    let mut srcs = srcs.into_iter();
+    let (src, src_p) = srcs.next().unwrap();
+    let tuple_len = tuple_tys.len();
+    let unp = h.add_node_with_parent(parent, UnpackTuple::new(tuple_tys));
+    h.connect(src, src_p, unp, 0);
+
+    for i in 0..tuple_len {
+        h.connect(unp, i, dst, i);
+    }
+    for (i, (src, src_p)) in srcs.enumerate() {
+        h.connect(src, src_p, dst, i + tuple_len);
+    }
 }
 
 #[cfg(test)]
