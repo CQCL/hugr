@@ -1,16 +1,18 @@
 //! Merge BBs along control-flow edges where the source BB has no other successors
 //! and the target BB has no other predecessors.
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::hugr::views::RootCheckable;
+use hugr_core::types::Signature;
 use itertools::Itertools;
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, Output};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, OpType, Output};
 use hugr_core::{Hugr, HugrView, Node};
 
 /// Merge any basic blocks that are direct children of the specified CFG
@@ -64,16 +66,38 @@ fn mk_rep<H: HugrView>(
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
 
-    // Make a Hugr with just a single CFG root node having the same signature.
-    let mut replacement: Hugr = Hugr::new_with_entrypoint(cfg.entrypoint_optype().clone())
-        .expect("Replacement should have a CFG entrypoint");
+    let opty = DataflowBlock {
+        inputs: pred_ty.inputs.clone(),
+        ..succ_ty.clone()
+    };
+    mk_rep2(
+        cfg,
+        cfg.entrypoint_optype().clone(),
+        Some(opty.into()),
+        pred,
+        succ,
+        succ_sig,
+    )
+}
 
-    let merged = replacement.add_node_with_parent(replacement.entrypoint(), {
-        DataflowBlock {
-            inputs: pred_ty.inputs.clone(),
-            ..succ_ty.clone()
-        }
+fn mk_rep2<H: HugrView>(
+    cfg: &H,
+    root_opty: OpType,
+    parent_opty: Option<OpType>,
+    pred: H::Node,
+    succ: H::Node,
+    succ_sig: Cow<Signature>,
+) -> (Replacement<H::Node>, Node, [Node; 2]) {
+    let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
+
+    // Make a Hugr with just a single CFG root node having the same signature.
+    let mut replacement =
+        Hugr::new_with_entrypoint(root_opty).expect("Replacement should have a CFG entrypoint");
+
+    let merged = parent_opty.map_or(replacement.entrypoint(), |opty| {
+        replacement.add_node_with_parent(replacement.entrypoint(), opty)
     });
+
     let input = replacement.add_node_with_parent(
         merged,
         Input {
