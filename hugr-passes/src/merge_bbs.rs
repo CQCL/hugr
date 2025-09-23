@@ -70,32 +70,35 @@ fn mk_rep<H: HugrView>(
         inputs: pred_ty.inputs.clone(),
         ..succ_ty.clone()
     };
-    mk_rep2(
+    let (repl, [merged], dfgs) = mk_rep2(
         cfg,
         cfg.entrypoint_optype().clone(),
-        Some(opty.into()),
+        [opty.into()],
         pred,
         succ,
         succ_sig,
-    )
+    );
+    (repl, merged, dfgs)
 }
 
-fn mk_rep2<H: HugrView>(
+fn mk_rep2<H: HugrView, const N: usize>(
     cfg: &H,
     root_opty: OpType,
-    parent_opty: Option<OpType>,
+    parent_optys: [OpType; N],
     pred: H::Node,
     succ: H::Node,
     succ_sig: Cow<Signature>,
-) -> (Replacement<H::Node>, Node, [Node; 2]) {
+) -> (Replacement<H::Node>, [Node; N], [Node; 2]) {
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
 
     // Make a Hugr with just a single CFG root node having the same signature.
     let mut replacement =
         Hugr::new_with_entrypoint(root_opty).expect("Replacement should have a CFG entrypoint");
 
-    let merged = parent_opty.map_or(replacement.entrypoint(), |opty| {
-        replacement.add_node_with_parent(replacement.entrypoint(), opty)
+    let mut merged = replacement.entrypoint();
+    let nested_blocks = parent_optys.map(|opty| {
+        merged = replacement.add_node_with_parent(merged, opty);
+        merged
     });
 
     let input = replacement.add_node_with_parent(
@@ -182,7 +185,7 @@ fn mk_rep2<H: HugrView>(
             .collect(),
         mu_new: vec![],
     };
-    (rep, merged, [dfg1, dfg2])
+    (rep, nested_blocks, [dfg1, dfg2])
 }
 
 #[cfg(test)]
