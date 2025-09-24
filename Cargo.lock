@@ -1365,6 +1365,7 @@ name = "hugr-py"
 version = "0.1.0"
 dependencies = [
  "bumpalo",
+ "hugr",
  "hugr-model",
  "pastey",
  "pyo3",
