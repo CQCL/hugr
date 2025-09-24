@@ -433,7 +433,13 @@ fn decode_model_ast(
     let bump = Bump::default();
     let model_package = ast_package.resolve(&bump)?;
 
-    Ok(import_package(&model_package, &extension_registry)?)
+    let package = import_package(&model_package, &extension_registry)?;
+    for module in &package.modules {
+        check_breaking_extensions(module, &extension_registry).map_err(|err| {
+            PackageEncodingError::ExtensionVersion(WithGenerator::new(err, &package.modules))
+        })?;
+    }
+    Ok(package)
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
@@ -513,9 +519,12 @@ struct UsedExtension {
 /// Error raised when the reported used version of an extension
 /// does not match the registered version in the extension registry.
 pub struct ExtensionVersionMismatch {
-    name: String,
-    registered: Version,
-    used: Version,
+    /// The name of the extension.
+    pub name: String,
+    /// The registered version of the extension in the loaded registry.
+    pub registered: Version,
+    /// The version of the extension reported as used in the HUGR metadata.
+    pub used: Version,
 }
 
 #[derive(Debug, Error)]
