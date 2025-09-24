@@ -22,7 +22,7 @@ updates:
         update-types: ["minor"]
       # Major updates still generate individual PRs
 
-  - package-ecosystem: "pip"
+  - package-ecosystem: "uv"
     directories: # Location of package manifests
       - "/hugr-py/"
       - "/"
