@@ -29,7 +29,11 @@ def package() -> Package:
 
 def test_envelope(package: Package):
     # Binary compression roundtrip
-    for format in [EnvelopeFormat.JSON]:
+    for format in [
+        EnvelopeFormat.JSON,
+        EnvelopeFormat.MODEL,
+        EnvelopeFormat.MODEL_WITH_EXTS,
+    ]:
         for compression in [None, 0]:
             encoded = package.to_bytes(EnvelopeConfig(format=format, zstd=compression))
             decoded = Package.from_bytes(encoded)
