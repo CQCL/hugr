@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.3...hugr-passes-v0.22.4) - 2025-09-24
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.2...hugr-passes-v0.22.3) - 2025-09-11
 
 ### New Features

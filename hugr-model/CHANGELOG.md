@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-model-v0.22.3...hugr-model-v0.22.4) - 2025-09-24
+
+### New Features
+
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+
 ## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-model-v0.22.1...hugr-model-v0.22.2) - 2025-08-06
 
 ### New Features
