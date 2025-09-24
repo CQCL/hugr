@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.1...hugr-py-v0.13.2) (2025-09-24)
+
+
+### Features
+
+* Add more options to `DotRenderer` config ([#2540](https://github.com/CQCL/hugr/issues/2540)) ([45f7573](https://github.com/CQCL/hugr/commit/45f7573fc0a863ea26d9e854a20482078bfdbd0c))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.1) (2025-08-18)
 
 
