@@ -135,6 +135,16 @@ impl<E: std::fmt::Display> WithGenerator<E> {
             generator: get_generator(modules),
         }
     }
+
+    /// Get a reference to the inner error.
+    pub fn inner(&self) -> &E {
+        &self.inner
+    }
+
+    /// Get the name of the generator that produced the envelope, if any.
+    pub fn generator(&self) -> Option<&String> {
+        self.generator.as_ref()
+    }
 }
 
 /// Read a HUGR envelope from a reader.
