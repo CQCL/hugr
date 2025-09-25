@@ -13,7 +13,7 @@ use hugr_core::{
             render::{self, MermaidFormatter, NodeLabel},
         },
     },
-    ops::OpType,
+    ops::{OpTag, OpTrait, OpType},
 };
 
 use crate::CommitId;
@@ -215,14 +215,26 @@ impl HugrView for PersistentHugr {
     }
 
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
-        let (hugr, node_map) = self.apply_all();
-        let children = hugr.children(node_map[&node]).collect_vec();
-        let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
-        children.into_iter().map(move |child| {
-            *inv_node_map
-                .get(&child)
-                .expect("node not found in node map")
-        })
+        // Only children of dataflow parents may change
+        if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
+            // TODO: make this more efficient by traversing from inputs to outputs
+            let (hugr, node_map) = self.apply_all();
+            let children = hugr.children(node_map[&node]).collect_vec();
+            let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
+            Either::Right(children.into_iter().map(move |child| {
+                *inv_node_map
+                    .get(&child)
+                    .expect("node not found in node map")
+            }))
+        } else {
+            // children are children of the commit hugr
+            let cm = self.get_commit(node.owner());
+            Either::Left(
+                cm.commit_hugr()
+                    .children(node.1)
+                    .map(|n| cm.to_patch_node(n)),
+            )
+        }
     }
 
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
