@@ -4,10 +4,13 @@ import pytest
 import semver
 
 from hugr import ops, tys
+from hugr.build.dfg import Dfg
 from hugr.build.function import Module
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
 from hugr.hugr.node_port import Node
 from hugr.package import Package
+
+from .conftest import QUANTUM_EXT, H
 
 
 @pytest.fixture
@@ -67,3 +70,16 @@ def test_legacy_funcdefn():
     op2 = h[Node(2)].op
     assert isinstance(op2, ops.FuncDefn)
     assert op2.visibility == "Private"
+
+
+@pytest.mark.xfail(reason="https://github.com/CQCL/hugr/issues/2589")
+def test_model_import_with_ext():
+    dfg = Dfg(tys.Qubit)
+    h_outs = dfg.add_op(H, dfg.inputs()[0])
+    dfg.set_outputs(h_outs)
+    pkg = Package(modules=[dfg.hugr], extensions=[QUANTUM_EXT])
+    data = pkg.to_bytes(config=EnvelopeConfig.BINARY)
+    pkg1 = Package.from_bytes(data)
+    data1 = pkg1.to_bytes(config=EnvelopeConfig.BINARY)
+    pkg2 = Package.from_bytes(data1)
+    assert pkg2.modules[0].num_nodes() == 8
