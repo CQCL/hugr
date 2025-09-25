@@ -39,4 +39,4 @@ bench = false
 rstest.workspace = true
 semver.workspace = true
 serde_with.workspace = true
-insta.workspace = true
+insta = { workspace = true, features = ["yaml"] }
