@@ -45,6 +45,7 @@ mod package_json;
 pub mod serde_with;
 
 pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
+use hugr_model::v0::bumpalo::Bump;
 pub use package_json::PackageEncodingError;
 
 use crate::{Hugr, HugrView};
@@ -345,6 +346,13 @@ pub enum EnvelopeError {
         /// The unrecognized flag bits.
         flag_ids: Vec<usize>,
     },
+    /// Error raised while checking for breaking extension version mismatch.
+    #[error(transparent)]
+    ExtensionVersion {
+        /// The source error.
+        #[from]
+        source: WithGenerator<ExtensionBreakingError>,
+    },
 }
 
 /// Internal implementation of [`read_envelope`] to call with/without the zstd decompression wrapper.
@@ -353,7 +361,7 @@ fn read_impl(
     header: EnvelopeHeader,
     registry: &ExtensionRegistry,
 ) -> Result<Package, EnvelopeError> {
-    match header.format {
+    let (package, combined_registry) = match header.format {
         #[allow(deprecated)]
         EnvelopeFormat::PackageJson => Ok(package_json::from_json_reader(payload, registry)?),
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
@@ -362,7 +370,13 @@ fn read_impl(
         EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
             decode_model_ast(payload, registry, header.format)
         }
-    }
+    }?;
+
+    package.modules.iter().try_for_each(|module| {
+        check_breaking_extensions(module, &combined_registry)
+            .map_err(|err| WithGenerator::new(err, &package.modules))
+    })?;
+    Ok(package)
 }
 
 /// Read a HUGR model payload from a reader.
@@ -372,20 +386,15 @@ fn read_impl(
 /// - `extension_registry`: An extension registry with additional extensions to use when
 ///   decoding the HUGR, if they are not already included in the package.
 /// - `format`: The format of the payload.
+///
+/// Returns package and the combined extension registry
+/// of the provided registry and the package extensions.
 fn decode_model(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
-) -> Result<Package, EnvelopeError> {
-    use hugr_model::v0::bumpalo::Bump;
-
-    if format.model_version() != Some(0) {
-        return Err(EnvelopeError::FormatUnsupported {
-            format,
-            feature: None,
-        });
-    }
-
+) -> Result<(Package, ExtensionRegistry), EnvelopeError> {
+    check_model_version(format)?;
     let bump = Bump::default();
     let model_package = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
 
@@ -395,7 +404,19 @@ fn decode_model(
         extension_registry.extend(extra_extensions);
     }
 
-    Ok(import_package(&model_package, &extension_registry)?)
+    let package = import_package(&model_package, &extension_registry)?;
+
+    Ok((package, extension_registry))
+}
+
+fn check_model_version(format: EnvelopeFormat) -> Result<(), EnvelopeError> {
+    if format.model_version() != Some(0) {
+        return Err(EnvelopeError::FormatUnsupported {
+            format,
+            feature: None,
+        });
+    }
+    Ok(())
 }
 
 /// Read a HUGR model text payload from a reader.
@@ -409,16 +430,8 @@ fn decode_model_ast(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
-) -> Result<Package, EnvelopeError> {
-    use crate::import::import_package;
-    use hugr_model::v0::bumpalo::Bump;
-
-    if format.model_version() != Some(0) {
-        return Err(EnvelopeError::FormatUnsupported {
-            format,
-            feature: None,
-        });
-    }
+) -> Result<(Package, ExtensionRegistry), EnvelopeError> {
+    check_model_version(format)?;
 
     let mut extension_registry = extension_registry.clone();
     if format == EnvelopeFormat::ModelTextWithExtensions {
@@ -444,12 +457,8 @@ fn decode_model_ast(
     let model_package = ast_package.resolve(&bump)?;
 
     let package = import_package(&model_package, &extension_registry)?;
-    for module in &package.modules {
-        check_breaking_extensions(module, &extension_registry).map_err(|err| {
-            PackageEncodingError::ExtensionVersion(WithGenerator::new(err, &package.modules))
-        })?;
-    }
-    Ok(package)
+
+    Ok((package, extension_registry))
 }
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
