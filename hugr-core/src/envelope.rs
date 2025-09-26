@@ -559,16 +559,16 @@ pub enum ExtensionBreakingError {
 }
 /// If HUGR metadata contains a list of used extensions, under the key [`USED_EXTENSIONS_KEY`],
 /// and extension is resolved in the HUGR, check that the
-/// version of the extension in the metadata matches the resolved version (up to
-/// MAJOR.MINOR).
+/// version of the extension in the metadata matches the resolved version.
+/// Version compatibility is defined by [`compatible_versions`].
 fn check_breaking_extensions(hugr: impl crate::HugrView) -> Result<(), ExtensionBreakingError> {
     check_breaking_extensions_against_registry(&hugr, hugr.extensions())
 }
 
 /// If HUGR metadata contains a list of used extensions, under the key [`USED_EXTENSIONS_KEY`],
 /// and extension is registered in the given registry, check that the
-/// version of the extension in the metadata matches the registered version (up to
-/// MAJOR.MINOR).
+/// version of the extension in the metadata matches the registered version.
+/// Version compatibility is defined by [`compatible_versions`].
 fn check_breaking_extensions_against_registry(
     hugr: &impl crate::HugrView,
     registry: &ExtensionRegistry,
