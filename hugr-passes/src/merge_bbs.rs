@@ -441,17 +441,16 @@ mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::prelude::PRELUDE_ID;
-    use hugr_core::ops::handle::NodeHandle;
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
-    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
+    use hugr_core::builder::{CFGBuilder, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
+    use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
+    use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
     use crate::merge_bbs::{NormalizeCFGResult, normalize_cfg};
 
@@ -480,10 +479,6 @@ mod test {
         )
     }
 
-    fn unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
-        b.add_load_value(Value::unary_unit_sum())
-    }
-
     #[rstest]
     #[case(true)]
     #[case(false)]
@@ -500,7 +495,6 @@ mod test {
                \--<--<--/                       \--<-----<--/
         */
 
-        use hugr_core::extension::prelude::Noop;
         let loop_variants: TypeRow = vec![qb_t()].into();
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
@@ -508,7 +502,7 @@ mod test {
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
-        let br = unary_unit_sum(&mut no_b1);
+        let br = no_b1.add_load_value(Value::unary_unit_sum());
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
@@ -526,7 +520,7 @@ mod test {
         } else {
             let mut no_b2 = h.simple_block_builder(endo_sig(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop::new(qb_t()), no_b2.input_wires())?;
-            let br = unary_unit_sum(&mut no_b2);
+            let br = no_b2.add_load_value(Value::unary_unit_sum());
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
             nid
@@ -604,7 +598,7 @@ mod test {
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
-        let pred = unary_unit_sum(&mut bb1);
+        let pred = bb1.add_load_value(Value::unary_unit_sum());
         let bb1 = bb1.finish_with_outputs(pred, [load_cst, inw])?;
 
         let mut bb2 = h.block_builder(
@@ -613,7 +607,7 @@ mod test {
             vec![qb_t(), usize_t()].into(),
         )?;
         let [u, q] = bb2.input_wires_arr();
-        let pred = unary_unit_sum(&mut bb2);
+        let pred = bb2.add_load_value(Value::unary_unit_sum());
         let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
 
         let mut bb3 = h.block_builder(
@@ -623,7 +617,7 @@ mod test {
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
-        let pred = unary_unit_sum(&mut bb3);
+        let pred = bb3.add_load_value(Value::unary_unit_sum());
         let bb3 = bb3.finish_with_outputs(pred, tst.outputs())?;
         // Now add control-flow edges between basic blocks
         h.branch(&bb1, 0, &bb2)?;
