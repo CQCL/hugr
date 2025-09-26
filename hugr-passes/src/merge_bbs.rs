@@ -155,7 +155,7 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             ou.types = unpacked.into();
             add_unpack(h, values, orders, outp);
             return Ok(NormalizeCFGResult::CFGToDFG);
-        } else if h.input_neighbours(succ).count() == 1 {
+        } else if h.input_neighbours(entry).count() == 0 {
             // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
             let [entry_input, entry_output] = h.get_io(entry).unwrap();
             let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
@@ -324,11 +324,11 @@ fn mk_rep<H: HugrView>(
         .enumerate()
         .map(|(i, _)| (dfg1, i.into()))
         .collect::<Vec<_>>();
-    let dfg_order_out = [(
-        dfg1,
-        replacement.get_optype(dfg1).other_output_port().unwrap(),
-    )];
-    add_unpack(&mut replacement, dfg1_outs, dfg_order_out, dfg2);
+
+    let dfg_order_out = replacement.get_optype(dfg1).other_output_port().unwrap();
+    let order_srcs = (dfg1_outs.is_empty()).then_some((dfg1, dfg_order_out));
+    // Do not add Order edges between DFGs unless there are no value edges
+    add_unpack(&mut replacement, dfg1_outs, order_srcs, dfg2);
 
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
@@ -727,7 +727,7 @@ mod test {
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [])?;
-        let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
+        let mut h = CFGBuilder::new(inout_sig(qb_t(), usize_t()))?;
         let mut nop_b = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = nop_b.add_dataflow_op(Noop::new(qb_t()), nop_b.input_wires())?;
         let br = nop_b.add_load_value(Value::unary_unit_sum());
@@ -735,12 +735,12 @@ mod test {
 
         let mut loop_b = h.block_builder(
             loop_variants.clone(),
-            vec![loop_variants, exit_types],
+            [loop_variants, exit_types],
             type_row![],
         )?;
-        let [tst] = loop_b
-            .add_dataflow_op(tst_op, loop_b.input_wires())?
-            .outputs_arr();
+        let [qb] = loop_b.input_wires_arr();
+        let usz = loop_b.add_load_value(ConstUsize::new(3));
+        let [tst] = loop_b.add_dataflow_op(tst_op, [qb, usz])?.outputs_arr();
         let loop_ = loop_b.finish_with_outputs(tst, [])?;
         h.branch(&entry, 0, &loop_)?;
         h.branch(&loop_, 0, &loop_)?;
@@ -764,18 +764,29 @@ mod test {
             [OpTag::DataflowBlock, OpTag::BasicBlockExit]
         );
         let func = h.get_parent(h.entrypoint()).unwrap();
-        let func_children = h
+        let mut func_children = h
             .children(func)
-            .map(|n| h.get_optype(n).tag())
-            .collect_vec();
-        assert_eq!(func_children.len(), 6);
+            .map(|n| (h.get_optype(n).tag(), n))
+            .into_group_map();
+        let ext_ops = func_children.remove(&OpTag::Leaf).unwrap();
+        assert_eq!(
+            ext_ops
+                .into_iter()
+                .map(|n| h.get_optype(n).as_extension_op().unwrap().unqualified_id())
+                .sorted()
+                .collect_vec(),
+            ["Noop", "UnpackTuple"]
+        );
+
         {
             use OpTag::*;
             assert_eq!(
-                HashSet::from_iter(func_children),
-                HashSet::from([Input, Output, Leaf, Cfg, Const, LoadConst])
+                func_children.keys().copied().collect::<HashSet<_>>(),
+                HashSet::from([Input, Output, Cfg, Const, LoadConst])
             );
         }
+        assert!(func_children.values().all(|v| v.len() == 1));
+
         Ok(())
     }
 }
