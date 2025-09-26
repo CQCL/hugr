@@ -443,7 +443,7 @@ fn add_unpack<H: HugrMut>(
 #[cfg(test)]
 #[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
     use itertools::Itertools;
@@ -487,7 +487,7 @@ mod test {
     #[rstest]
     #[case(true)]
     #[case(false)]
-    fn in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
+    fn merge_bbs_in_loop(#[case] self_loop: bool) -> Result<(), Box<dyn std::error::Error>> {
         /* self_loop==False:
            -> Noop1 -----> Test -> Exit       -> Noop1AndTest --> Exit
                |            |            =>     /            \
@@ -585,7 +585,7 @@ mod test {
     }
 
     #[test]
-    fn triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
+    fn merge_bbs_triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
         // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
         // CFG Normalization would move everything outside the CFG and elide the CFG altogether,
         // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
@@ -705,6 +705,7 @@ mod test {
             .collect_vec();
 
         let res = normalize_cfg(&mut h);
+        h.validate().unwrap();
         assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
         assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
         assert_eq!(
@@ -769,17 +770,9 @@ mod test {
             [OpTag::DataflowBlock, OpTag::BasicBlockExit]
         );
         let func = h.get_parent(h.entrypoint()).unwrap();
-        let mut func_children = h
-            .children(func)
-            .map(|n| (h.get_optype(n).tag(), n))
-            .into_group_map();
-        let ext_ops = func_children.remove(&OpTag::Leaf).unwrap();
+        let mut func_children = child_optypes(&h, func);
         assert_eq!(
-            ext_ops
-                .into_iter()
-                .map(|n| h.get_optype(n).as_extension_op().unwrap().unqualified_id())
-                .sorted()
-                .collect_vec(),
+            ext_op_ids(&h, func_children.remove(&OpTag::Leaf).unwrap()),
             ["Noop", "UnpackTuple"]
         );
 
@@ -793,5 +786,86 @@ mod test {
         assert!(func_children.values().all(|v| v.len() == 1));
 
         Ok(())
+    }
+
+    #[test]
+    fn loop_before_exit() -> Result<(), Box<dyn std::error::Error>> {
+        /* -> Test -> Noop -> Exit      -> Test --> Exit (then Noop)
+              |  |                  =>    |  |
+              \<-/                        \<-/
+        */
+        let loop_variants: TypeRow = vec![qb_t()].into();
+        let exit_types: TypeRow = vec![usize_t()].into();
+        let e = extension();
+        let tst_op = e.instantiate_extension_op("Test", [])?;
+        let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
+
+        let mut loop_b = h.entry_builder(vec![loop_variants, exit_types.clone()], type_row![])?;
+        let [qb] = loop_b.input_wires_arr();
+        let usz = loop_b.add_load_value(ConstUsize::new(3));
+        let [tst] = loop_b.add_dataflow_op(tst_op, [qb, usz])?.outputs_arr();
+        let loop_ = loop_b.finish_with_outputs(tst, [])?;
+        h.branch(&loop_, 0, &loop_)?;
+
+        let mut nop_b = h.simple_block_builder(endo_sig(exit_types), 1)?;
+        let n = nop_b.add_dataflow_op(Noop::new(usize_t()), nop_b.input_wires())?;
+        let br = nop_b.add_load_value(Value::unary_unit_sum());
+        let tail = nop_b.finish_with_outputs(br, n.outputs())?;
+
+        h.branch(&loop_, 1, &tail)?;
+        h.branch(&tail, 0, &h.exit_block())?;
+
+        let mut h = h.finish_hugr()?;
+        let res = normalize_cfg(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            res,
+            NormalizeCFGResult::CFGPreserved {
+                entry_changed: false,
+                exit_changed: true
+            }
+        );
+        assert_eq!(
+            h.children(h.entrypoint())
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::DataflowBlock, OpTag::BasicBlockExit]
+        );
+        let func = h.get_parent(h.entrypoint()).unwrap();
+        assert_eq!(
+            h.children(func)
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::Input, OpTag::Output, OpTag::Cfg, OpTag::Dfg]
+        );
+
+        let dfg = h.children(func).last().unwrap();
+        let mut dfg_children = child_optypes(&h, dfg);
+        let ext_ops = dfg_children.remove(&OpTag::Leaf).unwrap();
+        assert_eq!(ext_op_ids(&h, ext_ops), ["Noop", "UnpackTuple"]);
+
+        {
+            use OpTag::*;
+            assert_eq!(
+                dfg_children.keys().copied().collect::<HashSet<_>>(),
+                HashSet::from([Input, Output, Const, LoadConst])
+            );
+        }
+        assert!(dfg_children.values().all(|v| v.len() == 1));
+        Ok(())
+    }
+
+    fn child_optypes<H: HugrView>(h: &H, n: H::Node) -> HashMap<OpTag, Vec<H::Node>> {
+        h.children(n)
+            .map(|n| (h.get_optype(n).tag(), n))
+            .into_group_map()
+    }
+
+    fn ext_op_ids<H: HugrView>(h: &H, nodes: Vec<H::Node>) -> Vec<&str> {
+        nodes
+            .into_iter()
+            .map(|n| h.get_optype(n).as_extension_op().unwrap().unqualified_id())
+            .sorted()
+            .collect_vec()
     }
 }
