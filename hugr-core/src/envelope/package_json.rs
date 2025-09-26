@@ -15,7 +15,7 @@ use crate::{Extension, Hugr};
 pub(super) fn from_json_reader(
     reader: impl io::Read,
     extension_registry: &ExtensionRegistry,
-) -> Result<(Package, ExtensionRegistry), PackageEncodingError> {
+) -> Result<Package, PackageEncodingError> {
     let val: serde_json::Value = serde_json::from_reader(reader)?;
 
     let PackageDeser {
@@ -38,13 +38,10 @@ pub(super) fn from_json_reader(
         .try_for_each(|module| module.resolve_extension_defs(&combined_registry))
         .map_err(|err| WithGenerator::new(err, &modules))?;
 
-    Ok((
-        Package {
-            modules,
-            extensions: pkg_extensions,
-        },
-        combined_registry,
-    ))
+    Ok(Package {
+        modules,
+        extensions: pkg_extensions,
+    })
 }
 
 /// Write the Package in json format into an io writer.
