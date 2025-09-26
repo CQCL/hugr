@@ -3,7 +3,7 @@
 use anyhow::Result;
 use std::str::FromStr;
 
-use hugr::std_extensions::std_reg;
+use hugr::{envelope::read_envelope, std_extensions::std_reg};
 use hugr_core::{export::export_package, import::import_package};
 use hugr_model::v0 as model;
 
@@ -11,7 +11,7 @@ fn roundtrip(source: &str) -> Result<String> {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source)?;
     let package_table = package_ast.resolve(&bump)?;
-    let core = import_package(&package_table, &std_reg())?;
+    let core = import_package(&package_table, Default::default(), &std_reg())?;
     let exported_table = export_package(&core.modules, &core.extensions, &bump);
     let exported_ast = exported_table.as_ast().unwrap();
 
@@ -83,3 +83,47 @@ test_roundtrip!(
     test_roundtrip_entrypoint,
     "../../hugr-model/tests/fixtures/model-entrypoint.edn"
 );
+
+#[test]
+fn import_package_with_extensions() {
+    let simple_with_exts = r#"HUGRiHJv)@[{"version":"0.1.0","name":"miniquantum","types":{},"operations":{"H":{"extension":"miniquantum","name":"H","description":"Hadamard gate","signature":{"params":[],"body":{"input":[{"t":"Q"}],"output":[{"t":"Q"}]}},"binary":false}}}](hugr 0)
+        (mod)
+
+        (import core.entrypoint)
+
+        (import core.title)
+
+        (import prelude.qubit)
+
+        (import core.fn)
+
+        (import core.meta.description)
+
+        (declare-operation miniquantum.H (core.fn [prelude.qubit] [prelude.qubit])
+        (meta (core.meta.description "Hadamard gate")))
+
+        (define-func private _1 (core.fn [prelude.qubit] [prelude.qubit])
+        (meta (core.title "main"))
+        (dfg [%0] [%1]
+            (signature (core.fn [prelude.qubit] [prelude.qubit]))
+            (dfg [%0] [%1]
+            (signature (core.fn [prelude.qubit] [prelude.qubit]))
+            (meta core.entrypoint)
+            (dfg [%2] [%3]
+                (signature (core.fn [prelude.qubit] [prelude.qubit]))
+                (miniquantum.H [%2] [%3]
+                (signature (core.fn [prelude.qubit] [prelude.qubit])))))))
+    "#;
+
+    let bytes = simple_with_exts.as_bytes();
+    let buff = std::io::BufReader::new(bytes);
+    let (_, pkg) = read_envelope(buff, &std_reg()).unwrap();
+
+    assert_eq!(pkg.modules.len(), 1);
+    assert_eq!(pkg.extensions.len(), 1);
+
+    assert_eq!(
+        pkg.extensions.iter().next().unwrap().name(),
+        &hugr::extension::ExtensionId::new_unchecked("miniquantum")
+    );
+}
