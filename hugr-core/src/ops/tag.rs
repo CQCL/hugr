@@ -9,7 +9,7 @@ use std::{cmp, fmt::Display};
 ///
 /// Uses a flat representation for all the variants, in contrast to the complex
 /// `OpType` structures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum OpTag {
     /// All operations allowed.

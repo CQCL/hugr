@@ -438,9 +438,11 @@ mod test {
     use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
     use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
-    use hugr_core::ops::{LoadConstant, OpTrait, OpType};
+    use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
+
+    use crate::merge_bbs::{NormalizeCFGResult, normalize_cfg};
 
     use super::merge_basic_blocks;
 
@@ -651,5 +653,54 @@ mod test {
 
     fn find_unique<T>(items: impl Iterator<Item = T>, pred: impl Fn(&T) -> bool) -> T {
         items.filter(pred).exactly_one().ok().unwrap()
+    }
+
+    #[rstest]
+    fn elide_cfg() {
+        let ext = extension();
+        let op = ext.instantiate_extension_op("Test", []).unwrap();
+        let out_ty = op.signature().output().clone();
+        let mut cfg = CFGBuilder::new(op.signature().into_owned()).unwrap();
+        let mut entry = cfg.simple_entry_builder(out_ty, 1).unwrap();
+        let op_res = entry
+            .add_dataflow_op(op.clone(), entry.input_wires())
+            .unwrap();
+        let predicate = entry.add_load_value(Value::unary_unit_sum());
+        let entry = entry
+            .finish_with_outputs(predicate, op_res.outputs())
+            .unwrap();
+        cfg.branch(&entry, 0, &cfg.exit_block()).unwrap();
+        let mut h = cfg.finish_hugr().unwrap();
+
+        let func = h.children(h.module_root()).exactly_one().ok().unwrap();
+        assert_eq!(
+            h.children(func)
+                .map(|n| h.get_optype(n).tag())
+                .collect::<HashSet<_>>(),
+            HashSet::from([OpTag::Input, OpTag::Output, OpTag::Cfg])
+        );
+        let res = normalize_cfg(&mut h);
+        assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
+        h.validate().unwrap();
+        assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
+        assert_eq!(
+            h.children(func)
+                .map(|n| h.get_optype(n).tag())
+                .collect::<HashSet<_>>(),
+            HashSet::from([
+                OpTag::Input,
+                OpTag::Output,
+                OpTag::Dfg,
+                OpTag::Leaf,
+                OpTag::LoadConst,
+                OpTag::Const
+            ])
+        );
+        assert_eq!(
+            h.children(func)
+                .flat_map(|n| h.get_optype(n).as_extension_op())
+                .collect_vec(),
+            [&op]
+        );
     }
 }
