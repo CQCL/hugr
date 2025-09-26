@@ -1,9 +1,18 @@
 #![allow(missing_docs)]
 
 use anyhow::Result;
+use rstest::{fixture, rstest};
 use std::str::FromStr;
 
-use hugr::{envelope::read_envelope, std_extensions::std_reg};
+use hugr::{
+    Extension, Hugr,
+    builder::{Dataflow as _, DataflowHugr as _},
+    envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
+    extension::prelude::bool_t,
+    package::Package,
+    std_extensions::std_reg,
+    types::Signature,
+};
 use hugr_core::{export::export_package, import::import_package};
 use hugr_model::v0 as model;
 
@@ -84,46 +93,35 @@ test_roundtrip!(
     "../../hugr-model/tests/fixtures/model-entrypoint.edn"
 );
 
-#[test]
-fn import_package_with_extensions() {
-    let simple_with_exts = r#"HUGRiHJv)@[{"version":"0.1.0","name":"miniquantum","types":{},"operations":{"H":{"extension":"miniquantum","name":"H","description":"Hadamard gate","signature":{"params":[],"body":{"input":[{"t":"Q"}],"output":[{"t":"Q"}]}},"binary":false}}}](hugr 0)
-        (mod)
+#[fixture]
+fn simple_dfg_hugr() -> Hugr {
+    let dfg_builder =
+        hugr::builder::DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
+    let [i1] = dfg_builder.input_wires_arr();
+    dfg_builder.finish_hugr_with_outputs([i1]).unwrap()
+}
 
-        (import core.entrypoint)
-
-        (import core.title)
-
-        (import prelude.qubit)
-
-        (import core.fn)
-
-        (import core.meta.description)
-
-        (declare-operation miniquantum.H (core.fn [prelude.qubit] [prelude.qubit])
-        (meta (core.meta.description "Hadamard gate")))
-
-        (define-func private _1 (core.fn [prelude.qubit] [prelude.qubit])
-        (meta (core.title "main"))
-        (dfg [%0] [%1]
-            (signature (core.fn [prelude.qubit] [prelude.qubit]))
-            (dfg [%0] [%1]
-            (signature (core.fn [prelude.qubit] [prelude.qubit]))
-            (meta core.entrypoint)
-            (dfg [%2] [%3]
-                (signature (core.fn [prelude.qubit] [prelude.qubit]))
-                (miniquantum.H [%2] [%3]
-                (signature (core.fn [prelude.qubit] [prelude.qubit])))))))
-    "#;
-
-    let bytes = simple_with_exts.as_bytes();
-    let buff = std::io::BufReader::new(bytes);
-    let (_, pkg) = read_envelope(buff, &std_reg()).unwrap();
-
-    assert_eq!(pkg.modules.len(), 1);
-    assert_eq!(pkg.extensions.len(), 1);
-
-    assert_eq!(
-        pkg.extensions.iter().next().unwrap().name(),
-        &hugr::extension::ExtensionId::new_unchecked("miniquantum")
+#[rstest]
+#[case(EnvelopeFormat::ModelTextWithExtensions)]
+#[case(EnvelopeFormat::ModelWithExtensions)]
+fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hugr: Hugr) {
+    let ext = Extension::new_arc(
+        "miniquantum".try_into().unwrap(),
+        hugr::extension::Version::new(0, 1, 0),
+        |_, _| {},
     );
+    let mut package = Package::new([simple_dfg_hugr]);
+    package.extensions.register_updated(ext);
+
+    let mut bytes: Vec<u8> = Vec::new();
+    write_envelope(&mut bytes, &package, EnvelopeConfig::new(format)).unwrap();
+
+    let buff = std::io::BufReader::new(bytes.as_slice());
+    let (_, loaded_pkg) = read_envelope(buff, &std_reg()).unwrap();
+
+    assert_eq!(loaded_pkg.extensions.len(), 1);
+    let read_ext = loaded_pkg.extensions.iter().next().unwrap();
+    assert_eq!(read_ext.name(), &"miniquantum".try_into().unwrap());
+
+    assert_eq!(package, loaded_pkg);
 }
