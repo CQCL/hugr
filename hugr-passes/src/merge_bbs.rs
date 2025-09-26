@@ -3,22 +3,30 @@
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::views::RootCheckable;
+use hugr_core::hugr::views::{RootCheckable, RootChecked};
+use hugr_core::hugr::{HugrError, hugrmut::HugrMut};
+use hugr_core::types::{EdgeKind, Signature, TypeRow};
 use itertools::Itertools;
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, Input, Output};
-use hugr_core::{Hugr, HugrView, Node};
+use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output};
+use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
-pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID>)
+///
+/// # Panics
+///
+/// If the [HugrMut::entrypoint] of `cfg` is not an [OpType::CFG]
+///
+/// [OpType::CFG]: hugr_core::ops::OpType::CFG
+#[deprecated(note = "Use normalize_cfg")] // Note: as a first step, just hide this
+pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>)
 where
-    H: 'h + HugrMut<Node = Node>,
+    H: 'h + HugrMut,
 {
     let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
     let cfg = checked.into_hugr();
@@ -49,11 +57,220 @@ where
     }
 }
 
-fn mk_rep(
-    cfg: &impl HugrView<Node = Node>,
-    pred: Node,
-    succ: Node,
-) -> (Replacement, Node, [Node; 2]) {
+/// Errors from [normalize_cfg]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+pub enum NormalizeCFGError {
+    /// The requested node was not a CFG
+    #[error("Requested node was not a CFG but {_0}")]
+    NotCFG(OpTag),
+}
+
+/// Result from [normalize_cfg], i.e. a report of what changes were made to the Hugr.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NormalizeCFGResult {
+    /// The entire [CFG] was converted into a [DFG]
+    CFGToDFG,
+    /// The CFG was preserved, but the entry or exit blocks may have changed.
+    #[allow(missing_docs)]
+    CFGPreserved {
+        entry_changed: bool,
+        exit_changed: bool,
+    },
+}
+
+/// Normalize a CFG in a Hugr:
+/// * Merge consecutive basic blocks i.e. where a BB has only a single successor which
+///   has no predecessors
+/// * If the entry block has only one successor, and no predecessors, then move its contents
+///   outside/before CFG.
+/// * (Similarly) if the exit block has only one predecessor, then move contents
+///   outside/after CFG.
+///    * If that predecessor is the entry block, then remove the CFG.
+///
+/// *Note that this may remove the entrypoint*; such will be reported in the result
+/// ([NormalizeCFGResult::CFGRemoved])
+///
+/// # Errors
+///
+/// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
+#[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
+pub fn normalize_cfg<H: HugrMut<Node = Node>>(
+    mut h: &mut H,
+) -> Result<NormalizeCFGResult, NormalizeCFGError> {
+    let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
+        .map_err(|e| match e {
+            HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
+            _ => unreachable!(),
+        })?;
+    merge_basic_blocks(checked);
+    let cfg_node = h.entrypoint();
+
+    // Further normalizations with effects outside the CFG
+    let [entry, exit] = h.children(cfg_node).take(2).collect_array().unwrap();
+    let entry_blk = h.get_optype(entry).as_dataflow_block().unwrap();
+    let cfg_parent = h.get_parent(cfg_node).unwrap();
+    // 1. If the entry block has only one successor, and no predecessors, then move contents
+    // outside/before CFG. (Note if the entry block has multiple successors, but no predecessors,
+    // we could move its contents outside (before) the CFG, but would need to keep an empty/identity
+    // entry block - we do not do this here
+    let mut entry_changed = false;
+    #[allow(clippy::match_result_ok)] // let Ok(...) without .ok() borrows `cfg`
+    if let Some(succ) = h.output_neighbours(entry).exactly_one().ok() {
+        if succ == exit {
+            // Ignore any other predecessors as they are unreachable!
+            assert_eq!(
+                &Signature::new(
+                    entry_blk.inputs.clone(),
+                    entry_blk.successor_input(0).unwrap()
+                ),
+                h.signature(cfg_node).unwrap().as_ref()
+            );
+            // Turn the CFG into a DFG containing only what was in the entry block
+            // Annoying here - "while let Some(blk) = cfg.children(...).skip(1).next()" keeps iterator alive
+            let children_to_remove: Vec<_> = h.children(cfg_node).skip(1).collect();
+            for blk in children_to_remove {
+                h.remove_subtree(blk);
+            }
+            while let Some(ch) = h.first_child(entry) {
+                h.set_parent(ch, cfg_node);
+            }
+            h.remove_node(entry);
+            let cfg_ty = h.optype_mut(cfg_node);
+            let OpType::CFG(cfg_) = std::mem::take(cfg_ty) else {
+                panic!()
+            };
+            *cfg_ty = OpType::DFG(DFG {
+                signature: cfg_.signature,
+            });
+            // Unpack the first output and shuffle all the rest along
+            let [_, outp] = h.get_io(cfg_node).unwrap();
+            let (values, orders) = take_inputs(h, outp);
+            let mut unpacked = tuple_elems(h, values[0].0, values[0].1).into_owned();
+            h.add_ports(outp, Direction::Incoming, unpacked.len() as isize - 1);
+            let OpType::Output(ou) = h.optype_mut(outp) else {
+                panic!()
+            };
+            let rest = std::mem::take(&mut ou.types).into_owned();
+            unpacked.extend(rest.into_iter().skip(1));
+            ou.types = unpacked.into();
+            add_unpack(h, values, orders, outp);
+            return Ok(NormalizeCFGResult::CFGToDFG);
+        } else if h.input_neighbours(succ).count() == 1 {
+            // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
+            let [entry_input, entry_output] = h.get_io(entry).unwrap();
+            let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
+            // Inputs to CFG go directly to consumers of the entry block's Input node
+            for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
+                let srcs = h.linked_outputs(cfg_node, inp).collect::<Vec<_>>();
+                h.disconnect(cfg_node, inp);
+                for tgt in h
+                    .linked_inputs(entry_input, inp.index())
+                    .collect::<Vec<_>>()
+                {
+                    // Connecting all sources to all targets handles Order edges as well as Value
+                    for src in srcs.iter() {
+                        h.connect(src.0, src.1, tgt.0, tgt.1);
+                    }
+                }
+            }
+            h.remove_node(entry_input);
+
+            // Update input ports
+            let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
+                panic!()
+            };
+            let inputs_to_add =
+                new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
+            cfg_ty.signature.input = new_cfg_inputs;
+            h.add_ports(cfg_node, Direction::Incoming, inputs_to_add);
+
+            // Inputs to entry block Output node go instead to CFG
+            let (entry_results, orders) = take_inputs(h, entry_output);
+            h.remove_node(entry_output);
+            add_unpack(h, entry_results, orders, cfg_node);
+
+            // Transfer remaining entry children - including any used to compute the predicate
+            while let Some(n) = h.first_child(entry) {
+                h.set_parent(n, cfg_parent);
+            }
+            // old entry-node's successor is the new entry node, move into place
+            h.move_before_sibling(succ, entry);
+            h.remove_node(entry);
+            entry_changed = true;
+        }
+    }
+    // 2. If the exit node has a single predecessor and that predecessor has no other successors...
+    let mut exit_changed = false;
+    if let Some(pred) = h
+        .input_neighbours(exit)
+        .exactly_one()
+        .ok()
+        .filter(|pred| h.output_neighbours(*pred).count() == 1)
+    {
+        // Code in that predecessor can be moved outside (after the CFG), and the predecessor deleted
+        let [_, output] = h.get_io(pred).unwrap();
+        let pred_blk = h.get_optype(pred).as_dataflow_block().unwrap();
+        let new_cfg_outs = pred_blk.inner_signature().into_owned().input;
+
+        // new CFG result type and exit block
+        let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
+            panic!()
+        };
+        let result_tys = std::mem::replace(&mut cfg_ty.signature.output, new_cfg_outs.clone());
+        // TODO update number of CFG outports
+
+        *h.optype_mut(pred) = ExitBlock {
+            cfg_outputs: new_cfg_outs.clone(),
+        }
+        .into();
+        h.set_num_ports(pred, h.num_ports(pred, Direction::Incoming), 0);
+
+        h.move_before_sibling(pred, exit);
+        h.remove_node(exit);
+        // Move contents into new DFG
+        let dfg = h.add_node_with_parent(
+            cfg_parent,
+            DFG {
+                signature: Signature::new(new_cfg_outs, result_tys.clone()),
+            },
+        );
+        while let Some(n) = h.first_child(pred) {
+            h.set_parent(n, dfg);
+        }
+        // Add tuple-unpack inside the DFG
+        let (values, orders) = take_inputs(h, output);
+        let OpType::Output(ou) = h.optype_mut(output) else {
+            panic!()
+        };
+        ou.types = result_tys;
+        // TODO update number of input ports
+
+        add_unpack(h, values, orders, output);
+        // Move output edges.
+        // TODO result_tys is almost this, but we want to move Order edges too
+        for p in h.node_outputs(cfg_node).collect_vec() {
+            let tgts = h.linked_inputs(cfg_node, p).collect_vec();
+            h.disconnect(cfg_node, p);
+            for tgt in tgts {
+                h.connect(dfg, p, tgt.0, tgt.1)
+            }
+        }
+        for p in h.node_inputs(dfg).collect_vec() {
+            h.connect(cfg_node, p.index(), dfg, p);
+        }
+        exit_changed = true;
+    }
+    Ok(NormalizeCFGResult::CFGPreserved {
+        entry_changed,
+        exit_changed,
+    })
+}
+
+fn mk_rep<H: HugrView>(
+    cfg: &H,
+    pred: H::Node,
+    succ: H::Node,
+) -> (Replacement<H::Node>, Node, [Node; 2]) {
     let pred_ty = cfg.get_optype(pred).as_dataflow_block().unwrap();
     let succ_ty = cfg.get_optype(succ).as_dataflow_block().unwrap();
     let succ_sig = succ_ty.inner_signature();
@@ -102,16 +319,17 @@ fn mk_rep(
     }
 
     // At the junction, must unpack the first (tuple, branch predicate) output
-    let tuple_elems = pred_ty.sum_rows.clone().into_iter().exactly_one().unwrap();
-    let unp = replacement.add_node_with_parent(merged, UnpackTuple::new(tuple_elems.clone()));
-    replacement.connect(dfg1, 0, unp, 0);
-    let other_start = tuple_elems.len();
-    for (i, _) in tuple_elems.iter().enumerate() {
-        replacement.connect(unp, i, dfg2, i);
-    }
-    for (i, _) in pred_ty.other_outputs.iter().enumerate() {
-        replacement.connect(dfg1, i + 1, dfg2, i + other_start);
-    }
+    let dfg1_outs = replacement
+        .out_value_types(dfg1)
+        .enumerate()
+        .map(|(i, _)| (dfg1, i.into()))
+        .collect::<Vec<_>>();
+    let dfg_order_out = [(
+        dfg1,
+        replacement.get_optype(dfg1).other_output_port().unwrap(),
+    )];
+    add_unpack(&mut replacement, dfg1_outs, dfg_order_out, dfg2);
+
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
     for (_, src_pos) in cfg.all_linked_outputs(pred).filter(|(src, _)| *src == succ) {
@@ -155,21 +373,86 @@ fn mk_rep(
     (rep, merged, [dfg1, dfg2])
 }
 
+type NodePorts<N> = Vec<(N, OutgoingPort)>;
+fn take_inputs<H: HugrMut>(h: &mut H, n: H::Node) -> (NodePorts<H::Node>, NodePorts<H::Node>) {
+    let mut values = vec![];
+    let mut orders = vec![];
+    for p in h.node_inputs(n).collect_vec() {
+        let srcs = h.linked_outputs(n, p).collect_vec();
+        h.disconnect(n, p);
+        match h.get_optype(n).port_kind(p) {
+            Some(EdgeKind::Value(_)) => {
+                assert_eq!(srcs.len(), 1);
+                values.extend(srcs);
+            }
+            Some(EdgeKind::StateOrder) => {
+                assert_eq!(orders, []);
+                orders.extend(srcs);
+            }
+            k => panic!("Unexpected port kind: {:?}", k),
+        }
+    }
+    (values, orders)
+}
+
+fn tuple_elems<H: HugrView>(h: &H, n: H::Node, p: OutgoingPort) -> TypeRow {
+    match h.get_optype(n).port_kind(p) {
+        Some(EdgeKind::Value(ty)) => ty.as_sum().unwrap().as_tuple().unwrap().clone(),
+        p => panic!("Expected Value port not {:?}", p),
+    }
+    .try_into()
+    .unwrap()
+}
+
+fn add_unpack<H: HugrMut>(
+    h: &mut H,
+    value_srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
+    order_srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
+    dst: H::Node,
+) {
+    let parent = h.get_parent(dst).unwrap();
+    let mut srcs = value_srcs.into_iter();
+    let src_to_unpack = srcs.next().unwrap();
+    let tuple_tys = tuple_elems(h, src_to_unpack.0, src_to_unpack.1);
+    let tuple_len = tuple_tys.len();
+    let unp = h.add_node_with_parent(parent, UnpackTuple::new(tuple_tys));
+    h.connect(src_to_unpack.0, src_to_unpack.1, unp, 0);
+
+    for i in 0..tuple_len {
+        h.connect(unp, i, dst, i);
+    }
+    assert_eq!(
+        h.get_optype(dst).other_port_kind(Direction::Incoming),
+        Some(EdgeKind::StateOrder)
+    );
+    let order_tgt = h.get_optype(dst).other_input_port().unwrap();
+    for (i, (src, src_p)) in srcs.enumerate() {
+        assert!(i + tuple_len < order_tgt.index());
+        h.connect(src, src_p, dst, i + tuple_len);
+    }
+    for (src, src_p) in order_srcs {
+        h.connect(src, src_p, dst, order_tgt);
+    }
+}
+
 #[cfg(test)]
+#[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
 
-    use hugr_core::extension::prelude::PRELUDE_ID;
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{CFGBuilder, DFGWrapper, Dataflow, HugrBuilder, endo_sig, inout_sig};
-    use hugr_core::extension::prelude::{ConstUsize, qb_t, usize_t};
+    use hugr_core::builder::{CFGBuilder, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
-    use hugr_core::ops::{LoadConstant, OpTrait, OpType};
+    use hugr_core::ops::handle::NodeHandle;
+    use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType};
     use hugr_core::types::{Signature, Type, TypeRow};
-    use hugr_core::{Extension, Hugr, HugrView, Wire, const_extension_ids, type_row};
+    use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
+
+    use crate::merge_bbs::{NormalizeCFGResult, normalize_cfg};
 
     use super::merge_basic_blocks;
 
@@ -196,10 +479,6 @@ mod test {
         )
     }
 
-    fn unary_unit_sum<B: AsMut<Hugr> + AsRef<Hugr>, T>(b: &mut DFGWrapper<B, T>) -> Wire {
-        b.add_load_value(Value::unary_unit_sum())
-    }
-
     #[rstest]
     #[case(true)]
     #[case(false)]
@@ -216,7 +495,6 @@ mod test {
                \--<--<--/                       \--<-----<--/
         */
 
-        use hugr_core::extension::prelude::Noop;
         let loop_variants: TypeRow = vec![qb_t()].into();
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
@@ -224,7 +502,7 @@ mod test {
         let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
         let mut no_b1 = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = no_b1.add_dataflow_op(Noop::new(qb_t()), no_b1.input_wires())?;
-        let br = unary_unit_sum(&mut no_b1);
+        let br = no_b1.add_load_value(Value::unary_unit_sum());
         let no_b1 = no_b1.finish_with_outputs(br, n.outputs())?;
         let mut test_block = h.block_builder(
             loop_variants.clone(),
@@ -242,7 +520,7 @@ mod test {
         } else {
             let mut no_b2 = h.simple_block_builder(endo_sig(loop_variants), 1)?;
             let n = no_b2.add_dataflow_op(Noop::new(qb_t()), no_b2.input_wires())?;
-            let br = unary_unit_sum(&mut no_b2);
+            let br = no_b2.add_load_value(Value::unary_unit_sum());
             let nid = no_b2.finish_with_outputs(br, n.outputs())?;
             h.branch(&nid, 0, &no_b1)?;
             nid
@@ -320,7 +598,7 @@ mod test {
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
-        let pred = unary_unit_sum(&mut bb1);
+        let pred = bb1.add_load_value(Value::unary_unit_sum());
         let bb1 = bb1.finish_with_outputs(pred, [load_cst, inw])?;
 
         let mut bb2 = h.block_builder(
@@ -329,7 +607,7 @@ mod test {
             vec![qb_t(), usize_t()].into(),
         )?;
         let [u, q] = bb2.input_wires_arr();
-        let pred = unary_unit_sum(&mut bb2);
+        let pred = bb2.add_load_value(Value::unary_unit_sum());
         let bb2 = bb2.finish_with_outputs(pred, [q, u])?;
 
         let mut bb3 = h.block_builder(
@@ -339,7 +617,7 @@ mod test {
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
-        let pred = unary_unit_sum(&mut bb3);
+        let pred = bb3.add_load_value(Value::unary_unit_sum());
         let bb3 = bb3.finish_with_outputs(pred, tst.outputs())?;
         // Now add control-flow edges between basic blocks
         h.branch(&bb1, 0, &bb2)?;
@@ -380,5 +658,124 @@ mod test {
 
     fn find_unique<T>(items: impl Iterator<Item = T>, pred: impl Fn(&T) -> bool) -> T {
         items.filter(pred).exactly_one().ok().unwrap()
+    }
+
+    #[rstest]
+    fn elide_cfg(#[values(false, true)] extra_blocks: bool) {
+        let ext = extension();
+        let op = ext.instantiate_extension_op("Test", []).unwrap();
+        let out_ty = op.signature().output().clone();
+        let mut cfg = CFGBuilder::new(op.signature().into_owned()).unwrap();
+        let mut entry = cfg.simple_entry_builder(out_ty, 1).unwrap();
+        let op_res = entry
+            .add_dataflow_op(op.clone(), entry.input_wires())
+            .unwrap();
+        let predicate = entry.add_load_value(Value::unary_unit_sum());
+        let entry = entry
+            .finish_with_outputs(predicate, op_res.outputs())
+            .unwrap();
+        cfg.branch(&entry, 0, &cfg.exit_block()).unwrap();
+        if extra_blocks {
+            let Signature { input, output } = op.signature().as_ref().clone();
+            for (ty, dest) in [(input, entry), (output, cfg.exit_block())] {
+                let mut extra = cfg.simple_block_builder(endo_sig(ty), 1).unwrap();
+                let inp = extra.input_wires();
+                let branch = extra.add_load_value(Value::unary_unit_sum());
+                let extra = extra.finish_with_outputs(branch, inp).unwrap();
+                cfg.branch(&extra, 0, &dest).unwrap();
+            }
+        }
+        let mut h = cfg.finish_hugr().unwrap();
+
+        let func = h.children(h.module_root()).exactly_one().ok().unwrap();
+        assert_eq!(
+            h.children(func)
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::Input, OpTag::Output, OpTag::Cfg]
+        );
+        let mut dfb_children = h
+            .children(entry.node())
+            .map(|n| h.get_optype(n).tag())
+            .collect_vec();
+
+        let res = normalize_cfg(&mut h);
+        assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
+        assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
+        assert_eq!(
+            h.children(func)
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::Input, OpTag::Output, OpTag::Dfg,]
+        );
+        dfb_children.push(OpTag::Leaf);
+        assert_eq!(
+            h.children(h.entrypoint())
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            dfb_children
+        );
+    }
+
+    #[test]
+    fn entry_before_loop() -> Result<(), Box<dyn std::error::Error>> {
+        /* -> Noop --> Test -> Exit      -> Test --> Exit
+                       |  |          =>     |  |
+                       \<-/                 \<-/
+        */
+        let loop_variants: TypeRow = vec![qb_t()].into();
+        let exit_types: TypeRow = vec![usize_t()].into();
+        let e = extension();
+        let tst_op = e.instantiate_extension_op("Test", [])?;
+        let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
+        let mut nop_b = h.simple_entry_builder(loop_variants.clone(), 1)?;
+        let n = nop_b.add_dataflow_op(Noop::new(qb_t()), nop_b.input_wires())?;
+        let br = nop_b.add_load_value(Value::unary_unit_sum());
+        let entry = nop_b.finish_with_outputs(br, n.outputs())?;
+
+        let mut loop_b = h.block_builder(
+            loop_variants.clone(),
+            vec![loop_variants, exit_types],
+            type_row![],
+        )?;
+        let [tst] = loop_b
+            .add_dataflow_op(tst_op, loop_b.input_wires())?
+            .outputs_arr();
+        let loop_ = loop_b.finish_with_outputs(tst, [])?;
+        h.branch(&entry, 0, &loop_)?;
+        h.branch(&loop_, 0, &loop_)?;
+        h.branch(&loop_, 1, &h.exit_block())?;
+
+        let mut h = h.finish_hugr()?;
+
+        let res = normalize_cfg(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            res,
+            NormalizeCFGResult::CFGPreserved {
+                entry_changed: true,
+                exit_changed: false
+            }
+        );
+        assert_eq!(
+            h.children(h.entrypoint())
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::DataflowBlock, OpTag::BasicBlockExit]
+        );
+        let func = h.get_parent(h.entrypoint()).unwrap();
+        let func_children = h
+            .children(func)
+            .map(|n| h.get_optype(n).tag())
+            .collect_vec();
+        assert_eq!(func_children.len(), 6);
+        {
+            use OpTag::*;
+            assert_eq!(
+                HashSet::from_iter(func_children),
+                HashSet::from([Input, Output, Leaf, Cfg, Const, LoadConst])
+            );
+        }
+        Ok(())
     }
 }
