@@ -23,7 +23,7 @@ use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 /// If the [HugrMut::entrypoint] of `cfg` is not an [OpType::CFG]
 ///
 /// [OpType::CFG]: hugr_core::ops::OpType::CFG
-#[deprecated(note = "Use normalize_cfg")]
+#[deprecated(note = "Use normalize_cfg")] // Note: as a first step, just hide this
 pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>)
 where
     H: 'h + HugrMut,
@@ -57,22 +57,43 @@ where
     }
 }
 
-#[derive(Clone, Debug, thiserror::Error)]
+/// Errors from [normalize_cfg]
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum NormalizeCFGError {
-    /// The requested node was not a CFG. ALAN note this could just be [hugr_core::hugr::HugrError]??
+    /// The requested node was not a CFG
     #[error("Requested node was not a CFG but {_0}")]
     NotCFG(OpTag),
 }
 
+/// Result from [normalize_cfg], i.e. a report of what changes were made to the Hugr.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NormalizeCFGResult {
-    CFGRemoved,
+    /// The entire [CFG] was converted into a [DFG]
+    CFGToDFG,
+    /// The CFG was preserved, but the entry or exit blocks may have changed.
+    #[allow(missing_docs)]
     CFGPreserved {
         entry_changed: bool,
         exit_changed: bool,
     },
 }
 
-#[allow(deprecated)]
+/// Normalize a CFG in a Hugr:
+/// * Merge consecutive basic blocks i.e. where a BB has only a single successor which
+///   has no predecessors
+/// * If the entry block has only one successor, and no predecessors, then move its contents
+///   outside/before CFG.
+/// * (Similarly) if the exit block has only one predecessor, then move contents
+///   outside/after CFG.
+///    * If that predecessor is the entry block, then remove the CFG.
+///
+/// *Note that this may remove the entrypoint*; such will be reported in the result
+/// ([NormalizeCFGResult::CFGRemoved])
+///
+/// # Errors
+///
+/// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
+#[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
 pub fn normalize_cfg<H: HugrMut<Node = Node>>(
     mut cfg: &mut H,
 ) -> Result<NormalizeCFGResult, NormalizeCFGError> {
@@ -109,14 +130,18 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
         // Inputs to CFG go directly to consumers of the entry block's Input node
         for inp in cfg.node_inputs(cfg.entrypoint()).collect::<Vec<_>>() {
-            // TODO order edges?? Might need to generalize beyond single_linked...
-            let src = cfg.single_linked_output(cfg.entrypoint(), inp).unwrap();
+            let srcs = cfg
+                .linked_outputs(cfg.entrypoint(), inp)
+                .collect::<Vec<_>>();
             cfg.disconnect(cfg.entrypoint(), inp);
             for tgt in cfg
                 .linked_inputs(entry_input, inp.index())
                 .collect::<Vec<_>>()
             {
-                cfg.connect(src.0, src.1, tgt.0, tgt.1);
+                // Connecting all sources to all targets handles Order edges as well as Value
+                for src in srcs.iter() {
+                    cfg.connect(src.0, src.1, tgt.0, tgt.1);
+                }
             }
         }
         cfg.remove_node(entry_input);
@@ -144,7 +169,7 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             cfg.set_parent(n, cfg_parent);
         }
         if succ == exit {
-            // 1a. CFG must have distinct entry/exit; but we are left with a no-op
+            // 1a. We are left with a "CFG" whose only block is the exit, this is illegal.
             let tys = cfg
                 .get_optype(exit)
                 .as_exit_block()
@@ -164,12 +189,12 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
                 cfg.remove_subtree(c);
             }
             let inp = cfg.add_node_with_parent(cfg.entrypoint(), Input { types: tys.clone() });
-            let out = cfg.add_node_with_parent(cfg.entrypoint(), Input { types: tys.clone() });
+            let out = cfg.add_node_with_parent(cfg.entrypoint(), Output { types: tys.clone() });
             for p in cfg.node_outputs(inp).collect_vec() {
                 cfg.connect(inp, p, out, p.index());
             }
             // This has replaced the entire CFG with an empty DFG...should we just inline/remove that??
-            return Ok(NormalizeCFGResult::CFGRemoved);
+            return Ok(NormalizeCFGResult::CFGToDFG);
         }
         // 1b. else, old entry-node's successor is the new entry node, move into place
         cfg.move_before_sibling(succ, entry);
@@ -401,6 +426,7 @@ fn add_unpack<H: HugrMut>(
 }
 
 #[cfg(test)]
+#[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
