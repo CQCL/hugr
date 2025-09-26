@@ -6,15 +6,15 @@ expression: ast
 
 (mod)
 
-(import core.call)
+(import compat.meta_json)
 
-(import core.load_const)
+(import core.call)
 
 (import core.fn)
 
-(import compat.meta_json)
-
 (import arithmetic.int.types.int)
+
+(import core.load_const)
 
 (declare-func
   public

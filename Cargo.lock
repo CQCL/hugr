@@ -1208,7 +1208,7 @@ checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
 name = "hugr"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "bumpalo",
  "criterion",
@@ -1217,13 +1217,12 @@ dependencies = [
  "hugr-model",
  "hugr-passes",
  "hugr-persistent",
- "lazy_static",
  "serde_json",
 ]
 
 [[package]]
 name = "hugr-cli"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1244,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "anyhow",
  "base64",
@@ -1254,7 +1253,6 @@ dependencies = [
  "derive_more 1.0.0",
  "downcast-rs",
  "enum_dispatch",
- "fxhash",
  "html-escape",
  "hugr",
  "hugr-model",
@@ -1262,9 +1260,8 @@ dependencies = [
  "insta",
  "itertools 0.14.0",
  "jsonschema",
- "lazy_static",
  "ordered-float",
- "paste",
+ "pastey",
  "petgraph 0.8.2",
  "portgraph",
  "proptest",
@@ -1272,6 +1269,7 @@ dependencies = [
  "regex",
  "relrc",
  "rstest",
+ "rustc-hash",
  "semver",
  "serde",
  "serde_json",
@@ -1289,7 +1287,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "anyhow",
  "cc",
@@ -1300,7 +1298,6 @@ dependencies = [
  "inkwell",
  "insta",
  "itertools 0.14.0",
- "lazy_static",
  "petgraph 0.8.2",
  "portgraph",
  "rstest",
@@ -1309,13 +1306,12 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "base64",
  "bumpalo",
  "capnp",
  "derive_more 1.0.0",
- "fxhash",
  "indexmap 2.11.3",
  "insta",
  "itertools 0.14.0",
@@ -1327,6 +1323,7 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "pyo3",
+ "rustc-hash",
  "semver",
  "smol_str",
  "thiserror 2.0.16",
@@ -1334,14 +1331,13 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.22.3"
+version = "0.22.4"
 dependencies = [
  "ascent",
  "derive_more 1.0.0",
  "hugr-core",
  "itertools 0.14.0",
- "lazy_static",
- "paste",
+ "pastey",
  "petgraph 0.8.2",
  "portgraph",
  "proptest",
@@ -1360,7 +1356,6 @@ dependencies = [
  "hugr-core",
  "insta",
  "itertools 0.14.0",
- "lazy_static",
  "petgraph 0.8.2",
  "portgraph",
  "relrc",
@@ -1379,7 +1374,7 @@ version = "0.1.0"
 dependencies = [
  "bumpalo",
  "hugr-model",
- "paste",
+ "pastey",
  "pyo3",
 ]
 
@@ -2058,6 +2053,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "pastey"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2292,9 +2293,9 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.7.0"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fcdab19deb5195a31cf7726a210015ff1496ba1464fd42cb4f537b8b01b471f"
+checksum = "2bb0be07becd10686a0bb407298fb425360a5c44a663774406340c59a22de4ce"
 dependencies = [
  "bit-set",
  "bit-vec",
