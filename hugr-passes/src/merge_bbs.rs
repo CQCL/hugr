@@ -95,30 +95,27 @@ pub enum NormalizeCFGResult {
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
 #[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
 pub fn normalize_cfg<H: HugrMut<Node = Node>>(
-    mut cfg: &mut H,
+    mut h: &mut H,
 ) -> Result<NormalizeCFGResult, NormalizeCFGError> {
-    let checked: RootChecked<_, CfgID<H::Node>> =
-        RootChecked::<_, CfgID<H::Node>>::try_new(&mut cfg).map_err(|e| match e {
+    let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
+        .map_err(|e| match e {
             HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
             _ => unreachable!(),
         })?;
     merge_basic_blocks(checked);
+    let cfg_node = h.entrypoint();
 
     // Further normalizations with effects outside the CFG
-    let [entry, exit] = cfg
-        .children(cfg.entrypoint())
-        .take(2)
-        .collect_array()
-        .unwrap();
-    let entry_blk = cfg.get_optype(entry).as_dataflow_block().unwrap();
-    let cfg_parent = cfg.get_parent(cfg.entrypoint()).unwrap();
+    let [entry, exit] = h.children(cfg_node).take(2).collect_array().unwrap();
+    let entry_blk = h.get_optype(entry).as_dataflow_block().unwrap();
+    let cfg_parent = h.get_parent(cfg_node).unwrap();
     // 1. If the entry block has only one successor, and no predecessors, then move contents
     // outside/before CFG. (Note if the entry block has multiple successors, but no predecessors,
     // we could move its contents outside (before) the CFG, but would need to keep an empty/identity
     // entry block - we do not do this here
     let mut entry_changed = false;
     #[allow(clippy::match_result_ok)] // let Ok(...) without .ok() borrows `cfg`
-    if let Some(succ) = cfg.output_neighbours(entry).exactly_one().ok() {
+    if let Some(succ) = h.output_neighbours(entry).exactly_one().ok() {
         if succ == exit {
             // Ignore any other predecessors as they are unreachable!
             assert_eq!(
@@ -126,140 +123,140 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
                     entry_blk.inputs.clone(),
                     entry_blk.successor_input(0).unwrap()
                 ),
-                cfg.signature(cfg.entrypoint()).unwrap().as_ref()
+                h.signature(cfg_node).unwrap().as_ref()
             );
             // Turn the CFG into a DFG containing only what was in the entry block
             // Annoying here - "while let Some(blk) = cfg.children(...).skip(1).next()" keeps iterator alive
-            let children_to_remove: Vec<_> = cfg.children(cfg.entrypoint()).skip(1).collect();
+            let children_to_remove: Vec<_> = h.children(cfg_node).skip(1).collect();
             for blk in children_to_remove {
-                cfg.remove_subtree(blk);
+                h.remove_subtree(blk);
             }
-            while let Some(ch) = cfg.first_child(entry) {
-                cfg.set_parent(ch, cfg.entrypoint());
+            while let Some(ch) = h.first_child(entry) {
+                h.set_parent(ch, cfg_node);
             }
-            cfg.remove_node(entry);
-            let cfg_ty = cfg.optype_mut(cfg.entrypoint());
+            h.remove_node(entry);
+            let cfg_ty = h.optype_mut(cfg_node);
             let OpType::CFG(cfg_) = std::mem::take(cfg_ty) else {
                 panic!()
             };
             *cfg_ty = OpType::DFG(DFG {
                 signature: cfg_.signature,
             });
-            let [_, outp] = cfg.get_io(cfg.entrypoint()).unwrap();
-            let (values, orders) = take_inputs(cfg, outp);
-            let mut unpacked = tuple_elems(cfg, values[0].0, values[0].1).into_owned();
-            let OpType::Output(ou) = cfg.optype_mut(outp) else {
+            // Unpack the first output and shuffle all the rest along
+            let [_, outp] = h.get_io(cfg_node).unwrap();
+            let (values, orders) = take_inputs(h, outp);
+            let mut unpacked = tuple_elems(h, values[0].0, values[0].1).into_owned();
+            h.add_ports(outp, Direction::Incoming, unpacked.len() as isize - 1);
+            let OpType::Output(ou) = h.optype_mut(outp) else {
                 panic!()
             };
             let rest = std::mem::take(&mut ou.types).into_owned();
             unpacked.extend(rest.into_iter().skip(1));
             ou.types = unpacked.into();
-            add_unpack(cfg, values, orders, outp);
+            add_unpack(h, values, orders, outp);
             return Ok(NormalizeCFGResult::CFGToDFG);
-        } else if cfg.input_neighbours(succ).count() == 1 {
+        } else if h.input_neighbours(succ).count() == 1 {
             // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
-            let [entry_input, entry_output] = cfg.get_io(entry).unwrap();
+            let [entry_input, entry_output] = h.get_io(entry).unwrap();
             let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
             // Inputs to CFG go directly to consumers of the entry block's Input node
-            for inp in cfg.node_inputs(cfg.entrypoint()).collect::<Vec<_>>() {
-                let srcs = cfg
-                    .linked_outputs(cfg.entrypoint(), inp)
-                    .collect::<Vec<_>>();
-                cfg.disconnect(cfg.entrypoint(), inp);
-                for tgt in cfg
+            for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
+                let srcs = h.linked_outputs(cfg_node, inp).collect::<Vec<_>>();
+                h.disconnect(cfg_node, inp);
+                for tgt in h
                     .linked_inputs(entry_input, inp.index())
                     .collect::<Vec<_>>()
                 {
                     // Connecting all sources to all targets handles Order edges as well as Value
                     for src in srcs.iter() {
-                        cfg.connect(src.0, src.1, tgt.0, tgt.1);
+                        h.connect(src.0, src.1, tgt.0, tgt.1);
                     }
                 }
             }
-            cfg.remove_node(entry_input);
+            h.remove_node(entry_input);
 
             // Update input ports
-            let OpType::CFG(cfg_ty) = cfg.optype_mut(cfg.entrypoint()) else {
+            let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
                 panic!()
             };
             let inputs_to_add =
                 new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
             cfg_ty.signature.input = new_cfg_inputs;
-            cfg.add_ports(cfg.entrypoint(), Direction::Incoming, inputs_to_add);
+            h.add_ports(cfg_node, Direction::Incoming, inputs_to_add);
 
             // Inputs to entry block Output node go instead to CFG
-            let (entry_results, orders) = take_inputs(cfg, entry_output);
-            cfg.remove_node(entry_output);
-            add_unpack(cfg, entry_results, orders, cfg.entrypoint());
+            let (entry_results, orders) = take_inputs(h, entry_output);
+            h.remove_node(entry_output);
+            add_unpack(h, entry_results, orders, cfg_node);
 
             // Transfer remaining entry children - including any used to compute the predicate
-            while let Some(n) = cfg.first_child(entry) {
-                cfg.set_parent(n, cfg_parent);
+            while let Some(n) = h.first_child(entry) {
+                h.set_parent(n, cfg_parent);
             }
             // old entry-node's successor is the new entry node, move into place
-            cfg.move_before_sibling(succ, entry);
-            cfg.remove_node(entry);
+            h.move_before_sibling(succ, entry);
+            h.remove_node(entry);
             entry_changed = true;
         }
     }
     // 2. If the exit node has a single predecessor and that predecessor has no other successors...
     let mut exit_changed = false;
-    if let Some(pred) = cfg
+    if let Some(pred) = h
         .input_neighbours(exit)
         .exactly_one()
         .ok()
-        .filter(|pred| cfg.output_neighbours(*pred).count() == 1)
+        .filter(|pred| h.output_neighbours(*pred).count() == 1)
     {
         // Code in that predecessor can be moved outside (after the CFG), and the predecessor deleted
-        let [_, output] = cfg.get_io(pred).unwrap();
-        let pred_blk = cfg.get_optype(pred).as_dataflow_block().unwrap();
+        let [_, output] = h.get_io(pred).unwrap();
+        let pred_blk = h.get_optype(pred).as_dataflow_block().unwrap();
         let new_cfg_outs = pred_blk.inner_signature().into_owned().input;
 
         // new CFG result type and exit block
-        let OpType::CFG(cfg_ty) = cfg.optype_mut(cfg.entrypoint()) else {
+        let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
             panic!()
         };
         let result_tys = std::mem::replace(&mut cfg_ty.signature.output, new_cfg_outs.clone());
         // TODO update number of CFG outports
 
-        *cfg.optype_mut(pred) = ExitBlock {
+        *h.optype_mut(pred) = ExitBlock {
             cfg_outputs: new_cfg_outs.clone(),
         }
         .into();
-        cfg.set_num_ports(pred, cfg.num_ports(pred, Direction::Incoming), 0);
+        h.set_num_ports(pred, h.num_ports(pred, Direction::Incoming), 0);
 
-        cfg.move_before_sibling(pred, exit);
-        cfg.remove_node(exit);
+        h.move_before_sibling(pred, exit);
+        h.remove_node(exit);
         // Move contents into new DFG
-        let dfg = cfg.add_node_with_parent(
+        let dfg = h.add_node_with_parent(
             cfg_parent,
             DFG {
                 signature: Signature::new(new_cfg_outs, result_tys.clone()),
             },
         );
-        while let Some(n) = cfg.first_child(pred) {
-            cfg.set_parent(n, dfg);
+        while let Some(n) = h.first_child(pred) {
+            h.set_parent(n, dfg);
         }
         // Add tuple-unpack inside the DFG
-        let (values, orders) = take_inputs(cfg, output);
-        let OpType::Output(ou) = cfg.optype_mut(output) else {
+        let (values, orders) = take_inputs(h, output);
+        let OpType::Output(ou) = h.optype_mut(output) else {
             panic!()
         };
         ou.types = result_tys;
         // TODO update number of input ports
 
-        add_unpack(cfg, values, orders, output);
+        add_unpack(h, values, orders, output);
         // Move output edges.
         // TODO result_tys is almost this, but we want to move Order edges too
-        for p in cfg.node_outputs(cfg.entrypoint()).collect_vec() {
-            let tgts = cfg.linked_inputs(cfg.entrypoint(), p).collect_vec();
-            cfg.disconnect(cfg.entrypoint(), p);
+        for p in h.node_outputs(cfg_node).collect_vec() {
+            let tgts = h.linked_inputs(cfg_node, p).collect_vec();
+            h.disconnect(cfg_node, p);
             for tgt in tgts {
-                cfg.connect(dfg, p, tgt.0, tgt.1)
+                h.connect(dfg, p, tgt.0, tgt.1)
             }
         }
-        for p in cfg.node_inputs(dfg).collect_vec() {
-            cfg.connect(cfg.entrypoint(), p.index(), dfg, p);
+        for p in h.node_inputs(dfg).collect_vec() {
+            h.connect(cfg_node, p.index(), dfg, p);
         }
         exit_changed = true;
     }
