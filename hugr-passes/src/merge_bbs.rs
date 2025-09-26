@@ -667,7 +667,7 @@ mod test {
     }
 
     #[rstest]
-    fn elide_cfg() {
+    fn elide_cfg(#[values(false, true)] extra_blocks: bool) {
         let ext = extension();
         let op = ext.instantiate_extension_op("Test", []).unwrap();
         let out_ty = op.signature().output().clone();
@@ -681,6 +681,16 @@ mod test {
             .finish_with_outputs(predicate, op_res.outputs())
             .unwrap();
         cfg.branch(&entry, 0, &cfg.exit_block()).unwrap();
+        if extra_blocks {
+            let Signature { input, output } = op.signature().as_ref().clone();
+            for (ty, dest) in [(input, entry), (output, cfg.exit_block())] {
+                let mut extra = cfg.simple_block_builder(endo_sig(ty), 1).unwrap();
+                let inp = extra.input_wires();
+                let branch = extra.add_load_value(Value::unary_unit_sum());
+                let extra = extra.finish_with_outputs(branch, inp).unwrap();
+                cfg.branch(&extra, 0, &dest).unwrap();
+            }
+        }
         let mut h = cfg.finish_hugr().unwrap();
 
         let func = h.children(h.module_root()).exactly_one().ok().unwrap();
@@ -690,11 +700,11 @@ mod test {
                 .collect_vec(),
             [OpTag::Input, OpTag::Output, OpTag::Cfg]
         );
-        //let dfb = h.nodes().filter(|n| h.get_optype(*n).is_dataflow_block()).exactly_one().ok().unwrap();
         let mut dfb_children = h
             .children(entry.node())
             .map(|n| h.get_optype(n).tag())
             .collect_vec();
+
         let res = normalize_cfg(&mut h);
         assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
         assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
