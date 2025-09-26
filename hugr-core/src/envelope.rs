@@ -397,13 +397,13 @@ fn decode_model(
     let bump = Bump::default();
     let model_package = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
 
-    let mut extension_registry = extension_registry.clone();
-    if format == EnvelopeFormat::ModelWithExtensions {
-        let extra_extensions = ExtensionRegistry::load_json(stream, &extension_registry)?;
-        extension_registry.extend(extra_extensions);
-    }
+    let packaged_extensions = if format == EnvelopeFormat::ModelWithExtensions {
+        ExtensionRegistry::load_json(stream, extension_registry)?
+    } else {
+        ExtensionRegistry::new([])
+    };
 
-    let package = import_package(&model_package, &extension_registry)?;
+    let package = import_package(&model_package, packaged_extensions, extension_registry)?;
 
     Ok(package)
 }
@@ -432,18 +432,17 @@ fn decode_model_ast(
 ) -> Result<Package, EnvelopeError> {
     check_model_version(format)?;
 
-    let mut extension_registry = extension_registry.clone();
-    if format == EnvelopeFormat::ModelTextWithExtensions {
+    let packaged_extensions = if format == EnvelopeFormat::ModelTextWithExtensions {
         let deserializer = serde_json::Deserializer::from_reader(&mut stream);
         // Deserialize the first json object, leaving the rest of the reader unconsumed.
         let extra_extensions = deserializer
             .into_iter::<Vec<Extension>>()
             .next()
             .unwrap_or(Ok(vec![]))?;
-        for ext in extra_extensions {
-            extension_registry.register_updated(ext);
-        }
-    }
+        ExtensionRegistry::new(extra_extensions.into_iter().map(std::sync::Arc::new))
+    } else {
+        ExtensionRegistry::new([])
+    };
 
     // Read the package into a string, then parse it.
     //
@@ -455,7 +454,7 @@ fn decode_model_ast(
     let bump = Bump::default();
     let model_package = ast_package.resolve(&bump)?;
 
-    let package = import_package(&model_package, &extension_registry)?;
+    let package = import_package(&model_package, packaged_extensions, extension_registry)?;
 
     Ok(package)
 }
