@@ -8,7 +8,7 @@
 //! the offset instead of mutating the pointer. This way, we can still free the original
 //! pointer when the array is discarded after a pop.
 //!
-//! We provide utility functions [`array_fat_pointer_ty`], [`build_barray_fat_pointer`], and
+//! We provide utility functions [`barray_fat_pointer_ty`], [`build_barray_fat_pointer`], and
 //! [`decompose_barray_fat_pointer`] to work with array fat pointers.
 //!
 //! The [`DefaultBorrowArrayCodegen`] extension allocates all arrays on the heap using the
@@ -16,6 +16,7 @@
 //! by providing a different implementation for [`BorrowArrayCodegen::emit_allocate_array`]
 //! and [`BorrowArrayCodegen::emit_free_array`].
 use std::iter;
+use std::sync::LazyLock;
 
 use anyhow::{Ok, Result, anyhow};
 use hugr_core::extension::prelude::{ConstError, option_type, usize_t};
@@ -36,7 +37,6 @@ use inkwell::values::{
 };
 use inkwell::{AddressSpace, IntPredicate};
 use itertools::Itertools;
-use lazy_static::lazy_static;
 
 use crate::emit::emit_value;
 use crate::emit::func::outline_into_function;
@@ -48,28 +48,26 @@ use crate::{
     types::{HugrType, TypingSession},
 };
 
-lazy_static! {
-    static ref ERR_ALREADY_BORROWED: ConstError = ConstError {
-        signal: 2,
-        message: "Array element is already borrowed".to_string(),
-    };
-    static ref ERR_NOT_FREE: ConstError = ConstError {
-        signal: 2,
-        message: "Array already contains an element at this index".to_string(),
-    };
-    static ref ERR_OUT_OF_BOUNDS: ConstError = ConstError {
-        signal: 2,
-        message: "Index out of bounds".to_string(),
-    };
-    static ref ERR_NOT_ALL_BORROWED: ConstError = ConstError {
-        signal: 2,
-        message: "Array contains non-borrowed elements and cannot be discarded".to_string(),
-    };
-    static ref ERR_SOME_BORROWED: ConstError = ConstError {
-        signal: 2,
-        message: "Some array elements have been borrowed".to_string(),
-    };
-}
+static ERR_ALREADY_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Array element is already borrowed".to_string(),
+});
+static ERR_NOT_FREE: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Array already contains an element at this index".to_string(),
+});
+static ERR_OUT_OF_BOUNDS: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Index out of bounds".to_string(),
+});
+static ERR_NOT_ALL_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Array contains non-borrowed elements and cannot be discarded".to_string(),
+});
+static ERR_SOME_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+    signal: 2,
+    message: "Some array elements have been borrowed".to_string(),
+});
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
@@ -2349,7 +2347,7 @@ mod test {
                 );
                 let mut array = builder.add_load_value(array);
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
@@ -2417,7 +2415,7 @@ mod test {
                 );
                 let mut array = builder.add_load_value(array);
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
@@ -2479,7 +2477,7 @@ mod test {
                     .unwrap()
                     .1;
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i2)
                     .unwrap()
@@ -2529,7 +2527,7 @@ mod test {
                     .add_borrow_array_return(int_ty.clone(), size, array, i1, zero)
                     .unwrap();
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 array = builder
                     .add_borrow_array_return(int_ty.clone(), size, array, i2, zero)
                     .unwrap();
