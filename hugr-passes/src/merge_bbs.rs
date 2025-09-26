@@ -217,13 +217,18 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             panic!()
         };
         let result_tys = std::mem::replace(&mut cfg_ty.signature.output, new_cfg_outs.clone());
-        // TODO update number of CFG outports
+        h.add_ports(
+            cfg_node,
+            Direction::Outgoing,
+            new_cfg_outs.len() as isize - result_tys.len() as isize,
+        );
 
         *h.optype_mut(pred) = ExitBlock {
             cfg_outputs: new_cfg_outs.clone(),
         }
         .into();
-        h.set_num_ports(pred, h.num_ports(pred, Direction::Incoming), 0);
+        debug_assert_eq!(h.num_ports(pred, Direction::Outgoing), 1);
+        h.set_num_ports(pred, 1, 0);
 
         h.move_before_sibling(pred, exit);
         h.remove_node(exit);
@@ -242,12 +247,12 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         let OpType::Output(ou) = h.optype_mut(output) else {
             panic!()
         };
+        let ports_to_add = result_tys.len() as isize - ou.types.len() as isize;
         ou.types = result_tys;
-        // TODO update number of input ports
+        h.add_ports(output, Direction::Incoming, ports_to_add);
 
         add_unpack(h, values, orders, output);
         // Move output edges.
-        // TODO result_tys is almost this, but we want to move Order edges too
         for p in h.node_outputs(cfg_node).collect_vec() {
             let tgts = h.linked_inputs(cfg_node, p).collect_vec();
             h.disconnect(cfg_node, p);
