@@ -716,4 +716,66 @@ mod test {
             dfb_children
         );
     }
+
+    #[test]
+    fn entry_before_loop() -> Result<(), Box<dyn std::error::Error>> {
+        /* -> Noop --> Test -> Exit      -> Test --> Exit
+                       |  |          =>     |  |
+                       \<-/                 \<-/
+        */
+        let loop_variants: TypeRow = vec![qb_t()].into();
+        let exit_types: TypeRow = vec![usize_t()].into();
+        let e = extension();
+        let tst_op = e.instantiate_extension_op("Test", [])?;
+        let mut h = CFGBuilder::new(inout_sig(loop_variants.clone(), exit_types.clone()))?;
+        let mut nop_b = h.simple_entry_builder(loop_variants.clone(), 1)?;
+        let n = nop_b.add_dataflow_op(Noop::new(qb_t()), nop_b.input_wires())?;
+        let br = nop_b.add_load_value(Value::unary_unit_sum());
+        let entry = nop_b.finish_with_outputs(br, n.outputs())?;
+
+        let mut loop_b = h.block_builder(
+            loop_variants.clone(),
+            vec![loop_variants, exit_types],
+            type_row![],
+        )?;
+        let [tst] = loop_b
+            .add_dataflow_op(tst_op, loop_b.input_wires())?
+            .outputs_arr();
+        let loop_ = loop_b.finish_with_outputs(tst, [])?;
+        h.branch(&entry, 0, &loop_)?;
+        h.branch(&loop_, 0, &loop_)?;
+        h.branch(&loop_, 1, &h.exit_block())?;
+
+        let mut h = h.finish_hugr()?;
+
+        let res = normalize_cfg(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            res,
+            NormalizeCFGResult::CFGPreserved {
+                entry_changed: true,
+                exit_changed: false
+            }
+        );
+        assert_eq!(
+            h.children(h.entrypoint())
+                .map(|n| h.get_optype(n).tag())
+                .collect_vec(),
+            [OpTag::DataflowBlock, OpTag::BasicBlockExit]
+        );
+        let func = h.get_parent(h.entrypoint()).unwrap();
+        let func_children = h
+            .children(func)
+            .map(|n| h.get_optype(n).tag())
+            .collect_vec();
+        assert_eq!(func_children.len(), 6);
+        {
+            use OpTag::*;
+            assert_eq!(
+                HashSet::from_iter(func_children),
+                HashSet::from([Input, Output, Leaf, Cfg, Const, LoadConst])
+            );
+        }
+        Ok(())
+    }
 }
