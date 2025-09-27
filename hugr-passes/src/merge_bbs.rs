@@ -114,10 +114,10 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
     // we could move its contents outside (before) the CFG, but would need to keep an empty/identity
     // entry block - we do not do this here
     let mut entry_changed = false;
-    #[allow(clippy::match_result_ok)] // let Ok(...) without .ok() borrows `cfg`
+    #[allow(clippy::match_result_ok)] // let Ok(...) without .ok() borrows `h`
     if let Some(succ) = h.output_neighbours(entry).exactly_one().ok() {
         if succ == exit {
-            // Ignore any other predecessors as they are unreachable!
+            // Any (basic-block) predecessors of `entry` are unreachable, so allow/ignore
             assert_eq!(
                 &Signature::new(
                     entry_blk.inputs.clone(),
@@ -153,7 +153,7 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             let rest = std::mem::take(&mut ou.types).into_owned();
             unpacked.extend(rest.into_iter().skip(1));
             ou.types = unpacked.into();
-            add_unpack(h, values, orders, outp);
+            wire_unpack_first(h, values, orders, outp);
             return Ok(NormalizeCFGResult::CFGToDFG);
         } else if h.input_neighbours(entry).count() == 0 {
             // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
@@ -187,7 +187,7 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             // Inputs to entry block Output node go instead to CFG
             let (entry_results, orders) = take_inputs(h, entry_output);
             h.remove_node(entry_output);
-            add_unpack(h, entry_results, orders, cfg_node);
+            wire_unpack_first(h, entry_results, orders, cfg_node);
 
             // Transfer remaining entry children - including any used to compute the predicate
             while let Some(n) = h.first_child(entry) {
@@ -250,8 +250,8 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         let ports_to_add = result_tys.len() as isize - ou.types.len() as isize;
         ou.types = result_tys;
         h.add_ports(output, Direction::Incoming, ports_to_add);
+        wire_unpack_first(h, values, orders, output);
 
-        add_unpack(h, values, orders, output);
         // Move output edges.
         for p in h.node_outputs(cfg_node).collect_vec() {
             let tgts = h.linked_inputs(cfg_node, p).collect_vec();
@@ -333,7 +333,7 @@ fn mk_rep<H: HugrView>(
     let dfg_order_out = replacement.get_optype(dfg1).other_output_port().unwrap();
     let order_srcs = (dfg1_outs.is_empty()).then_some((dfg1, dfg_order_out));
     // Do not add Order edges between DFGs unless there are no value edges
-    add_unpack(&mut replacement, dfg1_outs, order_srcs, dfg2);
+    wire_unpack_first(&mut replacement, dfg1_outs, order_srcs, dfg2);
 
     // If there are edges from succ back to pred, we cannot do these via the mu_inp/out/new
     // edge-maps as both source and target of the new edge are in the replacement Hugr
@@ -409,7 +409,7 @@ fn tuple_elems<H: HugrView>(h: &H, n: H::Node, p: OutgoingPort) -> TypeRow {
     .unwrap()
 }
 
-fn add_unpack<H: HugrMut>(
+fn wire_unpack_first<H: HugrMut>(
     h: &mut H,
     value_srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
     order_srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
