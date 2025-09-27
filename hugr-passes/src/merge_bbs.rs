@@ -11,7 +11,9 @@ use itertools::Itertools;
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
 use hugr_core::ops::handle::CfgID;
-use hugr_core::ops::{DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output};
+use hugr_core::ops::{
+    CFG, DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output,
+};
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 /// Merge any basic blocks that are direct children of the specified CFG
@@ -136,24 +138,12 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
             }
             h.remove_node(entry);
             let cfg_ty = h.optype_mut(cfg_node);
-            let OpType::CFG(cfg_) = std::mem::take(cfg_ty) else {
+            let OpType::CFG(CFG { signature }) = std::mem::take(cfg_ty) else {
                 panic!()
             };
-            *cfg_ty = OpType::DFG(DFG {
-                signature: cfg_.signature,
-            });
-            // Unpack the first output and shuffle all the rest along
-            let [_, outp] = h.get_io(cfg_node).unwrap();
-            let (values, orders) = take_inputs(h, outp);
-            let mut unpacked = tuple_elems(h, values[0].0, values[0].1).into_owned();
-            h.add_ports(outp, Direction::Incoming, unpacked.len() as isize - 1);
-            let OpType::Output(ou) = h.optype_mut(outp) else {
-                panic!()
-            };
-            let rest = std::mem::take(&mut ou.types).into_owned();
-            unpacked.extend(rest.into_iter().skip(1));
-            ou.types = unpacked.into();
-            wire_unpack_first(h, values, orders, outp);
+            let result_tys = signature.output.clone();
+            *cfg_ty = OpType::DFG(DFG { signature });
+            unpack_before_output(h, h.get_io(cfg_node).unwrap()[1], result_tys);
             return Ok(NormalizeCFGResult::CFGToDFG);
         } else if h.input_neighbours(entry).count() == 0 {
             // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
@@ -242,15 +232,7 @@ pub fn normalize_cfg<H: HugrMut<Node = Node>>(
         while let Some(n) = h.first_child(pred) {
             h.set_parent(n, dfg);
         }
-        // Add tuple-unpack inside the DFG
-        let (values, orders) = take_inputs(h, output);
-        let OpType::Output(ou) = h.optype_mut(output) else {
-            panic!()
-        };
-        let ports_to_add = result_tys.len() as isize - ou.types.len() as isize;
-        ou.types = result_tys;
-        h.add_ports(output, Direction::Incoming, ports_to_add);
-        wire_unpack_first(h, values, orders, output);
+        unpack_before_output(h, output, result_tys);
 
         // Move output edges.
         for p in h.node_outputs(cfg_node).collect_vec() {
@@ -438,6 +420,18 @@ fn wire_unpack_first<H: HugrMut>(
     for (src, src_p) in order_srcs {
         h.connect(src, src_p, dst, order_tgt);
     }
+}
+
+/// Unpack the first input to specified [Output] node and shuffle all the rest along
+fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: TypeRow) {
+    let (values, orders) = take_inputs(h, output_node);
+    let OpType::Output(ou) = h.optype_mut(output_node) else {
+        panic!()
+    };
+    let ports_to_add = new_types.len() as isize - ou.types.len() as isize;
+    ou.types = new_types;
+    h.add_ports(output_node, Direction::Incoming, ports_to_add);
+    wire_unpack_first(h, values, orders, output_node);
 }
 
 #[cfg(test)]
