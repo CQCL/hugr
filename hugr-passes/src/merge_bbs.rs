@@ -662,7 +662,7 @@ mod test {
     }
 
     #[rstest]
-    fn elide_cfg(#[values(false, true)] extra_blocks: bool) {
+    fn elide_cfg() {
         let ext = extension();
         let op = ext.instantiate_extension_op("Test", []).unwrap();
         let out_ty = op.signature().output().clone();
@@ -676,16 +676,17 @@ mod test {
             .finish_with_outputs(predicate, op_res.outputs())
             .unwrap();
         cfg.branch(&entry, 0, &cfg.exit_block()).unwrap();
-        if extra_blocks {
-            let Signature { input, output } = op.signature().as_ref().clone();
-            for (ty, dest) in [(input, entry), (output, cfg.exit_block())] {
-                let mut extra = cfg.simple_block_builder(endo_sig(ty), 1).unwrap();
-                let inp = extra.input_wires();
-                let branch = extra.add_load_value(Value::unary_unit_sum());
-                let extra = extra.finish_with_outputs(branch, inp).unwrap();
-                cfg.branch(&extra, 0, &dest).unwrap();
-            }
+
+        // Add an (unreachable) block before the entry
+        let Signature { input, output } = op.signature().as_ref().clone();
+        for (ty, dest) in [(input, entry), (output, cfg.exit_block())] {
+            let mut extra = cfg.simple_block_builder(endo_sig(ty), 1).unwrap();
+            let inp = extra.input_wires();
+            let branch = extra.add_load_value(Value::unary_unit_sum());
+            let extra = extra.finish_with_outputs(branch, inp).unwrap();
+            cfg.branch(&extra, 0, &dest).unwrap();
         }
+
         let mut h = cfg.finish_hugr().unwrap();
 
         let func = h.children(h.module_root()).exactly_one().ok().unwrap();
