@@ -437,7 +437,7 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 #[cfg(test)]
 #[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use std::sync::Arc;
 
     use itertools::Itertools;
@@ -687,34 +687,16 @@ mod test {
         let mut h = cfg.finish_hugr().unwrap();
 
         let func = h.children(h.module_root()).exactly_one().ok().unwrap();
-        assert_eq!(
-            h.children(func)
-                .map(|n| h.get_optype(n).tag())
-                .collect_vec(),
-            [OpTag::Input, OpTag::Output, OpTag::Cfg]
-        );
-        let mut dfb_children = h
-            .children(entry.node())
-            .map(|n| h.get_optype(n).tag())
-            .collect_vec();
+        assert_eq!(child_tags_ext_ids(&h, func), ["Input", "Output", "Cfg"]);
+        let mut dfb_children = child_tags_ext_ids(&h, entry.node());
 
         let res = normalize_cfg(&mut h);
         h.validate().unwrap();
         assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
         assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
-        assert_eq!(
-            h.children(func)
-                .map(|n| h.get_optype(n).tag())
-                .collect_vec(),
-            [OpTag::Input, OpTag::Output, OpTag::Dfg,]
-        );
-        dfb_children.push(OpTag::Leaf);
-        assert_eq!(
-            h.children(h.entrypoint())
-                .map(|n| h.get_optype(n).tag())
-                .collect_vec(),
-            dfb_children
-        );
+        assert_eq!(child_tags_ext_ids(&h, func), ["Input", "Output", "Dfg"]);
+        dfb_children.push("UnpackTuple".to_string());
+        assert_eq!(child_tags_ext_ids(&h, h.entrypoint()), dfb_children);
     }
 
     #[test]
@@ -764,21 +746,19 @@ mod test {
             [OpTag::DataflowBlock, OpTag::BasicBlockExit]
         );
         let func = h.get_parent(h.entrypoint()).unwrap();
-        let mut func_children = child_optypes(&h, func);
+        let func_children = child_tags_ext_ids(&h, func);
         assert_eq!(
-            ext_op_ids(&h, func_children.remove(&OpTag::Leaf).unwrap()),
-            ["Noop", "UnpackTuple"]
+            func_children.into_iter().sorted().collect_vec(),
+            [
+                "Cfg",
+                "Const",
+                "Input",
+                "LoadConst",
+                "Noop",
+                "Output",
+                "UnpackTuple"
+            ]
         );
-
-        {
-            use OpTag::*;
-            assert_eq!(
-                func_children.keys().copied().collect::<HashSet<_>>(),
-                HashSet::from([Input, Output, Cfg, Const, LoadConst])
-            );
-        }
-        assert!(func_children.values().all(|v| v.len() == 1));
-
         Ok(())
     }
 
@@ -834,32 +814,28 @@ mod test {
         );
 
         let dfg = h.children(func).last().unwrap();
-        let mut dfg_children = child_optypes(&h, dfg);
-        let ext_ops = dfg_children.remove(&OpTag::Leaf).unwrap();
-        assert_eq!(ext_op_ids(&h, ext_ops), ["Noop", "UnpackTuple"]);
+        let dfg_children = child_tags_ext_ids(&h, dfg);
+        assert_eq!(
+            dfg_children.into_iter().sorted().collect_vec(),
+            [
+                "Const",
+                "Input",
+                "LoadConst",
+                "Noop",
+                "Output",
+                "UnpackTuple"
+            ]
+        );
 
-        {
-            use OpTag::*;
-            assert_eq!(
-                dfg_children.keys().copied().collect::<HashSet<_>>(),
-                HashSet::from([Input, Output, Const, LoadConst])
-            );
-        }
-        assert!(dfg_children.values().all(|v| v.len() == 1));
         Ok(())
     }
 
-    fn child_optypes<H: HugrView>(h: &H, n: H::Node) -> HashMap<OpTag, Vec<H::Node>> {
+    fn child_tags_ext_ids<H: HugrView>(h: &H, n: H::Node) -> Vec<String> {
         h.children(n)
-            .map(|n| (h.get_optype(n).tag(), n))
-            .into_group_map()
-    }
-
-    fn ext_op_ids<H: HugrView>(h: &H, nodes: Vec<H::Node>) -> Vec<&str> {
-        nodes
-            .into_iter()
-            .map(|n| h.get_optype(n).as_extension_op().unwrap().unqualified_id())
-            .sorted()
-            .collect_vec()
+            .map(|n| match h.get_optype(n) {
+                OpType::ExtensionOp(e) => e.unqualified_id().to_string(),
+                op => format!("{:?}", op.tag()),
+            })
+            .collect()
     }
 }
