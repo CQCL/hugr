@@ -579,10 +579,10 @@ mod test {
     }
 
     #[test]
-    fn merge_bbs_triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
+    fn elide_triple_with_permute() -> Result<(), Box<dyn std::error::Error>> {
         // Blocks are just BB1 -> BB2 -> BB3 --> Exit.
-        // CFG Normalization would move everything outside the CFG and elide the CFG altogether,
-        // but this is an easy-to-construct test of merge-basic-blocks only (no CFG normalization).
+        // Should be merged into one BB (we don't check that specifically)
+        // and then the whole CFG elided.
         let e = extension();
         let tst_op: OpType = e.instantiate_extension_op("Test", &[])?.into();
         let [res_t] = tst_op
@@ -624,20 +624,22 @@ mod test {
         h.branch(&bb3, 0, &h.exit_block())?;
 
         let mut h = h.finish_hugr()?;
-        merge_basic_blocks(&mut h);
+        let res = normalize_cfg(&mut h);
+        assert_eq!(res, Ok(NormalizeCFGResult::CFGToDFG));
         h.validate()?;
-
-        // Should only be one BB left
-        let [bb, _exit] = h
-            .children(h.entrypoint())
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
+        assert_eq!(h.entrypoint_optype().tag(), OpTag::Dfg);
+        assert_eq!(
+            h.entry_descendants().find(|n| matches!(
+                h.get_optype(*n),
+                OpType::DataflowBlock(_) | OpType::CFG(_) | OpType::ExitBlock(_)
+            )),
+            None
+        );
         let tst = find_unique(
             h.entry_descendants(),
             |n| matches!(h.get_optype(*n), OpType::ExtensionOp(c) if c.def().extension_id() != &PRELUDE_ID),
         );
-        assert_eq!(h.get_parent(tst), Some(bb));
+        assert_eq!(h.get_parent(tst), Some(h.entrypoint()));
 
         let inp = find_unique(h.entry_descendants(), |n| {
             matches!(h.get_optype(*n), OpType::Input(_))
