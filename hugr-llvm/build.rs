@@ -1,16 +1,16 @@
 //! The hugr-llvm build script.
 //!
-//! For debug builds, we compile the `test_panic_runtime` library to enable
+//! For test builds, we compile the `test_panic_runtime` library to enable
 //! LLVM execution tests involving panics.
 
 fn main() {
+    #[cfg(feature = "test-utils")]
+    compile_panic_runtime();
+}
+
+fn compile_panic_runtime() {
     println!("cargo::rerun-if-changed=src/emit/test/panic_runtime.c");
-    match std::env::var("PROFILE").unwrap().as_str() {
-        "debug" | "bench" => {
-            cc::Build::new()
-                .file("src/emit/test/panic_runtime.c")
-                .compile("test_panic_runtime");
-        }
-        _ => {}
-    }
+    cc::Build::new()
+        .file("src/emit/test/panic_runtime.c")
+        .compile("test_panic_runtime");
 }

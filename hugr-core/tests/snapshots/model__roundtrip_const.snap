@@ -6,29 +6,29 @@ expression: ast
 
 (mod)
 
-(import collections.array.array)
+(import collections.array.const)
 
-(import compat.const_json)
+(import core.const)
 
-(import core.load_const)
+(import core.adt)
+
+(import core.fn)
+
+(import core.const.adt)
 
 (import arithmetic.int.const)
 
 (import arithmetic.float.const_f64)
 
-(import core.const.adt)
+(import arithmetic.float.types.float64)
+
+(import core.load_const)
+
+(import compat.const_json)
 
 (import arithmetic.int.types.int)
 
-(import core.const)
-
-(import collections.array.const)
-
-(import arithmetic.float.types.float64)
-
-(import core.fn)
-
-(import core.adt)
+(import collections.array.array)
 
 (define-func
   public

@@ -6,9 +6,9 @@ expression: ast
 
 (mod)
 
-(import core.fn)
-
 (import core.entrypoint)
+
+(import core.fn)
 
 (define-func public main (core.fn [] [])
   (meta core.entrypoint)
@@ -16,9 +16,9 @@ expression: ast
 
 (mod)
 
-(import core.fn)
-
 (import core.entrypoint)
+
+(import core.fn)
 
 (define-func public wrapper_dfg (core.fn [] [])
   (meta core.entrypoint)
@@ -26,15 +26,15 @@ expression: ast
 
 (mod)
 
+(import core.entrypoint)
+
 (import core.make_adt)
 
 (import core.ctrl)
 
-(import core.fn)
-
-(import core.entrypoint)
-
 (import core.adt)
+
+(import core.fn)
 
 (define-func public wrapper_cfg (core.fn [] [])
   (dfg

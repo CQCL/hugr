@@ -1,6 +1,6 @@
 use bumpalo::{Bump, collections::Vec as BumpVec};
-use fxhash::FxHashMap;
 use itertools::zip_eq;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 use super::{

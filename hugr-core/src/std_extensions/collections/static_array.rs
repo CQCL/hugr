@@ -16,7 +16,7 @@
 use std::{
     hash::{self, Hash as _},
     iter,
-    sync::{self, Arc},
+    sync::{self, Arc, LazyLock},
 };
 
 use crate::{
@@ -41,8 +41,6 @@ use crate::{
         type_param::{TermTypeError, TypeParam},
     },
 };
-
-use lazy_static::lazy_static;
 
 use super::array::ArrayValue;
 
@@ -139,24 +137,23 @@ impl CustomConst for StaticArrayValue {
     }
 }
 
-lazy_static! {
-    /// Extension for array operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        use TypeBound::Copyable;
-        Extension::new_arc(EXTENSION_ID.clone(), VERSION, |extension, extension_ref| {
-            extension.add_type(
-                    STATIC_ARRAY_TYPENAME,
-                    vec![Copyable.into()],
-                    "Fixed-length constant array".into(),
-                    Copyable.into(),
-                    extension_ref,
-                )
-                .unwrap();
+/// Extension for array operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    use TypeBound::Copyable;
+    Extension::new_arc(EXTENSION_ID.clone(), VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                STATIC_ARRAY_TYPENAME,
+                vec![Copyable.into()],
+                "Fixed-length constant array".into(),
+                Copyable.into(),
+                extension_ref,
+            )
+            .unwrap();
 
-            StaticArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+        StaticArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 fn instantiate_const_static_array_custom_type(
     def: &TypeDef,
