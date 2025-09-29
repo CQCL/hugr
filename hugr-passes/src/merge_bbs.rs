@@ -22,7 +22,7 @@ use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 ///
 /// # Panics
 ///
-/// If the [HugrMut::entrypoint] of `cfg` is not an [OpType::CFG]
+/// If the [HugrView::entrypoint] of `cfg` is not an [OpType::CFG]
 ///
 /// [OpType::CFG]: hugr_core::ops::OpType::CFG
 #[deprecated(note = "Use normalize_cfg")] // Note: as a first step, just hide this
@@ -87,10 +87,9 @@ pub enum NormalizeCFGResult {
 ///   outside/before CFG.
 /// * (Similarly) if the exit block has only one predecessor, then move contents
 ///   outside/after CFG.
-///    * If that predecessor is the entry block, then remove the CFG.
+///    * If that predecessor is the entry block, then convert the CFG to a DFG.
+///      This will be reported via [NormalizeCFGResult::CFGToDFG]
 ///
-/// *Note that this may remove the entrypoint*; such will be reported in the result
-/// ([NormalizeCFGResult::CFGRemoved])
 ///
 /// # Errors
 ///
