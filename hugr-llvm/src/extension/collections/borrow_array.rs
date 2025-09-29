@@ -56,7 +56,7 @@ static ERR_ALREADY_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError 
     message: "Array element is already borrowed".to_string(),
 });
 
-static ERR_NOT_FREE: LazyLock<ConstError> = LazyLock::new(|| ConstError {
+static ERR_NOT_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError {
     signal: 2,
     message: "Array already contains an element at this index".to_string(),
 });
@@ -698,7 +698,7 @@ pub fn build_idx_free_check<'c, H: HugrView<Node = Node>>(
                 mask_ptr.into_pointer_value(),
                 idx.into_int_value(),
                 |ctx| {
-                    let err: &ConstError = &ERR_NOT_FREE;
+                    let err: &ConstError = &ERR_NOT_BORROWED;
                     let err_val = ctx.emit_custom_const(err).unwrap();
                     ccg.emit_panic(ctx, err_val)?;
                     ctx.builder().build_unreachable()?;
