@@ -1,6 +1,6 @@
 //! Supporting Rust library for the hugr Python bindings.
 
-use hugr::{
+use hugr_core::{
     envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
     std_extensions::STD_REG,
 };
