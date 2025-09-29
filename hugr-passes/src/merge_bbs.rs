@@ -115,9 +115,14 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         let cfgs = if self.cfgs.is_empty() {
-            hugr.entry_descendants()
+            let mut v = hugr
+                .entry_descendants()
                 .filter(|n| hugr.get_optype(*n).is_cfg())
-                .collect()
+                .collect::<Vec<_>>();
+            // Process inner CFGs first, in case they are removed
+            // (if they are in an unreachable block when the Entry node has only the Exit as successor)
+            v.reverse();
+            v
         } else {
             self.cfgs.clone()
         };
