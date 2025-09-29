@@ -54,6 +54,7 @@ fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
     Ok(package)
 }
 
+/// Convert an envelope to a new envelope in JSON format.
 #[pyfunction]
 fn model_to_json(bytes: &[u8]) -> PyResult<Vec<u8>> {
     let (_, pkg) =
