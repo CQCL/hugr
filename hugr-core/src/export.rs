@@ -20,7 +20,6 @@ use crate::{
     },
 };
 
-use fxhash::{FxBuildHasher, FxHashMap};
 use hugr_model::v0::bumpalo;
 use hugr_model::v0::{
     self as model,
@@ -28,6 +27,7 @@ use hugr_model::v0::{
     table,
 };
 use petgraph::unionfind::UnionFind;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use smol_str::ToSmolStr;
 use std::fmt::Write;
 

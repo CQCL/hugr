@@ -6,21 +6,21 @@ expression: ast
 
 (mod)
 
-(import core.call)
-
-(import core.type)
+(import core.title)
 
 (import core.bytes)
 
-(import core.nat)
+(import core.type)
 
 (import core.fn)
 
+(import core.call)
+
 (import core.str)
 
-(import core.float)
+(import core.nat)
 
-(import core.title)
+(import core.float)
 
 (define-func
   public

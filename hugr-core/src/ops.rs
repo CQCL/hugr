@@ -22,7 +22,7 @@ use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use derive_more::Display;
 use handle::NodeHandle;
-use paste::paste;
+use pastey::paste;
 
 use enum_dispatch::enum_dispatch;
 

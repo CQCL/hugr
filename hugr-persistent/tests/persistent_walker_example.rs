@@ -21,14 +21,13 @@ const MAX_COMMITS: usize = 4;
 // you would use an existing extension (e.g. as provided by tket2).
 use walker_example_extension::cz_gate;
 mod walker_example_extension {
-    use std::sync::Arc;
+    use std::sync::{Arc, LazyLock};
 
     use hugr_core::Extension;
     use hugr_core::extension::ExtensionId;
     use hugr_core::ops::{ExtensionOp, OpName};
     use hugr_core::types::{FuncValueType, PolyFuncTypeRV};
 
-    use lazy_static::lazy_static;
     use semver::Version;
 
     use super::*;
@@ -56,10 +55,8 @@ mod walker_example_extension {
         )
     }
 
-    lazy_static! {
-        /// Quantum extension definition.
-        static ref EXTENSION: Arc<Extension> = extension();
-    }
+    /// Quantum extension definition.
+    static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
     pub fn cz_gate() -> ExtensionOp {
         EXTENSION.instantiate_extension_op("CZ", []).unwrap()
