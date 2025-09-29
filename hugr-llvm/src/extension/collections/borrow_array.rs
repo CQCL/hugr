@@ -42,7 +42,7 @@ use inkwell::{AddressSpace, IntPredicate};
 use itertools::Itertools;
 
 use crate::emit::emit_value;
-use crate::emit::func::outline_into_function;
+use crate::emit::func::get_or_make_function;
 use crate::emit::libc::{emit_libc_free, emit_libc_malloc};
 use crate::extension::PreludeCodegen;
 use crate::{CodegenExtension, CodegenExtsBuilder};
@@ -622,7 +622,7 @@ fn build_mask_flip<'c, H: HugrView<Node = Node>>(
     idx: IntValue<'c>,
 ) -> Result<()> {
     const FUNC_NAME: &str = "__barray_flip_borrowed";
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
@@ -655,7 +655,7 @@ pub fn build_idx_not_borrowed_check<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_idx_not_borrowed";
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
@@ -687,7 +687,7 @@ pub fn build_idx_free_check<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_idx_free";
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
@@ -725,7 +725,7 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
     const FUNC_NAME: &str = "__barray_check_none_borrowed";
     let usize_t = usize_ty(&ctx.typing_session());
     let size = usize_t.const_int(size, false);
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), offset.into(), size.into()],
@@ -773,7 +773,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
     const FUNC_NAME: &str = "__barray_check_all_borrowed";
     let usize_t = usize_ty(&ctx.typing_session());
     let size = usize_t.const_int(size, false);
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), offset.into(), size.into()],
@@ -820,7 +820,7 @@ pub fn build_bounds_check<'c, H: HugrView<Node = Node>>(
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_bounds";
     let size = usize_ty(&ctx.typing_session()).const_int(size, false);
-    outline_into_function(
+    get_or_make_function(
         ctx,
         FUNC_NAME,
         [size.into(), idx.into()],
