@@ -719,6 +719,9 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
     offset: IntValue<'c>,
     size: u64,
 ) -> Result<()> {
+    if size == 0 {
+        return Ok(())
+    }
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_none_borrowed";
     let usize_t = usize_ty(&ctx.typing_session());
@@ -764,6 +767,9 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
     offset: IntValue<'c>,
     size: u64,
 ) -> Result<()> {
+    if size == 0 {
+        return Ok(())
+    }
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_all_borrowed";
     let usize_t = usize_ty(&ctx.typing_session());
