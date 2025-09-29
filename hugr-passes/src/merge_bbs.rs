@@ -16,6 +16,8 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
+use crate::ComposablePass;
+
 /// Merge any basic blocks that are direct children of the specified CFG
 /// i.e. where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
@@ -80,6 +82,45 @@ pub enum NormalizeCFGResult {
     },
 }
 
+/// A [ComposablePass] that normalizes CFGs (i.e. [normalize_cfg]) in a Hugr.
+#[derive(Clone, Debug, Default)]
+pub struct NormalizeCFGPass<N> {
+    cfgs: Vec<N>,
+}
+
+impl<N> NormalizeCFGPass<N> {
+    /// Allows mutating the set of CFG nodes that will be normalized.
+    ///
+    /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
+    /// will be normalized.
+    pub fn cfgs(&mut self) -> &mut Vec<N> {
+        &mut self.cfgs
+    }
+}
+
+impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
+    type Error = NormalizeCFGError;
+
+    /// For each CFG node that was normalized, the [NormalizeCFGResult] for that CFG
+    type Result = HashMap<H::Node, NormalizeCFGResult>;
+
+    fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
+        let cfgs = if self.cfgs.is_empty() {
+            hugr.entry_descendants()
+                .filter(|n| hugr.get_optype(*n).is_cfg())
+                .collect()
+        } else {
+            self.cfgs.clone()
+        };
+        let mut results = HashMap::new();
+        for cfg in cfgs {
+            let res = normalize_cfg(hugr)?;
+            results.insert(cfg, res);
+        }
+        Ok(results)
+    }
+}
+
 /// Normalize a CFG in a Hugr:
 /// * Merge consecutive basic blocks i.e. where a BB has only a single successor which
 ///   has no predecessors
@@ -95,9 +136,7 @@ pub enum NormalizeCFGResult {
 ///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
 #[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
-pub fn normalize_cfg<H: HugrMut>(
-    mut h: &mut H,
-) -> Result<NormalizeCFGResult, NormalizeCFGError> {
+pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, NormalizeCFGError> {
     let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
         .map_err(|e| match e {
             HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
@@ -442,11 +481,13 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{CFGBuilder, Dataflow, HugrBuilder, endo_sig, inout_sig};
+    use hugr_core::builder::{
+        CFGBuilder, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
+    };
     use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, qb_t, usize_t};
     use hugr_core::ops::constant::Value;
     use hugr_core::ops::handle::NodeHandle;
-    use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType};
+    use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType, Tag};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
@@ -830,6 +871,68 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn nested_cfgs_pass() {
+        let e = extension();
+        let tst_op = e.instantiate_extension_op("Test", []).unwrap();
+        let qqu = vec![qb_t(), qb_t(), usize_t()];
+        let qq = TypeRow::from(vec![qb_t(); 2]);
+        let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
+        let mut entry = outer.entry_builder(vec![qq.clone()], type_row![]).unwrap();
+        let [q1, q2, u] = entry.input_wires_arr();
+        let [q1, q2] = {
+            let mut inner = entry
+                .cfg_builder([(qb_t(), q1), (qb_t(), q2)], qq.clone())
+                .unwrap();
+            let mut entry = inner.entry_builder(vec![qq.clone()], type_row![]).unwrap();
+            let [q1, q2] = entry.input_wires_arr();
+            let [pred] = entry
+                .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
+                .unwrap()
+                .outputs_arr();
+            let entry = entry.finish_with_outputs(pred, []).unwrap();
+            inner.branch(&entry, 0, &inner.exit_block()).unwrap();
+            inner.finish_sub_container().unwrap().outputs_arr()
+        };
+        let [pred] = entry
+            .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
+            .unwrap()
+            .outputs_arr();
+        let entry = entry.finish_with_outputs(pred, []).unwrap();
+
+        let loop_b = {
+            let mut loop_b = outer
+                .block_builder(qq.clone(), [qb_t().into(), usize_t().into()], qb_t().into())
+                .unwrap();
+            let [q1, q2] = loop_b.input_wires_arr();
+            // u here is `dom` edge from entry block
+            let [pred] = loop_b
+                .add_dataflow_op(tst_op, [q1, u])
+                .unwrap()
+                .outputs_arr();
+            loop_b.finish_with_outputs(pred, [q2]).unwrap()
+        };
+        outer.branch(&entry, 0, &loop_b).unwrap();
+        outer.branch(&loop_b, 0, &loop_b).unwrap();
+
+        let tail_b = {
+            let uq = TypeRow::from(vec![usize_t(), qb_t()]);
+            let mut tail_b = outer
+                .block_builder(uq.clone(), vec![uq.clone()], type_row![])
+                .unwrap();
+            let [u, q] = tail_b.input_wires_arr();
+            let [br] = tail_b
+                .add_dataflow_op(Tag::new(0, vec![uq.clone()]), [u, q])
+                .unwrap()
+                .outputs_arr();
+            tail_b.finish_with_outputs(br, []).unwrap()
+        };
+        outer.branch(&loop_b, 1, &tail_b).unwrap();
+        outer.branch(&tail_b, 0, &outer.exit_block()).unwrap();
+        let mut h = outer.finish_hugr().unwrap();
+        normalize_cfg(&mut h).unwrap();
     }
 
     fn child_tags_ext_ids<H: HugrView>(h: &H, n: H::Node) -> Vec<String> {
