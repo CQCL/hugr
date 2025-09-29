@@ -484,23 +484,21 @@ mod test {
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
+    use hugr_core::extension::simple_op::MakeExtensionOp;
     use itertools::Itertools;
     use rstest::rstest;
 
     use hugr_core::builder::{
-        CFGBuilder, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
+        CFGBuilder, Container, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
     };
-    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, qb_t, usize_t};
-    use hugr_core::ops::constant::Value;
-    use hugr_core::ops::handle::NodeHandle;
+    use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, UnpackTuple, qb_t, usize_t};
     use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType, Tag};
+    use hugr_core::ops::{constant::Value, handle::NodeHandle};
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
+    use super::{NormalizeCFGPass, NormalizeCFGResult, merge_basic_blocks, normalize_cfg};
     use crate::ComposablePass;
-    use crate::merge_bbs::{NormalizeCFGPass, NormalizeCFGResult, normalize_cfg};
-
-    use super::merge_basic_blocks;
 
     const_extension_ids! {
         const EXT_ID: ExtensionId = "TestExt";
@@ -892,7 +890,7 @@ mod test {
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
         let mut entry = outer.entry_builder(vec![qq.clone()], type_row![]).unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
-        let inner = {
+        let (inner, inner_pred) = {
             let mut inner = entry
                 .cfg_builder([(qb_t(), q1), (qb_t(), q2)], qq.clone())
                 .unwrap();
@@ -904,14 +902,19 @@ mod test {
                 .outputs_arr();
             let entry = entry.finish_with_outputs(pred, []).unwrap();
             inner.branch(&entry, 0, &inner.exit_block()).unwrap();
-            inner.finish_sub_container().unwrap()
+            (inner.finish_sub_container().unwrap(), pred.node())
         };
         let [q1, q2] = inner.outputs_arr();
-        let [pred] = entry
+        let [entry_pred] = entry
             .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
             .unwrap()
             .outputs_arr();
-        let entry = entry.finish_with_outputs(pred, []).unwrap();
+        let entry = entry.finish_with_outputs(entry_pred, []).unwrap();
+        eprintln!(
+            "ALAN inner cfg is {} of type {:?}",
+            inner.node(),
+            outer.hugr().get_optype(inner.node())
+        );
 
         let loop_b = {
             let mut loop_b = outer
@@ -928,7 +931,7 @@ mod test {
         outer.branch(&entry, 0, &loop_b).unwrap();
         outer.branch(&loop_b, 0, &loop_b).unwrap();
 
-        let tail_b = {
+        let (tail_b, tail_pred) = {
             let uq = TypeRow::from(vec![usize_t(), qb_t()]);
             let mut tail_b = outer
                 .block_builder(uq.clone(), vec![uq.clone()], type_row![])
@@ -938,11 +941,18 @@ mod test {
                 .add_dataflow_op(Tag::new(0, vec![uq.clone()]), [u, q])
                 .unwrap()
                 .outputs_arr();
-            tail_b.finish_with_outputs(br, []).unwrap()
+            (tail_b.finish_with_outputs(br, []).unwrap(), br.node())
         };
         outer.branch(&loop_b, 1, &tail_b).unwrap();
         outer.branch(&tail_b, 0, &outer.exit_block()).unwrap();
         let mut h = outer.finish_hugr().unwrap();
+        assert_eq!(
+            h.get_parent(h.get_parent(inner_pred).unwrap()),
+            Some(inner.node())
+        );
+        assert_eq!(h.get_parent(entry_pred.node()), Some(entry.node()));
+        assert_eq!(h.get_parent(tail_pred.node()), Some(tail_b.node()));
+
         let res = NormalizeCFGPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(
@@ -959,14 +969,34 @@ mod test {
             ])
         );
         // Now contains only one CFG with one BB (self-loop)
-        let cfg = h
-            .nodes()
-            .filter(|n| h.get_optype(*n).is_cfg())
-            .exactly_one()
-            .ok()
-            .unwrap();
-        let [entry, exit] = h.children(cfg).collect_array().unwrap();
+        assert_eq!(
+            h.nodes()
+                .filter(|n| h.get_optype(*n).is_cfg())
+                .exactly_one()
+                .ok(),
+            Some(h.entrypoint())
+        );
+        let [entry, exit] = h.children(h.entrypoint()).collect_array().unwrap();
         assert_eq!(h.output_neighbours(entry).collect_vec(), [entry, exit]);
+        // Predicates lifted appropriately
+        assert_eq!(h.get_parent(inner_pred), Some(inner.node()));
+        assert_eq!(h.get_optype(inner.node()).tag(), OpTag::Dfg);
+        assert_eq!(
+            h.get_parent(entry_pred.node()),
+            h.get_parent(h.entrypoint())
+        );
+        let tail_dfg = h.get_parent(tail_pred.node()).unwrap();
+        assert_eq!(h.get_optype(tail_dfg).tag(), OpTag::Dfg);
+        assert_eq!(h.get_parent(tail_dfg), h.get_parent(h.entrypoint()));
+        for n in [inner_pred, entry_pred.node(), tail_pred.node()] {
+            let [unpack] = h.output_neighbours(n).collect_array().unwrap();
+            assert!(
+                h.get_optype(unpack)
+                    .as_extension_op()
+                    .and_then(|e| UnpackTuple::from_extension_op(e).ok())
+                    .is_some()
+            );
+        }
     }
 
     fn child_tags_ext_ids<H: HugrView>(h: &H, n: H::Node) -> Vec<String> {
