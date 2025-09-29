@@ -25,7 +25,7 @@
 // # Safety
 //
 // `jmp_buf` must have size of at least `jmp_buf_size()`.
-void trampoline(int* jmp_buf, void entry()) {
+void trampoline(void* jmp_buf, void entry()) {
     if (!setjmp(jmp_buf)) {
         entry();
     }
