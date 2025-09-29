@@ -8,7 +8,7 @@ use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
 /// Structure identifying an `InlineDFG` rewrite from the spec
-pub struct InlineDFG<N>(pub DfgID<N>);
+pub struct InlineDFG<N=Node>(pub DfgID<N>);
 
 /// Errors from an [`InlineDFG`] rewrite.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
