@@ -1,14 +1,17 @@
-//! Codegen for prelude array operations.
+//! Codegen for prelude borrow array operations.
 //!
-//! An `array<n, T>` is now lowered to a fat pointer `{ptr, usize}` that is allocated
-//! to at least `n * sizeof(T)` bytes. The extra `usize` is an offset pointing to the
-//! first element, i.e. the first element is at address `ptr + offset * sizeof(T)`.
+//! An `borrow_array<n, T>` is lowered to a fat pointer `{ptr, mask_ptr, usize}` that is
+//! allocated to at least `n * sizeof(T)` bytes. The second pointer is a bit-packed mask
+//! storing which array elements have been borrowed (1=borrowed, 0=available). It should
+//! be allocated to at least `ceil(n / sizeof(usize)) * sizeof(usize)` bytes. The extra
+//! `usize` is an offset pointing to the first element, i.e. the first element is at address
+//! `ptr + offset * sizeof(T)`.
 //!
 //! The rational behind the additional offset is the `pop_left` operation which bumps
 //! the offset instead of mutating the pointer. This way, we can still free the original
 //! pointer when the array is discarded after a pop.
 //!
-//! We provide utility functions [`array_fat_pointer_ty`], [`build_barray_fat_pointer`], and
+//! We provide utility functions [`barray_fat_pointer_ty`], [`build_barray_fat_pointer`], and
 //! [`decompose_barray_fat_pointer`] to work with array fat pointers.
 //!
 //! The [`DefaultBorrowArrayCodegen`] extension allocates all arrays on the heap using the
@@ -74,35 +77,29 @@ static ERR_SOME_BORROWED: LazyLock<ConstError> = LazyLock::new(|| ConstError {
 });
 
 impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
-    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
-    /// as the implementation.
+    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
+    /// [`DefaultBorrowArrayCodegen`] as the implementation.
     #[must_use]
     pub fn add_default_borrow_array_extensions(self, pcg: impl PreludeCodegen + 'a) -> Self {
         self.add_borrow_array_extensions(DefaultBorrowArrayCodegen(pcg))
     }
 
-    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using
-    /// [`DefaultBorrowArrayCodegen`] as the implementation.
+    /// Add a [`BorrowArrayCodegenExtension`] to the given [`CodegenExtsBuilder`] using `ccg`
+    /// as the implementation.
     pub fn add_borrow_array_extensions(self, ccg: impl BorrowArrayCodegen + 'a) -> Self {
         self.add_extension(BorrowArrayCodegenExtension::from(ccg))
     }
 }
 
-/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::array`]
+/// A helper trait for customising the lowering of [`borrow_array`], including its
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
-///
-/// An `array<n, T>` is now lowered to a fat pointer `{ptr, usize}` that is allocated
-/// to at least `n * sizeof(T)` bytes. The extra `usize` is an offset pointing to the
-/// first element, i.e. the first element is at address `ptr + offset * sizeof(T)`.
-///
-/// The rational behind the additional offset is the `pop_left` operation which bumps
-/// the offset instead of mutating the pointer. This way, we can still free the original
-/// pointer when the array is discarded after a pop.
 ///
 /// By default, all arrays are allocated on the heap using the standard libc `malloc`
 /// and `free` functions. This behaviour can be customised by providing a different
 /// implementation for [`BorrowArrayCodegen::emit_allocate_array`] and
 /// [`BorrowArrayCodegen::emit_free_array`].
+///
+/// See [`crate::extension::collections::borrow_array`] for details.
 pub trait BorrowArrayCodegen: Clone {
     /// Emit instructions to halt execution with the error `err`.
     ///
@@ -406,7 +403,7 @@ pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into_struct_value())
 }
 
-/// Returns the underlying pointer and offset stored in a fat borrow array pointer.
+/// Returns the underlying pointer, mask and offset stored in a fat borrow array pointer.
 pub fn decompose_barray_fat_pointer<'c>(
     builder: &Builder<'c>,
     array_v: BasicValueEnum<'c>,
