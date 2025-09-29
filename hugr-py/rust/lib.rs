@@ -56,7 +56,7 @@ fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
 
 /// Convert an envelope to a new envelope in JSON format.
 #[pyfunction]
-fn model_to_json(bytes: &[u8]) -> PyResult<Vec<u8>> {
+fn to_json_envelope(bytes: &[u8]) -> PyResult<Vec<u8>> {
     let (_, pkg) =
         read_envelope(bytes, &STD_REG).map_err(|err| PyValueError::new_err(err.to_string()))?;
     let config_json = EnvelopeConfig::new(EnvelopeFormat::PackageJson);
@@ -94,6 +94,6 @@ fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(symbol_to_string, m)?)?;
     m.add_function(wrap_pyfunction!(string_to_symbol, m)?)?;
     m.add_function(wrap_pyfunction!(current_model_version, m)?)?;
-    m.add_function(wrap_pyfunction!(model_to_json, m)?)?;
+    m.add_function(wrap_pyfunction!(to_json_envelope, m)?)?;
     Ok(())
 }

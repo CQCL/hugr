@@ -117,7 +117,7 @@ def read_envelope(envelope: bytes) -> Package:
             # TODO Going via JSON is a temporary solution, until we get model import to
             # python properly implemented.
             # https://github.com/CQCL/hugr/issues/2287
-            json_data = rust.model_to_json(envelope)
+            json_data = rust.to_json_envelope(envelope)
             return read_envelope(json_data)
 
 
