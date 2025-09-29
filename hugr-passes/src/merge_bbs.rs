@@ -72,7 +72,10 @@ pub enum NormalizeCFGError {
 /// Result from [normalize_cfg], i.e. a report of what changes were made to the Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NormalizeCFGResult {
-    /// The entire [CFG] was converted into a [DFG]
+    /// The entire [`CFG`] was converted into a [`DFG`].
+    ///
+    /// The entrypoint node id is preserved after the conversion, but now identifies
+    /// the new [`DFG`].
     CFGToDFG,
     /// The CFG was preserved, but the entry or exit blocks may have changed.
     #[allow(missing_docs)]
