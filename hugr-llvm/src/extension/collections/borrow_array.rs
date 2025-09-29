@@ -720,7 +720,7 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
     size: u64,
 ) -> Result<()> {
     if size == 0 {
-        return Ok(())
+        return Ok(());
     }
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_none_borrowed";
@@ -768,7 +768,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
     size: u64,
 ) -> Result<()> {
     if size == 0 {
-        return Ok(())
+        return Ok(());
     }
     // Wrap the check into a function instead of inlining
     const FUNC_NAME: &str = "__barray_check_all_borrowed";
@@ -2355,7 +2355,7 @@ mod test {
                 );
                 let mut array = builder.add_load_value(array);
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
@@ -2423,7 +2423,7 @@ mod test {
                 );
                 let mut array = builder.add_load_value(array);
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
@@ -2485,7 +2485,7 @@ mod test {
                     .unwrap()
                     .1;
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i2)
                     .unwrap()
@@ -2535,7 +2535,7 @@ mod test {
                     .add_borrow_array_return(int_ty.clone(), size, array, i1, zero)
                     .unwrap();
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
-                size = size - num_pops;
+                size -= num_pops;
                 array = builder
                     .add_borrow_array_return(int_ty.clone(), size, array, i2, zero)
                     .unwrap();
