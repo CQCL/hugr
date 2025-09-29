@@ -72,7 +72,6 @@ def test_legacy_funcdefn():
     assert op2.visibility == "Private"
 
 
-@pytest.mark.xfail(reason="https://github.com/CQCL/hugr/issues/2589")
 def test_model_import_with_ext():
     dfg = Dfg(tys.Qubit)
     h_outs = dfg.add_op(H, dfg.inputs()[0])
