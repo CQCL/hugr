@@ -8,6 +8,7 @@ fn main() {
     compile_panic_runtime();
 }
 
+#[cfg(feature = "test-utils")]
 fn compile_panic_runtime() {
     println!("cargo::rerun-if-changed=src/emit/test/panic_runtime.c");
     cc::Build::new()
