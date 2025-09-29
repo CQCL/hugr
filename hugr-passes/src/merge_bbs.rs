@@ -164,9 +164,10 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
     let entry_blk = h.get_optype(entry).as_dataflow_block().unwrap();
     let cfg_parent = h.get_parent(cfg_node).unwrap();
     // 1. If the entry block has only one successor, and no predecessors, then move contents
-    // outside/before CFG. (Note if the entry block has multiple successors, but no predecessors,
-    // we could move its contents outside (before) the CFG, but would need to keep an empty/identity
-    // entry block - we do not do this here
+    // outside/before CFG.
+    // (Note if the entry block has multiple successors, but no predecessors, we *could* move
+    // its contents outside/before the CFG, but would need to keep an empty/identity entry
+    // block - we do not do this here.)
     let mut entry_changed = false;
     #[allow(clippy::match_result_ok)] // let Ok(...) without .ok() borrows `h`
     if let Some(succ) = h.output_neighbours(entry).exactly_one().ok() {
@@ -198,24 +199,30 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
             unpack_before_output(h, h.get_io(cfg_node).unwrap()[1], result_tys);
             return Ok(NormalizeCFGResult::CFGToDFG);
         } else if h.input_neighbours(entry).count() == 0 {
-            // 1b. Move contents of entry block outside/before the CFG; the successor becomes the entry block.
-            let [entry_input, entry_output] = h.get_io(entry).unwrap();
+            // 1b. Move entry block outside/before the CFG into a DFG; its successor becomes the entry block.
             let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
-            // Inputs to CFG go directly to consumers of the entry block's Input node
-            for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
-                let srcs = h.linked_outputs(cfg_node, inp).collect::<Vec<_>>();
-                h.disconnect(cfg_node, inp);
-                for tgt in h
-                    .linked_inputs(entry_input, inp.index())
-                    .collect::<Vec<_>>()
-                {
-                    // Connecting all sources to all targets handles Order edges as well as Value
-                    for src in srcs.iter() {
-                        h.connect(src.0, src.1, tgt.0, tgt.1);
-                    }
-                }
+            let dfg = h.add_node_with_parent(
+                cfg_parent,
+                DFG {
+                    signature: Signature::new(entry_blk.inputs.clone(), new_cfg_inputs.clone()),
+                },
+            );
+            let [_, entry_output] = h.get_io(entry).unwrap();
+            while let Some(n) = h.first_child(entry) {
+                h.set_parent(n, dfg);
             }
-            h.remove_node(entry_input);
+            h.move_before_sibling(succ, entry);
+            h.remove_node(entry);
+
+            unpack_before_output(h, entry_output, new_cfg_inputs.clone());
+
+            // Inputs to CFG go directly to DFG
+            for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
+                for src in h.linked_outputs(cfg_node, inp).collect::<Vec<_>>() {
+                    h.connect(src.0, src.1, dfg, inp.index());
+                }
+                h.disconnect(cfg_node, inp);
+            }
 
             // Update input ports
             let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
@@ -226,18 +233,10 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
             cfg_ty.signature.input = new_cfg_inputs;
             h.add_ports(cfg_node, Direction::Incoming, inputs_to_add);
 
-            // Inputs to entry block Output node go instead to CFG
-            let (entry_results, orders) = take_inputs(h, entry_output);
-            h.remove_node(entry_output);
-            wire_unpack_first(h, entry_results, orders, cfg_node);
-
-            // Transfer remaining entry children - including any used to compute the predicate
-            while let Some(n) = h.first_child(entry) {
-                h.set_parent(n, cfg_parent);
+            // Wire outputs of DFG directly to CFG
+            for src in h.node_outputs(dfg).collect::<Vec<_>>() {
+                h.connect(dfg, src, cfg_node, src.index());
             }
-            // old entry-node's successor is the new entry node, move into place
-            h.move_before_sibling(succ, entry);
-            h.remove_node(entry);
             entry_changed = true;
         }
     }
@@ -808,14 +807,20 @@ mod test {
             func_children.into_iter().sorted().collect_vec(),
             [
                 "Cfg",
-                "Const",
+                "Dfg",
                 "Input",
-                "LoadConst",
-                "Noop",
                 "Output",
-                "UnpackTuple"
             ]
         );
+        let [dfg] = h.children(func).filter(|n| h.get_optype(*n).is_dfg()).collect_array().unwrap();
+        assert_eq!(child_tags_ext_ids(&h, dfg).into_iter().sorted().collect_vec(), [
+            "Const",
+            "Input",
+            "LoadConst",
+            "Noop",
+            "Output",
+            "UnpackTuple"
+        ]);
         Ok(())
     }
 
@@ -982,16 +987,17 @@ mod test {
         );
         let [entry, exit] = h.children(h.entrypoint()).collect_array().unwrap();
         assert_eq!(h.output_neighbours(entry).collect_vec(), [entry, exit]);
-        // Predicates lifted appropriately
+        // Inner CFG is now a DFG (and still sibling of entry_pred)...
         assert_eq!(h.get_parent(inner_pred), Some(inner.node()));
         assert_eq!(h.get_optype(inner.node()).tag(), OpTag::Dfg);
-        assert_eq!(
-            h.get_parent(entry_pred.node()),
-            h.get_parent(h.entrypoint())
-        );
-        let tail_dfg = h.get_parent(tail_pred.node()).unwrap();
-        assert_eq!(h.get_optype(tail_dfg).tag(), OpTag::Dfg);
-        assert_eq!(h.get_parent(tail_dfg), h.get_parent(h.entrypoint()));
+        assert_eq!(h.get_parent(inner.node()), h.get_parent(entry_pred.node()));
+        // Predicates lifted appropriately...
+        for n in [entry_pred.node(), tail_pred.node()] {
+            let parent = h.get_parent(n).unwrap();
+            assert_eq!(h.get_optype(parent).tag(), OpTag::Dfg);
+            assert_eq!(h.get_parent(parent), h.get_parent(h.entrypoint()));
+        }
+        // ...and followed by UnpackTuple's
         for n in [inner_pred, entry_pred.node(), tail_pred.node()] {
             let [unpack] = h.output_neighbours(n).collect_array().unwrap();
             assert!(
