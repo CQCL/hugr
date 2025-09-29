@@ -95,7 +95,7 @@ pub enum NormalizeCFGResult {
 ///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
 #[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
-pub fn normalize_cfg<H: HugrMut<Node = Node>>(
+pub fn normalize_cfg<H: HugrMut>(
     mut h: &mut H,
 ) -> Result<NormalizeCFGResult, NormalizeCFGError> {
     let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
