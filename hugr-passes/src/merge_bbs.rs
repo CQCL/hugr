@@ -174,7 +174,7 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
                 ),
                 h.signature(cfg_node).unwrap().as_ref()
             );
-            // Turn the CFG into a DFG containing only what was in the entry block
+            // 1a. Turn the CFG into a DFG containing only what was in the entry block
             // Annoying here - "while let Some(blk) = cfg.children(...).skip(1).next()" keeps iterator alive
             let children_to_remove: Vec<_> = h.children(cfg_node).skip(1).collect();
             for blk in children_to_remove {
@@ -244,7 +244,8 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         .ok()
         .filter(|pred| h.output_neighbours(*pred).count() == 1)
     {
-        // Code in that predecessor can be moved outside (after the CFG), and the predecessor deleted
+        // Code in that predecessor can be moved outside (into a new DFG after the CFG),
+        // and the predecessor deleted
         let [_, output] = h.get_io(pred).unwrap();
         let pred_blk = h.get_optype(pred).as_dataflow_block().unwrap();
         let new_cfg_outs = pred_blk.inner_signature().into_owned().input;
