@@ -363,17 +363,15 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
 /// The first time this helper is called with a given function name, a function is built
 /// using the provided closure. Future invocations with the same name will just emit calls
 /// to this function.
-pub fn outline_into_function<'c, H: HugrView<Node = Node>, const N: usize>(
+pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     func_name: &str,
     args: [BasicValueEnum<'c>; N],
     go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, [BasicValueEnum<'c>; N]) -> Result<()>,
 ) -> Result<()> {
-    let func = ctx
-        .get_current_module()
-        .get_function(func_name)
-        .map(Ok::<_, anyhow::Error>)
-        .unwrap_or_else(|| {
+    let func = match ctx.get_current_module().get_function(func_name) {
+        Some(func) => func,
+        None => {
             let arg_tys = args.iter().map(|v| v.get_type().into()).collect_vec();
             let sig = ctx.iw_context().void_type().fn_type(&arg_tys, false);
             let func =
@@ -403,8 +401,9 @@ pub fn outline_into_function<'c, H: HugrView<Node = Node>, const N: usize>(
 
             ctx.builder().position_at_end(curr_bb);
             ctx.func = curr_func;
-            Ok(func)
-        })?;
+            func
+        }
+    };
     ctx.builder()
         .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
     Ok(())
