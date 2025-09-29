@@ -919,11 +919,6 @@ mod test {
             .unwrap()
             .outputs_arr();
         let entry = entry.finish_with_outputs(entry_pred, []).unwrap();
-        eprintln!(
-            "ALAN inner cfg is {} of type {:?}",
-            inner.node(),
-            outer.hugr().get_optype(inner.node())
-        );
 
         let loop_b = {
             let mut loop_b = outer
