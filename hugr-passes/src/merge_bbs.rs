@@ -83,9 +83,15 @@ pub enum NormalizeCFGResult {
 }
 
 /// A [ComposablePass] that normalizes CFGs (i.e. [normalize_cfg]) in a Hugr.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct NormalizeCFGPass<N> {
     cfgs: Vec<N>,
+}
+
+impl<N> Default for NormalizeCFGPass<N> {
+    fn default() -> Self {
+        Self { cfgs: vec![] }
+    }
 }
 
 impl<N> NormalizeCFGPass<N> {
@@ -114,7 +120,7 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
         };
         let mut results = HashMap::new();
         for cfg in cfgs {
-            let res = normalize_cfg(hugr)?;
+            let res = normalize_cfg(&mut hugr.with_entrypoint_mut(cfg))?;
             results.insert(cfg, res);
         }
         Ok(results)
@@ -475,7 +481,7 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 #[cfg(test)]
 #[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
 
     use itertools::Itertools;
@@ -491,7 +497,8 @@ mod test {
     use hugr_core::types::{Signature, Type, TypeRow};
     use hugr_core::{Extension, HugrView, const_extension_ids, type_row};
 
-    use crate::merge_bbs::{NormalizeCFGResult, normalize_cfg};
+    use crate::ComposablePass;
+    use crate::merge_bbs::{NormalizeCFGPass, NormalizeCFGResult, normalize_cfg};
 
     use super::merge_basic_blocks;
 
@@ -875,6 +882,9 @@ mod test {
 
     #[test]
     fn nested_cfgs_pass() {
+        //  --> Entry --> Loop --> Tail --> EXIT
+        //        |       /  \
+        //      (E->X)    \<-/
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", []).unwrap();
         let qqu = vec![qb_t(), qb_t(), usize_t()];
@@ -882,7 +892,7 @@ mod test {
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
         let mut entry = outer.entry_builder(vec![qq.clone()], type_row![]).unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
-        let [q1, q2] = {
+        let inner = {
             let mut inner = entry
                 .cfg_builder([(qb_t(), q1), (qb_t(), q2)], qq.clone())
                 .unwrap();
@@ -894,8 +904,9 @@ mod test {
                 .outputs_arr();
             let entry = entry.finish_with_outputs(pred, []).unwrap();
             inner.branch(&entry, 0, &inner.exit_block()).unwrap();
-            inner.finish_sub_container().unwrap().outputs_arr()
+            inner.finish_sub_container().unwrap()
         };
+        let [q1, q2] = inner.outputs_arr();
         let [pred] = entry
             .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
             .unwrap()
@@ -932,7 +943,30 @@ mod test {
         outer.branch(&loop_b, 1, &tail_b).unwrap();
         outer.branch(&tail_b, 0, &outer.exit_block()).unwrap();
         let mut h = outer.finish_hugr().unwrap();
-        normalize_cfg(&mut h).unwrap();
+        let res = NormalizeCFGPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+        assert_eq!(
+            res,
+            HashMap::from([
+                (inner.node(), NormalizeCFGResult::CFGToDFG),
+                (
+                    h.entrypoint(),
+                    NormalizeCFGResult::CFGPreserved {
+                        entry_changed: true,
+                        exit_changed: true
+                    }
+                )
+            ])
+        );
+        // Now contains only one CFG with one BB (self-loop)
+        let cfg = h
+            .nodes()
+            .filter(|n| h.get_optype(*n).is_cfg())
+            .exactly_one()
+            .ok()
+            .unwrap();
+        let [entry, exit] = h.children(cfg).collect_array().unwrap();
+        assert_eq!(h.output_neighbours(entry).collect_vec(), [entry, exit]);
     }
 
     fn child_tags_ext_ids<H: HugrView>(h: &H, n: H::Node) -> Vec<String> {
