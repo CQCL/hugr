@@ -413,6 +413,8 @@ fn mk_rep<H: HugrView>(
 }
 
 type NodePorts<N> = Vec<(N, OutgoingPort)>;
+/// Remove all input wires to `n` and return them in two groups:
+/// the [EdgeKind::Value] inputs, and the [EdgeKind::StateOrder] inputs
 fn take_inputs<H: HugrMut>(h: &mut H, n: H::Node) -> (NodePorts<H::Node>, NodePorts<H::Node>) {
     let mut values = vec![];
     let mut orders = vec![];
@@ -443,6 +445,8 @@ fn tuple_elems<H: HugrView>(h: &H, n: H::Node, p: OutgoingPort) -> TypeRow {
     .unwrap()
 }
 
+/// Unpack the first `value_srcs`; wire the unpacked elements and remaining `value_srcs` into
+/// consecutive ports of `dst`. Finally wire `order_srcs` all to the order input of `dst`.
 fn wire_unpack_first<H: HugrMut>(
     h: &mut H,
     value_srcs: impl IntoIterator<Item = (H::Node, OutgoingPort)>,
