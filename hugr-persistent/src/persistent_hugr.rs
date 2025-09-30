@@ -66,11 +66,14 @@ pub struct PersistentHugr {
     ///  - there is a unique commit of variant [`CommitData::Base`] and its ID
     ///    is `base_commit_id`.
     graph: HistoryGraph<CommitData, ()>,
-    /// The unique root of the commit graph.
+    /// Cache of the unique root of the commit graph.
     ///
     /// The only commit in the graph with variant [`CommitData::Base`]. All
     /// other commits are [`CommitData::Replacement`]s, and are descendants
     /// of this.
+    ///
+    /// Invariant: any path from any commit in `self` through ancestors will
+    /// always lead to this commit.
     base_commit_id: CommitId,
 }
 
@@ -108,8 +111,7 @@ impl PersistentHugr {
         let state_space = commits
             .front()
             .ok_or(InvalidCommit::NonUniqueBase(0))?
-            .state_space()
-            .to_owned();
+            .state_space();
         let all_commit_ids = BTreeSet::from_iter(commits.iter().map(|c| c.as_ptr()));
         let mut graph = HistoryGraph::with_registry(state_space.to_registry());
 

@@ -79,6 +79,9 @@ pub(crate) use hidden::CommitData;
 /// general case: pairs of commits may be mutually exclusive if they modify the
 /// same subgraph. Use [`Self::try_create`] to get a [`PersistentHugr`]
 /// with a set of compatible commits.
+///
+/// Cloning a [`CommitStateSpace`] value corresponds to creating a new handle to
+/// the same underlying state space.
 #[derive(Clone, Debug)]
 #[repr(transparent)]
 pub struct CommitStateSpace {
