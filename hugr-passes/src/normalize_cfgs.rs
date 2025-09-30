@@ -28,6 +28,8 @@ use crate::ComposablePass;
 ///
 /// Returns the number of merged blocks.
 ///
+/// # Errors
+///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
 pub fn merge_basic_blocks<H: HugrMut>(cfg: &mut H) -> Result<usize, NormalizeCFGError> {
     if !cfg.entrypoint_optype().is_cfg() {
@@ -146,12 +148,11 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
 /// * Merge consecutive basic blocks i.e. where a BB has only a single successor which
 ///   has no predecessors
 /// * If the entry block has only one successor, and no predecessors, then move its contents
-///   outside/before CFG.
-/// * (Similarly) if the exit block has only one predecessor, then move contents
-///   outside/after CFG.
-///    * If that predecessor is the entry block, then convert the CFG to a DFG.
+///   into a DFG outside/before CFG.
+///    * If that successor is the exit block, then convert the entire CFG to a DFG.
 ///      This will be reported via [NormalizeCFGResult::CFGToDFG]
-///
+/// * (Similarly) if the exit block has only one predecessor, then move contents into a DFG
+///   outside/after CFG.
 ///
 /// # Errors
 ///

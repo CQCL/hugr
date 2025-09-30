@@ -33,7 +33,7 @@ pub mod merge_bbs {
     ///
     /// # Panics
     ///
-    /// If the [HugrView::entrypoint] of `cfg` is not an [OpType::CFG]
+    /// If the `entrypoint` of `cfg` is not an [OpType::CFG]
     ///
     /// [OpType::CFG]: hugr_core::ops::OpType::CFG
     #[deprecated(note = "Use version in normalize_cfgs", since = "0.15.1")]
