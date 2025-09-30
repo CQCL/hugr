@@ -22,7 +22,7 @@ pub mod normalize_cfgs;
 pub mod untuple;
 
 /// Merge basic blocks. Subset of [normalize_cfgs], use the latter.
-#[deprecated(note = "Use normalize_cfgs", since = "0.15.1")]
+#[deprecated(note = "Use normalize_cfgs", since = "0.23.0")]
 pub mod merge_bbs {
     use hugr_core::hugr::{hugrmut::HugrMut, views::RootCheckable};
     use hugr_core::ops::handle::CfgID;
@@ -36,7 +36,7 @@ pub mod merge_bbs {
     /// If the `entrypoint` of `cfg` is not an [OpType::CFG]
     ///
     /// [OpType::CFG]: hugr_core::ops::OpType::CFG
-    #[deprecated(note = "Use version in normalize_cfgs", since = "0.15.1")]
+    #[deprecated(note = "Use version in normalize_cfgs", since = "0.23.0")]
     pub fn merge_basic_blocks<'h, H: 'h + HugrMut>(
         cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>,
     ) {
