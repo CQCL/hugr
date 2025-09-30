@@ -182,19 +182,24 @@ macro_rules! error_context {
     }
 }
 
-/// Import a [`Package`] from its model representation.
+/// Import a [`Package`] from the model representation
+/// of the modules and any included extensions.
 pub fn import_package(
     package: &table::Package,
-    extensions: &ExtensionRegistry,
+    packaged_extensions: ExtensionRegistry,
+    loaded_extensions: &ExtensionRegistry,
 ) -> Result<Package, ImportError> {
+    let mut registry = loaded_extensions.clone();
+    registry.extend(&packaged_extensions);
     let modules = package
         .modules
         .iter()
-        .map(|module| import_hugr(module, extensions))
+        .map(|module| import_hugr(module, &registry))
         .collect::<Result<Vec<_>, _>>()?;
 
     // This does not panic since the import already requires a module root.
-    let package = Package::new(modules);
+    let mut package = Package::new(modules);
+    package.extensions = packaged_extensions;
     Ok(package)
 }
 

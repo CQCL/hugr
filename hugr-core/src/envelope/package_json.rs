@@ -3,13 +3,15 @@ use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::io;
 
-use super::{ExtensionBreakingError, WithGenerator, check_breaking_extensions};
+use super::WithGenerator;
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
 
 /// Read a Package in json format from an io reader.
+/// Returns package and the combined extension registry
+/// of the provided registry and the package extensions.
 pub(super) fn from_json_reader(
     reader: impl io::Read,
     extension_registry: &ExtensionRegistry,
@@ -31,10 +33,6 @@ pub(super) fn from_json_reader(
     let mut combined_registry = extension_registry.clone();
     combined_registry.extend(&pkg_extensions);
 
-    for module in &modules {
-        check_breaking_extensions(module, &combined_registry)
-            .map_err(|err| WithGenerator::new(err, &modules))?;
-    }
     modules
         .iter_mut()
         .try_for_each(|module| module.resolve_extension_defs(&combined_registry))
@@ -85,8 +83,6 @@ pub enum PackageEncodingError {
     IOError(#[from] io::Error),
     /// Could not resolve the extension needed to encode the hugr.
     ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
-    /// Error raised while checking for breaking extension version mismatch.
-    ExtensionVersion(#[from] WithGenerator<ExtensionBreakingError>),
 }
 
 /// A private package structure implementing the serde traits.
