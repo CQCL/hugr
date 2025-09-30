@@ -34,12 +34,6 @@
 //! - Bit 7,6: Constant "01" to make some headers ascii-printable.
 //!
 
-#![allow(deprecated)]
-// TODO: Due to a bug in `derive_more`
-// (https://github.com/JelteF/derive_more/issues/419) we need to deactivate
-// deprecation warnings here. We can reactivate them once the bug is fixed by
-// https://github.com/JelteF/derive_more/pull/454.
-
 mod header;
 mod package_json;
 pub mod serde_with;
@@ -362,7 +356,6 @@ fn read_impl(
     registry: &ExtensionRegistry,
 ) -> Result<Package, EnvelopeError> {
     let package = match header.format {
-        #[allow(deprecated)]
         EnvelopeFormat::PackageJson => Ok(package_json::from_json_reader(payload, registry)?),
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
             decode_model(payload, registry, header.format)
@@ -467,7 +460,6 @@ fn write_impl<'h>(
     config: EnvelopeConfig,
 ) -> Result<(), EnvelopeError> {
     match config.format {
-        #[allow(deprecated)]
         EnvelopeFormat::PackageJson => package_json::to_json_writer(hugrs, extensions, writer)?,
         EnvelopeFormat::Model
         | EnvelopeFormat::ModelWithExtensions
