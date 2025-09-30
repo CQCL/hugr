@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeSet, HashMap, VecDeque},
+    iter::FusedIterator,
+};
 
 use itertools::{Either, Itertools};
 
@@ -16,7 +19,7 @@ use hugr_core::{
     ops::{OpTag, OpTrait, OpType},
 };
 
-use crate::CommitId;
+use crate::{CommitId, persistent_hugr::NodeStatus};
 
 use super::{
     InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement, state_space::CommitData,
@@ -100,14 +103,18 @@ impl HugrView for PersistentHugr {
     }
 
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
-        assert!(self.contains_node(node), "invalid node");
-        let (hugr, node_map) = self.apply_all();
-        let parent = hugr.get_parent(node_map[&node])?;
-        let parent_inv = node_map
-            .iter()
-            .find_map(|(&k, &v)| (v == parent).then_some(k))
-            .expect("parent not found in node map");
-        Some(parent_inv)
+        debug_assert!(self.contains_node(node), "invalid node");
+
+        if node.owner() == self.base() {
+            self.base_hugr()
+                .get_parent(node.1)
+                .map(|n| PatchNode(self.base(), n))
+        } else {
+            // all nodes in children commits are applied on the sibling DFG of the
+            // entrypoint
+            // TODO: generalise this for the case that commits introduce nested DFGs.
+            Some(self.entrypoint())
+        }
     }
 
     fn get_optype(&self, PatchNode(commit_id, node): Self::Node) -> &OpType {
@@ -216,24 +223,16 @@ impl HugrView for PersistentHugr {
 
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
         // Only children of dataflow parents may change
+        let cm = self.get_commit(node.owner());
+        let commit_hugr = cm.commit_hugr();
+        let children = commit_hugr.children(node.1).map(|n| cm.to_patch_node(n));
         if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
-            // TODO: make this more efficient by traversing from inputs to outputs
-            let (hugr, node_map) = self.apply_all();
-            let children = hugr.children(node_map[&node]).collect_vec();
-            let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
-            Either::Right(children.into_iter().map(move |child| {
-                *inv_node_map
-                    .get(&child)
-                    .expect("node not found in node map")
-            }))
+            // we must filter out children nodes that are invalidated by later commits, and
+            // on the other hand add nodes in those commits
+            Either::Left(IterValidNodes::new(self, children.fuse()))
         } else {
-            // children are children of the commit hugr
-            let cm = self.get_commit(node.owner());
-            Either::Left(
-                cm.commit_hugr()
-                    .children(node.1)
-                    .map(|n| cm.to_patch_node(n)),
-            )
+            // children are precisely children of the commit hugr
+            Either::Right(children)
         }
     }
 
@@ -338,6 +337,79 @@ impl HugrView for PersistentHugr {
             .collect();
 
         (extracted_hugr, node_map)
+    }
+}
+
+/// An iterator over nodes in a `PersistentHugr` that filters out invalid nodes.
+///
+/// For any invalid node encountered, it will traverse and return the nodes in
+/// the commit deleting the node instead.
+#[derive(Debug, Clone)]
+pub struct IterValidNodes<'a, I> {
+    /// The original iterator over nodes.
+    nodes_iter: I,
+    /// Nodes discovered in commits deleting nodes in the original iterator.
+    discovered_nodes: VecDeque<PatchNode>,
+    /// Commits discovered that delete nodes in the original iterator.
+    discovered_commits: VecDeque<CommitId>,
+    /// Commits discovered across all time, to make sure we only process each
+    /// commit once.
+    processed_commits: BTreeSet<CommitId>,
+    /// The persistent hugr that the nodes belong to.
+    hugr: &'a PersistentHugr,
+}
+
+impl<'a, I> IterValidNodes<'a, I> {
+    fn new(hugr: &'a PersistentHugr, nodes_iter: impl IntoIterator<IntoIter = I>) -> Self {
+        Self {
+            nodes_iter: nodes_iter.into_iter(),
+            discovered_nodes: VecDeque::new(),
+            discovered_commits: VecDeque::new(),
+            processed_commits: BTreeSet::new(),
+            hugr,
+        }
+    }
+}
+
+impl<I: FusedIterator<Item = PatchNode>> Iterator for IterValidNodes<'_, I> {
+    type Item = PatchNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let Some(node) = self
+                .nodes_iter
+                .next()
+                .or_else(|| self.discovered_nodes.pop_front())
+            else {
+                break;
+            };
+            match self.hugr.node_status(node) {
+                NodeStatus::Deleted(commit_id) => {
+                    if self.processed_commits.insert(commit_id) {
+                        self.discovered_commits.push_back(commit_id);
+                    }
+                }
+                NodeStatus::ReplacementIO | NodeStatus::Valid => return Some(node),
+            }
+        }
+
+        // Add nodes in next commit to queue
+        let next_commit_id = self.discovered_commits.pop_front()?;
+        let next_commit = self.hugr.get_commit(next_commit_id);
+
+        self.discovered_nodes.extend(
+            next_commit
+                .inserted_nodes()
+                .map(|n| next_commit.to_patch_node(n)),
+        );
+
+        self.next()
+    }
+}
+
+impl<I: FusedIterator<Item = PatchNode>> DoubleEndedIterator for IterValidNodes<'_, I> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        unimplemented!("cannot go backwards")
     }
 }
 

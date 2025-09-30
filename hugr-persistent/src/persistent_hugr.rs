@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::{BTreeSet, HashMap, VecDeque},
     vec,
 };
@@ -13,6 +14,9 @@ use relrc::HistoryGraph;
 use crate::{
     Commit, CommitData, CommitId, CommitStateSpace, InvalidCommit, PatchNode, PersistentReplacement,
 };
+
+mod cache;
+use cache::PersistentHugrCache;
 
 pub mod serial;
 
@@ -56,7 +60,7 @@ pub mod serial;
 /// subgraphs within dataflow regions are supported.
 ///
 /// [`SimpleReplacement`]: hugr_core::SimpleReplacement
-#[derive(Clone, Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub struct PersistentHugr {
     /// The state space of all commits.
     ///
@@ -75,6 +79,9 @@ pub struct PersistentHugr {
     /// Invariant: any path from any commit in `self` through ancestors will
     /// always lead to this commit.
     base_commit_id: CommitId,
+    /// Cache some properties for performance.
+    #[debug(skip)]
+    cache: RefCell<PersistentHugrCache>,
 }
 
 impl PersistentHugr {
@@ -146,6 +153,7 @@ impl PersistentHugr {
         Ok(Self {
             graph,
             base_commit_id: base_commit,
+            cache: RefCell::new(PersistentHugrCache::default()),
         })
     }
 
@@ -249,6 +257,11 @@ impl PersistentHugr {
             }
 
             self.graph.insert_node(new_commit.clone().into());
+
+            // Invalidate cache
+            for parent in new_commit.parents() {
+                self.cache.borrow_mut().invalidate_children(parent.id());
+            }
         }
 
         Ok(())
@@ -333,7 +346,11 @@ impl PersistentHugr {
     }
 
     pub fn children_commits(&self, commit_id: CommitId) -> impl Iterator<Item = CommitId> + '_ {
-        self.graph.children(commit_id)
+        self.cache
+            .borrow_mut()
+            .children_or_insert(commit_id, || self.graph.children(commit_id).collect())
+            .clone()
+            .into_iter()
     }
 
     pub fn parent_commits(&self, commit_id: CommitId) -> impl Iterator<Item = CommitId> + '_ {
@@ -463,6 +480,21 @@ fn get_ancestors_while<'a>(
     all_commits
 }
 
+/// A node in a commit of a [`PersistentHugr`] is either a valid node of the
+/// HUGR, a node deleted by a child commit in that [`PersistentHugr`], or an
+/// input or output node in a replacement graph.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NodeStatus {
+    /// A node deleted by a child commit in that [`PersistentHugr`].
+    ///
+    /// The ID of the child commit is stored in the variant.
+    Deleted(CommitId),
+    /// An input or output node in the replacement graph of a Commit
+    ReplacementIO,
+    /// A valid node in the [`PersistentHugr`]
+    Valid,
+}
+
 // non-public methods
 impl PersistentHugr {
     /// Convert a node ID specific to a commit HUGR into a patch node in the
@@ -481,6 +513,26 @@ impl PersistentHugr {
             let child = self.get_commit(child_id);
             child.deleted_parent_nodes().contains(&node)
         })
+    }
+
+    /// Whether a node is valid in `self`, is deleted or is an IO node in a
+    /// replacement graph.
+    pub(crate) fn node_status(
+        &self,
+        per_node @ PatchNode(commit_id, node): PatchNode,
+    ) -> NodeStatus {
+        debug_assert!(self.contains_id(commit_id), "unknown commit");
+        if self
+            .get_commit(commit_id)
+            .replacement()
+            .is_some_and(|repl| repl.get_replacement_io().contains(&node))
+        {
+            NodeStatus::ReplacementIO
+        } else if let Some(commit_id) = self.find_deleting_commit(per_node) {
+            NodeStatus::Deleted(commit_id)
+        } else {
+            NodeStatus::Valid
+        }
     }
 }
 
