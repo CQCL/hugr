@@ -42,4 +42,4 @@ derive_more = { workspace = true, features = ["debug"] }
 hugr-llvm = { "path" = ".", features = ["test-utils"] }
 
 [build-dependencies]
-cc = "1.2.38"
+cc = "1.2.39"
