@@ -7,38 +7,33 @@
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
-use hugr_core::hugr::views::{RootCheckable, RootChecked};
-use hugr_core::hugr::{HugrError, hugrmut::HugrMut};
+use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::types::{EdgeKind, Signature, TypeRow};
 use itertools::Itertools;
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
-use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{
-    CFG, DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpType, Output,
+    CFG, DFG, DataflowBlock, DataflowParent, ExitBlock, Input, OpTag, OpTrait, OpType, Output,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 use crate::ComposablePass;
 
-/// Merge any basic blocks that are direct children of the specified CFG
-/// i.e. where a basic block B has a single successor B' whose only predecessor
+/// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
+/// Hugr.
+///
+/// That is, where a basic block B has a single successor B' whose only predecessor
 /// is B, B and B' can be combined.
 ///
-/// # Panics
+/// Returns the number of merged blocks.
 ///
-/// If the [HugrView::entrypoint] of `cfg` is not an [OpType::CFG]
-///
-/// [OpType::CFG]: hugr_core::ops::OpType::CFG
-#[deprecated(note = "Use normalize_cfg")] // Note: as a first step, just hide this
-pub fn merge_basic_blocks<'h, H>(cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>)
-where
-    H: 'h + HugrMut,
-{
-    let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
-    let cfg = checked.into_hugr();
-
+/// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
+pub fn merge_basic_blocks<H: HugrMut>(cfg: &mut H) -> Result<usize, NormalizeCFGError> {
+    if !cfg.entrypoint_optype().is_cfg() {
+        return Err(NormalizeCFGError::NotCFG(cfg.entrypoint_optype().tag()));
+    }
+    let mut num_merged = 0;
     let mut worklist = cfg.children(cfg.entrypoint()).collect::<Vec<_>>();
     while let Some(n) = worklist.pop() {
         // Consider merging n with its successor
@@ -54,6 +49,7 @@ where
             //   - the exit block, nodes in n should move *outside* the CFG - a separate pass.
             continue;
         }
+        num_merged += 1;
         let (rep, merge_bb, dfgs) = mk_rep(cfg, n, succ);
         let node_map = cfg.apply_patch(rep).unwrap();
         let merged_bb = *node_map.get(&merge_bb).unwrap();
@@ -63,6 +59,7 @@ where
         }
         worklist.push(merged_bb);
     }
+    Ok(num_merged)
 }
 
 /// Errors from [normalize_cfg]
@@ -87,8 +84,11 @@ pub enum NormalizeCFGResult<N = Node> {
     CFGPreserved {
         /// If `Some`, the new [DFG] containing what was previously in the entry block
         entry_dfg: Option<N>,
-        /// If `Some`, the new [DFG] containing what was previously in the last block before the exit
+        /// If `Some`, the new [DFG] of what was previously in the last block before the exit
         exit_dfg: Option<N>,
+        /// The number of basic blocks merged together.
+        /// Does not include any lifted to become DFGs outside.
+        num_merged: usize,
     },
 }
 
@@ -156,16 +156,10 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
 /// # Errors
 ///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
-#[expect(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
 pub fn normalize_cfg<H: HugrMut>(
-    mut h: &mut H,
+    h: &mut H,
 ) -> Result<NormalizeCFGResult<H::Node>, NormalizeCFGError> {
-    let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
-        .map_err(|e| match e {
-            HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
-            _ => unreachable!(),
-        })?;
-    merge_basic_blocks(checked);
+    let num_merged = merge_basic_blocks(h)?;
     let cfg_node = h.entrypoint();
     fn cfg_ty_mut<H: HugrMut>(h: &mut H, n: H::Node) -> &mut CFG {
         match h.optype_mut(n) {
@@ -309,6 +303,7 @@ pub fn normalize_cfg<H: HugrMut>(
     Ok(NormalizeCFGResult::CFGPreserved {
         entry_dfg,
         exit_dfg,
+        num_merged,
     })
 }
 
@@ -498,7 +493,6 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 }
 
 #[cfg(test)]
-#[expect(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
     use std::collections::HashSet;
     use std::sync::Arc;
@@ -594,7 +588,8 @@ mod test {
 
         let mut h = h.finish_hugr()?;
         let r = h.entrypoint();
-        merge_basic_blocks(&mut h);
+        let num_merged = merge_basic_blocks(&mut h)?;
+        assert_eq!(num_merged, 1);
         h.validate().unwrap();
         assert_eq!(r, h.entrypoint());
         assert!(matches!(h.get_optype(r), OpType::CFG(_)));
@@ -761,6 +756,7 @@ mod test {
         let NormalizeCFGResult::CFGPreserved {
             entry_dfg: Some(dfg),
             exit_dfg: None,
+            num_merged: 0,
         } = res
         else {
             panic!("Unexpected result");
@@ -833,6 +829,7 @@ mod test {
         let NormalizeCFGResult::CFGPreserved {
             entry_dfg: None,
             exit_dfg: Some(dfg),
+            num_merged: 0,
         } = res
         else {
             panic!("Unexpected result");
@@ -947,6 +944,7 @@ mod test {
         let Some(NormalizeCFGResult::CFGPreserved {
             entry_dfg: Some(entry_dfg),
             exit_dfg: Some(tail_dfg),
+            num_merged: 0,
         }) = res.remove(&h.entrypoint())
         else {
             panic!("Unexpected result")
