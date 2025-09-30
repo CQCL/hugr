@@ -14,7 +14,7 @@ use hugr_core::std_extensions::collections::array::{
     GenericArrayRepeat, GenericArrayScan, GenericArrayValue, array_type,
 };
 use hugr_core::std_extensions::collections::borrow_array::{
-    BArrayClone, BArrayDiscard, BArrayOpBuilder, borrow_array_type,
+    BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
@@ -391,6 +391,6 @@ pub fn copy_discard_borrow_array(
         }
     } else {
         // For linear elements we have to fall back to the generic linearization implementation
-        linearize_generic_array::<Array>(args, num_outports, lin)
+        linearize_generic_array::<BorrowArray>(args, num_outports, lin)
     }
 }
