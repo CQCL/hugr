@@ -17,10 +17,8 @@ pub use inline_funcs::inline_acyclic;
 pub mod linearize_array;
 pub use linearize_array::LinearizeArrayPass;
 pub mod lower;
-#[deprecated(note = "Use normalize_cfg", since = "0.15.1")]
 pub mod merge_bbs;
 mod monomorphize;
-pub mod normalize_cfg;
 pub mod untuple;
 
 pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
