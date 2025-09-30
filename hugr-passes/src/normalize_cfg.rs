@@ -74,18 +74,21 @@ pub enum NormalizeCFGError {
 }
 
 /// Result from [normalize_cfg], i.e. a report of what changes were made to the Hugr.
+///
+/// `N` is the type of the nodes in the Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NormalizeCFGResult {
+pub enum NormalizeCFGResult<N = Node> {
     /// The entire [`CFG`] was converted into a [`DFG`].
     ///
     /// The entrypoint node id is preserved after the conversion, but now identifies
     /// the new [`DFG`].
     CFGToDFG,
     /// The CFG was preserved, but the entry or exit blocks may have changed.
-    #[allow(missing_docs)]
     CFGPreserved {
-        entry_changed: bool,
-        exit_changed: bool,
+        /// If `Some`, the new [DFG] containing what was previously in the entry block
+        entry_dfg: Option<N>,
+        /// If `Some`, the new [DFG] containing what was previously in the last block before the exit
+        exit_dfg: Option<N>,
     },
 }
 
@@ -115,7 +118,7 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
     type Error = NormalizeCFGError;
 
     /// For each CFG node that was normalized, the [NormalizeCFGResult] for that CFG
-    type Result = HashMap<H::Node, NormalizeCFGResult>;
+    type Result = HashMap<H::Node, NormalizeCFGResult<H::Node>>;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         let cfgs = if self.cfgs.is_empty() {
@@ -154,7 +157,9 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
 ///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
 #[expect(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
-pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, NormalizeCFGError> {
+pub fn normalize_cfg<H: HugrMut>(
+    mut h: &mut H,
+) -> Result<NormalizeCFGResult<H::Node>, NormalizeCFGError> {
     let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
         .map_err(|e| match e {
             HugrError::InvalidTag { actual, .. } => NormalizeCFGError::NotCFG(actual),
@@ -176,7 +181,7 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
     // However, we only do this if the Entry block has just one successor (i.e. we can remove
     // the entry block altogether) - an extension would be to do this in other cases, preserving
     // the Entry block as an empty branch.
-    let mut entry_changed = false;
+    let mut entry_dfg = None;
     if let Some(succ) = h
         .output_neighbours(entry)
         .exactly_one()
@@ -242,10 +247,10 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         for src in h.node_outputs(dfg).collect::<Vec<_>>() {
             h.connect(dfg, src, cfg_node, src.index());
         }
-        entry_changed = true;
+        entry_dfg = Some(dfg);
     }
     // 2. If the exit node has a single predecessor and that predecessor has no other successors...
-    let mut exit_changed = false;
+    let mut exit_dfg = None;
     if let Some(pred) = h
         .input_neighbours(exit)
         .exactly_one()
@@ -299,11 +304,11 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         for p in h.node_inputs(dfg).collect_vec() {
             h.connect(cfg_node, p.index(), dfg, p);
         }
-        exit_changed = true;
+        exit_dfg = Some(dfg);
     }
     Ok(NormalizeCFGResult::CFGPreserved {
-        entry_changed,
-        exit_changed,
+        entry_dfg,
+        exit_dfg,
     })
 }
 
@@ -495,7 +500,7 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 #[cfg(test)]
 #[expect(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
     use std::sync::Arc;
 
     use hugr_core::extension::simple_op::MakeExtensionOp;
@@ -753,13 +758,13 @@ mod test {
 
         let res = normalize_cfg(&mut h).unwrap();
         h.validate().unwrap();
-        assert_eq!(
-            res,
-            NormalizeCFGResult::CFGPreserved {
-                entry_changed: true,
-                exit_changed: false
-            }
-        );
+        let NormalizeCFGResult::CFGPreserved {
+            entry_dfg: Some(dfg),
+            exit_dfg: None,
+        } = res
+        else {
+            panic!("Unexpected result");
+        };
         assert_eq!(
             h.children(h.entrypoint())
                 .map(|n| h.get_optype(n).tag())
@@ -772,11 +777,12 @@ mod test {
             func_children.into_iter().sorted().collect_vec(),
             ["Cfg", "Dfg", "Input", "Output",]
         );
-        let [dfg] = h
-            .children(func)
-            .filter(|n| h.get_optype(*n).is_dfg())
-            .collect_array()
-            .unwrap();
+        assert_eq!(
+            h.children(func)
+                .filter(|n| h.get_optype(*n).is_dfg())
+                .collect_vec(),
+            [dfg]
+        );
         assert_eq!(
             child_tags_ext_ids(&h, dfg)
                 .into_iter()
@@ -824,13 +830,13 @@ mod test {
         let mut h = h.finish_hugr()?;
         let res = normalize_cfg(&mut h).unwrap();
         h.validate().unwrap();
-        assert_eq!(
-            res,
-            NormalizeCFGResult::CFGPreserved {
-                entry_changed: false,
-                exit_changed: true
-            }
-        );
+        let NormalizeCFGResult::CFGPreserved {
+            entry_dfg: None,
+            exit_dfg: Some(dfg),
+        } = res
+        else {
+            panic!("Unexpected result");
+        };
         assert_eq!(
             h.children(h.entrypoint())
                 .map(|n| h.get_optype(n).tag())
@@ -839,16 +845,16 @@ mod test {
         );
         let func = h.get_parent(h.entrypoint()).unwrap();
         assert_eq!(
-            h.children(func)
-                .map(|n| h.get_optype(n).tag())
-                .collect_vec(),
-            [OpTag::Input, OpTag::Output, OpTag::Cfg, OpTag::Dfg]
+            child_tags_ext_ids(&h, func),
+            ["Input", "Output", "Cfg", "Dfg"]
         );
 
-        let dfg = h.children(func).last().unwrap();
-        let dfg_children = child_tags_ext_ids(&h, dfg);
+        assert_eq!(h.children(func).last(), Some(dfg));
         assert_eq!(
-            dfg_children.into_iter().sorted().collect_vec(),
+            child_tags_ext_ids(&h, dfg)
+                .into_iter()
+                .sorted()
+                .collect_vec(),
             [
                 "Const",
                 "Input",
@@ -932,21 +938,20 @@ mod test {
         assert_eq!(h.get_parent(entry_pred.node()), Some(entry.node()));
         assert_eq!(h.get_parent(tail_pred.node()), Some(tail_b.node()));
 
-        let res = NormalizeCFGPass::default().run(&mut h).unwrap();
+        let mut res = NormalizeCFGPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
         assert_eq!(
-            res,
-            HashMap::from([
-                (inner.node(), NormalizeCFGResult::CFGToDFG),
-                (
-                    h.entrypoint(),
-                    NormalizeCFGResult::CFGPreserved {
-                        entry_changed: true,
-                        exit_changed: true
-                    }
-                )
-            ])
+            res.remove(&inner.node()),
+            Some(NormalizeCFGResult::CFGToDFG)
         );
+        let Some(NormalizeCFGResult::CFGPreserved {
+            entry_dfg: Some(entry_dfg),
+            exit_dfg: Some(tail_dfg),
+        }) = res.remove(&h.entrypoint())
+        else {
+            panic!("Unexpected result")
+        };
+        assert!(res.is_empty());
         // Now contains only one CFG with one BB (self-loop)
         assert_eq!(
             h.nodes()
@@ -962,8 +967,8 @@ mod test {
         assert_eq!(h.get_optype(inner.node()).tag(), OpTag::Dfg);
         assert_eq!(h.get_parent(inner.node()), h.get_parent(entry_pred.node()));
         // Predicates lifted appropriately...
-        for n in [entry_pred.node(), tail_pred.node()] {
-            let parent = h.get_parent(n).unwrap();
+        for (n, parent) in [(entry_pred.node(), entry_dfg), (tail_pred.node(), tail_dfg)] {
+            assert_eq!(h.get_parent(n), Some(parent));
             assert_eq!(h.get_optype(parent).tag(), OpTag::Dfg);
             assert_eq!(h.get_parent(parent), h.get_parent(h.entrypoint()));
         }
