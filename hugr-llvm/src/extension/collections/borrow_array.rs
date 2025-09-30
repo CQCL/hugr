@@ -23,12 +23,13 @@ use std::sync::LazyLock;
 
 use anyhow::{Ok, Result, anyhow};
 use hugr_core::extension::prelude::{ConstError, option_type, usize_t};
-use hugr_core::extension::simple_op::{MakeExtensionOp, MakeRegisteredOp};
+use hugr_core::extension::simple_op::{MakeExtensionOp, MakeOpDef, MakeRegisteredOp};
 use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array;
 use hugr_core::std_extensions::collections::borrow_array::{
-    self, BArrayClone, BArrayDiscard, BArrayOp, BArrayOpDef, BArrayRepeat, BArrayScan,
-    BArrayUnsafeOp, BArrayUnsafeOpDef, borrow_array_type,
+    self, BArrayClone, BArrayDiscard, BArrayFromArray, BArrayFromArrayDef, BArrayOp, BArrayOpDef,
+    BArrayRepeat, BArrayScan, BArrayToArray, BArrayToArrayDef, BArrayUnsafeOp, BArrayUnsafeOpDef,
+    borrow_array_type,
 };
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
@@ -45,6 +46,7 @@ use crate::emit::emit_value;
 use crate::emit::func::get_or_make_function;
 use crate::emit::libc::{emit_libc_free, emit_libc_malloc};
 use crate::extension::PreludeCodegen;
+use crate::extension::collections::array::{build_array_fat_pointer, decompose_array_fat_pointer};
 use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::{
     emit::{EmitFuncContext, RowPromise, deaggregate_call_result},
@@ -225,6 +227,26 @@ pub trait BorrowArrayCodegen: Clone {
             initial_accs,
         )
     }
+
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayToArray`].
+    fn emit_to_array_op<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: BArrayToArray,
+        barray_v: BasicValueEnum<'c>,
+    ) -> Result<BasicValueEnum<'c>> {
+        emit_to_array_op(self, ctx, op, barray_v)
+    }
+
+    /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayFromArray`].
+    fn emit_from_array_op<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        op: BArrayFromArray,
+        array_v: BasicValueEnum<'c>,
+    ) -> Result<BasicValueEnum<'c>> {
+        emit_from_array_op(self, ctx, op, array_v)
+    }
 }
 
 /// A trivial implementation of [`BorrowArrayCodegen`] which passes all methods
@@ -349,6 +371,32 @@ impl<CCG: BorrowArrayCodegen> CodegenExtension for BorrowArrayCodegenExtension<C
                         .finish(context.builder(), iter::once(tgt_array).chain(final_accs))
                 }
             })
+            .extension_op(
+                borrow_array::EXTENSION_ID,
+                BArrayToArrayDef::new().opdef_id(),
+                {
+                    let ccg = self.0.clone();
+                    move |context, args| {
+                        let barray = args.inputs[0];
+                        let op = BArrayToArray::from_extension_op(args.node().as_ref())?;
+                        let array = ccg.emit_to_array_op(context, op, barray)?;
+                        args.outputs.finish(context.builder(), [array])
+                    }
+                },
+            )
+            .extension_op(
+                borrow_array::EXTENSION_ID,
+                BArrayFromArrayDef::new().opdef_id(),
+                {
+                    let ccg = self.0.clone();
+                    move |context, args| {
+                        let array = args.inputs[0];
+                        let op = BArrayFromArray::from_extension_op(args.node().as_ref())?;
+                        let barray = ccg.emit_from_array_op(context, op, array)?;
+                        args.outputs.finish(context.builder(), [barray])
+                    }
+                },
+            )
     }
 }
 
@@ -452,15 +500,28 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
         .builder()
         .build_bit_cast(mask_ptr, usize_t.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
-    // Initialise mask using memset
+    fill_mask(ctx, mask_ptr, mask_size_value, set_borrowed)?;
+
+    let offset = usize_t.const_zero();
+    let array_v = build_barray_fat_pointer(ctx, elem_ptr, mask_ptr, offset)?;
+    Ok((elem_ptr, mask_ptr, array_v))
+}
+
+/// Emits instructions to fill the entire mask with a bit value.
+fn fill_mask<H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<H>,
+    mask_ptr: PointerValue,
+    size: IntValue,
+    value: bool,
+) -> Result<()> {
     let memset_intrinsic = Intrinsic::find("llvm.memset").unwrap();
     let memset = memset_intrinsic
         .get_declaration(
             ctx.get_current_module(),
-            &[mask_ptr.get_type().into(), usize_t.into()],
+            &[mask_ptr.get_type().into(), size.get_type().into()],
         )
         .unwrap();
-    let val = if set_borrowed {
+    let val = if value {
         ctx.iw_context().i8_type().const_all_ones()
     } else {
         ctx.iw_context().i8_type().const_zero()
@@ -468,18 +529,10 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     let volatile = ctx.iw_context().bool_type().const_zero().into();
     ctx.builder().build_call(
         memset,
-        &[
-            mask_ptr.into(),
-            val.into(),
-            mask_size_value.into(),
-            volatile,
-        ],
+        &[mask_ptr.into(), val.into(), size.into(), volatile],
         "",
     )?;
-
-    let offset = usize_t.const_zero();
-    let array_v = build_barray_fat_pointer(ctx, elem_ptr, mask_ptr, offset)?;
-    Ok((elem_ptr, mask_ptr, array_v))
+    Ok(())
 }
 
 fn inspect_mask_idx<'c, H: HugrView<Node = Node>>(
@@ -1489,6 +1542,45 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
     }
 }
 
+/// Emits an [`BArrayToArray`] op.
+pub fn emit_to_array_op<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    op: BArrayToArray,
+    barray_v: BasicValueEnum<'c>,
+) -> Result<BasicValueEnum<'c>> {
+    let (ptr, mask_ptr, offset) = decompose_barray_fat_pointer(ctx.builder(), barray_v)?;
+    build_none_borrowed_check(ccg, ctx, mask_ptr, offset, op.size)?;
+    Ok(build_array_fat_pointer(ctx, ptr, offset)?.into())
+}
+
+/// Emits an [`BArrayFromArray`] op.
+pub fn emit_from_array_op<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    op: BArrayFromArray,
+    array_v: BasicValueEnum<'c>,
+) -> Result<BasicValueEnum<'c>> {
+    // We reuse the allocation from the array but we have to allocate a fresh mask.
+    // Note that the mask must have size at least `size + offset` so the offsets match up.
+    let usize_t = usize_ty(&ctx.typing_session());
+    let builder = ctx.builder();
+    let (ptr, offset) = decompose_array_fat_pointer(builder, array_v)?;
+    let size = usize_t.const_int(op.size, false);
+    let mask_bits = builder.build_int_add(size, offset, "")?;
+    let mask_blocks = builder.build_int_unsigned_div(mask_bits, usize_t.size_of(), "")?;
+    // Increment by one to account for potential rounding down
+    let mask_blocks = builder.build_int_add(mask_blocks, usize_t.const_int(1, false), "")?;
+    let mask_size = builder.build_int_mul(mask_blocks, usize_t.size_of(), "")?;
+    let mask_ptr = ccg.emit_allocate_array(ctx, mask_size)?;
+    let mask_ptr = ctx
+        .builder()
+        .build_bit_cast(mask_ptr, usize_t.ptr_type(AddressSpace::default()), "")?
+        .into_pointer_value();
+    fill_mask(ctx, mask_ptr, mask_size, false)?;
+    Ok(build_barray_fat_pointer(ctx, ptr, mask_ptr, offset)?.into())
+}
+
 #[cfg(test)]
 mod test {
     use hugr_core::Wire;
@@ -1496,9 +1588,10 @@ mod test {
     use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::collections::array::ArrayOpBuilder;
     use hugr_core::std_extensions::collections::array::op_builder::build_all_borrow_array_ops;
     use hugr_core::std_extensions::collections::borrow_array::{
-        self, BArrayOpBuilder, BArrayRepeat, BArrayScan, borrow_array_type,
+        self, BArrayOpBuilder, BArrayRepeat, BArrayScan, BArrayToArray, borrow_array_type,
     };
     use hugr_core::types::Type;
     use hugr_core::{
@@ -2447,6 +2540,72 @@ mod test {
     }
 
     #[rstest]
+    #[case::basic(32, 0)]
+    #[case::boundary(65, 0)]
+    #[case::pop1(65, 10)]
+    #[case::pop2(200, 32)]
+    fn exec_conversion_roundtrip(
+        mut exec_ctx: TestContext,
+        #[case] mut size: u64,
+        #[case] num_pops: u64,
+    ) {
+        // We build a HUGR that:
+        // - Loads a borrow array filled with 0..size
+        // - Pops specified numbers from the left to introduce an offset
+        // - Converts it into a regular array
+        // - Converts it back into a borrow array
+        // - Borrows alls elements, sums them up, and returns the sum
+
+        let int_ty = int_type(6);
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                use hugr_core::std_extensions::collections::borrow_array::BArrayFromArray;
+
+                let barray = borrow_array::BArrayValue::new(
+                    int_ty.clone(),
+                    (0..size)
+                        .map(|i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let barray = builder.add_load_value(barray);
+                let barray = build_pops(&mut builder, int_ty.clone(), size, barray, num_pops);
+                size -= num_pops;
+                let array = builder
+                    .add_dataflow_op(BArrayToArray::new(int_ty.clone(), size), [barray])
+                    .unwrap()
+                    .out_wire(0);
+                let mut barray = builder
+                    .add_dataflow_op(BArrayFromArray::new(int_ty.clone(), size), [array])
+                    .unwrap()
+                    .out_wire(0);
+
+                let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
+                for i in 0..size {
+                    let i = builder.add_load_value(ConstUsize::new(i));
+                    let (val, arr) = builder
+                        .add_borrow_array_borrow(int_ty.clone(), size, barray, i)
+                        .unwrap();
+                    r = builder.add_iadd(6, r, val).unwrap();
+                    barray = arr;
+                }
+                builder
+                    .add_discard_all_borrowed(int_ty.clone(), size, barray)
+                    .unwrap();
+                builder.finish_hugr_with_outputs([r]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_borrow_array_extensions(DefaultPreludeCodegen)
+                .add_default_array_extensions()
+                .add_default_int_extensions()
+        });
+        let expected: u64 = (num_pops..size + num_pops).sum();
+        assert_eq!(expected, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
     #[case::oob(1, 0, [0, 1], "Index out of bounds")]
     #[case::double_borrow(32, 0, [0, 0], "Array element is already borrowed")]
     #[case::double_borrow_pop(32, 1, [1, 0], "Array element is already borrowed")]
@@ -2578,6 +2737,44 @@ mod test {
                 .add_default_int_extensions()
         });
         let msg = "Array contains non-borrowed elements and cannot be discarded";
+        assert_eq!(&exec_ctx.exec_hugr_panicking(hugr, "main"), msg);
+    }
+
+    #[rstest]
+    fn exec_to_array_panic(mut exec_ctx: TestContext) {
+        let int_ty = int_type(6);
+        let size = 10;
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let barray = borrow_array::BArrayValue::new(
+                    int_ty.clone(),
+                    (0..size)
+                        .map(|i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let barray = builder.add_load_value(barray);
+                let idx = builder.add_load_value(ConstUsize::new(0));
+                let (_, barray) = builder
+                    .add_borrow_array_borrow(int_ty.clone(), size, barray, idx)
+                    .unwrap();
+                let array = builder
+                    .add_dataflow_op(BArrayToArray::new(int_ty.clone(), size), [barray])
+                    .unwrap()
+                    .out_wire(0);
+                builder
+                    .add_array_discard(int_ty.clone(), size, array)
+                    .unwrap();
+                builder.finish_hugr_with_outputs([]).unwrap()
+            });
+
+        exec_ctx.add_extensions(|cge| {
+            cge.add_prelude_extensions(PanicTestPreludeCodegen)
+                .add_default_borrow_array_extensions(PanicTestPreludeCodegen)
+                .add_default_array_extensions()
+                .add_default_int_extensions()
+        });
+        let msg = "Some array elements have been borrowed";
         assert_eq!(&exec_ctx.exec_hugr_panicking(hugr, "main"), msg);
     }
 }
