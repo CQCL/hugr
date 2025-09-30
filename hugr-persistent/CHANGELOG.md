@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.2.3...hugr-persistent-v0.3.0) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
 ## [0.2.3](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.2.2...hugr-persistent-v0.2.3) - 2025-09-11
 
 ### Documentation

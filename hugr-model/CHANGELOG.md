@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.22.4...hugr-model-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+
+### New Features
+
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+
 ## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-model-v0.22.3...hugr-model-v0.22.4) - 2025-09-24
 
 ### New Features
