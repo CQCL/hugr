@@ -1,6 +1,26 @@
 # Changelog
 
 
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.4...hugr-passes-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### New Features
+
+- [**breaking**] DeadCodeElimPass reports error on non-existent entry_points ([#2566](https://github.com/CQCL/hugr/pull/2566))
+- Normalize CFGs ([#2591](https://github.com/CQCL/hugr/pull/2591))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
 ## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.3...hugr-passes-v0.22.4) - 2025-09-24
 
 ### Bug Fixes
