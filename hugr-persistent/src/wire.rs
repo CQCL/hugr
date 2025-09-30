@@ -6,7 +6,7 @@ use hugr_core::{
 };
 use itertools::Itertools;
 
-use crate::{CommitId, PatchNode, PersistentHugr, Walker};
+use crate::{CommitId, PatchNode, PersistentHugr, Walker, persistent_hugr::NodeStatus};
 
 /// A wire in a [`PersistentHugr`].
 ///
@@ -59,41 +59,9 @@ impl CommitWire {
     }
 }
 
-/// A node in a commit of a [`PersistentHugr`] is either a valid node of the
-/// HUGR, a node deleted by a child commit in that [`PersistentHugr`], or an
-/// input or output node in a replacement graph.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum NodeStatus {
-    /// A node deleted by a child commit in that [`PersistentHugr`].
-    ///
-    /// The ID of the child commit is stored in the variant.
-    Deleted(CommitId),
-    /// An input or output node in the replacement graph of a Commit
-    ReplacementIO,
-    /// A valid node in the [`PersistentHugr`]
-    Valid,
-}
-
 impl PersistentHugr {
     pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PersistentWire {
         PersistentWire::from_port(node, port, self)
-    }
-
-    /// Whether a node is valid in `self`, is deleted or is an IO node in a
-    /// replacement graph.
-    fn node_status(&self, per_node @ PatchNode(commit_id, node): PatchNode) -> NodeStatus {
-        debug_assert!(self.contains_id(commit_id), "unknown commit");
-        if self
-            .get_commit(commit_id)
-            .replacement()
-            .is_some_and(|repl| repl.get_replacement_io().contains(&node))
-        {
-            NodeStatus::ReplacementIO
-        } else if let Some(commit_id) = self.find_deleting_commit(per_node) {
-            NodeStatus::Deleted(commit_id)
-        } else {
-            NodeStatus::Valid
-        }
     }
 
     /// The unique outgoing port in `self` that `port` is attached to.
@@ -132,7 +100,7 @@ impl PersistentHugr {
 impl PersistentWire {
     /// Get the wire connected to a specified port of a pinned node in `hugr`.
     fn from_port(node: PatchNode, port: impl Into<Port>, per_hugr: &PersistentHugr) -> Self {
-        assert!(per_hugr.contains_node(node), "node not in hugr");
+        debug_assert!(per_hugr.contains_node(node), "node not in hugr");
 
         // Queue of wires within each commit HUGR, that combined will form the
         // persistent wire.
