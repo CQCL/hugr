@@ -53,6 +53,7 @@ commit_parsers = [
     { message = "^revert", group = "Reverted changes", skip = true },
     { message = "^ci", group = "CI", skip = true },
 ]
+protect_breaking_commits = true
 
 [[package]]
 name = "hugr"

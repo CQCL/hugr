@@ -39,6 +39,8 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pyzstd
 
+import hugr._hugr as rust
+
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
     from hugr.package import Package
@@ -112,8 +114,11 @@ def read_envelope(envelope: bytes) -> Package:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
         case EnvelopeFormat.MODEL | EnvelopeFormat.MODEL_WITH_EXTS:
-            msg = "Decoding HUGR envelopes in MODULE format is not supported yet."
-            raise ValueError(msg)
+            # TODO Going via JSON is a temporary solution, until we get model import to
+            # python properly implemented.
+            # https://github.com/CQCL/hugr/issues/2287
+            json_data = rust.to_json_envelope(envelope)
+            return read_envelope(json_data)
 
 
 def read_envelope_hugr(envelope: bytes) -> Hugr:

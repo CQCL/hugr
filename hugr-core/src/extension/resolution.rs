@@ -186,8 +186,7 @@ impl<N: HugrNode> ExtensionResolutionError<N> {
 }
 
 /// Errors that can occur when collecting extension requirements.
-// TODO: [Deprecated] Remove `From` implementation from here
-#[derive(Debug, Display, Clone, Error, From, PartialEq)]
+#[derive(Debug, Display, Clone, Error, PartialEq)]
 #[non_exhaustive]
 pub enum ExtensionCollectionError<N: HugrNode = Node> {
     /// An operation requires an extension that is not in the given registry.
@@ -220,7 +219,6 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
         "Type {typ} contains custom types which have lost the reference to their defining extensions. Dropped extensions: {}",
         missing_extensions.join(", ")
     )]
-    #[from(ignore)]
     DroppedTypeExtensions {
         /// The type that is missing extensions.
         typ: String,

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-v0.22.3...hugr-v0.22.4) - 2025-09-24
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+
+### New Features
+
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-v0.22.2...hugr-v0.22.3) - 2025-09-11
 
 ### Bug Fixes

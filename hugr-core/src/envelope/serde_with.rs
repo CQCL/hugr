@@ -198,7 +198,7 @@ macro_rules! impl_serde_as_string_envelope {
                         //
                         // TODO: Remove this fallback in 0.21.0
                         let deserializer = serde::de::value::MapAccessDeserializer::new(map);
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let mut hugr =
                             $crate::hugr::serialize::serde_deserialize_hugr(deserializer)
                                 .map_err(serde::de::Error::custom)?;
@@ -394,7 +394,7 @@ macro_rules! impl_serde_as_binary_envelope {
                         //
                         // TODO: Remove this fallback in a breaking change
                         let deserializer = serde::de::value::MapAccessDeserializer::new(map);
-                        #[allow(deprecated)]
+                        #[expect(deprecated)]
                         let mut hugr =
                             $crate::hugr::serialize::serde_deserialize_hugr(deserializer)
                                 .map_err(serde::de::Error::custom)?;

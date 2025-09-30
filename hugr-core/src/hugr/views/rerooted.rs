@@ -100,7 +100,7 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
                 fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
                 fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                #[allow(deprecated)]
+                #[expect(deprecated)]
                 fn mermaid_string_with_config(&self, config: crate::hugr::views::render::RenderConfig<Self::Node>) -> String;
                 fn dot_string(&self) -> String;
                 fn static_source(&self, node: Self::Node) -> Option<Self::Node>;

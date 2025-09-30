@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.22.3"
+version = "0.22.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -31,10 +31,10 @@ zstd = ["hugr-core/zstd"]
 persistent_unstable = ["hugr-persistent"]
 
 [dependencies]
-hugr-model = { path = "../hugr-model", version = "0.22.3" }
-hugr-core = { path = "../hugr-core", version = "0.22.3" }
-hugr-passes = { path = "../hugr-passes", version = "0.22.3" }
-hugr-llvm = { path = "../hugr-llvm", version = "0.22.3", optional = true }
+hugr-model = { path = "../hugr-model", version = "0.22.4" }
+hugr-core = { path = "../hugr-core", version = "0.22.4" }
+hugr-passes = { path = "../hugr-passes", version = "0.22.4" }
+hugr-llvm = { path = "../hugr-llvm", version = "0.22.4", optional = true }
 hugr-persistent = { path = "../hugr-persistent", version = "0.2.3", optional = true }
 
 [dev-dependencies]
