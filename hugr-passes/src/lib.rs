@@ -17,12 +17,12 @@ pub use inline_funcs::inline_acyclic;
 pub mod linearize_array;
 pub use linearize_array::LinearizeArrayPass;
 pub mod lower;
-pub mod normalize_cfg;
 mod monomorphize;
+pub mod normalize_cfg;
 pub mod untuple;
 
 /// Merge basic blocks. Subset of [normalize_cfg], use the latter.
-#[deprecated(note = "Use normalize_cfg", since="0.15.1")]
+#[deprecated(note = "Use normalize_cfg", since = "0.15.1")]
 pub mod merge_bbs {
     #[expect(deprecated)] // remove this
     pub use super::normalize_cfg::merge_basic_blocks;

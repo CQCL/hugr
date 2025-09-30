@@ -1,5 +1,5 @@
 //! CFG normalizations.
-//! 
+//!
 //! * Merge BBs along control-flow edges where the source BB has no other successors
 //!   and the target BB has no other predecessors.
 //! * Move entry/last-before-exit blocks outside of CFG when possible.
