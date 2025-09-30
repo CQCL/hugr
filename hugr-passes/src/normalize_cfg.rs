@@ -162,7 +162,7 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         })?;
     merge_basic_blocks(checked);
     let cfg_node = h.entrypoint();
-    fn cfg_ty_mut<'a, H: HugrMut>(h: &'a mut H, n: H::Node) -> &'a mut CFG {
+    fn cfg_ty_mut<H: HugrMut>(h: &mut H, n: H::Node) -> &mut CFG {
         match h.optype_mut(n) {
             OpType::CFG(cfg) => cfg,
             _ => unreachable!(), // Checked at entry to normalize_cfg
