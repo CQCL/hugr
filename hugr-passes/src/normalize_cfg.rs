@@ -162,7 +162,12 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         })?;
     merge_basic_blocks(checked);
     let cfg_node = h.entrypoint();
-
+    fn cfg_ty_mut<'a, H: HugrMut>(h: &'a mut H, n: H::Node) -> &'a mut CFG {
+        match h.optype_mut(n) {
+            OpType::CFG(cfg) => cfg,
+            _ => unreachable!(), // Checked at entry to normalize_cfg
+        }
+    };
     // Further normalizations with effects outside the CFG
     let [entry, exit] = h.children(cfg_node).take(2).collect_array().unwrap();
     let entry_blk = h.get_optype(entry).as_dataflow_block().unwrap();
@@ -194,12 +199,9 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
                 h.set_parent(ch, cfg_node);
             }
             h.remove_node(entry);
-            let cfg_ty = h.optype_mut(cfg_node);
-            let OpType::CFG(CFG { signature }) = std::mem::take(cfg_ty) else {
-                panic!()
-            };
+            let signature = std::mem::take(&mut cfg_ty_mut(h, cfg_node).signature);
             let result_tys = signature.output.clone();
-            *cfg_ty = OpType::DFG(DFG { signature });
+            h.replace_op(cfg_node, OpType::DFG(DFG { signature }));
             unpack_before_output(h, h.get_io(cfg_node).unwrap()[1], result_tys);
             return Ok(NormalizeCFGResult::CFGToDFG);
         } else if h.input_neighbours(entry).count() == 0 {
@@ -229,9 +231,7 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
             }
 
             // Update input ports
-            let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
-                panic!()
-            };
+            let cfg_ty = cfg_ty_mut(h, cfg_node);
             let inputs_to_add =
                 new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
             cfg_ty.signature.input = new_cfg_inputs;
@@ -259,9 +259,7 @@ pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, No
         let new_cfg_outs = pred_blk.inner_signature().into_owned().input;
 
         // new CFG result type and exit block
-        let OpType::CFG(cfg_ty) = h.optype_mut(cfg_node) else {
-            panic!()
-        };
+        let cfg_ty = cfg_ty_mut(h, cfg_node);
         let result_tys = std::mem::replace(&mut cfg_ty.signature.output, new_cfg_outs.clone());
         h.add_ports(
             cfg_node,
