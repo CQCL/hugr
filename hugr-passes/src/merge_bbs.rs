@@ -149,7 +149,7 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
 /// # Errors
 ///
 /// [NormalizeCFGError::NotCFG] If the entrypoint is not a CFG
-#[allow(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
+#[expect(deprecated)] // inline/combine/refactor with merge_bbs, or just hide latter
 pub fn normalize_cfg<H: HugrMut>(mut h: &mut H) -> Result<NormalizeCFGResult, NormalizeCFGError> {
     let checked: RootChecked<_, CfgID<H::Node>> = RootChecked::<_, CfgID<H::Node>>::try_new(&mut h)
         .map_err(|e| match e {
@@ -491,7 +491,7 @@ fn unpack_before_output<H: HugrMut>(h: &mut H, output_node: H::Node, new_types: 
 }
 
 #[cfg(test)]
-#[allow(deprecated)] // remove tests of merge_bbs, or just hide the latter
+#[expect(deprecated)] // remove tests of merge_bbs, or just hide the latter
 mod test {
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
@@ -501,7 +501,7 @@ mod test {
     use rstest::rstest;
 
     use hugr_core::builder::{
-        CFGBuilder, Container, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
+        CFGBuilder, Dataflow, HugrBuilder, SubContainer, endo_sig, inout_sig,
     };
     use hugr_core::extension::prelude::{ConstUsize, Noop, PRELUDE_ID, UnpackTuple, qb_t, usize_t};
     use hugr_core::ops::{DataflowOpTrait, LoadConstant, OpTag, OpTrait, OpType, Tag};
@@ -809,22 +809,27 @@ mod test {
         let func_children = child_tags_ext_ids(&h, func);
         assert_eq!(
             func_children.into_iter().sorted().collect_vec(),
+            ["Cfg", "Dfg", "Input", "Output",]
+        );
+        let [dfg] = h
+            .children(func)
+            .filter(|n| h.get_optype(*n).is_dfg())
+            .collect_array()
+            .unwrap();
+        assert_eq!(
+            child_tags_ext_ids(&h, dfg)
+                .into_iter()
+                .sorted()
+                .collect_vec(),
             [
-                "Cfg",
-                "Dfg",
+                "Const",
                 "Input",
+                "LoadConst",
+                "Noop",
                 "Output",
+                "UnpackTuple"
             ]
         );
-        let [dfg] = h.children(func).filter(|n| h.get_optype(*n).is_dfg()).collect_array().unwrap();
-        assert_eq!(child_tags_ext_ids(&h, dfg).into_iter().sorted().collect_vec(), [
-            "Const",
-            "Input",
-            "LoadConst",
-            "Noop",
-            "Output",
-            "UnpackTuple"
-        ]);
         Ok(())
     }
 
