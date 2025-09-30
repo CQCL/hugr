@@ -123,8 +123,8 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
                 .entry_descendants()
                 .filter(|n| hugr.get_optype(*n).is_cfg())
                 .collect::<Vec<_>>();
-            // Process inner CFGs first, in case they are removed
-            // (if they are in an unreachable block when the Entry node has only the Exit as successor)
+            // Process inner CFGs first, in case they are removed (if they are in a completely
+            // disconnected block when the Entry node has only the Exit as successor).
             v.reverse();
             v
         } else {
