@@ -1,5 +1,9 @@
-//! Merge BBs along control-flow edges where the source BB has no other successors
-//! and the target BB has no other predecessors.
+//! CFG normalizations.
+//! 
+//! * Merge BBs along control-flow edges where the source BB has no other successors
+//!   and the target BB has no other predecessors.
+//! * Move entry/last-before-exit blocks outside of CFG when possible.
+//! * Convert whole CFG to DFG if straight-line control-flow
 use std::collections::HashMap;
 
 use hugr_core::extension::prelude::UnpackTuple;
