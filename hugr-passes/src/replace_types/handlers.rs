@@ -13,6 +13,9 @@ use hugr_core::std_extensions::collections::array::{
     Array, ArrayClone, ArrayDiscard, ArrayKind, ArrayOpBuilder, GenericArrayOpDef,
     GenericArrayRepeat, GenericArrayScan, GenericArrayValue, array_type,
 };
+use hugr_core::std_extensions::collections::borrow_array::{
+    BArrayClone, BArrayDiscard, BArrayOpBuilder, borrow_array_type,
+};
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
 use hugr_core::type_row;
@@ -332,6 +335,53 @@ pub fn copy_discard_array(
                 let mut outs = vec![];
                 for _ in 0..(num_outports - 1) {
                     let (arr1, arr2) = dfb.add_array_clone(ty.clone(), *n, arr).unwrap();
+                    arr = arr1;
+                    outs.push(arr2);
+                }
+                outs.push(arr);
+                dfb.finish_hugr_with_outputs(outs).unwrap()
+            })))
+        }
+    } else {
+        // For linear elements we have to fall back to the generic linearization implementation
+        linearize_generic_array::<Array>(args, num_outports, lin)
+    }
+}
+
+/// Handler for copying and discarding of borrow arrays. Only works if the elements are copyable, or
+/// can be copied/discarded via the provided [`CallbackHandler`].
+///
+/// This should be used when lowering a copyable type to a borrow array.
+pub fn copy_discard_borrow_array(
+    args: &[TypeArg],
+    num_outports: usize,
+    lin: &CallbackHandler,
+) -> Result<NodeTemplate, LinearizeError> {
+    // Require known length i.e. usable only after monomorphization, due to no-variables limitation
+    // restriction on NodeTemplate::CompoundOp
+    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+        panic!("Illegal TypeArgs to borrow array: {args:?}")
+    };
+    if ty.copyable() {
+        // For arrays with copyable elements, we can just use the clone/discard ops
+        if num_outports == 0 {
+            Ok(NodeTemplate::SingleOp(
+                BArrayDiscard::new(ty.clone(), *n).unwrap().into(),
+            ))
+        } else if num_outports == 2 {
+            Ok(NodeTemplate::SingleOp(
+                BArrayClone::new(ty.clone(), *n).unwrap().into(),
+            ))
+        } else {
+            let array_ty = borrow_array_type(*n, ty.clone());
+            Ok(NodeTemplate::CompoundOp(Box::new({
+                let mut dfb =
+                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                        .unwrap();
+                let [mut arr] = dfb.input_wires_arr();
+                let mut outs = vec![];
+                for _ in 0..(num_outports - 1) {
+                    let (arr1, arr2) = dfb.add_borrow_array_clone(ty.clone(), *n, arr).unwrap();
                     arr = arr1;
                     outs.push(arr2);
                 }
