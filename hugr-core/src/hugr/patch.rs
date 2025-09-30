@@ -40,7 +40,7 @@ pub trait PatchVerification {
     /// The nodes invalidated by the rewrite. Deprecated: implement
     /// [Self::invalidated_nodes] instead. The default returns the empty
     /// iterator; this should be fine as there are no external calls.
-    #[deprecated(note = "Use/implement invalidated_nodes instead")]
+    #[deprecated(note = "Use/implement invalidated_nodes instead", since = "0.20.2")]
     fn invalidation_set(&self) -> impl Iterator<Item = Self::Node> {
         std::iter::empty()
     }
