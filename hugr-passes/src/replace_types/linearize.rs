@@ -929,8 +929,15 @@ mod test {
         assert_eq!(exts.clone().count(), 2);
         assert!(exts.all(|eo| eo.qualified_id() == "TestExt.discard"));
 
-        // We can drop an array of lin_t
+        // We can drop a borrow array of lin_t
         let mut h = build_hugr(borrow_array_type(4, lin_t));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+
+        // We can drop a borrow array of usize
+        let mut h = build_hugr(borrow_array_type(4, usize_t()));
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
