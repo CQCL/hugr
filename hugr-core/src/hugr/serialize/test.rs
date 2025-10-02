@@ -633,6 +633,7 @@ fn std_extensions_valid() {
 }
 
 #[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 // https://github.com/CQCL/hugr/issues/2600
 fn cfg_edge_ordering() {
     let pkg: Package = Package::load(
