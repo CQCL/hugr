@@ -215,7 +215,8 @@ impl TryFrom<&Hugr> for SerHugrLatest {
             let op = hugr.get_optype(node);
             let is_value_port = offset < op.value_port_count(dir);
             let is_static_input = op.static_port(dir).is_some_and(|p| p.index() == offset);
-            let offset = (is_value_port || is_static_input).then_some(offset as u32);
+            let is_cfg_edge = op.is_dataflow_block();
+            let offset = (is_value_port || is_static_input || is_cfg_edge).then_some(offset as u32);
             (node_rekey[&node], offset)
         };
 
