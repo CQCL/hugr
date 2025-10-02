@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.23.1](https://github.com/CQCL/hugr/compare/hugr-v0.23.0...hugr-v0.23.1) - 2025-10-02
+
+### Bug Fixes
+
+- Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/pull/2606))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-v0.22.4...hugr-v0.23.0) - 2025-09-30
 
 ### Bug Fixes
