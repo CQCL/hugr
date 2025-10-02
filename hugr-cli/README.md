@@ -24,20 +24,28 @@ cargo install hugr-cli
 This will install the `hugr` binary. Running `hugr --help` shows:
 
 ```
-Validate a HUGR.
+HUGR CLI tools.
 
-Usage: hugr [OPTIONS] <INPUT>
+Usage: hugr [OPTIONS] <COMMAND>
 
-Arguments:
-  <INPUT>
+Commands:
+  validate        Validate a HUGR package
+  gen-extensions  Write standard extensions out in serialized form
+  mermaid         Write HUGR as mermaid diagrams
+  convert         Convert between different HUGR envelope formats
+  help            Print this message or the help of the given subcommand(s)
 
 Options:
-  -m, --mermaid      Visualise with mermaid.
-  -n, --no-validate  Skip validation.
-  -v, --verbose...   Increase logging verbosity
-  -q, --quiet...     Decrease logging verbosity
-  -h, --help         Print help
-  -V, --version      Print version
+  -v, --verbose...  Increase logging verbosity
+  -q, --quiet...    Decrease logging verbosity
+  -h, --help        Print help
+  -V, --version     Print version
+```
+
+Refer to the help for each subcommand for more information, e.g.
+
+```
+hugr validate --help
 ```
 
 

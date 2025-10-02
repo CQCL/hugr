@@ -9,51 +9,14 @@
 //! directory](https://doc.rust-lang.org/book/ch14-04-installing-binaries.html)
 //! in your path.
 //!
-//! The CLI provides two subcommands:
-//!
-//! - `validate` for validating HUGR files.
-//! - `mermaid` for visualizing HUGR files as mermaid diagrams.
-//!
-//! ### Validate
-//!
-//! Validate and visualize a HUGR file
-//!
-//! Usage: `hugr validate [OPTIONS] [INPUT]`
-//!
-//! ```text
-//! Options:
-//!   -v, --verbose...  Increase logging verbosity
-//!   -q, --quiet...    Decrease logging verbosity
-//!   -h, --help        Print help (see more with '--help')
-//!   -V, --version     Print version
-//!
-//! Input:
-//!       --no-std                   Don't use standard extensions when validating hugrs. Prelude is still used.
-//!   -e, --extensions <EXTENSIONS>  Paths to serialised extensions to validate against.
-//!       --hugr-json                Read the input as a HUGR JSON file instead of an envelope
-//!   [INPUT]                    Input file. Defaults to `-` for stdin
+//! The top level help can be accessed with:
+//! ```sh
+//! hugr --help
 //! ```
 //!
-//! ### Mermaid
-//!
-//! Write HUGR as mermaid diagrams
-//!
-//! Usage: `hugr mermaid [OPTIONS] [INPUT]`
-//!
-//! ```text
-//! Options:
-//!       --validate         Validate before rendering, includes extension inference.
-//!   -o, --output <OUTPUT>  Output file '-' for stdout [default: -]
-//!   -v, --verbose...       Increase logging verbosity
-//!   -q, --quiet...         Decrease logging verbosity
-//!   -h, --help             Print help (see more with '--help')
-//!   -V, --version          Print version
-//!
-//! Input:
-//!       --no-std                   Don't use standard extensions when validating hugrs. Prelude is still used.
-//!   -e, --extensions <EXTENSIONS>  Paths to serialised extensions to validate against.
-//!       --hugr-json                Read the input as a HUGR JSON file instead of an envelope
-//!   [INPUT]                    Input file. Defaults to `-` for stdin.
+//! Refer to the help for each subcommand for more information, e.g.
+//! ```sh
+//! hugr validate --help
 //! ```
 
 use clap::{Parser, crate_version};
@@ -87,7 +50,7 @@ pub struct CliArgs {
 #[derive(Debug, clap::Subcommand)]
 #[non_exhaustive]
 pub enum CliCommand {
-    /// Validate and visualize a HUGR file.
+    /// Validate a HUGR package.
     Validate(validate::ValArgs),
     /// Write standard extensions out in serialized form.
     GenExtensions(extensions::ExtArgs),
