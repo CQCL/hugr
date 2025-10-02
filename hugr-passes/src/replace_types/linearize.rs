@@ -386,6 +386,7 @@ mod test {
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
+    use hugr_core::std_extensions::collections::borrow_array::borrow_array_type;
     use hugr_core::std_extensions::collections::value_array::{
         VArrayOpDef, VArrayRepeat, VArrayScan, VArrayScanDef, value_array_type,
         value_array_type_def,
@@ -405,6 +406,7 @@ mod test {
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
+    const COPY_T: &str = "Copy";
 
     struct NWayCopySigFn(Type);
     impl CustomSignatureFunc for NWayCopySigFn {
@@ -438,6 +440,16 @@ mod test {
                         .instantiate([])
                         .unwrap(),
                 );
+                e.add_type(
+                    COPY_T.into(),
+                    vec![],
+                    String::new(),
+                    TypeDefBound::copyable(),
+                    w,
+                )
+                .unwrap()
+                .instantiate([])
+                .unwrap();
                 e.add_op(
                     "discard".into(),
                     String::new(),
@@ -910,15 +922,29 @@ mod test {
         };
         // We can drop a tuple of 2* lin_t
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let mut h = build_hugr(Type::new_tuple(vec![lin_t; 2]));
+        let mut h = build_hugr(Type::new_tuple(vec![lin_t.clone(); 2]));
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
         assert_eq!(exts.clone().count(), 2);
         assert!(exts.all(|eo| eo.qualified_id() == "TestExt.discard"));
 
+        // We can drop an array of lin_t
+        let mut h = build_hugr(borrow_array_type(4, lin_t));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+
         // We cannot drop a qubit
         let mut h = build_hugr(qb_t());
+        assert_eq!(
+            lowerer.run(&mut h).unwrap_err(),
+            ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
+        );
+
+        // We cannot drop an array of qubits
+        let mut h = build_hugr(borrow_array_type(4, qb_t()));
         assert_eq!(
             lowerer.run(&mut h).unwrap_err(),
             ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
