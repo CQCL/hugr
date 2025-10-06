@@ -514,17 +514,18 @@ fn fill_mask<H: HugrView<Node = Node>>(
     size: IntValue,
     value: bool,
 ) -> Result<()> {
-    let memset_intrinsic = Intrinsic::find("llvm.memset").unwrap();
-    let memset = memset_intrinsic
+    let memset = Intrinsic::find("llvm.memset")
+        .unwrap()
         .get_declaration(
             ctx.get_current_module(),
             &[mask_ptr.get_type().into(), size.get_type().into()],
         )
         .unwrap();
+    let i8t = ctx.iw_context().i8_type(); // Value to fill with is always this size
     let val = if value {
-        ctx.iw_context().i8_type().const_all_ones()
+        i8t.const_all_ones()
     } else {
-        ctx.iw_context().i8_type().const_zero()
+        i8t.const_zero()
     };
     let volatile = ctx.iw_context().bool_type().const_zero().into();
     ctx.builder().build_call(
