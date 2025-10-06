@@ -971,7 +971,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def _constrain_offset(self, p: P) -> PortOffset | None:
         """Constrain an offset to be a valid encoded port offset.
 
-        Order edges and control flow edges should be encoded without an offset.
+        Order edges should be encoded without an offset.
         """
         if p.offset < 0:
             assert p.offset == -1, "Only order edges are allowed with offset < 0"
