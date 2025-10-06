@@ -1,5 +1,6 @@
 { pkgs, lib, inputs, config, ... }:
 let
+  pkgs-stable = import inputs.nixpkgs-2505 { system = pkgs.stdenv.system; };
   cfg = config.hugr;
 in
 {
@@ -27,7 +28,7 @@ in
     ];
 
     env = {
-      "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
+      "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs-stable."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
     };
 
 
