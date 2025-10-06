@@ -47,10 +47,6 @@ pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, I
     })
 }
 
-/// Legacy alias of [FindNonLocalEdgesError]
-#[deprecated(note = "Use FindNonLocalEdgesError")]
-pub type NonLocalEdgesError<N> = FindNonLocalEdgesError<N>;
-
 /// An error from [ensure_no_nonlocal_edges]
 #[derive(Clone, derive_more::Error, derive_more::Display, Debug, PartialEq, Eq)]
 #[non_exhaustive]

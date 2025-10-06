@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.4...hugr-core-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+- [**breaking**] test extension version compatibility on ModelWithExts ([#2587](https://github.com/CQCL/hugr/pull/2587))
+- *(core)* check used extension versions against resolved extensions ([#2588](https://github.com/CQCL/hugr/pull/2588))
+- [**breaking**] model import loads Package extensions ([#2590](https://github.com/CQCL/hugr/pull/2590))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### New Features
+
+- add trait+funcs for linking Hugrs explicitly by Node ([#2521](https://github.com/CQCL/hugr/pull/2521))
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- [**breaking**] Return error instead of panicking in DFGWrapper::add_{in,out}put ([#2571](https://github.com/CQCL/hugr/pull/2571))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+- Normalize CFGs ([#2591](https://github.com/CQCL/hugr/pull/2591))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
 ## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.3...hugr-core-v0.22.4) - 2025-09-24
 
 ### Bug Fixes
