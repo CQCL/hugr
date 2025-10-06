@@ -1011,6 +1011,7 @@
                 "misc": {
                     "anyOf": [
                         {
+                            "additionalProperties": true,
                             "type": "object"
                         },
                         {
@@ -1373,6 +1374,7 @@
                             "items": {
                                 "anyOf": [
                                     {
+                                        "additionalProperties": true,
                                         "type": "object"
                                     },
                                     {
