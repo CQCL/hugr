@@ -194,7 +194,7 @@ pub trait BorrowArrayCodegen: Clone {
         op: BArrayDiscard,
         array_v: BasicValueEnum<'c>,
     ) -> Result<()> {
-        emit_array_discard(self, ctx, op, array_v)
+        emit_barray_discard(self, ctx, op, array_v)
     }
 
     /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayRepeat`] op.
@@ -1333,7 +1333,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
 }
 
 /// Emits an [`BArrayDiscard`] op.
-pub fn emit_array_discard<'c, H: HugrView<Node = Node>>(
+pub fn emit_barray_discard<'c, H: HugrView<Node = Node>>(
     ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     _op: BArrayDiscard,
