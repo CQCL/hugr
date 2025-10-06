@@ -560,28 +560,10 @@ fn inspect_mask_idx<'c, H: HugrView<Node = Node>>(
     let borrowed_bb =
         ctx.build_positioned_new_block("elem_borrowed", None, |ctx, borrowed_bb| {
             if_borrowed(ctx)?;
-            if ctx
-                .builder()
-                .get_insert_block()
-                .unwrap()
-                .get_terminator()
-                .is_none()
-            {
-                ctx.builder().build_return(None)?;
-            }
             Ok(borrowed_bb)
         })?;
     let free_bb = ctx.build_positioned_new_block("elem_free", None, |ctx, free_bb| {
         if_free(ctx)?;
-        if ctx
-            .builder()
-            .get_insert_block()
-            .unwrap()
-            .get_terminator()
-            .is_none()
-        {
-            ctx.builder().build_return(None)?;
-        }
         Ok(free_bb)
     })?;
     ctx.builder()
@@ -722,7 +704,10 @@ pub fn build_idx_not_borrowed_check<'c, H: HugrView<Node = Node>>(
                 ctx,
                 mask_ptr.into_pointer_value(),
                 idx.into_int_value(),
-                |_| Ok(()),
+                |ctx| {
+                    ctx.builder().build_return(None)?;
+                    Ok(())
+                },
                 |ctx| {
                     let err: &ConstError = &ERR_ALREADY_BORROWED;
                     let err_val = ctx.emit_custom_const(err).unwrap();
@@ -764,7 +749,10 @@ pub fn build_idx_free_check<'c, H: HugrView<Node = Node>>(
                     ctx.builder().build_unreachable()?;
                     Ok(())
                 },
-                |_| Ok(()),
+                |ctx| {
+                    ctx.builder().build_return(None)?;
+                    Ok(())
+                },
             )?;
             Ok(None)
         },
