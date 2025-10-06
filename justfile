@@ -28,7 +28,7 @@ test-rust *TEST_ARGS:
 test-python *TEST_ARGS:
     uv run maturin develop --uv
     cargo build -p hugr-cli
-    HUGR_RENDER_DOT=1 uv run pytest {{TEST_ARGS}}
+    HUGR_RENDER_DOT=1 uv run pytest -n auto {{TEST_ARGS}}
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \
@@ -51,7 +51,7 @@ format language="[rust|python]": (_run_lang language \
 # Generate a test coverage report.
 coverage language="[rust|python]": (_run_lang language \
         "cargo llvm-cov --lcov > lcov.info" \
-        "uv run pytest --cov=./ --cov-report=html"
+        "uv run pytest -n auto --cov=./ --cov-report=html"
     )
 
 # Run unsoundness checks using miri
@@ -69,9 +69,9 @@ update-model-capnp:
     @# When modifying the schema version, update the `ci-rs.yml` file too.
     capnp compile -orust:hugr-model/src --src-prefix=hugr-model hugr-model/capnp/hugr-v0.capnp
 
-# Update snapshots used in the pytest tests.
+# Update snapshots used in the pytest -n auto tests.
 update-pytest-snapshots:
-    uv run pytest --snapshot-update
+    uv run pytest -n auto --snapshot-update
 
 # Generate serialized declarations for the standard extensions and prelude.
 gen-extensions:
