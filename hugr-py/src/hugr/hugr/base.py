@@ -173,7 +173,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                         pass
                     case _:
                         raise ValueError(unsupported_op_msg)
-
+                df_op = cast(ops.DataflowOp, df_op)  # checked above, to appease mypy
                 inputs, outputs = None, None
                 try:
                     sig = df_op.outer_signature()
