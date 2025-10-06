@@ -13,7 +13,7 @@ use inkwell::{
     context::Context,
     module::{Linkage, Module},
     types::{BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue, GlobalValue, IntValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
 use itertools::{Itertools, zip_eq};
 
@@ -406,10 +406,8 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
                 .get_terminator()
                 .is_none()
             {
-                match ret_val {
-                    Some(ref v) => ctx.builder().build_return(Some(v))?,
-                    None => ctx.builder().build_return(None)?,
-                };
+                ctx.builder()
+                    .build_return(ret_val.as_ref().map::<&dyn BasicValue, _>(|v| v))?;
             }
 
             ctx.builder().position_at_end(curr_bb);
