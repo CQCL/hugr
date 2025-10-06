@@ -571,21 +571,26 @@ fn inspect_mask_idx<'c, H: HugrView<Node = Node>>(
     Ok(())
 }
 
+struct MaskInfo<'a> {
+    mask_ptr: PointerValue<'a>,
+    offset: IntValue<'a>,
+    size: IntValue<'a>,
+}
+
 /// Emits instructions to inspect blocks of the borrowed mask using the provided closure.
 fn inspect_mask_blocks<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    mask_ptr: PointerValue<'c>,
-    offset: IntValue<'c>,
-    size: IntValue<'c>,
-    go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, IntValue<'c>) -> Result<()>,
+    mask_info: MaskInfo<'c>,
+    expected_val: IntValue<'c>,
+    err: &ConstError,
 ) -> Result<()> {
     let builder = ctx.builder();
-    let start_idx = offset;
-    let end_idx = builder.build_int_add(offset, size, "")?;
+    let end_idx = builder.build_int_add(mask_info.offset, mask_info.size, "")?;
 
     let usize_t = usize_ty(&ctx.typing_session());
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
-    let start_block = builder.build_int_unsigned_div(start_idx, block_size, "")?;
+    let start_block = builder.build_int_unsigned_div(mask_info.offset, block_size, "")?;
     let end_block = builder.build_int_unsigned_div(end_idx, block_size, "")?;
 
     let iters = builder.build_int_sub(end_block, start_block, "")?;
@@ -593,9 +598,21 @@ fn inspect_mask_blocks<'c, H: HugrView<Node = Node>>(
     build_loop(ctx, iters, |ctx, idx| {
         let builder = ctx.builder();
         let block_idx = builder.build_int_add(idx, start_block, "")?;
-        let block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
+        let block_addr =
+            unsafe { builder.build_in_bounds_gep(mask_info.mask_ptr, &[block_idx], "")? };
         let block = builder.build_load(block_addr, "")?.into_int_value();
-        go(ctx, block)
+        let err_bb = ctx.build_positioned_new_block("mask_block_err", None, |ctx, bb| {
+            let err_val = ctx.emit_custom_const(err).unwrap();
+            ccg.emit_panic(ctx, err_val)?;
+            ctx.builder().build_unreachable()?;
+            Ok(bb)
+        })?;
+        let ok_bb = ctx.build_positioned_new_block("mask_block_ok", None, |_, bb| bb);
+        let builder = ctx.builder();
+        let cond = builder.build_int_compare(IntPredicate::EQ, block, expected_val, "")?;
+        builder.build_conditional_branch(cond, ok_bb, err_bb)?;
+        builder.position_at_end(ok_bb);
+        Ok(())
     })
 }
 
@@ -786,25 +803,12 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
             let size = size.into_int_value();
             // Pad unused bits to zero
             build_mask_padding(ctx, mask_ptr, offset, size, false)?;
-
-            inspect_mask_blocks(ctx, mask_ptr, offset, size, |ctx, block| {
-                let none_borrowed_bb =
-                    ctx.build_positioned_new_block("none_borrowed", None, |_, bb| bb);
-                let some_borrowed_bb =
-                    ctx.build_positioned_new_block("some_borrowed", None, |ctx, bb| {
-                        let err: &ConstError = &ERR_SOME_BORROWED;
-                        let err_val = ctx.emit_custom_const(err).unwrap();
-                        ccg.emit_panic(ctx, err_val)?;
-                        ctx.builder().build_unreachable()?;
-                        Ok(bb)
-                    })?;
-                let builder = ctx.builder();
-                let cond =
-                    builder.build_int_compare(IntPredicate::EQ, block, usize_t.const_zero(), "")?;
-                builder.build_conditional_branch(cond, none_borrowed_bb, some_borrowed_bb)?;
-                builder.position_at_end(none_borrowed_bb);
-                Ok(())
-            })?;
+            let info = MaskInfo {
+                mask_ptr,
+                offset,
+                size,
+            };
+            inspect_mask_blocks(ccg, ctx, info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
             Ok(None)
         },
     )?;
@@ -838,28 +842,13 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
             // Pad unused bits to one
             build_mask_padding(ctx, mask_ptr, offset, size, true)?;
 
-            inspect_mask_blocks(ctx, mask_ptr, offset, size, |ctx, block| {
-                let some_not_borrowed =
-                    ctx.build_positioned_new_block("some_not_borrowed", None, |ctx, bb| {
-                        let err: &ConstError = &ERR_NOT_ALL_BORROWED;
-                        let err_val = ctx.emit_custom_const(err).unwrap();
-                        ccg.emit_panic(ctx, err_val)?;
-                        ctx.builder().build_unreachable()?;
-                        Ok(bb)
-                    })?;
-                let all_borrowed_bb =
-                    ctx.build_positioned_new_block("all_borrowed", None, |_, bb| bb);
-                let builder = ctx.builder();
-                let cond = builder.build_int_compare(
-                    IntPredicate::EQ,
-                    block,
-                    usize_t.const_all_ones(),
-                    "",
-                )?;
-                builder.build_conditional_branch(cond, all_borrowed_bb, some_not_borrowed)?;
-                builder.position_at_end(all_borrowed_bb);
-                Ok(())
-            })?;
+            let info = MaskInfo {
+                mask_ptr,
+                offset,
+                size,
+            };
+            let ones = usize_t.const_all_ones();
+            inspect_mask_blocks(ccg, ctx, info, ones, &ERR_NOT_ALL_BORROWED)?;
             Ok(None)
         },
     )?;
