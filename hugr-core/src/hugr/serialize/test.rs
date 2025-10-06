@@ -5,6 +5,7 @@ use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
     ModuleBuilder, endo_sig, inout_sig, test::closed_dfg_root_hugr,
 };
+use crate::envelope::{EnvelopeConfig, read_envelope, write_envelope};
 use crate::extension::ExtensionRegistry;
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
@@ -16,15 +17,21 @@ use crate::hugr::validate::ValidationError;
 use crate::hugr::views::ExtractionResult;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
+use crate::package::Package;
 use crate::std_extensions::arithmetic::float_types::float64_type;
 use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
 use crate::std_extensions::logic::LogicOp;
+use crate::std_extensions::std_reg;
+use crate::test_file;
 use crate::types::type_param::TypeParam;
 use crate::types::{
     FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
     TypeRV,
 };
 use crate::{OutgoingPort, Visibility, type_row};
+use std::fs::File;
+use std::io::{BufReader, Cursor};
+
 use std::sync::LazyLock;
 
 use itertools::Itertools;
@@ -623,6 +630,25 @@ fn std_extensions_valid() {
         let deser: crate::extension::Extension = serde_json::from_value(val.clone()).unwrap();
         assert_eq!(serde_json::to_value(deser).unwrap(), val);
     }
+}
+
+#[test]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+// https://github.com/CQCL/hugr/issues/2600
+fn cfg_edge_ordering() {
+    let pkg: Package = Package::load(
+        BufReader::new(File::open(test_file!("issue-2600.hugr")).unwrap()),
+        None,
+    )
+    .unwrap();
+    pkg.validate().unwrap();
+
+    let mut data1: Vec<u8> = Vec::new();
+    let _ = write_envelope(&mut data1, &pkg, EnvelopeConfig::text());
+
+    let buff1 = Cursor::new(data1);
+    let (_, pkg1) = read_envelope(buff1, &std_reg()).unwrap();
+    pkg1.validate().unwrap();
 }
 
 mod proptest {

@@ -357,23 +357,32 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     let either = builder.build_select(is_ok, right, left, "")?;
     Ok(either)
 }
-
 /// Helper to outline LLVM IR into a function call instead of inlining it every time.
 ///
 /// The first time this helper is called with a given function name, a function is built
 /// using the provided closure. Future invocations with the same name will just emit calls
 /// to this function.
+///
+/// The return type is specified by `ret_type`, and the closure must return a value of that type.
+/// If `ret_type` is `None`, the function is assumed to return void.
 pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     func_name: &str,
     args: [BasicValueEnum<'c>; N],
-    go: impl FnOnce(&mut EmitFuncContext<'c, '_, H>, [BasicValueEnum<'c>; N]) -> Result<()>,
-) -> Result<()> {
+    ret_type: Option<BasicTypeEnum<'c>>,
+    go: impl FnOnce(
+        &mut EmitFuncContext<'c, '_, H>,
+        [BasicValueEnum<'c>; N],
+    ) -> Result<Option<BasicValueEnum<'c>>>,
+) -> Result<Option<BasicValueEnum<'c>>> {
     let func = match ctx.get_current_module().get_function(func_name) {
         Some(func) => func,
         None => {
             let arg_tys = args.iter().map(|v| v.get_type().into()).collect_vec();
-            let sig = ctx.iw_context().void_type().fn_type(&arg_tys, false);
+            let sig = match ret_type {
+                Some(ret_ty) => ret_ty.fn_type(&arg_tys, false),
+                None => ctx.iw_context().void_type().fn_type(&arg_tys, false),
+            };
             let func =
                 ctx.get_current_module()
                     .add_function(func_name, sig, Some(Linkage::Internal));
@@ -388,7 +397,7 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
 
             ctx.builder().position_at_end(bb);
             ctx.func = func;
-            go(ctx, args)?;
+            let ret_val = go(ctx, args)?;
             if ctx
                 .builder()
                 .get_insert_block()
@@ -396,7 +405,10 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
                 .get_terminator()
                 .is_none()
             {
-                ctx.builder().build_return(None)?;
+                match ret_val {
+                    Some(ref v) => ctx.builder().build_return(Some(v))?,
+                    None => ctx.builder().build_return(None)?,
+                };
             }
 
             ctx.builder().position_at_end(curr_bb);
@@ -404,9 +416,11 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
             func
         }
     };
-    ctx.builder()
-        .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
-    Ok(())
+    let call_site =
+        ctx.builder()
+            .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
+    let result = call_site.try_as_basic_value().left();
+    Ok(result)
 }
 
 #[cfg(test)]

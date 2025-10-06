@@ -238,7 +238,7 @@ impl<R> HugrView for PersistentHugr<R> {
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn mermaid_string_with_config(&self, config: render::RenderConfig<Self::Node>) -> String {
         self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }

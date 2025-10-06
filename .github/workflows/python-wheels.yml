@@ -67,7 +67,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
@@ -75,7 +75,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
@@ -109,7 +109,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -117,7 +117,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -148,7 +148,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
@@ -177,14 +177,14 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist --find-interpreter
+          args: --release --strip --out ../dist --find-interpreter
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
