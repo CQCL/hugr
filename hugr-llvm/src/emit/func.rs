@@ -363,8 +363,9 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
 /// using the provided closure. Future invocations with the same name will just emit calls
 /// to this function.
 ///
-/// The return type is specified by `ret_type`, and the closure must return a value of that type.
-/// If `ret_type` is `None`, the function is assumed to return void.
+/// The return type is specified by `ret_type`, and if `Some` then the closure must return
+/// a value of that type, which will be returned from the function. Otherwise, the function
+/// will return void.
 pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     func_name: &str,

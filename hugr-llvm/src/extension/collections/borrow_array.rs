@@ -1,18 +1,18 @@
 //! Codegen for prelude borrow array operations.
 //!
-//! An `borrow_array<n, T>` is lowered to a fat pointer `{ptr, mask_ptr, usize}` that is
+//! A `borrow_array<n, T>` is lowered to a fat pointer `{ptr, mask_ptr, usize}` that is
 //! allocated to at least `n * sizeof(T)` bytes. The second pointer is a bit-packed mask
 //! storing which array elements have been borrowed (1=borrowed, 0=available). It should
 //! be allocated to at least `ceil(n / sizeof(usize)) * sizeof(usize)` bytes. The extra
 //! `usize` is an offset pointing to the first element, i.e. the first element is at address
 //! `ptr + offset * sizeof(T)`.
 //!
-//! The rational behind the additional offset is the `pop_left` operation which bumps
+//! The rationale behind the additional offset is the `pop_left` operation which bumps
 //! the offset instead of mutating the pointer. This way, we can still free the original
 //! pointer when the array is discarded after a pop.
 //!
 //! We provide utility functions [`barray_fat_pointer_ty`], [`build_barray_fat_pointer`], and
-//! [`decompose_barray_fat_pointer`] to work with array fat pointers.
+//! [`decompose_barray_fat_pointer`] to work with borrow-array fat pointers.
 //!
 //! The [`DefaultBorrowArrayCodegen`] extension allocates all arrays on the heap using the
 //! standard libc `malloc` and `free` functions. This behaviour can be customised
@@ -490,7 +490,7 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
         .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
 
-    // Mask is bit-packed into an array of USIZE values
+    // Mask is bit-packed into an array of values of type usize
     let mask_length = usize_t.const_int(size.div_ceil(usize_t.get_bit_width() as u64), false);
     let mask_size_value = ctx
         .builder()
@@ -551,7 +551,7 @@ fn inspect_mask_idx<'c, H: HugrView<Node = Node>>(
     let block = builder.build_load(block_ptr, "")?.into_int_value();
     let builder = ctx.builder();
 
-    // Extrat bit from the block at position `idx % BLOCK_SIZE`
+    // Extract bit from the block at position `idx % BLOCK_SIZE`
     let block_offset = builder.build_int_unsigned_rem(idx, block_size, "")?;
     let block_shifted = builder.build_right_shift(block, block_offset, false, "")?;
     let bit = builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
@@ -616,7 +616,7 @@ fn inspect_mask_blocks<'c, H: HugrView<Node = Node>>(
     })
 }
 
-/// Emits instructions to pad unused bits in the mask with a value.
+/// Emits instructions to update the mask, overwriting unused bits with a value.
 fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     mask_ptr: PointerValue<'c>,
@@ -877,7 +877,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
     Ok(())
 }
 
-/// Emits a check that a specific array element has not already been borrowed.
+/// Emits a check that a specified (unsigned) index is less than the size of the array
 pub fn build_bounds_check<'c, H: HugrView<Node = Node>>(
     ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -899,7 +899,7 @@ pub fn build_bounds_check<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_int_compare(IntPredicate::ULT, idx, size, "")?;
             let ok_bb = ctx.build_positioned_new_block("ok", None, |_, bb| bb);
-            let err_bb = ctx.build_positioned_new_block("out_of_boudns", None, |ctx, bb| {
+            let err_bb = ctx.build_positioned_new_block("out_of_bounds", None, |ctx, bb| {
                 let err: &ConstError = &ERR_OUT_OF_BOUNDS;
                 let err_val = ctx.emit_custom_const(err).unwrap();
                 ccg.emit_panic(ctx, err_val)?;
