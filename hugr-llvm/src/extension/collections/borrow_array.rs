@@ -679,6 +679,7 @@ fn build_mask_flip<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
+        None,
         |ctx, [mask_ptr, idx]| {
             let mask_ptr = mask_ptr.into_pointer_value();
             let idx = idx.into_int_value();
@@ -694,9 +695,10 @@ fn build_mask_flip<'c, H: HugrView<Node = Node>>(
             let update = builder.build_left_shift(usize_t.const_int(1, false), block_offset, "")?;
             let block = builder.build_xor(block, update, "")?;
             builder.build_store(block_addr, block)?;
-            Ok(())
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Emits a check that a specific array element has not already been borrowed.
@@ -712,6 +714,7 @@ pub fn build_idx_not_borrowed_check<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
+        None,
         |ctx, [mask_ptr, idx]| {
             // Emit panic if borrow-bit is set
             inspect_mask_idx(
@@ -726,9 +729,11 @@ pub fn build_idx_not_borrowed_check<'c, H: HugrView<Node = Node>>(
                     ctx.builder().build_unreachable()?;
                     Ok(())
                 },
-            )
+            )?;
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Emits a check that a specific array index is free.
@@ -744,6 +749,7 @@ pub fn build_idx_free_check<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), idx.into()],
+        None,
         |ctx, [mask_ptr, idx]| {
             // Emit panic if borrow-bit is not set
             inspect_mask_idx(
@@ -758,9 +764,11 @@ pub fn build_idx_free_check<'c, H: HugrView<Node = Node>>(
                     Ok(())
                 },
                 |_| Ok(()),
-            )
+            )?;
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Emits a check that no array elements have been borrowed.
@@ -782,6 +790,7 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), offset.into(), size.into()],
+        None,
         |ctx, [mask_ptr, offset, size]| {
             let mask_ptr = mask_ptr.into_pointer_value();
             let offset = offset.into_int_value();
@@ -806,9 +815,11 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
                 builder.build_conditional_branch(cond, none_borrowed_bb, some_borrowed_bb)?;
                 builder.position_at_end(none_borrowed_bb);
                 Ok(())
-            })
+            })?;
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Emits a check that all array elements have been borrowed.
@@ -830,6 +841,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [mask_ptr.into(), offset.into(), size.into()],
+        None,
         |ctx, [mask_ptr, offset, size]| {
             let mask_ptr = mask_ptr.into_pointer_value();
             let offset = offset.into_int_value();
@@ -858,9 +870,11 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
                 builder.build_conditional_branch(cond, all_borrowed_bb, some_not_borrowed)?;
                 builder.position_at_end(all_borrowed_bb);
                 Ok(())
-            })
+            })?;
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Emits a check that a specific array element has not already been borrowed.
@@ -877,6 +891,7 @@ pub fn build_bounds_check<'c, H: HugrView<Node = Node>>(
         ctx,
         FUNC_NAME,
         [size.into(), idx.into()],
+        None,
         |ctx, [size, idx]| {
             let size = size.into_int_value();
             let idx = idx.into_int_value();
@@ -894,9 +909,10 @@ pub fn build_bounds_check<'c, H: HugrView<Node = Node>>(
             ctx.builder()
                 .build_conditional_branch(in_bounds, ok_bb, err_bb)?;
             ctx.builder().position_at_end(ok_bb);
-            Ok(())
+            Ok(None)
         },
-    )
+    )?;
+    Ok(())
 }
 
 /// Helper function to build a loop that repeats for a given number of iterations.
