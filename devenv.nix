@@ -14,11 +14,12 @@ in
   config = {
     # https://devenv.sh/packages/
     # on macos frameworks have to be explicitly specified
-    # otherwise a linker error ocurs on rust packages
+    # otherwise a linker error occurs on rust packages
     packages = [
       pkgs.just
       pkgs.graphviz
       pkgs.cargo-insta
+      pkgs.cargo-nextest
       pkgs.capnproto
 
       # These are required for hugr-llvm to be able to link to llvm.
