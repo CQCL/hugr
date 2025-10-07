@@ -598,8 +598,6 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
     expected: bool,
     err: &ConstError,
 ) -> Result<()> {
-    build_mask_padding(ctx, mask_info, expected)?;
-
     let usize_t = usize_ty(&ctx.typing_session());
     let builder = ctx.builder();
     let last_idx = builder.build_int_sub(
@@ -607,7 +605,9 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
         usize_t.const_int(1, false),
         "dec",
     )?;
+    build_mask_padding(ctx, mask_info.mask_ptr, mask_info.offset, last_idx, expected)?;
 
+    let builder = ctx.builder();
     let expected_val = if expected {
         usize_t.const_all_ones()
     } else {
@@ -643,14 +643,11 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
 /// Emits instructions to update the mask, overwriting unused bits with a value.
 fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    info: &MaskInfo<'c>,
+    mask_ptr: PointerValue<'c>,
+    offset: IntValue<'c>,
+    lst_idx: IntValue<'c>,
     value: bool,
 ) -> Result<()> {
-    let MaskInfo {
-        mask_ptr,
-        offset,
-        size,
-    } = *info;
     let builder = ctx.builder();
     let usize_t = usize_ty(&ctx.typing_session());
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
@@ -682,11 +679,6 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     builder.build_store(fst_block_addr, new_fst_block)?;
 
     // Find the last block that contain some used bits
-    let lst_idx = builder.build_int_sub(
-        builder.build_int_add(offset, size, "")?,
-        usize_t.const_int(1, false),
-        "dec",
-    )?;
     let lst_block_idx = builder.build_int_unsigned_div(lst_idx, block_size, "")?;
     let lst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[lst_block_idx], "")? };
     let lst_block = builder.build_load(lst_block_addr, "")?.into_int_value();
