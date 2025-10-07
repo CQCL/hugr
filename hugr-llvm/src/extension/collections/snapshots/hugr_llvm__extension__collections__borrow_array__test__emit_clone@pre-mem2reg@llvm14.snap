@@ -69,26 +69,26 @@ declare i8* @malloc(i64)
 declare void @llvm.memset.p0i64.i64(i64* nocapture writeonly, i8, i64, i1 immarg) #0
 
 define internal void @__barray_check_none_borrowed(i64* %0, i64 %1, i64 %2) {
-  %4 = add i64 %1, %2
-  %dec = sub i64 %4, 1
-  %5 = udiv i64 %1, 64
-  %6 = getelementptr inbounds i64, i64* %0, i64 %5
-  %7 = load i64, i64* %6, align 4
-  %8 = urem i64 %1, 64
-  %9 = shl i64 -1, %8
-  %10 = and i64 %7, %9
-  store i64 %10, i64* %6, align 4
-  %11 = udiv i64 %dec, 64
+  %4 = udiv i64 %1, 64
+  %5 = getelementptr inbounds i64, i64* %0, i64 %4
+  %6 = load i64, i64* %5, align 4
+  %7 = urem i64 %1, 64
+  %8 = shl i64 -1, %7
+  %9 = and i64 %6, %8
+  store i64 %9, i64* %5, align 4
+  %10 = add i64 %1, %2
+  %last_valid = sub i64 %10, 1
+  %11 = udiv i64 %last_valid, 64
   %12 = getelementptr inbounds i64, i64* %0, i64 %11
   %13 = load i64, i64* %12, align 4
-  %14 = urem i64 %dec, 64
+  %14 = urem i64 %last_valid, 64
   %15 = add i64 %14, 1
   %16 = sub i64 64, %15
   %17 = lshr i64 -1, %16
   %18 = and i64 %13, %17
   store i64 %18, i64* %12, align 4
   %19 = udiv i64 %1, 64
-  %20 = udiv i64 %dec, 64
+  %20 = udiv i64 %last_valid, 64
   %21 = sub i64 %20, %19
   %22 = add i64 %21, 1
   %23 = alloca i64, align 8

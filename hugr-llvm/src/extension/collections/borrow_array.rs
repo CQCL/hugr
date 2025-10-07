@@ -598,14 +598,27 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
     expected: bool,
     err: &ConstError,
 ) -> Result<()> {
+    build_mask_padding1d(
+        ctx,
+        mask_info.mask_ptr,
+        mask_info.offset,
+        BitsToPad::Before,
+        expected,
+    )?;
     let usize_t = usize_ty(&ctx.typing_session());
     let builder = ctx.builder();
     let last_idx = builder.build_int_sub(
         builder.build_int_add(mask_info.offset, mask_info.size, "")?,
         usize_t.const_int(1, false),
-        "dec",
+        "last_valid",
     )?;
-    build_mask_padding(ctx, mask_info.mask_ptr, mask_info.offset, last_idx, expected)?;
+    build_mask_padding1d(
+        ctx,
+        mask_info.mask_ptr,
+        last_idx,
+        BitsToPad::After,
+        expected,
+    )?;
 
     let builder = ctx.builder();
     let expected_val = if expected {
@@ -640,12 +653,18 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BitsToPad {
+    Before,
+    After,
+}
+
 /// Emits instructions to update the mask, overwriting unused bits with a value.
-fn build_mask_padding<'c, H: HugrView<Node = Node>>(
+fn build_mask_padding1d<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     mask_ptr: PointerValue<'c>,
-    offset: IntValue<'c>,
-    lst_idx: IntValue<'c>,
+    idx: IntValue<'c>,
+    end: BitsToPad,
     value: bool,
 ) -> Result<()> {
     let builder = ctx.builder();
@@ -653,62 +672,60 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
 
     // Find the first block that contain some used bits
-    let fst_block_idx = builder.build_int_unsigned_div(offset, block_size, "")?;
-    let fst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[fst_block_idx], "")? };
-    let fst_block = builder.build_load(fst_block_addr, "")?.into_int_value();
+    let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
+    let block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
+    let block = builder.build_load(block_addr, "")?.into_int_value();
 
-    // Pad out the unused bits in the first block
     let ones = usize_t.const_all_ones();
-    let fst_block_unused = builder.build_int_unsigned_rem(offset, block_size, "")?;
-    let new_fst_block = if value {
-        // Pad with ones.
-        // If fst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
-        let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
-        let rsh = builder.build_right_shift(ones, fst_block_used, false, "")?;
-        let all_used =
-            builder.build_int_compare(IntPredicate::EQ, fst_block_used, block_size, "")?;
-        let pad = builder
-            .build_select(all_used, usize_t.const_zero(), rsh, "")?
-            .into_int_value();
-        builder.build_or(fst_block, pad, "")?
-    } else {
-        // Pad with zeros
-        let pad = builder.build_left_shift(ones, fst_block_unused, "")?;
-        builder.build_and(fst_block, pad, "")?
+    let new_block = match end {
+        BitsToPad::Before => {
+            let fst_block_unused = builder.build_int_unsigned_rem(idx, block_size, "")?;
+            if value {
+                // Pad with ones.
+                // If fst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
+                let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
+                let rsh = builder.build_right_shift(ones, fst_block_used, false, "")?;
+                let all_used =
+                    builder.build_int_compare(IntPredicate::EQ, fst_block_used, block_size, "")?;
+                let pad = builder
+                    .build_select(all_used, usize_t.const_zero(), rsh, "")?
+                    .into_int_value();
+                builder.build_or(block, pad, "")?
+            } else {
+                // Pad with zeros
+                let pad = builder.build_left_shift(ones, fst_block_unused, "")?;
+                builder.build_and(block, pad, "")?
+            }
+        }
+        BitsToPad::After => {
+            // Pad out the unused bits in the last block.
+            // modulus produces 0-(block_size-1), so add one to get 1-block_size
+            // i.e. the number of used bits, not as index
+            let lst_block_used = builder.build_int_add(
+                builder.build_int_unsigned_rem(idx, block_size, "")?,
+                usize_t.const_int(1, false),
+                "",
+            )?;
+            if value {
+                // Pad with ones.
+                // If lst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
+                let lsh = builder.build_left_shift(ones, lst_block_used, "")?;
+                let all_used =
+                    builder.build_int_compare(IntPredicate::EQ, lst_block_used, block_size, "")?;
+                let pad = builder
+                    .build_select(all_used, usize_t.const_zero(), lsh, "")?
+                    .into_int_value();
+
+                builder.build_or(block, pad, "")?
+            } else {
+                // Pad with zeros.
+                let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
+                let pad = builder.build_right_shift(ones, lst_block_unused, false, "")?;
+                builder.build_and(block, pad, "")?
+            }
+        }
     };
-    builder.build_store(fst_block_addr, new_fst_block)?;
-
-    // Find the last block that contain some used bits
-    let lst_block_idx = builder.build_int_unsigned_div(lst_idx, block_size, "")?;
-    let lst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[lst_block_idx], "")? };
-    let lst_block = builder.build_load(lst_block_addr, "")?.into_int_value();
-
-    // Pad out the unused bits in the last block.
-    // modulus produces 0-(block_size-1), so add one to get 1-block_size
-    // i.e. the number of used bits, not as index
-    let lst_block_used = builder.build_int_add(
-        builder.build_int_unsigned_rem(lst_idx, block_size, "")?,
-        usize_t.const_int(1, false),
-        "",
-    )?;
-    let new_lst_block = if value {
-        // Pad with ones.
-        // If lst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
-        let lsh = builder.build_left_shift(ones, lst_block_used, "")?;
-        let all_used =
-            builder.build_int_compare(IntPredicate::EQ, lst_block_used, block_size, "")?;
-        let pad = builder
-            .build_select(all_used, usize_t.const_zero(), lsh, "")?
-            .into_int_value();
-
-        builder.build_or(lst_block, pad, "")?
-    } else {
-        // Pad with zeros.
-        let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
-        let pad = builder.build_right_shift(ones, lst_block_unused, false, "")?;
-        builder.build_and(lst_block, pad, "")?
-    };
-    builder.build_store(lst_block_addr, new_lst_block)?;
+    builder.build_store(block_addr, new_block)?;
     Ok(())
 }
 
