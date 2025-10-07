@@ -665,8 +665,18 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     let fst_block_unused = builder.build_int_unsigned_rem(offset, block_size, "")?;
     let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
     let new_fst_block = if value {
-        // Pad with ones
-        let pad = builder.build_right_shift(ones, fst_block_used, false, "")?;
+        // Pad with ones.
+        // If fst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
+        let rsh = builder.build_right_shift(ones, fst_block_used, false, "")?;
+        let is_all = builder.build_int_compare(
+            IntPredicate::EQ,
+            fst_block_used,
+            block_size,
+            "",
+        )?;
+        let pad = builder
+            .build_select(is_all, usize_t.const_zero(), rsh, "")?
+            .into_int_value();
         builder.build_or(fst_block, pad, "")?
     } else {
         // Pad with zeros
@@ -675,15 +685,18 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     };
     builder.build_store(fst_block_addr, new_fst_block)?;
 
-    // Pad out the unused bits in the last block
+    // Pad out the unused bits in the last block.
+    // Note that if the entire block is used, we'll compute 0 used and <block size> unused,
+    // which sounds wrong but actually helps (see below).
     let lst_block_used = builder.build_int_unsigned_rem(lst_idx, block_size, "")?;
     let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
     let new_lst_block = if value {
-        // Pad with ones
+        // Pad with ones. If entire block is used, shift by zero (a no-op), then or by ones (also a no-op)
         let pad = builder.build_left_shift(ones, lst_block_used, "")?;
         builder.build_or(lst_block, pad, "")?
     } else {
-        // Pad with zeros
+        // Pad with zeros. If entire block is used, the shift by block size will (contrary to expectations) be a no-op,
+        // producing all ones not zero, so the following and with ones will also be a no-op.
         let pad = builder.build_right_shift(ones, lst_block_unused, false, "")?;
         builder.build_and(lst_block, pad, "")?
     };
@@ -2796,11 +2809,42 @@ mod test {
     }
 
     #[rstest]
+    fn exec_shift_by_64(mut exec_ctx: TestContext, #[values(false, true)] right: bool) {
+        const SHIFTED_VAL: u64 = 35;
+        // This test generates LLVM code to shift a 64-bit value right/left by 64 places.
+        // This is a no-op in LLVM, rather than producing 0 as one might expect.
+        use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
+        let int_ty = int_type(6); // 64-bit integer
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let minus_one = builder.add_load_value(ConstInt::new_u(6, SHIFTED_VAL).unwrap());
+                let shift = builder.add_load_value(ConstInt::new_u(6, 64).unwrap());
+                let op = if right {
+                    IntOpDef::ishr
+                } else {
+                    IntOpDef::ishl
+                };
+                let result = builder
+                    .add_dataflow_op(op.with_log_width(6), [minus_one, shift])
+                    .unwrap()
+                    .out_wire(0);
+                builder.finish_hugr_with_outputs([result]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_int_extensions()
+        });
+        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), SHIFTED_VAL);
+    }
+
+    #[rstest]
     #[case::small(10, 0, 0)]
     #[case::small_right(10, 0, 9)]
     #[case::small_pop(10, 2, 0)]
     #[case::small_right_pop(10, 2, 7)]
-    #[case::oneword(64, 0, 0)] // ALAN Should panic but doesn't?!
+    #[case::oneword(64, 0, 0)]
     #[case::oneword_pop(64, 2, 0)]
     #[case::big_right(97, 0, 96)]
     #[case::big_pop(97, 5, 0)]
