@@ -43,7 +43,7 @@ pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
 use hugr_model::v0::bumpalo::Bump;
 pub use package_json::PackageEncodingError;
 
-use crate::envelope::description::PackageDescription;
+use crate::envelope::description::{ModuleDescription, PackageDesc, WithPackageDesc, WrapError};
 use crate::envelope::header::HeaderError;
 use crate::{Hugr, HugrView};
 use crate::{
@@ -158,38 +158,22 @@ pub fn read_envelope(
     registry: &ExtensionRegistry,
 ) -> Result<(EnvelopeConfig, Package), EnvelopeError> {
     match read_new(reader, registry) {
-        Ok((desc, pkg)) => Ok((desc.header.config(), pkg)),
+        Ok((desc, pkg)) => Ok((desc.header.expect("no error, header present").config(), pkg)),
         Err(_) => Err(todo!("Convert ReadError to EnvelopeError")),
     }
 }
 
-#[derive(Debug, Error)]
-#[error("{inner} while reading envelope: {partial_description}")]
-pub struct DescribedError<E: std::fmt::Display, D: std::fmt::Display> {
-    inner: Box<E>,
-    partial_description: D,
-}
-
-impl<E: std::fmt::Display, D: std::fmt::Display> DescribedError<E, D> {
-    pub fn new(partial_description: D, inner: E) -> Self {
-        Self {
-            partial_description,
-            inner: Box::new(inner),
-        }
-    }
-}
 #[derive(Error, Debug)]
 #[error(transparent)]
 pub enum ReadError {
     HeaderError(#[from] HeaderError),
-    PayloadError(#[from] DescribedError<PayloadError, PackageDescription>),
+    PayloadError(#[from] WithPackageDesc<PayloadError>),
 }
-#[derive(Error, Debug)]
-pub enum PayloadError {}
+
 pub fn read_new(
     mut reader: impl BufRead,
     registry: &ExtensionRegistry,
-) -> Result<(PackageDescription, Package), ReadError> {
+) -> Result<(PackageDesc, Package), ReadError> {
     let header = EnvelopeHeader::read_new(&mut reader)?;
     todo!()
 
@@ -245,7 +229,13 @@ pub(crate) fn write_envelope_impl<'h>(
 
     Ok(())
 }
-
+#[derive(Error, Debug)]
+#[non_exhaustive]
+#[error(transparent)]
+pub enum PayloadError {
+    JsonRead(#[from] PackageEncodingError),
+    ModelImport(#[from] ImportError),
+}
 /// Error type for envelope operations.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -391,14 +381,14 @@ fn read_impl(
     payload: impl BufRead,
     header: EnvelopeHeader,
     registry: &ExtensionRegistry,
-) -> Result<Package, EnvelopeError> {
+) -> Result<Package, WithPackageDesc<PayloadError>> {
     let package = match header.format {
         EnvelopeFormat::PackageJson => Ok(package_json::from_json_reader(payload, registry)?),
         EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
-            decode_model(payload, registry, header.format)
+            Ok(decode_model(payload, registry, header.format))?
         }
         EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
-            decode_model_ast(payload, registry, header.format)
+            Ok(decode_model_ast(payload, registry, header)?)
         }
     }?;
 
@@ -406,6 +396,15 @@ fn read_impl(
         check_breaking_extensions(module).map_err(|err| WithGenerator::new(err, &package.modules))
     })?;
     Ok(package)
+}
+#[derive(Debug, Error)]
+#[error(transparent)]
+enum ModelBinaryReadError {
+    ParseString(#[from] hugr_model::v0::ast::ParseError),
+    ReadBinary(#[from] hugr_model::v0::binary::ReadError),
+    Import(#[from] ImportError),
+    Extensions(#[from] crate::extension::ExtensionRegistryLoadError),
+    FormatUnsupported(#[from] FormatUnsupportedError),
 }
 
 /// Read a HUGR model payload from a reader.
@@ -422,7 +421,7 @@ fn decode_model(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
     format: EnvelopeFormat,
-) -> Result<Package, EnvelopeError> {
+) -> Result<Package, ModelBinaryReadError> {
     check_model_version(format)?;
     let bump = Bump::default();
     let model_package = hugr_model::v0::binary::read_from_reader(&mut stream, &bump)?;
@@ -438,9 +437,24 @@ fn decode_model(
     Ok(package)
 }
 
-fn check_model_version(format: EnvelopeFormat) -> Result<(), EnvelopeError> {
+#[derive(Debug, Error)]
+#[error(
+    "The envelope format {format} is not supported.{}",
+    match feature {
+        Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
+        None => String::new()
+    },
+)]
+struct FormatUnsupportedError {
+    /// The unsupported format.
+    format: EnvelopeFormat,
+    /// Optionally, the feature required to support this format.
+    feature: Option<&'static str>,
+}
+
+fn check_model_version(format: EnvelopeFormat) -> Result<(), FormatUnsupportedError> {
     if format.model_version() != Some(0) {
-        return Err(EnvelopeError::FormatUnsupported {
+        return Err(FormatUnsupportedError {
             format,
             feature: None,
         });
@@ -448,6 +462,17 @@ fn check_model_version(format: EnvelopeFormat) -> Result<(), EnvelopeError> {
     Ok(())
 }
 
+#[derive(Debug, Error)]
+#[error(transparent)]
+enum ModelTextReadError {
+    ParseString(#[from] hugr_model::v0::ast::ParseError),
+    Import(#[from] ImportError),
+    ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
+    FormatUnsupported(#[from] FormatUnsupportedError),
+    ExtensionDeserialize(#[from] serde_json::Error),
+    StringRead(#[from] std::io::Error),
+    ResolveError(#[from] hugr_model::v0::ast::ResolveError),
+}
 /// Read a HUGR model text payload from a reader.
 ///
 /// Parameters:
@@ -458,9 +483,11 @@ fn check_model_version(format: EnvelopeFormat) -> Result<(), EnvelopeError> {
 fn decode_model_ast(
     mut stream: impl BufRead,
     extension_registry: &ExtensionRegistry,
-    format: EnvelopeFormat,
-) -> Result<Package, EnvelopeError> {
-    check_model_version(format)?;
+    header: EnvelopeHeader,
+) -> Result<Package, WithPackageDesc<ModelTextReadError>> {
+    let desc = PackageDesc::default().with_header(header.clone());
+    let format = header.format;
+    check_model_version(format).map_err(|e| desc.wrap(e) )?;
 
     let packaged_extensions = if format == EnvelopeFormat::ModelTextWithExtensions {
         let deserializer = serde_json::Deserializer::from_reader(&mut stream);
@@ -468,7 +495,8 @@ fn decode_model_ast(
         let extra_extensions = deserializer
             .into_iter::<Vec<Extension>>()
             .next()
-            .unwrap_or(Ok(vec![]))?;
+            .unwrap_or(Ok(vec![]))
+            .map_err(|e| desc.wrap(e))?;
         ExtensionRegistry::new(extra_extensions.into_iter().map(std::sync::Arc::new))
     } else {
         ExtensionRegistry::new([])
@@ -478,13 +506,16 @@ fn decode_model_ast(
     //
     // Due to how `to_string` works, we cannot append extensions after the package.
     let mut buffer = String::new();
-    stream.read_to_string(&mut buffer)?;
-    let ast_package = hugr_model::v0::ast::Package::from_str(&buffer)?;
+    stream
+        .read_to_string(&mut buffer)
+        .map_err(|e| desc.wrap(e))?;
+    let ast_package = hugr_model::v0::ast::Package::from_str(&buffer).map_err(|e| desc.wrap(e))?;
 
     let bump = Bump::default();
-    let model_package = ast_package.resolve(&bump)?;
+    let model_package = ast_package.resolve(&bump).map_err(|e| desc.wrap(e))?;
 
-    let package = import_package(&model_package, packaged_extensions, extension_registry)?;
+    let package = import_package(&model_package, packaged_extensions, extension_registry)
+        .map_err(|e| desc.wrap(e))?;
 
     Ok(package)
 }
