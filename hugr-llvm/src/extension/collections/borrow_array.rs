@@ -2530,6 +2530,7 @@ mod test {
     }
 
     #[rstest]
+    #[case::empty(0, 0)]
     #[case::basic(32, 0)]
     #[case::boundary(65, 0)]
     #[case::pop1(65, 10)]
@@ -2755,9 +2756,17 @@ mod test {
     }
 
     #[rstest]
-    fn exec_discard_all_borrowed_panic(mut exec_ctx: TestContext) {
+    #[case::oneword(10, 0)]
+    #[case::oneword_pop(10, 2)]
+    #[case::big(97, 0)]
+    #[case::big_pop(97, 5)]
+    #[case::big_popmany(97, 65)]
+    fn exec_discard_all_borrowed_panic(
+        mut exec_ctx: TestContext,
+        #[case] size: u64,
+        #[case] num_pops: u64,
+    ) {
         let int_ty = int_type(6);
-        let size = 10;
         let hugr = SimpleHugrConfig::new()
             .with_extensions(exec_registry())
             .finish(|mut builder| {
@@ -2768,8 +2777,9 @@ mod test {
                         .collect_vec(),
                 );
                 let array = builder.add_load_value(array);
+                let array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
                 builder
-                    .add_discard_all_borrowed(int_ty.clone(), size, array)
+                    .add_discard_all_borrowed(int_ty.clone(), size - num_pops, array)
                     .unwrap();
                 builder.finish_hugr_with_outputs([]).unwrap()
             });
