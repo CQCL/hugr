@@ -577,8 +577,9 @@ struct MaskInfo<'a> {
     size: IntValue<'a>,
 }
 
-/// Emits instructions to inspect blocks of the borrowed mask using the provided closure.
-fn inspect_mask_blocks<'c, H: HugrView<Node = Node>>(
+/// Emits instructions to check all blocks of the borrowed mask are equal to `expected_val`
+/// or else panic with the specified error.
+fn check_all_mask_blocks_eq<'c, H: HugrView<Node = Node>>(
     ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     mask_info: MaskInfo<'c>,
@@ -808,7 +809,7 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
                 offset,
                 size,
             };
-            inspect_mask_blocks(ccg, ctx, info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
+            check_all_mask_blocks_eq(ccg, ctx, info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
             Ok(None)
         },
     )?;
@@ -848,7 +849,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
                 size,
             };
             let ones = usize_t.const_all_ones();
-            inspect_mask_blocks(ccg, ctx, info, ones, &ERR_NOT_ALL_BORROWED)?;
+            check_all_mask_blocks_eq(ccg, ctx, info, ones, &ERR_NOT_ALL_BORROWED)?;
             Ok(None)
         },
     )?;
