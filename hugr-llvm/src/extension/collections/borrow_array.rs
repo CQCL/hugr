@@ -651,14 +651,10 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     let usize_t = usize_ty(&ctx.typing_session());
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
 
-    // Find the first and last blocks that contain some used bits
-    let lst_idx = builder.build_int_add(offset, size, "")?;
+    // Find the first block that contain some used bits
     let fst_block_idx = builder.build_int_unsigned_div(offset, block_size, "")?;
-    let lst_block_idx = builder.build_int_unsigned_div(lst_idx, block_size, "")?;
     let fst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[fst_block_idx], "")? };
-    let lst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[lst_block_idx], "")? };
     let fst_block = builder.build_load(fst_block_addr, "")?.into_int_value();
-    let lst_block = builder.build_load(lst_block_addr, "")?.into_int_value();
 
     // Pad out the unused bits in the first block
     let ones = usize_t.const_all_ones();
@@ -684,6 +680,12 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
         builder.build_and(fst_block, pad, "")?
     };
     builder.build_store(fst_block_addr, new_fst_block)?;
+
+    // Find the last block that contain some used bits
+    let lst_idx = builder.build_int_add(offset, size, "")?;
+    let lst_block_idx = builder.build_int_unsigned_div(lst_idx, block_size, "")?;
+    let lst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[lst_block_idx], "")? };
+    let lst_block = builder.build_load(lst_block_addr, "")?.into_int_value();
 
     // Pad out the unused bits in the last block.
     // Note that if the entire block is used, we'll compute 0 used and <block size> unused,
@@ -2598,12 +2600,12 @@ mod test {
 
     #[rstest]
     #[case::small(10, 0)]
-    #[case::small_pop(10, 2)] // ALAN This panics (but shouldn't)...consistent that we haven't padded out the popped elements of the mask.
+    #[case::small_pop(10, 2)]
     #[case::oneword(64, 0)]
     #[case::oneword_pop(64, 5)]
     #[case::big(97, 0)]
     #[case::big_pop(97, 5)]
-    #[case::big_pop_until_small(97, 65)] // ALAN Similarly (for mask_ptr[1], the second/final word, common to both ends of the bit of the mask that's actually used)
+    #[case::big_pop_until_small(97, 65)]
     fn exec_discard_all_borrowed2(
         mut exec_ctx: TestContext,
         #[case] size: u64,
