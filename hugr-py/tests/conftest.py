@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import Self
 
 from hugr import ext, tys
-from hugr.envelope import EnvelopeConfig
+from hugr.envelope import EnvelopeConfig, EnvelopeFormat
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
 from hugr.package import Package
@@ -185,10 +185,19 @@ def validate(
     # `hugr convert --format`.
     FORMATS = {
         "json": EnvelopeConfig.TEXT,
+        "json-compressed": EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=0),
         "model-exts": EnvelopeConfig.BINARY,
+        "model-exts-no-compression": EnvelopeConfig(
+            format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=None
+        ),
     }
     # Envelope formats used when exporting test hugrs.
-    WRITE_FORMATS = ["json", "model-exts"]
+    WRITE_FORMATS = [
+        "json",
+        "json-compressed",
+        "model-exts",
+        "model-exts-no-compression",
+    ]
     # Envelope formats used as target for `hugr convert` before loading back the
     # test hugrs.
     LOAD_FORMATS = ["json", "model-exts"]
