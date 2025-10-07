@@ -582,7 +582,7 @@ struct MaskInfo<'a> {
 fn check_all_mask_blocks_eq<'c, H: HugrView<Node = Node>>(
     ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    mask_info: MaskInfo<'c>,
+    mask_info: &MaskInfo<'c>,
     expected_val: IntValue<'c>,
     err: &ConstError,
 ) -> Result<()> {
@@ -620,11 +620,14 @@ fn check_all_mask_blocks_eq<'c, H: HugrView<Node = Node>>(
 /// Emits instructions to update the mask, overwriting unused bits with a value.
 fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    mask_ptr: PointerValue<'c>,
-    offset: IntValue<'c>,
-    size: IntValue<'c>,
+    info: &MaskInfo<'c>,
     value: bool,
 ) -> Result<()> {
+    let MaskInfo {
+        mask_ptr,
+        offset,
+        size,
+    } = *info;
     let builder = ctx.builder();
     let usize_t = usize_ty(&ctx.typing_session());
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
@@ -803,13 +806,13 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
             let offset = offset.into_int_value();
             let size = size.into_int_value();
             // Pad unused bits to zero
-            build_mask_padding(ctx, mask_ptr, offset, size, false)?;
             let info = MaskInfo {
                 mask_ptr,
                 offset,
                 size,
             };
-            check_all_mask_blocks_eq(ccg, ctx, info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
+            build_mask_padding(ctx, &info, false)?;
+            check_all_mask_blocks_eq(ccg, ctx, &info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
             Ok(None)
         },
     )?;
@@ -841,15 +844,14 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
             let offset = offset.into_int_value();
             let size = size.into_int_value();
             // Pad unused bits to one
-            build_mask_padding(ctx, mask_ptr, offset, size, true)?;
-
             let info = MaskInfo {
                 mask_ptr,
                 offset,
                 size,
             };
+            build_mask_padding(ctx, &info, true)?;
             let ones = usize_t.const_all_ones();
-            check_all_mask_blocks_eq(ccg, ctx, info, ones, &ERR_NOT_ALL_BORROWED)?;
+            check_all_mask_blocks_eq(ccg, ctx, &info, ones, &ERR_NOT_ALL_BORROWED)?;
             Ok(None)
         },
     )?;
