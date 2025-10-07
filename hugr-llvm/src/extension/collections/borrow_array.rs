@@ -676,54 +676,44 @@ fn build_mask_padding1d<'c, H: HugrView<Node = Node>>(
     let block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
     let block = builder.build_load(block_addr, "")?.into_int_value();
 
-    let ones = usize_t.const_all_ones();
-    let new_block = match end {
-        BitsToPad::Before => {
-            let fst_block_unused = builder.build_int_unsigned_rem(idx, block_size, "")?;
-            if value {
-                // Pad with ones.
-                // If fst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
-                let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
-                let rsh = builder.build_right_shift(ones, fst_block_used, false, "")?;
-                let all_used =
-                    builder.build_int_compare(IntPredicate::EQ, fst_block_used, block_size, "")?;
-                let pad = builder
-                    .build_select(all_used, usize_t.const_zero(), rsh, "")?
-                    .into_int_value();
-                builder.build_or(block, pad, "")?
-            } else {
-                // Pad with zeros
-                let pad = builder.build_left_shift(ones, fst_block_unused, "")?;
-                builder.build_and(block, pad, "")?
+    let all_ones = usize_t.const_all_ones();
+    let one = usize_t.const_int(1, false);
+    let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
+    let new_block = if value {
+        // Pad with ones.
+        let (num_used, shifted) = match end {
+            BitsToPad::Before => {
+                let fst_block_used = builder.build_int_sub(block_size, idx_in_block, "")?;
+                let rsh = builder.build_right_shift(all_ones, fst_block_used, false, "")?;
+                (fst_block_used, rsh)
             }
-        }
-        BitsToPad::After => {
-            // Pad out the unused bits in the last block.
-            // modulus produces 0-(block_size-1), so add one to get 1-block_size
-            // i.e. the number of used bits, not as index
-            let lst_block_used = builder.build_int_add(
-                builder.build_int_unsigned_rem(idx, block_size, "")?,
-                usize_t.const_int(1, false),
-                "",
-            )?;
-            if value {
-                // Pad with ones.
-                // If lst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
-                let lsh = builder.build_left_shift(ones, lst_block_used, "")?;
-                let all_used =
-                    builder.build_int_compare(IntPredicate::EQ, lst_block_used, block_size, "")?;
-                let pad = builder
-                    .build_select(all_used, usize_t.const_zero(), lsh, "")?
-                    .into_int_value();
-
-                builder.build_or(block, pad, "")?
-            } else {
-                // Pad with zeros.
+            BitsToPad::After => {
+                // 0<=`idx_in_block`<block_size from int_unsigned_rem, so add one to get
+                // the number of used bits in the last block.
+                let lst_block_used = builder.build_int_add(idx_in_block, one, "")?;
+                let lsh = builder.build_left_shift(all_ones, lst_block_used, "")?;
+                (lst_block_used, lsh)
+            }
+        };
+        // If the shift amount is the block_size, LLVM defines the shift to be a no-op, but we want a zero.
+        let all_used = builder.build_int_compare(IntPredicate::EQ, num_used, block_size, "")?;
+        let pad = builder
+            .build_select(all_used, usize_t.const_zero(), shifted, "")?
+            .into_int_value();
+        builder.build_or(block, pad, "")?
+    } else {
+        // Pad with zeroes.
+        let pad = match end {
+            BitsToPad::Before => builder.build_left_shift(all_ones, idx_in_block, "")?,
+            BitsToPad::After => {
+                // 0<=`idx_in_block`<block_size from int_unsigned_rem, so add one to get
+                // the number of used bits in the last block.
+                let lst_block_used = builder.build_int_add(idx_in_block, one, "")?;
                 let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
-                let pad = builder.build_right_shift(ones, lst_block_unused, false, "")?;
-                builder.build_and(block, pad, "")?
+                builder.build_right_shift(all_ones, lst_block_unused, false, "")?
             }
-        }
+        };
+        builder.build_and(block, pad, "")?
     };
     builder.build_store(block_addr, new_block)?;
     Ok(())
