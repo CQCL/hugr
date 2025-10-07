@@ -2584,6 +2584,46 @@ mod test {
     }
 
     #[rstest]
+    #[case::small(10, 0)]
+    #[case::small_pop(10, 2)] // ALAN This panics (but shouldn't)...consistent that we haven't padded out the popped elements of the mask.
+    #[case::oneword(64, 0)]
+    #[case::oneword_pop(64, 5)]
+    #[case::big(97, 0)]
+    #[case::big_pop(97, 5)]
+    #[case::big_pop_until_small(97, 65)] // ALAN Similarly (for mask_ptr[1], the second/final word, common to both ends of the bit of the mask that's actually used)
+    fn exec_discard_all_borrowed2(
+        mut exec_ctx: TestContext,
+        #[case] size: u64,
+        #[case] num_pops: u64,
+    ) {
+        let int_ty = int_type(6);
+        let hugr = SimpleHugrConfig::new()
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let mut array = builder.add_new_all_borrowed(int_ty.clone(), size).unwrap();
+                let val = builder.add_load_value(ConstInt::new_u(6, 15).unwrap());
+                for i in 0..num_pops {
+                    let i = builder.add_load_value(ConstUsize::new(i));
+                    array = builder
+                        .add_borrow_array_return(int_ty.clone(), size, array, i, val)
+                        .unwrap();
+                }
+                let array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
+                builder
+                    .add_discard_all_borrowed(int_ty.clone(), size - num_pops, array)
+                    .unwrap();
+                builder.finish_hugr_with_outputs([]).unwrap()
+            });
+
+        exec_ctx.add_extensions(|cge| {
+            cge.add_prelude_extensions(PanicTestPreludeCodegen)
+                .add_default_borrow_array_extensions(PanicTestPreludeCodegen)
+                .add_default_int_extensions()
+        });
+        assert_eq!(&exec_ctx.exec_hugr_panicking(hugr, "main"), "");
+    }
+
+    #[rstest]
     #[case::basic(32, 0)]
     #[case::boundary(65, 0)]
     #[case::pop1(65, 10)]
@@ -2756,10 +2796,12 @@ mod test {
     }
 
     #[rstest]
-    #[case::oneword(10, 0, 0)]
-    #[case::oneword_right(10, 0, 9)]
-    #[case::oneword_pop(10, 2, 0)]
-    #[case::oneword_right_pop(10, 2, 7)]
+    #[case::small(10, 0, 0)]
+    #[case::small_right(10, 0, 9)]
+    #[case::small_pop(10, 2, 0)]
+    #[case::small_right_pop(10, 2, 7)]
+    #[case::oneword(64, 0, 0)] // ALAN Should panic but doesn't?!
+    #[case::oneword_pop(64, 2, 0)]
     #[case::big_right(97, 0, 96)]
     #[case::big_pop(97, 5, 0)]
     #[case::big_popmany(97, 65, 0)]
