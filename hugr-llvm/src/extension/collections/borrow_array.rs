@@ -579,17 +579,24 @@ struct MaskInfo<'a> {
 
 /// Emits instructions to check all blocks of the borrowed mask are equal to `expected_val`
 /// or else panic with the specified error.
-fn check_all_mask_blocks_eq<'c, H: HugrView<Node = Node>>(
+fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
     ccg: &impl BorrowArrayCodegen,
     ctx: &mut EmitFuncContext<'c, '_, H>,
     mask_info: &MaskInfo<'c>,
-    expected_val: IntValue<'c>,
+    expected: bool,
     err: &ConstError,
 ) -> Result<()> {
+    build_mask_padding(ctx, mask_info, expected)?;
+
     let builder = ctx.builder();
     let end_idx = builder.build_int_add(mask_info.offset, mask_info.size, "")?;
 
     let usize_t = usize_ty(&ctx.typing_session());
+    let expected_val = if expected {
+        usize_t.const_all_ones()
+    } else {
+        usize_t.const_zero()
+    };
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
     let start_block = builder.build_int_unsigned_div(mask_info.offset, block_size, "")?;
     let end_block = builder.build_int_unsigned_div(end_idx, block_size, "")?;
@@ -811,8 +818,7 @@ pub fn build_none_borrowed_check<'c, H: HugrView<Node = Node>>(
                 offset,
                 size,
             };
-            build_mask_padding(ctx, &info, false)?;
-            check_all_mask_blocks_eq(ccg, ctx, &info, usize_t.const_zero(), &ERR_SOME_BORROWED)?;
+            check_all_mask_eq(ccg, ctx, &info, false, &ERR_SOME_BORROWED)?;
             Ok(None)
         },
     )?;
@@ -849,9 +855,7 @@ pub fn build_all_borrowed_check<'c, H: HugrView<Node = Node>>(
                 offset,
                 size,
             };
-            build_mask_padding(ctx, &info, true)?;
-            let ones = usize_t.const_all_ones();
-            check_all_mask_blocks_eq(ccg, ctx, &info, ones, &ERR_NOT_ALL_BORROWED)?;
+            check_all_mask_eq(ccg, ctx, &info, true, &ERR_NOT_ALL_BORROWED)?;
             Ok(None)
         },
     )?;
