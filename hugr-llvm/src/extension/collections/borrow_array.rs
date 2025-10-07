@@ -430,18 +430,20 @@ pub fn barray_fat_pointer_ty<'c>(
 /// Constructs a borrow array fat pointer value.
 pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
-    ptr: PointerValue<'c>,
-    mask_ptr: PointerValue<'c>,
-    offset: IntValue<'c>,
+    BArrayFatPtrComponents {
+        elems_ptr,
+        mask_ptr,
+        offset,
+    }: BArrayFatPtrComponents<'c>,
 ) -> Result<StructValue<'c>> {
     let array_ty = barray_fat_pointer_ty(
         &ctx.typing_session(),
-        ptr.get_type().get_element_type().try_into().unwrap(),
+        elems_ptr.get_type().get_element_type().try_into().unwrap(),
     );
     let array_v = array_ty.get_poison();
-    let array_v = ctx
-        .builder()
-        .build_insert_value(array_v, ptr.as_basic_value_enum(), 0, "")?;
+    let array_v =
+        ctx.builder()
+            .build_insert_value(array_v, elems_ptr.as_basic_value_enum(), 0, "")?;
     let array_v =
         ctx.builder()
             .build_insert_value(array_v, mask_ptr.as_basic_value_enum(), 1, "")?;
@@ -497,7 +499,7 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
         .builder()
         .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
     let ptr = ccg.emit_allocate_array(ctx, size_value)?;
-    let elem_ptr = ctx
+    let elems_ptr = ctx
         .builder()
         .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
@@ -515,8 +517,15 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     fill_mask(ctx, mask_ptr, mask_size_value, set_borrowed)?;
 
     let offset = usize_t.const_zero();
-    let array_v = build_barray_fat_pointer(ctx, elem_ptr, mask_ptr, offset)?;
-    Ok((elem_ptr, array_v))
+    let array_v = build_barray_fat_pointer(
+        ctx,
+        BArrayFatPtrComponents {
+            elems_ptr,
+            mask_ptr,
+            offset,
+        },
+    )?;
+    Ok((elems_ptr, array_v))
 }
 
 /// Emits instructions to fill the entire mask with a bit value.
@@ -1402,11 +1411,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let builder = ctx.builder();
-    let BArrayFatPtrComponents {
-        elems_ptr,
-        mask_ptr,
-        offset,
-    } = decompose_barray_fat_pointer(builder, array_v.into())?;
+    let fp = decompose_barray_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         elem_ty.clone(),
         borrow_array_type(size.saturating_add_signed(-1), elem_ty),
@@ -1416,21 +1421,33 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     }
     let (elem_ptr, new_array_offset) = {
         if pop_left {
-            let new_array_offset =
-                builder.build_int_add(offset, usize_ty(&ts).const_int(1, false), "new_offset")?;
-            build_idx_not_borrowed_check(ccg, ctx, mask_ptr, offset)?;
-            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[offset], "") }?;
+            let new_array_offset = builder.build_int_add(
+                fp.offset,
+                usize_ty(&ts).const_int(1, false),
+                "new_offset",
+            )?;
+            build_idx_not_borrowed_check(ccg, ctx, fp.mask_ptr, fp.offset)?;
+            let elem_ptr = unsafe {
+                ctx.builder()
+                    .build_in_bounds_gep(fp.elems_ptr, &[fp.offset], "")
+            }?;
             (elem_ptr, new_array_offset)
         } else {
             let idx =
-                builder.build_int_add(offset, usize_ty(&ts).const_int(size - 1, false), "")?;
-            build_idx_not_borrowed_check(ccg, ctx, mask_ptr, idx)?;
-            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[idx], "") }?;
-            (elem_ptr, offset)
+                builder.build_int_add(fp.offset, usize_ty(&ts).const_int(size - 1, false), "")?;
+            build_idx_not_borrowed_check(ccg, ctx, fp.mask_ptr, idx)?;
+            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(fp.elems_ptr, &[idx], "") }?;
+            (elem_ptr, fp.offset)
         }
     };
     let elem_v = ctx.builder().build_load(elem_ptr, "")?;
-    let new_array_v = build_barray_fat_pointer(ctx, elems_ptr, mask_ptr, new_array_offset)?;
+    let new_array_v = build_barray_fat_pointer(
+        ctx,
+        BArrayFatPtrComponents {
+            offset: new_array_offset,
+            ..fp
+        },
+    )?;
 
     Ok(ret_ty
         .build_tag(ctx.builder(), 1, vec![elem_v, new_array_v.into()])?
@@ -1649,7 +1666,15 @@ pub fn emit_from_array_op<'c, H: HugrView<Node = Node>>(
         .build_bit_cast(mask_ptr, usize_t.ptr_type(AddressSpace::default()), "")?
         .into_pointer_value();
     fill_mask(ctx, mask_ptr, mask_size, false)?;
-    Ok(build_barray_fat_pointer(ctx, ptr, mask_ptr, offset)?.into())
+    Ok(build_barray_fat_pointer(
+        ctx,
+        BArrayFatPtrComponents {
+            elems_ptr: ptr,
+            mask_ptr,
+            offset,
+        },
+    )?
+    .into())
 }
 
 #[cfg(test)]
