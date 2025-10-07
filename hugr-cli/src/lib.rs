@@ -98,6 +98,9 @@ pub enum CliError {
         /// The generator of the HUGR.
         generator: Box<String>,
     },
+    #[error("Error reading envelope.")]
+    /// Errors produced when reading an envelope.
+    ReadEnvelope(#[from] hugr::envelope::ReadError),
 }
 
 impl CliError {
