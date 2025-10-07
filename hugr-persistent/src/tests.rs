@@ -567,7 +567,7 @@ mod serial {
         S: serde::Serializer,
     {
         let mut str = hugr
-            .store_str_with_exts(EnvelopeConfig::text(), &STD_REG)
+            .store_str(EnvelopeConfig::text())
             .map_err(serde::ser::Error::custom)?;
         // TODO: replace this with a proper hugr hash (see https://github.com/CQCL/hugr/issues/2091)
         remove_encoder_version(&mut str);

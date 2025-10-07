@@ -71,15 +71,15 @@ repos:
         language: system
         files: \.rs$
         pass_filenames: false
-      - id: cargo-test
-        name: cargo test
+      - id: cargo-nextest
+        name: cargo nextest r
         description:
-          Run tests with `cargo test`.
+          Run tests with `cargo nextest`.
           # We cannot use --all-features as `hugr-model`s pyo3 feature cannot be
           # built into a binary build (without using `maturin`)
           #
           # This feature list should be kept in sync with the `hugr-py/pyproject.toml`
-        entry: cargo test --workspace --exclude 'hugr-py' --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
+        entry: cargo nextest r --workspace --exclude 'hugr-py' --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd'
         language: system
         files: \.rs$
         pass_filenames: false
