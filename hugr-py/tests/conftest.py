@@ -191,10 +191,7 @@ def validate(
     WRITE_FORMATS = ["json", "model-exts"]
     # Envelope formats used as target for `hugr convert` before loading back the
     # test hugrs.
-    #
-    # Model envelopes cannot currently be loaded from python.
-    # TODO: Add model envelope loading to python, and add it to the list.
-    LOAD_FORMATS = ["json"]
+    LOAD_FORMATS = ["json", "model-exts"]
 
     cmd = [*_base_command(), "validate", "-"]
 
