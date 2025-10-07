@@ -78,8 +78,8 @@ define internal void @__barray_check_none_borrowed(i64* %0, i64 %1, i64 %2) {
   %23 = add i64 %22, 1
   br label %24
 
-24:                                               ; preds = %none_borrowed, %3
-  %.0 = phi i64 [ 0, %3 ], [ %32, %none_borrowed ]
+24:                                               ; preds = %mask_block_ok, %3
+  %.0 = phi i64 [ 0, %3 ], [ %33, %mask_block_ok ]
   %25 = icmp ult i64 %.0, %23
   br i1 %25, label %26, label %31
 
@@ -88,19 +88,19 @@ define internal void @__barray_check_none_borrowed(i64* %0, i64 %1, i64 %2) {
   %28 = getelementptr inbounds i64, i64* %0, i64 %27
   %29 = load i64, i64* %28, align 4
   %30 = icmp eq i64 %29, 0
-  br i1 %30, label %none_borrowed, label %some_borrowed
+  br i1 %30, label %mask_block_ok, label %mask_block_err
 
 31:                                               ; preds = %24
   ret void
 
-none_borrowed:                                    ; preds = %26
-  %32 = add i64 %.0, 1
-  br label %24
-
-some_borrowed:                                    ; preds = %26
-  %33 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([39 x i8], [39 x i8]* @0, i32 0, i32 0))
+mask_block_err:                                   ; preds = %26
+  %32 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([39 x i8], [39 x i8]* @0, i32 0, i32 0))
   call void @abort()
   unreachable
+
+mask_block_ok:                                    ; preds = %26
+  %33 = add i64 %.0, 1
+  br label %24
 }
 
 declare i32 @printf(i8*, ...)
