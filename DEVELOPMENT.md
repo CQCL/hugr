@@ -30,7 +30,8 @@ To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
 - Rust `>=1.85`: <https://www.rust-lang.org/tools/install>
-- uv `>=0.3`: <https://docs.astral.sh/uv/getting-started/installation>
+- cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
+- uv `>=0.7`: <https://docs.astral.sh/uv/getting-started/installation>
 - Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
     Required when modifying the `hugr-model` serialization schema.
 - Optional: llvm `== 14.0`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
