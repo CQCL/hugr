@@ -451,20 +451,32 @@ pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
     Ok(array_v.into_struct_value())
 }
 
+pub struct BArrayFatPtrComponents<'a> {
+    pub elems_ptr: PointerValue<'a>,
+    pub mask_ptr: PointerValue<'a>,
+    pub offset: IntValue<'a>,
+}
+
 /// Returns the underlying pointer, mask and offset stored in a fat borrow array pointer.
 pub fn decompose_barray_fat_pointer<'c>(
     builder: &Builder<'c>,
     array_v: BasicValueEnum<'c>,
-) -> Result<(PointerValue<'c>, PointerValue<'c>, IntValue<'c>)> {
+) -> Result<BArrayFatPtrComponents<'c>> {
     let array_v = array_v.into_struct_value();
-    let array_ptr = builder.build_extract_value(array_v, 0, "array_ptr")?;
-    let array_mask_ptr = builder.build_extract_value(array_v, 1, "array_mask_ptr")?;
-    let array_offset = builder.build_extract_value(array_v, 2, "array_offset")?;
-    Ok((
-        array_ptr.into_pointer_value(),
-        array_mask_ptr.into_pointer_value(),
-        array_offset.into_int_value(),
-    ))
+    let elems_ptr = builder
+        .build_extract_value(array_v, 0, "array_ptr")?
+        .into_pointer_value();
+    let mask_ptr = builder
+        .build_extract_value(array_v, 1, "array_mask_ptr")?
+        .into_pointer_value();
+    let offset = builder
+        .build_extract_value(array_v, 2, "array_offset")?
+        .into_int_value();
+    Ok(BArrayFatPtrComponents {
+        elems_ptr,
+        mask_ptr,
+        offset,
+    })
 }
 
 /// Helper function to allocate a fat borrow array pointer.
@@ -999,19 +1011,22 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let [array_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayOpDef::unpack expects one argument"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
 
             let mut result = Vec::with_capacity(size as usize);
             let usize_t = usize_ty(&ctx.typing_session());
 
             for i in 0..size {
-                let idx =
-                    ctx.builder()
-                        .build_int_add(array_offset, usize_t.const_int(i, false), "")?;
+                let idx = ctx
+                    .builder()
+                    .build_int_add(offset, usize_t.const_int(i, false), "")?;
                 build_idx_not_borrowed_check(ccg, ctx, mask_ptr, idx)?;
                 let elem_addr =
-                    unsafe { ctx.builder().build_in_bounds_gep(array_ptr, &[idx], "")? };
+                    unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[idx], "")? };
                 let elem_v = ctx.builder().build_load(elem_addr, "")?;
                 result.push(elem_v);
             }
@@ -1022,8 +1037,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayOpDef::get expects two arguments"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
             let res_hugr_ty = sig
                 .output()
@@ -1047,11 +1065,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let success_block =
                 ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
                     // inside `success_block` we know `index_v` to be in bounds
-                    let index_v = ctx.builder().build_int_add(index_v, array_offset, "")?;
+                    let index_v = ctx.builder().build_int_add(index_v, offset, "")?;
                     build_idx_not_borrowed_check(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
-                        unsafe { builder.build_in_bounds_gep(array_ptr, &[index_v], "")? };
+                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
                     let elem_v = builder.build_load(elem_addr, "")?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into(), array_v])?;
@@ -1084,8 +1102,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v, value_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayOpDef::set expects three arguments"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
 
             let res_hugr_ty = sig
@@ -1110,11 +1131,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let success_block =
                 ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
                     // inside `success_block` we know `index_v` to be in bounds.
-                    let index_v = ctx.builder().build_int_add(index_v, array_offset, "")?;
+                    let index_v = ctx.builder().build_int_add(index_v, offset, "")?;
                     build_idx_not_borrowed_check(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
-                        unsafe { builder.build_in_bounds_gep(array_ptr, &[index_v], "")? };
+                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
                     let elem_v = builder.build_load(elem_addr, "")?;
                     builder.build_store(elem_addr, value_v)?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v, array_v])?;
@@ -1147,8 +1168,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index1_v, index2_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayOpDef::swap expects three arguments"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
             let index1_v = index1_v.into_int_value();
             let index2_v = index2_v.into_int_value();
 
@@ -1183,16 +1207,16 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     let builder = ctx.builder();
                     // inside `success_block` we know `index1_v` and `index2_v`
                     // to be in bounds.
-                    let index1_v = builder.build_int_add(index1_v, array_offset, "")?;
-                    let index2_v = builder.build_int_add(index2_v, array_offset, "")?;
+                    let index1_v = builder.build_int_add(index1_v, offset, "")?;
+                    let index2_v = builder.build_int_add(index2_v, offset, "")?;
                     build_idx_not_borrowed_check(ccg, ctx, mask_ptr, index1_v)?;
                     build_idx_not_borrowed_check(ccg, ctx, mask_ptr, index2_v)?;
                     let builder = ctx.builder();
                     let elem1_addr =
-                        unsafe { builder.build_in_bounds_gep(array_ptr, &[index1_v], "")? };
+                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index1_v], "")? };
                     let elem1_v = builder.build_load(elem1_addr, "")?;
                     let elem2_addr =
-                        unsafe { builder.build_in_bounds_gep(array_ptr, &[index2_v], "")? };
+                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index2_v], "")? };
                     let elem2_v = builder.build_load(elem2_addr, "")?;
                     builder.build_store(elem1_addr, elem2_v)?;
                     builder.build_store(elem2_addr, elem1_v)?;
@@ -1263,8 +1287,12 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let [array_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayOpDef::discard_empty expects one argument"))?;
-            let (ptr, mask_ptr, _) = decompose_barray_fat_pointer(builder, array_v)?;
-            ccg.emit_free_array(ctx, ptr)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset: _,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
+            ccg.emit_free_array(ctx, elems_ptr)?;
             ccg.emit_free_array(ctx, mask_ptr)?;
             outputs.finish(ctx.builder(), [])
         }
@@ -1280,12 +1308,16 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     array_v: BasicValueEnum<'c>,
 ) -> Result<(BasicValueEnum<'c>, BasicValueEnum<'c>)> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (array_ptr, mask_ptr, array_offset) = decompose_barray_fat_pointer(ctx.builder(), array_v)?;
-    build_none_borrowed_check(ccg, ctx, mask_ptr, array_offset, op.size)?;
+    let BArrayFatPtrComponents {
+        elems_ptr,
+        mask_ptr,
+        offset,
+    } = decompose_barray_fat_pointer(ctx.builder(), array_v)?;
+    build_none_borrowed_check(ccg, ctx, mask_ptr, offset, op.size)?;
     let (other_ptr, _, other_array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let src_ptr = unsafe {
         ctx.builder()
-            .build_in_bounds_gep(array_ptr, &[array_offset], "")?
+            .build_in_bounds_gep(elems_ptr, &[offset], "")?
     };
     let length = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let size_value = ctx
@@ -1342,8 +1374,11 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let builder = ctx.builder();
-    let (array_ptr, mask_ptr, array_offset) =
-        decompose_barray_fat_pointer(builder, array_v.into())?;
+    let BArrayFatPtrComponents {
+        elems_ptr,
+        mask_ptr,
+        offset,
+    } = decompose_barray_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         elem_ty.clone(),
         borrow_array_type(size.saturating_add_signed(-1), elem_ty),
@@ -1353,30 +1388,21 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     }
     let (elem_ptr, new_array_offset) = {
         if pop_left {
-            let new_array_offset = builder.build_int_add(
-                array_offset,
-                usize_ty(&ts).const_int(1, false),
-                "new_offset",
-            )?;
-            build_idx_not_borrowed_check(ccg, ctx, mask_ptr, array_offset)?;
-            let elem_ptr = unsafe {
-                ctx.builder()
-                    .build_in_bounds_gep(array_ptr, &[array_offset], "")
-            }?;
+            let new_array_offset =
+                builder.build_int_add(offset, usize_ty(&ts).const_int(1, false), "new_offset")?;
+            build_idx_not_borrowed_check(ccg, ctx, mask_ptr, offset)?;
+            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[offset], "") }?;
             (elem_ptr, new_array_offset)
         } else {
-            let idx = builder.build_int_add(
-                array_offset,
-                usize_ty(&ts).const_int(size - 1, false),
-                "",
-            )?;
+            let idx =
+                builder.build_int_add(offset, usize_ty(&ts).const_int(size - 1, false), "")?;
             build_idx_not_borrowed_check(ccg, ctx, mask_ptr, idx)?;
-            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(array_ptr, &[idx], "") }?;
-            (elem_ptr, array_offset)
+            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[idx], "") }?;
+            (elem_ptr, offset)
         }
     };
     let elem_v = ctx.builder().build_load(elem_ptr, "")?;
-    let new_array_v = build_barray_fat_pointer(ctx, array_ptr, mask_ptr, new_array_offset)?;
+    let new_array_v = build_barray_fat_pointer(ctx, elems_ptr, mask_ptr, new_array_offset)?;
 
     Ok(ret_ty
         .build_tag(ctx.builder(), 1, vec![elem_v, new_array_v.into()])?
@@ -1420,8 +1446,11 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     func: BasicValueEnum<'c>,
     initial_accs: &[BasicValueEnum<'c>],
 ) -> Result<(BasicValueEnum<'c>, Vec<BasicValueEnum<'c>>)> {
-    let (src_ptr, src_mask_ptr, src_offset) =
-        decompose_barray_fat_pointer(ctx.builder(), src_array_v.into())?;
+    let BArrayFatPtrComponents {
+        elems_ptr: src_ptr,
+        mask_ptr: src_mask_ptr,
+        offset: src_offset,
+    } = decompose_barray_fat_pointer(ctx.builder(), src_array_v.into())?;
     build_none_borrowed_check(ccg, ctx, src_mask_ptr, src_offset, op.size)?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
     // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
@@ -1493,16 +1522,19 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayUnsafeOpDef::borrow expects two arguments"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
             build_bounds_check(ccg, ctx, size, index_v)?;
-            let offset_index_v = ctx.builder().build_int_add(index_v, array_offset, "")?;
+            let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
             build_idx_not_borrowed_check(ccg, ctx, mask_ptr, offset_index_v)?;
             build_mask_flip(ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
             let elem_addr =
-                unsafe { builder.build_in_bounds_gep(array_ptr, &[offset_index_v], "")? };
+                unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
             let elem_v = builder.build_load(elem_addr, "")?;
             outputs.finish(builder, [elem_v, array_v])
         }
@@ -1510,16 +1542,19 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let [array_v, index_v, elem_v] = inputs
                 .try_into()
                 .map_err(|_| anyhow!("BArrayUnsafeOpDef::return expects three arguments"))?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
             let index_v = index_v.into_int_value();
             build_bounds_check(ccg, ctx, size, index_v)?;
-            let offset_index_v = ctx.builder().build_int_add(index_v, array_offset, "")?;
+            let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
             build_idx_free_check(ccg, ctx, mask_ptr, offset_index_v)?;
             build_mask_flip(ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
             let elem_addr =
-                unsafe { builder.build_in_bounds_gep(array_ptr, &[offset_index_v], "")? };
+                unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
             builder.build_store(elem_addr, elem_v)?;
             outputs.finish(builder, [array_v])
         }
@@ -1527,10 +1562,13 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let [array_v] = inputs.try_into().map_err(|_| {
                 anyhow!("BArrayUnsafeOpDef::discard_all_borrowed expects one argument")
             })?;
-            let (array_ptr, mask_ptr, array_offset) =
-                decompose_barray_fat_pointer(builder, array_v)?;
-            build_all_borrowed_check(ccg, ctx, mask_ptr, array_offset, size)?;
-            ccg.emit_free_array(ctx, array_ptr)?;
+            let BArrayFatPtrComponents {
+                elems_ptr,
+                mask_ptr,
+                offset,
+            } = decompose_barray_fat_pointer(builder, array_v)?;
+            build_all_borrowed_check(ccg, ctx, mask_ptr, offset, size)?;
+            ccg.emit_free_array(ctx, elems_ptr)?;
             ccg.emit_free_array(ctx, mask_ptr)?;
             outputs.finish(ctx.builder(), [])
         }
@@ -1550,9 +1588,13 @@ pub fn emit_to_array_op<'c, H: HugrView<Node = Node>>(
     op: BArrayToArray,
     barray_v: BasicValueEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
-    let (ptr, mask_ptr, offset) = decompose_barray_fat_pointer(ctx.builder(), barray_v)?;
+    let BArrayFatPtrComponents {
+        elems_ptr,
+        mask_ptr,
+        offset,
+    } = decompose_barray_fat_pointer(ctx.builder(), barray_v)?;
     build_none_borrowed_check(ccg, ctx, mask_ptr, offset, op.size)?;
-    Ok(build_array_fat_pointer(ctx, ptr, offset)?.into())
+    Ok(build_array_fat_pointer(ctx, elems_ptr, offset)?.into())
 }
 
 /// Emits an [`BArrayFromArray`] op.
