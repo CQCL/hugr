@@ -2756,30 +2756,39 @@ mod test {
     }
 
     #[rstest]
-    #[case::oneword(10, 0)]
-    #[case::oneword_pop(10, 2)]
-    #[case::big(97, 0)]
-    #[case::big_pop(97, 5)]
-    #[case::big_popmany(97, 65)]
+    #[case::oneword(10, 0, 0)]
+    #[case::oneword_right(10, 0, 9)]
+    #[case::oneword_pop(10, 2, 0)]
+    #[case::oneword_right_pop(10, 2, 7)]
+    #[case::big_right(97, 0, 96)]
+    #[case::big_pop(97, 5, 0)]
+    #[case::big_popmany(97, 65, 0)]
     fn exec_discard_all_borrowed_panic(
         mut exec_ctx: TestContext,
         #[case] size: u64,
         #[case] num_pops: u64,
+        #[case] ret_index: u64,
     ) {
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
             .with_extensions(exec_registry())
             .finish(|mut builder| {
-                let array = borrow_array::BArrayValue::new(
-                    int_ty.clone(),
-                    (0..size)
-                        .map(|i| ConstInt::new_u(6, i).unwrap().into())
-                        .collect_vec(),
-                );
-                let array = builder.add_load_value(array);
+                let mut array = builder.add_new_all_borrowed(int_ty.clone(), size).unwrap();
+                let val = builder.add_load_value(ConstInt::new_u(6, 15).unwrap());
+                for i in 0..num_pops {
+                    let i = builder.add_load_value(ConstUsize::new(i));
+                    array = builder
+                        .add_borrow_array_return(int_ty.clone(), size, array, i, val)
+                        .unwrap();
+                }
                 let array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
+                let size = size - num_pops;
+                let ret_index = builder.add_load_value(ConstUsize::new(ret_index));
+                let array = builder
+                    .add_borrow_array_return(int_ty.clone(), size, array, ret_index, val)
+                    .unwrap();
                 builder
-                    .add_discard_all_borrowed(int_ty.clone(), size - num_pops, array)
+                    .add_discard_all_borrowed(int_ty.clone(), size, array)
                     .unwrap();
                 builder.finish_hugr_with_outputs([]).unwrap()
             });
