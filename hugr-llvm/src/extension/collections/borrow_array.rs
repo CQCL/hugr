@@ -481,16 +481,16 @@ pub fn decompose_barray_fat_pointer<'c>(
 
 /// Helper function to allocate a fat borrow array pointer.
 ///
-/// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
-/// is of type `elem_ty.ptr_type()`). The struct is the fat pointer of the that stores an additional
-/// offset (initialised to be 0).
+/// Returns a pointer and a struct:
+/// * The pointer points to the first element of the array (i.e. it is of type `elem_ty.ptr_type()`).
+/// * The struct is the fat pointer that stores also the pointer to the mask and an additional offset (initialised to 0).
 pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl BorrowArrayCodegen,
     elem_ty: BasicTypeEnum<'c>,
     size: u64,
     set_borrowed: bool,
-) -> Result<(PointerValue<'c>, PointerValue<'c>, StructValue<'c>)> {
+) -> Result<(PointerValue<'c>, StructValue<'c>)> {
     let usize_t = usize_ty(&ctx.typing_session());
     let length = usize_t.const_int(size, false);
     let size_value = ctx
@@ -516,7 +516,7 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
 
     let offset = usize_t.const_zero();
     let array_v = build_barray_fat_pointer(ctx, elem_ptr, mask_ptr, offset)?;
-    Ok((elem_ptr, mask_ptr, array_v))
+    Ok((elem_ptr, array_v))
 }
 
 /// Emits instructions to fill the entire mask with a bit value.
@@ -991,7 +991,7 @@ pub fn emit_barray_value<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let ts = ctx.typing_session();
     let elem_ty = ts.llvm_type(value.get_element_type())?;
-    let (elem_ptr, _, array_v) =
+    let (elem_ptr, array_v) =
         build_barray_alloc(ctx, ccg, elem_ty, value.get_contents().len() as u64, false)?;
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
@@ -1026,7 +1026,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
     let elem_ty = ts.llvm_type(hugr_elem_ty)?;
     match def {
         BArrayOpDef::new_array => {
-            let (elem_ptr, _, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size, false)?;
+            let (elem_ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size, false)?;
             let usize_t = usize_ty(&ctx.typing_session());
             for (i, v) in inputs.into_iter().enumerate() {
                 let idx = usize_t.const_int(i as u64, true);
@@ -1342,7 +1342,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
         offset,
     } = decompose_barray_fat_pointer(ctx.builder(), array_v)?;
     build_none_borrowed_check(ccg, ctx, mask_ptr, offset, op.size)?;
-    let (other_ptr, _, other_array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
+    let (other_ptr, other_array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let src_ptr = unsafe {
         ctx.builder()
             .build_in_bounds_gep(elems_ptr, &[offset], "")?
@@ -1445,7 +1445,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     func: BasicValueEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
-    let (ptr, _, array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
+    let (ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
@@ -1483,7 +1483,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
     // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
     // from `src` instead of allocating a fresh array
-    let (tgt_ptr, _, tgt_array_v) = build_barray_alloc(ctx, ccg, tgt_elem_ty, op.size, false)?;
+    let (tgt_ptr, tgt_array_v) = build_barray_alloc(ctx, ccg, tgt_elem_ty, op.size, false)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let acc_tys: Vec<_> = op
         .acc_tys
@@ -1602,7 +1602,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
         }
         BArrayUnsafeOpDef::new_all_borrowed => {
             let elem_ty = ctx.llvm_type(hugr_elem_ty)?;
-            let (_, _, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size, true)?;
+            let (_, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size, true)?;
             outputs.finish(ctx.builder(), [array_v.into()])
         }
         _ => todo!(),
