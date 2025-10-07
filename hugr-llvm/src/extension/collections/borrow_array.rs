@@ -600,10 +600,14 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     build_mask_padding(ctx, mask_info, expected)?;
 
-    let builder = ctx.builder();
-    let end_idx = builder.build_int_add(mask_info.offset, mask_info.size, "")?;
-
     let usize_t = usize_ty(&ctx.typing_session());
+    let builder = ctx.builder();
+    let last_idx = builder.build_int_sub(
+        builder.build_int_add(mask_info.offset, mask_info.size, "")?,
+        usize_t.const_int(1, false),
+        "dec",
+    )?;
+
     let expected_val = if expected {
         usize_t.const_all_ones()
     } else {
@@ -611,7 +615,7 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
     };
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
     let start_block = builder.build_int_unsigned_div(mask_info.offset, block_size, "")?;
-    let end_block = builder.build_int_unsigned_div(end_idx, block_size, "")?;
+    let end_block = builder.build_int_unsigned_div(last_idx, block_size, "")?;
 
     let iters = builder.build_int_sub(end_block, start_block, "")?;
     let iters = builder.build_int_add(iters, usize_t.const_int(1, false), "")?;
@@ -659,19 +663,15 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     // Pad out the unused bits in the first block
     let ones = usize_t.const_all_ones();
     let fst_block_unused = builder.build_int_unsigned_rem(offset, block_size, "")?;
-    let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
     let new_fst_block = if value {
         // Pad with ones.
         // If fst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
+        let fst_block_used = builder.build_int_sub(block_size, fst_block_unused, "")?;
         let rsh = builder.build_right_shift(ones, fst_block_used, false, "")?;
-        let is_all = builder.build_int_compare(
-            IntPredicate::EQ,
-            fst_block_used,
-            block_size,
-            "",
-        )?;
+        let all_used =
+            builder.build_int_compare(IntPredicate::EQ, fst_block_used, block_size, "")?;
         let pad = builder
-            .build_select(is_all, usize_t.const_zero(), rsh, "")?
+            .build_select(all_used, usize_t.const_zero(), rsh, "")?
             .into_int_value();
         builder.build_or(fst_block, pad, "")?
     } else {
@@ -682,23 +682,37 @@ fn build_mask_padding<'c, H: HugrView<Node = Node>>(
     builder.build_store(fst_block_addr, new_fst_block)?;
 
     // Find the last block that contain some used bits
-    let lst_idx = builder.build_int_add(offset, size, "")?;
+    let lst_idx = builder.build_int_sub(
+        builder.build_int_add(offset, size, "")?,
+        usize_t.const_int(1, false),
+        "dec",
+    )?;
     let lst_block_idx = builder.build_int_unsigned_div(lst_idx, block_size, "")?;
     let lst_block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[lst_block_idx], "")? };
     let lst_block = builder.build_load(lst_block_addr, "")?.into_int_value();
 
     // Pad out the unused bits in the last block.
-    // Note that if the entire block is used, we'll compute 0 used and <block size> unused,
-    // which sounds wrong but actually helps (see below).
-    let lst_block_used = builder.build_int_unsigned_rem(lst_idx, block_size, "")?;
-    let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
+    // modulus produces 0-(block_size-1), so add one to get 1-block_size
+    // i.e. the number of used bits, not as index
+    let lst_block_used = builder.build_int_add(
+        builder.build_int_unsigned_rem(lst_idx, block_size, "")?,
+        usize_t.const_int(1, false),
+        "",
+    )?;
     let new_lst_block = if value {
-        // Pad with ones. If entire block is used, shift by zero (a no-op), then or by ones (also a no-op)
-        let pad = builder.build_left_shift(ones, lst_block_used, "")?;
+        // Pad with ones.
+        // If lst_block_used == block_size, LLVM defines the shift to be a no-op, but we want a zero.
+        let lsh = builder.build_left_shift(ones, lst_block_used, "")?;
+        let all_used =
+            builder.build_int_compare(IntPredicate::EQ, lst_block_used, block_size, "")?;
+        let pad = builder
+            .build_select(all_used, usize_t.const_zero(), lsh, "")?
+            .into_int_value();
+
         builder.build_or(lst_block, pad, "")?
     } else {
-        // Pad with zeros. If entire block is used, the shift by block size will (contrary to expectations) be a no-op,
-        // producing all ones not zero, so the following and with ones will also be a no-op.
+        // Pad with zeros.
+        let lst_block_unused = builder.build_int_sub(block_size, lst_block_used, "")?;
         let pad = builder.build_right_shift(ones, lst_block_unused, false, "")?;
         builder.build_and(lst_block, pad, "")?
     };
