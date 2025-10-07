@@ -34,6 +34,7 @@
 //! - Bit 7,6: Constant "01" to make some headers ascii-printable.
 //!
 
+pub mod description;
 mod header;
 mod package_json;
 pub mod serde_with;
@@ -42,6 +43,8 @@ pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
 use hugr_model::v0::bumpalo::Bump;
 pub use package_json::PackageEncodingError;
 
+use crate::envelope::description::PackageDescription;
+use crate::envelope::header::HeaderError;
 use crate::{Hugr, HugrView};
 use crate::{
     extension::{ExtensionRegistry, Version},
@@ -154,20 +157,54 @@ pub fn read_envelope(
     mut reader: impl BufRead,
     registry: &ExtensionRegistry,
 ) -> Result<(EnvelopeConfig, Package), EnvelopeError> {
-    let header = EnvelopeHeader::read(&mut reader)?;
+    match read_new(reader, registry) {
+        Ok((desc, pkg)) => Ok((desc.header.config(), pkg)),
+        Err(_) => Err(todo!("Convert ReadError to EnvelopeError")),
+    }
+}
 
-    let package = match header.zstd {
-        #[cfg(feature = "zstd")]
-        true => read_impl(
-            std::io::BufReader::new(zstd::Decoder::new(reader)?),
-            header,
-            registry,
-        ),
-        #[cfg(not(feature = "zstd"))]
-        true => Err(EnvelopeError::ZstdUnsupported),
-        false => read_impl(reader, header, registry),
-    }?;
-    Ok((header.config(), package))
+#[derive(Debug, Error)]
+#[error("{inner} while reading envelope: {partial_description}")]
+pub struct DescribedError<E: std::fmt::Display, D: std::fmt::Display> {
+    inner: Box<E>,
+    partial_description: D,
+}
+
+impl<E: std::fmt::Display, D: std::fmt::Display> DescribedError<E, D> {
+    pub fn new(partial_description: D, inner: E) -> Self {
+        Self {
+            partial_description,
+            inner: Box::new(inner),
+        }
+    }
+}
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub enum ReadError {
+    HeaderError(#[from] HeaderError),
+    PayloadError(#[from] DescribedError<PayloadError, PackageDescription>),
+}
+#[derive(Error, Debug)]
+pub enum PayloadError {}
+pub fn read_new(
+    mut reader: impl BufRead,
+    registry: &ExtensionRegistry,
+) -> Result<(PackageDescription, Package), ReadError> {
+    let header = EnvelopeHeader::read_new(&mut reader)?;
+    todo!()
+
+    // let package = match header.zstd {
+    //     #[cfg(feature = "zstd")]
+    //     true => read_impl(
+    //         std::io::BufReader::new(zstd::Decoder::new(reader)?),
+    //         header,
+    //         registry,
+    //     ),
+    //     #[cfg(not(feature = "zstd"))]
+    //     true => Err(EnvelopeError::ZstdUnsupported),
+    //     false => read_impl(reader, header, registry),
+    // }?;
+    // Ok((header.config(), package))
 }
 
 /// Write a HUGR package into an envelope, using the specified configuration.

@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use std::num::NonZeroU8;
 
 use itertools::Itertools;
+use thiserror::Error;
 
 use super::EnvelopeError;
 
@@ -206,7 +207,56 @@ impl ZstdConfig {
         self.level.map_or(default, |l| i32::from(l.get()))
     }
 }
-
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum HeaderError {
+    /// Bad magic number.
+    #[error(
+        "Bad magic number. expected 0x{:X} found 0x{:X}",
+        u64::from_be_bytes(*expected),
+        u64::from_be_bytes(*found)
+    )]
+    MagicNumber {
+        /// The expected magic number.
+        ///
+        /// See [`MAGIC_NUMBERS`].
+        expected: [u8; 8],
+        /// The magic number in the envelope.
+        found: [u8; 8],
+    },
+    /// The specified payload format is invalid.
+    #[error("Format descriptor {descriptor} is invalid.")]
+    InvalidFormatDescriptor {
+        /// The unsupported format.
+        descriptor: usize,
+    },
+    /// IO read/write error.
+    #[error(transparent)]
+    IO {
+        /// The source error.
+        #[from]
+        source: std::io::Error,
+    },
+    /// The specified payload format is not supported.
+    #[error(
+        "The envelope configuration has unknown {}. Please update your HUGR version.",
+        if flag_ids.len() == 1 {format!("flag #{}", flag_ids[0])} else {format!("flags {}", flag_ids.iter().join(", "))}
+    )]
+    FlagUnsupported {
+        /// The unrecognized flag bits.
+        flag_ids: Vec<usize>,
+    },
+}
+impl From<HeaderError> for EnvelopeError {
+    fn from(err: HeaderError) -> Self {
+        match err {
+            HeaderError::IO { source } => EnvelopeError::IO { source },
+            HeaderError::MagicNumber { expected, found } => todo!(),
+            HeaderError::InvalidFormatDescriptor { descriptor } => todo!(),
+            HeaderError::FlagUnsupported { flag_ids } => todo!(),
+        }
+    }
+}
 impl EnvelopeHeader {
     /// Returns the envelope configuration corresponding to this header.
     ///
@@ -246,11 +296,14 @@ impl EnvelopeHeader {
     /// Consumes exactly 10 bytes from the reader.
     /// See the [`crate::envelope`] module documentation for the binary format.
     pub fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
+        Self::read_new(reader).map_err(EnvelopeError::from)
+    }
+    pub fn read_new(reader: &mut impl Read) -> Result<EnvelopeHeader, HeaderError> {
         // The first 8 bytes are the magic number in little-endian.
         let mut magic = [0; 8];
         reader.read_exact(&mut magic)?;
         if magic != MAGIC_NUMBERS {
-            return Err(EnvelopeError::MagicNumber {
+            return Err(HeaderError::MagicNumber {
                 expected: MAGIC_NUMBERS.try_into().unwrap(),
                 found: magic,
             });
@@ -261,7 +314,7 @@ impl EnvelopeHeader {
         reader.read_exact(&mut format_bytes)?;
         let format_discriminant = format_bytes[0] as usize;
         let Some(format) = EnvelopeFormat::from_repr(format_discriminant) else {
-            return Err(EnvelopeError::InvalidFormatDescriptor {
+            return Err(HeaderError::InvalidFormatDescriptor {
                 descriptor: format_discriminant,
             });
         };
@@ -277,7 +330,7 @@ impl EnvelopeHeader {
         let other_flags = (flags ^ DEFAULT_FLAGS) & !ZSTD_FLAG;
         if other_flags != 0 {
             let flag_ids = (0..8).filter(|i| other_flags & (1 << i) != 0).collect_vec();
-            return Err(EnvelopeError::FlagUnsupported { flag_ids });
+            return Err(HeaderError::FlagUnsupported { flag_ids });
         }
 
         Ok(Self { format, zstd })
