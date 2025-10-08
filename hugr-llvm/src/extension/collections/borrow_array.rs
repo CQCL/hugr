@@ -481,6 +481,26 @@ pub fn decompose_barray_fat_pointer<'c>(
     })
 }
 
+/// Helper function to allocate a typed array of `num_elems` elements of type `elem_ty`.
+/// Returns the pointer to the first element and the size in memory of the allocation.
+fn alloc_typed_array<'c, H: HugrView<Node = Node>>(
+    ccg: &impl BorrowArrayCodegen,
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    elem_ty: BasicTypeEnum<'c>,
+    num_elems: IntValue<'c>,
+) -> Result<(PointerValue<'c>, IntValue<'c>)> {
+    let size = ctx
+        .builder()
+        .build_int_mul(num_elems, elem_ty.size_of().unwrap(), "array_size")?;
+    let ptr = ccg.emit_allocate_array(ctx, size)?;
+    Ok((
+        ctx.builder()
+            .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
+            .into_pointer_value(),
+        size,
+    ))
+}
+
 /// Helper function to allocate a fat borrow array pointer.
 ///
 /// Returns a pointer and a struct:
@@ -495,25 +515,11 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
 ) -> Result<(PointerValue<'c>, StructValue<'c>)> {
     let usize_t = usize_ty(&ctx.typing_session());
     let length = usize_t.const_int(size, false);
-    let size_value = ctx
-        .builder()
-        .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
-    let ptr = ccg.emit_allocate_array(ctx, size_value)?;
-    let elems_ptr = ctx
-        .builder()
-        .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
-        .into_pointer_value();
+    let (elems_ptr, _) = alloc_typed_array(ccg, ctx, elem_ty, length)?;
 
     // Mask is bit-packed into an array of values of type usize
     let mask_length = usize_t.const_int(size.div_ceil(usize_t.get_bit_width() as u64), false);
-    let mask_size_value = ctx
-        .builder()
-        .build_int_mul(mask_length, usize_t.size_of(), "")?;
-    let mask_ptr = ccg.emit_allocate_array(ctx, mask_size_value)?;
-    let mask_ptr = ctx
-        .builder()
-        .build_bit_cast(mask_ptr, usize_t.ptr_type(AddressSpace::default()), "")?
-        .into_pointer_value();
+    let (mask_ptr, mask_size_value) = alloc_typed_array(ccg, ctx, usize_t.into(), mask_length)?;
     fill_mask(ctx, mask_ptr, mask_size_value, set_borrowed)?;
 
     let offset = usize_t.const_zero();
@@ -1592,12 +1598,7 @@ pub fn emit_from_array_op<'c, H: HugrView<Node = Node>>(
     let mask_blocks = builder.build_int_unsigned_div(mask_bits, usize_t.size_of(), "")?;
     // Increment by one to account for potential rounding down
     let mask_blocks = builder.build_int_add(mask_blocks, usize_t.const_int(1, false), "")?;
-    let mask_size = builder.build_int_mul(mask_blocks, usize_t.size_of(), "")?;
-    let mask_ptr = ccg.emit_allocate_array(ctx, mask_size)?;
-    let mask_ptr = ctx
-        .builder()
-        .build_bit_cast(mask_ptr, usize_t.ptr_type(AddressSpace::default()), "")?
-        .into_pointer_value();
+    let (mask_ptr, mask_size) = alloc_typed_array(ccg, ctx, usize_t.into(), mask_blocks)?;
     fill_mask(ctx, mask_ptr, mask_size, false)?;
     Ok(build_barray_fat_pointer(
         ctx,
