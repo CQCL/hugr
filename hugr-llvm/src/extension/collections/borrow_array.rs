@@ -578,68 +578,71 @@ impl MaskCheck {
             MaskCheck::Borrow => "__barray_mask_borrow",
         }
     }
-}
 
-fn check_mask_elem<'c, H: HugrView<Node = Node>>(
-    ccg: &impl BorrowArrayCodegen,
-    ctx: &mut EmitFuncContext<'c, '_, H>,
-    mask_ptr: PointerValue<'c>,
-    idx: IntValue<'c>,
-    action: MaskCheck,
-) -> Result<()> {
-    get_or_make_function(
-        ctx,
-        action.func_name(),
-        [mask_ptr.into(), idx.into()],
-        None,
-        |ctx, [mask_ptr, idx]| {
-            // Compute mask bitarray block index via `idx // BLOCK_SIZE`
-            let mask_ptr = mask_ptr.into_pointer_value();
-            let idx = idx.into_int_value();
-            let usize_t = usize_ty(&ctx.typing_session());
-            let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
-            let builder = ctx.builder();
-            let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
-            let block_ptr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
-            let block = builder.build_load(block_ptr, "")?.into_int_value();
+    fn emit<'c, H: HugrView<Node = Node>>(
+        &self,
+        ccg: &impl BorrowArrayCodegen,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        mask_ptr: PointerValue<'c>,
+        idx: IntValue<'c>,
+    ) -> Result<()> {
+        get_or_make_function(
+            ctx,
+            self.func_name(),
+            [mask_ptr.into(), idx.into()],
+            None,
+            |ctx, [mask_ptr, idx]| {
+                // Compute mask bitarray block index via `idx // BLOCK_SIZE`
+                let mask_ptr = mask_ptr.into_pointer_value();
+                let idx = idx.into_int_value();
+                let usize_t = usize_ty(&ctx.typing_session());
+                let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
+                let builder = ctx.builder();
+                let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
+                let block_ptr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
+                let block = builder.build_load(block_ptr, "")?.into_int_value();
 
-            // Extract bit from the block at position `idx % BLOCK_SIZE`
-            let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
-            let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
-            let bit =
-                builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
-            let panic_bb = ctx.build_positioned_new_block("panic", None, |ctx, panic_bb| {
-                let err: &ConstError = match action {
-                    MaskCheck::CheckPresent | MaskCheck::Borrow => &ERR_ALREADY_BORROWED,
-                    MaskCheck::Return => &ERR_NOT_BORROWED,
+                // Extract bit from the block at position `idx % BLOCK_SIZE`
+                let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
+                let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
+                let bit =
+                    builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
+                let panic_bb = ctx.build_positioned_new_block("panic", None, |ctx, panic_bb| {
+                    let err: &ConstError = match self {
+                        MaskCheck::CheckPresent | MaskCheck::Borrow => &ERR_ALREADY_BORROWED,
+                        MaskCheck::Return => &ERR_NOT_BORROWED,
+                    };
+                    let err_val = ctx.emit_custom_const(err).unwrap();
+                    ccg.emit_panic(ctx, err_val)?;
+                    ctx.builder().build_unreachable()?;
+                    Ok(panic_bb)
+                })?;
+                let ok_bb = ctx.build_positioned_new_block("ok", None, |ctx, ok_bb| {
+                    if let MaskCheck::Return | MaskCheck::Borrow = self {
+                        // Update the mask to mark the element as borrowed or free
+                        let builder = ctx.builder();
+                        let update = builder.build_left_shift(
+                            usize_t.const_int(1, false),
+                            idx_in_block,
+                            "",
+                        )?;
+                        let block = builder.build_xor(block, update, "")?;
+                        builder.build_store(block_ptr, block)?;
+                    }
+                    ctx.builder().build_return(None)?;
+                    Ok(ok_bb)
+                })?;
+                let (if_borrowed, if_present) = match self {
+                    MaskCheck::CheckPresent | MaskCheck::Borrow => (panic_bb, ok_bb),
+                    MaskCheck::Return => (ok_bb, panic_bb),
                 };
-                let err_val = ctx.emit_custom_const(err).unwrap();
-                ccg.emit_panic(ctx, err_val)?;
-                ctx.builder().build_unreachable()?;
-                Ok(panic_bb)
-            })?;
-            let ok_bb = ctx.build_positioned_new_block("ok", None, |ctx, ok_bb| {
-                if let MaskCheck::Return | MaskCheck::Borrow = action {
-                    // Update the mask to mark the element as borrowed or free
-                    let builder = ctx.builder();
-                    let update =
-                        builder.build_left_shift(usize_t.const_int(1, false), idx_in_block, "")?;
-                    let block = builder.build_xor(block, update, "")?;
-                    builder.build_store(block_ptr, block)?;
-                }
-                ctx.builder().build_return(None)?;
-                Ok(ok_bb)
-            })?;
-            let (if_borrowed, if_present) = match action {
-                MaskCheck::CheckPresent | MaskCheck::Borrow => (panic_bb, ok_bb),
-                MaskCheck::Return => (ok_bb, panic_bb),
-            };
-            ctx.builder()
-                .build_conditional_branch(bit, if_borrowed, if_present)?;
-            Ok(None)
-        },
-    )?;
-    Ok(())
+                ctx.builder()
+                    .build_conditional_branch(bit, if_borrowed, if_present)?;
+                Ok(None)
+            },
+        )?;
+        Ok(())
+    }
 }
 
 struct MaskInfo<'a> {
@@ -1002,7 +1005,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 let idx = ctx
                     .builder()
                     .build_int_add(offset, usize_t.const_int(i, false), "")?;
-                check_mask_elem(ccg, ctx, mask_ptr, idx, MaskCheck::CheckPresent)?;
+                MaskCheck::CheckPresent.emit(ccg, ctx, mask_ptr, idx)?;
                 let elem_addr =
                     unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[idx], "")? };
                 let elem_v = ctx.builder().build_load(elem_addr, "")?;
@@ -1044,7 +1047,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
                     // inside `success_block` we know `index_v` to be in bounds
                     let index_v = ctx.builder().build_int_add(index_v, offset, "")?;
-                    check_mask_elem(ccg, ctx, mask_ptr, index_v, MaskCheck::CheckPresent)?;
+                    MaskCheck::CheckPresent.emit(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
                         unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
@@ -1110,7 +1113,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
                     // inside `success_block` we know `index_v` to be in bounds.
                     let index_v = ctx.builder().build_int_add(index_v, offset, "")?;
-                    check_mask_elem(ccg, ctx, mask_ptr, index_v, MaskCheck::CheckPresent)?;
+                    MaskCheck::CheckPresent.emit(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
                         unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
@@ -1187,8 +1190,8 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     // to be in bounds.
                     let index1_v = builder.build_int_add(index1_v, offset, "")?;
                     let index2_v = builder.build_int_add(index2_v, offset, "")?;
-                    check_mask_elem(ccg, ctx, mask_ptr, index1_v, MaskCheck::CheckPresent)?;
-                    check_mask_elem(ccg, ctx, mask_ptr, index2_v, MaskCheck::CheckPresent)?;
+                    MaskCheck::CheckPresent.emit(ccg, ctx, mask_ptr, index1_v)?;
+                    MaskCheck::CheckPresent.emit(ccg, ctx, mask_ptr, index2_v)?;
                     let builder = ctx.builder();
                     let elem1_addr =
                         unsafe { builder.build_in_bounds_gep(elems_ptr, &[index1_v], "")? };
@@ -1367,7 +1370,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
                 usize_ty(&ts).const_int(1, false),
                 "new_offset",
             )?;
-            check_mask_elem(ccg, ctx, fp.mask_ptr, fp.offset, MaskCheck::CheckPresent)?;
+            MaskCheck::CheckPresent.emit(ccg, ctx, fp.mask_ptr, fp.offset)?;
             let elem_ptr = unsafe {
                 ctx.builder()
                     .build_in_bounds_gep(fp.elems_ptr, &[fp.offset], "")
@@ -1376,7 +1379,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
         } else {
             let idx =
                 builder.build_int_add(fp.offset, usize_ty(&ts).const_int(size - 1, false), "")?;
-            check_mask_elem(ccg, ctx, fp.mask_ptr, idx, MaskCheck::CheckPresent)?;
+            MaskCheck::CheckPresent.emit(ccg, ctx, fp.mask_ptr, idx)?;
             let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(fp.elems_ptr, &[idx], "") }?;
             (elem_ptr, fp.offset)
         }
@@ -1516,7 +1519,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let index_v = index_v.into_int_value();
             build_bounds_check(ccg, ctx, size, index_v)?;
             let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
-            check_mask_elem(ccg, ctx, mask_ptr, offset_index_v, MaskCheck::Borrow)?;
+            MaskCheck::Borrow.emit(ccg, ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
             let elem_addr =
                 unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
@@ -1535,7 +1538,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let index_v = index_v.into_int_value();
             build_bounds_check(ccg, ctx, size, index_v)?;
             let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
-            check_mask_elem(ccg, ctx, mask_ptr, offset_index_v, MaskCheck::Return)?;
+            MaskCheck::Return.emit(ccg, ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
             let elem_addr =
                 unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
