@@ -602,10 +602,6 @@ fn check_mask_idx<'c, H: HugrView<Node = Node>>(
             let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
             let bit =
                 builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
-            let bit_is_expected = match action {
-                MaskCheck::Return => bit,
-                MaskCheck::CheckPresent | MaskCheck::Borrow => builder.build_not(bit, "")?,
-            };
             let panic_bb = ctx.build_positioned_new_block("panic", None, |ctx, panic_bb| {
                 let err: &ConstError = match action {
                     MaskCheck::CheckPresent | MaskCheck::Borrow => &ERR_ALREADY_BORROWED,
@@ -628,8 +624,12 @@ fn check_mask_idx<'c, H: HugrView<Node = Node>>(
                 ctx.builder().build_return(None)?;
                 Ok(ok_bb)
             })?;
+            let (if_borrowed, if_present) = match action {
+                MaskCheck::CheckPresent | MaskCheck::Borrow => (panic_bb, ok_bb),
+                MaskCheck::Return => (ok_bb, panic_bb),
+            };
             ctx.builder()
-                .build_conditional_branch(bit_is_expected, ok_bb, panic_bb)?;
+                .build_conditional_branch(bit, if_borrowed, if_present)?;
             Ok(None)
         },
     )?;
