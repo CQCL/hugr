@@ -563,10 +563,14 @@ fn fill_mask<H: HugrView<Node = Node>>(
     Ok(())
 }
 
+/// Enum for mask operations that can be performed on a single bit of the mask.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MaskCheck {
+    /// Check the element is borrowed, panicking if it isnt; then mark as returned.
     Return,
+    /// Check the element is not borrowed, panicking if it is. (Do not change the bit.)
     CheckNotBorrowed,
+    /// Check the element is not borrowed, panicking if it is; then mark as borrowed.
     Borrow,
 }
 
@@ -579,6 +583,8 @@ impl MaskCheck {
         }
     }
 
+    /// Generate code to perform the check on the specified bit of the mask.
+    /// (Does not check the index is in bounds.)
     fn emit<'c, H: HugrView<Node = Node>>(
         &self,
         ccg: &impl BorrowArrayCodegen,
