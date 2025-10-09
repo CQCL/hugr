@@ -181,8 +181,8 @@ def validate(
         if os.environ.get("HUGR_RENDER_DOT"):
             dot.pipe("svg")
 
-    # Encoding formats to test, indexed by the format name as used by
-    # `hugr convert --format`.
+    # Encoding formats to test. Note that these include other formats than
+    # those supported by `hugr convert`.
     FORMATS = {
         "json": EnvelopeConfig.TEXT,
         "json-compressed": EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=0),
@@ -198,8 +198,8 @@ def validate(
         "model-exts",
         "model-exts-no-compression",
     ]
-    # Envelope formats used as target for `hugr convert` before loading back the
-    # test hugrs.
+    # Envelope formats used as target before loading back the test hugrs.
+    # These should correspond to the formats supported by `hugr convert`.
     LOAD_FORMATS = ["json", "model-exts"]
 
     cmd = [*_base_command(), "validate", "-"]
@@ -330,7 +330,9 @@ def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[
     The `serial` argument is the serialized HUGR to pass to the command via stdin.
     """
     try:
-        return subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
+        return subprocess.run(
+            cmd, check=True, input=serial, capture_output=True
+        )  # noqa: S603
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e
