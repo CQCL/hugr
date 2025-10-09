@@ -1,0 +1,116 @@
+---
+source: hugr-llvm/src/extension/collections/borrow_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [39 x i8] c"Some array elements have been borrowed\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private void @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %1 = bitcast i8* %0 to i64*
+  %2 = call i8* @malloc(i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64))
+  %3 = bitcast i8* %2 to i64*
+  call void @llvm.memset.p0i64.i64(i64* %3, i8 0, i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i1 false)
+  %4 = insertvalue { i64*, i64*, i64 } poison, i64* %1, 0
+  %5 = insertvalue { i64*, i64*, i64 } %4, i64* %3, 1
+  %6 = insertvalue { i64*, i64*, i64 } %5, i64 0, 2
+  %7 = getelementptr inbounds i64, i64* %1, i64 0
+  store i64 1, i64* %7, align 4
+  %8 = getelementptr inbounds i64, i64* %1, i64 1
+  store i64 2, i64* %8, align 4
+  %array_ptr = extractvalue { i64*, i64*, i64 } %6, 0
+  %array_mask_ptr = extractvalue { i64*, i64*, i64 } %6, 1
+  %array_offset = extractvalue { i64*, i64*, i64 } %6, 2
+  call void @__barray_check_none_borrowed(i64* %array_mask_ptr, i64 %array_offset, i64 2)
+  %9 = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %10 = bitcast i8* %9 to i64*
+  %11 = call i8* @malloc(i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64))
+  %12 = bitcast i8* %11 to i64*
+  call void @llvm.memset.p0i64.i64(i64* %12, i8 0, i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i1 false)
+  %13 = insertvalue { i64*, i64*, i64 } poison, i64* %10, 0
+  %14 = insertvalue { i64*, i64*, i64 } %13, i64* %12, 1
+  %15 = insertvalue { i64*, i64*, i64 } %14, i64 0, 2
+  %16 = getelementptr inbounds i64, i64* %array_ptr, i64 %array_offset
+  call void @llvm.memcpy.p0i64.p0i64.i64(i64* %10, i64* %16, i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2), i1 false)
+  %array_ptr5 = extractvalue { i64*, i64*, i64 } %15, 0
+  %17 = bitcast i64* %array_ptr5 to i8*
+  call void @free(i8* %17)
+  %array_ptr7 = extractvalue { i64*, i64*, i64 } %6, 0
+  %18 = bitcast i64* %array_ptr7 to i8*
+  call void @free(i8* %18)
+  ret void
+}
+
+declare i8* @malloc(i64)
+
+; Function Attrs: argmemonly nofree nounwind willreturn writeonly
+declare void @llvm.memset.p0i64.i64(i64* nocapture writeonly, i8, i64, i1 immarg) #0
+
+define internal void @__barray_check_none_borrowed(i64* %0, i64 %1, i64 %2) {
+  %4 = udiv i64 %1, 64
+  %5 = getelementptr inbounds i64, i64* %0, i64 %4
+  %6 = load i64, i64* %5, align 4
+  %7 = urem i64 %1, 64
+  %8 = shl i64 -1, %7
+  %9 = and i64 %6, %8
+  store i64 %9, i64* %5, align 4
+  %10 = add i64 %1, %2
+  %last_valid = sub i64 %10, 1
+  %11 = udiv i64 %last_valid, 64
+  %12 = getelementptr inbounds i64, i64* %0, i64 %11
+  %13 = load i64, i64* %12, align 4
+  %14 = urem i64 %last_valid, 64
+  %15 = add i64 %14, 1
+  %16 = sub i64 64, %15
+  %17 = lshr i64 -1, %16
+  %18 = and i64 %13, %17
+  store i64 %18, i64* %12, align 4
+  %19 = udiv i64 %1, 64
+  %20 = udiv i64 %last_valid, 64
+  %21 = sub i64 %20, %19
+  %22 = add i64 %21, 1
+  br label %23
+
+23:                                               ; preds = %mask_block_ok, %3
+  %.0 = phi i64 [ 0, %3 ], [ %32, %mask_block_ok ]
+  %24 = icmp ult i64 %.0, %22
+  br i1 %24, label %25, label %30
+
+25:                                               ; preds = %23
+  %26 = add i64 %.0, %19
+  %27 = getelementptr inbounds i64, i64* %0, i64 %26
+  %28 = load i64, i64* %27, align 4
+  %29 = icmp eq i64 %28, 0
+  br i1 %29, label %mask_block_ok, label %mask_block_err
+
+30:                                               ; preds = %23
+  ret void
+
+mask_block_err:                                   ; preds = %25
+  %31 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([39 x i8], [39 x i8]* @0, i32 0, i32 0))
+  call void @abort()
+  unreachable
+
+mask_block_ok:                                    ; preds = %25
+  %32 = add i64 %.0, 1
+  br label %23
+}
+
+declare i32 @printf(i8*, ...)
+
+declare void @abort()
+
+; Function Attrs: argmemonly nofree nounwind willreturn
+declare void @llvm.memcpy.p0i64.p0i64.i64(i64* noalias nocapture writeonly, i64* noalias nocapture readonly, i64, i1 immarg) #1
+
+declare void @free(i8*)
+
+attributes #0 = { argmemonly nofree nounwind willreturn writeonly }
+attributes #1 = { argmemonly nofree nounwind willreturn }
