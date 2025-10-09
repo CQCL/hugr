@@ -330,9 +330,7 @@ def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[
     The `serial` argument is the serialized HUGR to pass to the command via stdin.
     """
     try:
-        return subprocess.run(
-            cmd, check=True, input=serial, capture_output=True
-        )  # noqa: S603
+        return subprocess.run(cmd, check=True, input=serial, capture_output=True)
     except subprocess.CalledProcessError as e:
         error = e.stderr.decode()
         raise RuntimeError(error) from e
