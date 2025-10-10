@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.23.1](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.23.0...hugr-llvm-v0.23.1) - 2025-10-10
+
+### New Features
+
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.4...hugr-llvm-v0.23.0) - 2025-09-30
 
 ### Miscellaneous Tasks
