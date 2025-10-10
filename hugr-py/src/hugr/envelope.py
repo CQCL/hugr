@@ -64,7 +64,6 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
     if not isinstance(package, Package):
         package = Package(modules=[package], extensions=[])
 
-    # Currently only uncompressed JSON is supported.
     payload: bytes
     match config.format:
         case EnvelopeFormat.JSON:
