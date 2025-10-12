@@ -10,7 +10,7 @@ use hugr_core::{
 use itertools::Itertools;
 use thiserror::Error;
 
-use crate::{CommitId, PatchNode, PersistentHugr, PersistentWire, Resolver, Walker};
+use crate::{CommitId, PatchNode, PersistentHugr, PersistentWire, Walker};
 
 /// A set of pinned nodes and wires between them, along with a fixed input
 /// and output boundary, simmilar to [`SiblingSubgraph`].
@@ -73,10 +73,10 @@ impl PinnedSubgraph {
     /// Nodes that are not isolated, i.e. are attached to at least one wire in
     /// `wires` will be added implicitly to the graph and do not need to be
     /// explicitly listed in `nodes`.
-    pub fn try_from_pinned<R: Resolver>(
+    pub fn try_from_pinned(
         nodes: impl IntoIterator<Item = PatchNode>,
         wires: impl IntoIterator<Item = PersistentWire>,
-        walker: &Walker<R>,
+        walker: &Walker,
     ) -> Result<Self, InvalidPinnedSubgraph> {
         let mut selected_commits = BTreeSet::new();
         let host = walker.as_hugr_view();
@@ -111,9 +111,9 @@ impl PinnedSubgraph {
     }
 
     /// Create a new subgraph from a set of complete wires in `walker`.
-    pub fn try_from_wires<R: Resolver>(
+    pub fn try_from_wires(
         wires: impl IntoIterator<Item = PersistentWire>,
-        walker: &Walker<R>,
+        walker: &Walker,
     ) -> Result<Self, InvalidPinnedSubgraph> {
         Self::try_from_pinned(std::iter::empty(), wires, walker)
     }
@@ -122,10 +122,10 @@ impl PinnedSubgraph {
     ///
     /// Return the input boundary ports, output boundary ports as well as the
     /// set of all nodes in the subgraph.
-    pub fn compute_io_ports<R: Resolver>(
+    pub fn compute_io_ports(
         nodes: impl IntoIterator<Item = PatchNode>,
         wires: impl IntoIterator<Item = PersistentWire>,
-        host: &PersistentHugr<R>,
+        host: &PersistentHugr,
     ) -> (
         IncomingPorts<PatchNode>,
         OutgoingPorts<PatchNode>,
@@ -147,13 +147,23 @@ impl PinnedSubgraph {
         // that are part of the wires
         let inputs = all_nodes
             .iter()
-            .flat_map(|&n| host.input_value_ports(n))
+            .flat_map(|&PatchNode(owner, node)| {
+                let owner = host.get_commit(owner);
+                owner
+                    .input_value_ports(node)
+                    .map(|(n, p)| (owner.to_patch_node(n), p))
+            })
             .filter(|node_port| !wire_ports_incoming.contains(node_port))
             .map(|np| vec![np])
             .collect_vec();
         let outputs = all_nodes
             .iter()
-            .flat_map(|&n| host.output_value_ports(n))
+            .flat_map(|&PatchNode(owner, node)| {
+                let owner = host.get_commit(owner);
+                owner
+                    .output_value_ports(node)
+                    .map(|(n, p)| (owner.to_patch_node(n), p))
+            })
             .filter(|node_port| !wire_ports_outgoing.contains(node_port))
             .collect_vec();
 
@@ -166,9 +176,9 @@ impl PinnedSubgraph {
     /// This will fail if any of the required selected commits are not in the
     /// host, if any of the nodes are invalid in the host (e.g. deleted by
     /// another commit in host), or if the subgraph is not convex.
-    pub fn to_sibling_subgraph<R>(
+    pub fn to_sibling_subgraph(
         &self,
-        host: &PersistentHugr<R>,
+        host: &PersistentHugr,
     ) -> Result<SiblingSubgraph<PatchNode>, InvalidPinnedSubgraph> {
         if let Some(&unselected) = self
             .selected_commits
@@ -217,7 +227,7 @@ impl PinnedSubgraph {
 pub enum InvalidPinnedSubgraph {
     #[error("Invalid subgraph: {0}")]
     InvalidSubgraph(#[from] InvalidSubgraph<PatchNode>),
-    #[error("Invalid commit in host: {0}")]
+    #[error("Invalid commit in host: {0:?}")]
     InvalidCommit(CommitId),
     #[error("Wire is not complete: {0:?}")]
     IncompleteWire(PersistentWire),
