@@ -18,7 +18,12 @@ name = "persistent_walker_example"
 [dependencies]
 hugr-core = { path = "../hugr-core", version = "0.23.0" }
 
-derive_more = { workspace = true, features = ["display", "error", "from"] }
+derive_more = { workspace = true, features = [
+    "display",
+    "error",
+    "from",
+    "debug",
+] }
 delegate.workspace = true
 itertools.workspace = true
 petgraph.workspace = true

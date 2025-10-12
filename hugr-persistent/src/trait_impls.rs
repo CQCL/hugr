@@ -25,6 +25,9 @@ use super::{
     InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement, state_space::CommitData,
 };
 
+mod utils;
+use utils::DoubleEndedIteratorAdapter;
+
 impl Patch<PersistentHugr> for PersistentReplacement {
     type Outcome = CommitId;
     const UNCHANGED_ON_FAILURE: bool = true;
@@ -226,14 +229,15 @@ impl HugrView for PersistentHugr {
         let cm = self.get_commit(node.owner());
         let commit_hugr = cm.commit_hugr();
         let children = commit_hugr.children(node.1).map(|n| cm.to_patch_node(n));
-        if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
+        let it = if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
             // we must filter out children nodes that are invalidated by later commits, and
             // on the other hand add nodes in those commits
             Either::Left(IterValidNodes::new(self, children.fuse()))
         } else {
             // children are precisely children of the commit hugr
             Either::Right(children)
-        }
+        };
+        DoubleEndedIteratorAdapter::from(it)
     }
 
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
@@ -407,11 +411,7 @@ impl<I: FusedIterator<Item = PatchNode>> Iterator for IterValidNodes<'_, I> {
     }
 }
 
-impl<I: FusedIterator<Item = PatchNode>> DoubleEndedIterator for IterValidNodes<'_, I> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        unimplemented!("cannot go backwards")
-    }
-}
+impl<I: FusedIterator<Item = PatchNode>> FusedIterator for IterValidNodes<'_, I> {}
 
 #[cfg(test)]
 mod tests {
