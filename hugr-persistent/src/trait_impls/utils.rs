@@ -63,3 +63,29 @@ impl<I: Iterator> DoubleEndedIterator for DoubleEndedIteratorAdapter<I> {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hugr_core::Direction;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(Direction::Outgoing, Box::new(0..3) as Box<dyn Iterator<Item = i32>>, vec![0, 1, 2])]
+    #[case(Direction::Incoming, Box::new(0..3) as Box<dyn Iterator<Item = i32>>, vec![2, 1, 0])]
+    #[case(Direction::Outgoing, Box::new(std::iter::empty()) as Box<dyn Iterator<Item = i32>>, vec![])]
+    #[case(Direction::Incoming, Box::new(std::iter::empty()) as Box<dyn Iterator<Item = i32>>, vec![])]
+    #[case(Direction::Outgoing, Box::new(std::iter::once(42)) as Box<dyn Iterator<Item = i32>>, vec![42])]
+    #[case(Direction::Incoming, Box::new(std::iter::once(42)) as Box<dyn Iterator<Item = i32>>, vec![42])]
+    fn test_double_ended_iterator_adapter(
+        #[case] direction: Direction,
+        #[case] iter: Box<dyn Iterator<Item = i32>>,
+        #[case] expected: Vec<i32>,
+    ) {
+        let adapter = DoubleEndedIteratorAdapter::from(iter);
+        let collected: Vec<_> = match direction {
+            Direction::Outgoing => adapter.collect(),
+            Direction::Incoming => adapter.rev().collect(),
+        };
+        assert_eq!(collected, expected);
+    }
+}
