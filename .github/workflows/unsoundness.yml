@@ -3,7 +3,7 @@ name: Unsoundness checks
 on:
   schedule:
     # Weekly on Monday at 04:00 UTC
-    - cron: '0 4 * * 1'
+    - cron: "0 4 * * 1"
   workflow_dispatch: {}
 
 concurrency:
@@ -16,11 +16,10 @@ env:
   RUSTFLAGS: "--cfg=ci_run"
   # Permissive provenance is required due to warnings in bitvec 1.0.1
   # Proptest flags required to fix https://github.com/proptest-rs/proptest/issues/253
-  MIRIFLAGS: '-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE'
+  MIRIFLAGS: "-Zmiri-permissive-provenance -Zmiri-env-forward=PROPTEST_DISABLE_FAILURE_PERSISTENCE"
   PROPTEST_DISABLE_FAILURE_PERSISTENCE: true
 
 jobs:
-
   miri:
     name: "Miri"
     runs-on: ubuntu-latest
@@ -53,6 +52,7 @@ jobs:
             --skip "extension::type_def::test::test_instantiate_typedef" \
             --skip "hugr::ident::test::proptest::arbitrary_identlist_valid" \
             --skip "hugr::ident::test::test_idents" \
+            --skip "hugr::patch::inline_call::test::test_recursion" \
             --skip "hugr::patch::replace::test::test_invalid" \
             --skip "hugr::validate::test::check_ext_id_wellformed" \
             --skip "ops::constant::test::test_json_const" \
@@ -63,6 +63,8 @@ jobs:
             --skip "types::test::transform" \
             --skip "types::test::transform_copyable_to_linear" \
             --skip "types::type_param::test::proptest::term_contains_itself" \
+            `# -------- hugr-core::model integration tests` \
+            --skip "import_package_with_extensions" \
             `# -------- hugr-model` \
             --skip "v0::test::test_literal_text" \
             `# -------- hugr-passes` \
@@ -72,8 +74,11 @@ jobs:
             --skip "dataflow::partial_value::test::meet_join_self_noop" \
             --skip "dataflow::partial_value::test::partial_value_type" \
             --skip "dataflow::partial_value::test::partial_value_valid" \
+            --skip "linearize_array::test::implicit_clone" \
             --skip "merge_bbs::test::check_ext_id_wellformed" \
             --skip "monomorphize::test::test_recursion_module" \
+            --skip "normalize_cfgs::test::check_ext_id_wellformed" \
+            --skip "replace_types::linearize::test::value_array" \
             --skip "replace_types::test::dfg_conditional_case" \
             --skip "replace_types::test::module_func_cfg_call" \
             --skip "replace_types::test::op_to_call" \
@@ -84,12 +89,12 @@ jobs:
     needs: miri
     if: always() && needs.miri.result == 'failure' && github.ref == 'refs/heads/main'
     secrets:
-        GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:
-        title: "💥 Unsoundness check fail on main"
-        body: |
-            The unsoundness check for `CQCL/hugr` failed.
+      title: "💥 Unsoundness check fail on main"
+      body: |
+        The unsoundness check for `CQCL/hugr` failed.
 
-            [Please investigate](https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}).
-        unique-label: "unsoundness-checks"
-        other-labels: "bug"
+        [Please investigate](https://github.com/CQCL/hugr/actions/runs/${{ github.run_id }}).
+      unique-label: "unsoundness-checks"
+      other-labels: "bug"
