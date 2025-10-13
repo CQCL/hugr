@@ -382,11 +382,50 @@ pub enum PayloadError {
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
 
+impl From<ModelTextReadError> for EnvelopeError {
+    fn from(value: ModelTextReadError) -> Self {
+        match value {
+            ModelTextReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
+                format: e.format,
+                feature: e.feature,
+            },
+            ModelTextReadError::ParseString(e) => e.into(),
+            ModelTextReadError::Import(e) => e.into(),
+            ModelTextReadError::ExtensionLoad(e) => e.into(),
+            ModelTextReadError::ExtensionDeserialize(e) => e.into(),
+            ModelTextReadError::StringRead(e) => e.into(),
+            ModelTextReadError::ResolveError(e) => e.into(),
+        }
+    }
+}
+
+impl From<ModelBinaryReadError> for EnvelopeError {
+    fn from(value: ModelBinaryReadError) -> Self {
+        match value {
+            ModelBinaryReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
+                format: e.format,
+                feature: e.feature,
+            },
+            ModelBinaryReadError::ParseString(e) => e.into(),
+            ModelBinaryReadError::ReadBinary(e) => e.into(),
+            ModelBinaryReadError::Import(e) => e.into(),
+            ModelBinaryReadError::Extensions(e) => e.into(),
+        }
+    }
+}
+
 impl From<PayloadError> for EnvelopeError {
     fn from(value: PayloadError) -> Self {
         match value {
-            PayloadError::JsonRead(e) => EnvelopeError::PackageEncoding { source: e },
-            _ => todo!("convert model errors to envelope errors"),
+            PayloadError::JsonRead(e) => e.into(),
+            PayloadError::ModelBinary(e) => e.into(),
+            PayloadError::ModelText(e) => e.into(),
+            PayloadError::ExtensionsBreaking(e) => WithGenerator {
+                inner: Box::new(e),
+                generator: None,
+            }
+            .into(),
+            PayloadError::ExtensionResolution(e) => e.into(),
         }
     }
 }
@@ -528,6 +567,10 @@ pub enum EnvelopeError {
         #[from]
         source: WithGenerator<ExtensionBreakingError>,
     },
+
+    // for backwards compatibility
+    #[error(transparent)]
+    ExtensionLoading(#[from] ExtensionResolutionError),
 }
 
 #[derive(Debug, Error)]
