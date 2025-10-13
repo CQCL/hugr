@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.1...hugr-py-v0.14.0) (2025-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* BorrowArray::{borrow, is_borrowed} return types have been swapped such that the array is first.
+
+### Features
+
+* Add more options to `DotRenderer` config ([#2540](https://github.com/CQCL/hugr/issues/2540)) ([45f7573](https://github.com/CQCL/hugr/commit/45f7573fc0a863ea26d9e854a20482078bfdbd0c))
+* Allow importing from model data to python. ([#2581](https://github.com/CQCL/hugr/issues/2581)) ([4fb0a5e](https://github.com/CQCL/hugr/commit/4fb0a5e04b1f8f3ee2f062d505307a2698584534))
+* **py, core, llvm:** add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/issues/2610)) ([1cd08ef](https://github.com/CQCL/hugr/commit/1cd08ef7538091b81c6442d014d5aa9a469eea38)), closes [#2569](https://github.com/CQCL/hugr/issues/2569)
+
+
+### Bug Fixes
+
+* Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/issues/2606)) ([69a126d](https://github.com/CQCL/hugr/commit/69a126d8b24e1f03003417ae47fccc3dc9ae4f94))
+
+
+### Code Refactoring
+
+* consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/issues/2621)) ([8fc59f3](https://github.com/CQCL/hugr/commit/8fc59f3ea36ed0c707cd21b4c936d79e1d6baae3))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.1) (2025-08-18)
 
 
