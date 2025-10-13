@@ -371,14 +371,27 @@ pub(crate) fn write_envelope_impl<'h>(
 
     Ok(())
 }
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 #[error(transparent)]
-pub enum PayloadError {
+/// Error decoding an envelope payload.
+pub struct PayloadError(PayloadErrorInner);
+
+#[derive(Error, Debug)]
+#[non_exhaustive]
+#[error(transparent)]
+/// Error decoding an envelope payload with enumerated variants.
+enum PayloadErrorInner {
+    /// Error decoding a JSON format package.
     JsonRead(#[from] PackageEncodingError),
+    /// Error decoding a binary model format package.
     ModelBinary(#[from] ModelBinaryReadError),
+    /// Error decoding a text model format package.
     ModelText(#[from] ModelTextReadError),
+    /// Error raised while checking for breaking extension version mismatch.
     ExtensionsBreaking(#[from] ExtensionBreakingError),
+    /// Error resolving extensions while decoding the payload.
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
 
@@ -416,17 +429,23 @@ impl From<ModelBinaryReadError> for EnvelopeError {
 
 impl From<PayloadError> for EnvelopeError {
     fn from(value: PayloadError) -> Self {
-        match value {
-            PayloadError::JsonRead(e) => e.into(),
-            PayloadError::ModelBinary(e) => e.into(),
-            PayloadError::ModelText(e) => e.into(),
-            PayloadError::ExtensionsBreaking(e) => WithGenerator {
+        match value.0 {
+            PayloadErrorInner::JsonRead(e) => e.into(),
+            PayloadErrorInner::ModelBinary(e) => e.into(),
+            PayloadErrorInner::ModelText(e) => e.into(),
+            PayloadErrorInner::ExtensionsBreaking(e) => WithGenerator {
                 inner: Box::new(e),
                 generator: None,
             }
             .into(),
-            PayloadError::ExtensionResolution(e) => e.into(),
+            PayloadErrorInner::ExtensionResolution(e) => e.into(),
         }
+    }
+}
+
+impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }
 /// Error type for envelope operations.
