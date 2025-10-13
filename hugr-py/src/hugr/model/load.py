@@ -11,7 +11,18 @@ from hugr.hugr.node_port import Node
 from hugr.std.int import IntVal
 from hugr.std.float import FloatVal
 from hugr.std.collections.array import ArrayVal, Array
-from hugr.ops import DFG, Case, Conditional, Custom, FuncDecl, FuncDefn, Op, TailLoop, Input, Output
+from hugr.ops import (
+    DFG,
+    Case,
+    Conditional,
+    Custom,
+    FuncDecl,
+    FuncDefn,
+    Op,
+    TailLoop,
+    Input,
+    Output,
+)
 from hugr.tys import (
     BoundedNatArg,
     BoundedNatParam,
@@ -99,7 +110,7 @@ class ModelImport:
 
     def add_node(self, node: model.Node, operation: Op, parent: Node) -> Node:
         metadata = self.import_meta_json(node)
-        node_id = self.hugr.add_node(operation, parent, metadata = metadata)
+        node_id = self.hugr.add_node(operation, parent, metadata=metadata)
         self.record_in_links(node_id, node.inputs)
         self.record_out_links(node_id, node.outputs)
         if model.Apply("core.entrypoint") in node.meta:
@@ -125,7 +136,6 @@ class ModelImport:
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
             link_ports_out.setdefault(link, []).append(out_port)
-
 
     def link_ports(self):
         link_ports_in, link_ports_out = self.linked_ports[-1]
@@ -301,7 +311,7 @@ class ModelImport:
                 Conditional(
                     sum_ty=sum_ty,
                     other_inputs=[self.import_type(t) for t in other_inputs],
-                    _outputs=self.import_type_row(outputs)
+                    _outputs=self.import_type_row(outputs),
                 ),
                 parent,
             )
@@ -417,7 +427,7 @@ class ModelImport:
 
         for index, param in enumerate(symbol.params):
             bound = bounds[param.name] if param.name in bounds else TypeBound.Linear
-            type = self.import_type_param(param.type, bound = bound)
+            type = self.import_type_param(param.type, bound=bound)
             self.local_vars[param.name] = LocalVarData(index, type)
             param_types.append(type)
 
@@ -447,7 +457,9 @@ class ModelImport:
 
         return self.local_vars[name]
 
-    def import_type_param(self, term: model.Term, bound: TypeBound = TypeBound.Linear) -> TypeParam:
+    def import_type_param(
+        self, term: model.Term, bound: TypeBound = TypeBound.Linear
+    ) -> TypeParam:
         """Import a TypeParam from a model Term."""
         match term:
             case model.Apply("core.nat"):
@@ -573,10 +585,10 @@ class ModelImport:
 
         for meta in node.meta:
             match meta:
-                case model.Apply("compat.meta_json", [
-                    model.Literal(str() as key),
-                    model.Literal(str() as value)
-                ]):
+                case model.Apply(
+                    "compat.meta_json",
+                    [model.Literal(str() as key), model.Literal(str() as value)],
+                ):
                     pass
                 case _:
                     continue
@@ -612,18 +624,16 @@ class ModelImport:
         for meta in region.meta:
             match meta:
                 case model.Apply(
-                    "core.order_hint.input_key",
-                    [model.Literal(int() as key)]
+                    "core.order_hint.input_key", [model.Literal(int() as key)]
                 ):
                     data.input_keys.append(key)
                 case model.Apply(
-                    "core.order_hint.output_key",
-                    [model.Literal(int() as key)]
+                    "core.order_hint.output_key", [model.Literal(int() as key)]
                 ):
                     data.output_keys.append(key)
                 case model.Apply(
                     "core.order_hint.order",
-                    [model.Literal(int() as before), model.Literal(int() as after)]
+                    [model.Literal(int() as before), model.Literal(int() as after)],
                 ):
                     data.edges.append((before, after))
                 case _:
@@ -637,10 +647,7 @@ class ModelImport:
 
         for meta in node.meta:
             match meta:
-                case model.Apply(
-                    "core.order_hint.key",
-                    [model.Literal(int() as key)]
-                ):
+                case model.Apply("core.order_hint.key", [model.Literal(int() as key)]):
                     keys.append(key)
                 case _:
                     pass
@@ -649,22 +656,28 @@ class ModelImport:
 
     def import_value(self, term: model.Term) -> val.Value:
         match term:
-            case model.Apply("arithmetic.int.const", [
-                model.Literal(int() as int_bitwidth),
-                model.Literal(int() as int_value)
-            ]):
+            case model.Apply(
+                "arithmetic.int.const",
+                [
+                    model.Literal(int() as int_bitwidth),
+                    model.Literal(int() as int_value),
+                ],
+            ):
                 return IntVal(int_value, int_bitwidth)
-            case model.Apply("arithmetic.float.const_f64", [model.Literal(float() as float_value)]):
+            case model.Apply(
+                "arithmetic.float.const_f64", [model.Literal(float() as float_value)]
+            ):
                 return FloatVal(float_value)
-            case model.Apply("collections.array.const", [
-                _,
-                array_item_type,
-                array_items
-            ]):
+            case model.Apply(
+                "collections.array.const", [_, array_item_type, array_items]
+            ):
                 raise NotImplementedError("Import array constants")
-            case model.Apply("compat.const_json", [
-                model.Literal(str() as json),
-            ]):
+            case model.Apply(
+                "compat.const_json",
+                [
+                    model.Literal(str() as json),
+                ],
+            ):
                 # TODO
                 raise NotImplementedError("Import json encoded constants")
             case _:
@@ -677,6 +690,7 @@ class LocalVarData:
     index: int
     type: TypeParam
     bound: TypeBound = field(default=TypeBound.Linear)
+
 
 @dataclass
 class RegionOrderHints:
@@ -699,6 +713,7 @@ class RegionOrderHints:
             raise ModelImportError(error)
 
         return self.key_to_node[key]
+
 
 def group_seq_parts(
     parts: Iterable[model.SeqPart],
