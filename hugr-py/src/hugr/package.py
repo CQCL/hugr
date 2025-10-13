@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar, cast
 from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
+from hugr.hugr.base import Hugr
 import hugr.model as model
 from hugr.envelope import (
     EnvelopeConfig,
@@ -20,7 +21,6 @@ from hugr.ops import FuncDecl, FuncDefn, Op
 
 if TYPE_CHECKING:
     from hugr.ext import Extension
-    from hugr.hugr.base import Hugr
     from hugr.hugr.node_port import Node
 
 __all__ = [
@@ -81,6 +81,11 @@ class Package:
             The deserialized Package object.
         """
         return read_envelope_str(envelope)
+
+    @staticmethod
+    def from_model(package: model.Package):
+        return Package([Hugr.from_model(hugr) for hugr in package.modules])
+        # FIXME extensions?
 
     def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the package to a HUGR envelope byte string.
