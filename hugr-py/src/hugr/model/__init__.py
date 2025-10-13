@@ -1,6 +1,5 @@
 """HUGR model data structures."""
 
-from abc import ABC
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -21,7 +20,7 @@ def _current_version() -> Version:
 CURRENT_VERSION: Version = _current_version()
 
 
-class Term(ABC):
+class Term:
     """A model term for static data such as types, constants and metadata."""
 
     def __str__(self) -> str:
@@ -149,7 +148,7 @@ class Symbol:
         return rust.string_to_symbol(s)
 
 
-class Op(ABC):
+class Op:
     """The operation of a node."""
 
     def symbol_name(self) -> str | None:
