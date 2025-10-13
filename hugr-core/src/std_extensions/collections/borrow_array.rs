@@ -45,7 +45,7 @@ pub const BORROW_ARRAY_VALUENAME: TypeName = TypeName::new_inline("borrow_array"
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.borrow_arr");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 2);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
 
 /// A linear, unsafe, fixed-length collection of values.
 ///
@@ -153,7 +153,7 @@ impl BArrayUnsafeOpDef {
         match self {
             Self::borrow => PolyFuncTypeRV::new(
                 params,
-                FuncValueType::new(vec![array_ty.clone(), usize_t], vec![elem_ty_var, array_ty]),
+                FuncValueType::new(vec![array_ty.clone(), usize_t], vec![array_ty, elem_ty_var]),
             ),
             Self::r#return => PolyFuncTypeRV::new(
                 params,
@@ -172,7 +172,7 @@ impl BArrayUnsafeOpDef {
                 params,
                 FuncValueType::new(
                     vec![array_ty.clone(), usize_t],
-                    vec![crate::extension::prelude::bool_t(), array_ty],
+                    vec![array_ty, crate::extension::prelude::bool_t()],
                 ),
             ),
         }
@@ -644,6 +644,12 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// * `input` - The wire representing the array.
     /// * `index` - The wire representing the index to get.
     ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// * The wire representing the updated array with the element marked as borrowed.
+    /// * The wire representing the borrowed element at the specified index.
+    ///
     /// # Errors
     ///
     /// Returns an error if building the operation fails.
@@ -655,10 +661,10 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
         let op = BArrayUnsafeOpDef::borrow.instantiate(&[size.into(), elem_ty.into()])?;
-        let [out, arr] = self
+        let [arr, out] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();
-        Ok((out, arr))
+        Ok((arr, out))
     }
 
     /// Adds a borrow array put operation to the dataflow graph.
@@ -746,8 +752,8 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// # Returns
     ///
     /// A tuple containing:
-    /// * The wire representing the boolean result (true if borrowed).
     /// * The wire representing the updated array.
+    /// * The wire representing the boolean result (true if borrowed).
     fn add_is_borrowed(
         &mut self,
         elem_ty: Type,
@@ -756,10 +762,10 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
         let op = BArrayUnsafeOpDef::is_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
-        let [is_borrowed, arr] = self
+        let [arr, is_borrowed] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();
-        Ok((is_borrowed, arr))
+        Ok((arr, is_borrowed))
     }
 }
 
@@ -799,7 +805,7 @@ mod test {
             let idx1 = builder.add_load_value(ConstUsize::new(11));
             let idx2 = builder.add_load_value(ConstUsize::new(11));
             let [arr] = builder.input_wires_arr();
-            let (el, arr_with_take) = builder
+            let (arr_with_take, el) = builder
                 .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx1)
                 .unwrap();
             let arr_with_put = builder
@@ -819,7 +825,7 @@ mod test {
                 DFGBuilder::new(Signature::new(vec![arr_ty.clone()], vec![qb_t()])).unwrap();
             let idx = builder.add_load_value(ConstUsize::new(0));
             let [arr] = builder.input_wires_arr();
-            let (el, arr_with_borrowed) = builder
+            let (arr_with_borrowed, el) = builder
                 .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
                 .unwrap();
             builder
@@ -857,10 +863,10 @@ mod test {
         let idx = builder.add_load_value(ConstUsize::new(2));
         let [arr] = builder.input_wires_arr();
         // Borrow the element at index 2
-        let (qb, arr_with_borrowed) = builder
+        let (arr_with_borrowed, qb) = builder
             .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
             .unwrap();
-        let (_is_borrowed, arr_after_check) = builder
+        let (arr_after_check, _is_borrowed) = builder
             .add_is_borrowed(elem_ty.clone(), size, arr_with_borrowed, idx)
             .unwrap();
         builder
