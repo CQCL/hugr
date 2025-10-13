@@ -301,10 +301,7 @@ impl EnvelopeHeader {
     ///
     /// Consumes exactly 10 bytes from the reader.
     /// See the [`crate::envelope`] module documentation for the binary format.
-    pub fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, EnvelopeError> {
-        Self::read_new(reader).map_err(EnvelopeError::from)
-    }
-    pub fn read_new(reader: &mut impl Read) -> Result<EnvelopeHeader, HeaderError> {
+    pub fn read(reader: &mut impl Read) -> Result<EnvelopeHeader, HeaderError> {
         // The first 8 bytes are the magic number in little-endian.
         let mut magic = [0; 8];
         reader.read_exact(&mut magic)?;
