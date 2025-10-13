@@ -192,7 +192,7 @@ pub fn import_package(
     let modules = package
         .modules
         .iter()
-        .map(|module| import_hugr(module, &loaded_extensions))
+        .map(|module| import_hugr(module, loaded_extensions))
         .collect::<Result<Vec<_>, _>>()?;
 
     // This does not panic since the import already requires a module root.
