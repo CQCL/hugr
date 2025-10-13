@@ -77,6 +77,8 @@ class ModelImportError(Exception):
 
 
 class ModelImport:
+    """Helper to import a Hugr."""
+
     local_vars: dict[str, "LocalVarData"]
     current_symbol: str | None
     linked_ports: list[tuple[dict[str, list[InPort]], dict[str, list[OutPort]]]]
