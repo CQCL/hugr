@@ -189,12 +189,10 @@ pub fn import_package(
     packaged_extensions: ExtensionRegistry,
     loaded_extensions: &ExtensionRegistry,
 ) -> Result<Package, ImportError> {
-    let mut registry = loaded_extensions.clone();
-    registry.extend(&packaged_extensions);
     let modules = package
         .modules
         .iter()
-        .map(|module| import_hugr(module, &registry))
+        .map(|module| import_hugr(module, &loaded_extensions))
         .collect::<Result<Vec<_>, _>>()?;
 
     // This does not panic since the import already requires a module root.
@@ -252,12 +250,12 @@ pub fn import_hugr(
             });
         }
     }
-    ctx.hugr
-        .resolve_extension_defs(extensions)
-        .map_err(|e| ImportError {
-            inner: ImportErrorInner::ExtensionResolution(e),
-            generator: get_generator(&ctx),
-        })?;
+    // ctx.hugr
+    //     .resolve_extension_defs(extensions)
+    //     .map_err(|e| ImportError {
+    //         inner: ImportErrorInner::ExtensionResolution(e),
+    //         generator: get_generator(&ctx),
+    //     })?;
     Ok(ctx.hugr)
 }
 
