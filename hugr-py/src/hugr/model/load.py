@@ -1,3 +1,5 @@
+"""Helpers to import hugr graphs from hugr model to their python representation."""
+
 import json
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
