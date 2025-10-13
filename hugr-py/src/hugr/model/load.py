@@ -691,6 +691,8 @@ class ModelImport:
 
 @dataclass
 class LocalVarData:
+    """Data describing a local variable."""
+
     index: int
     type: TypeParam
     bound: TypeBound = field(default=TypeBound.Linear)
@@ -698,6 +700,8 @@ class LocalVarData:
 
 @dataclass
 class RegionOrderHints:
+    """Order hint metadata."""
+
     input_keys: list[int] = field(default_factory=list)
     output_keys: list[int] = field(default_factory=list)
     edges: list[tuple[int, int]] = field(default_factory=list)
