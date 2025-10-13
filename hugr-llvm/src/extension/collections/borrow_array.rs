@@ -1579,7 +1579,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let elem_addr =
                 unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
             let elem_v = builder.build_load(elem_addr, "")?;
-            outputs.finish(builder, [elem_v, array_v])
+            outputs.finish(builder, [array_v, elem_v])
         }
         BArrayUnsafeOpDef::r#return => {
             let [array_v, index_v, elem_v] = inputs
@@ -1631,7 +1631,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
             // let bit = build_is_borrowed_check(ctx, mask_ptr, offset_index_v)?;
             let bit = build_is_borrowed_bit(ctx, mask_ptr, offset_index_v)?;
-            outputs.finish(ctx.builder(), [bit.into(), array_v])
+            outputs.finish(ctx.builder(), [array_v, bit.into()])
         }
         _ => todo!(),
     }
@@ -2555,7 +2555,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2570,7 +2570,7 @@ mod test {
                 }
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2624,7 +2624,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2729,7 +2729,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, barray, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2786,13 +2786,13 @@ mod test {
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i1)
                     .unwrap()
-                    .1;
+                    .0;
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
                 size -= num_pops;
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i2)
                     .unwrap()
-                    .1;
+                    .0;
                 builder
                     .add_borrow_array_discard(int_ty.clone(), size, array)
                     .unwrap();
@@ -2951,7 +2951,7 @@ mod test {
                 );
                 let barray = builder.add_load_value(barray);
                 let idx = builder.add_load_value(ConstUsize::new(0));
-                let (_, barray) = builder
+                let (barray, _) = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, barray, idx)
                     .unwrap();
                 let array = builder
@@ -2995,7 +2995,7 @@ mod test {
                 );
                 let barray = builder.add_load_value(barray);
                 let idx1 = builder.add_load_value(ConstUsize::new(1));
-                let (_, barray) = builder
+                let (barray, _) = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, barray, idx1)
                     .unwrap();
 
@@ -3004,7 +3004,7 @@ mod test {
                     [idx0, idx1]
                         .iter()
                         .fold((barray, Vec::new()), |(arr, mut bools), idx| {
-                            let (b, arr) = builder
+                            let (arr, b) = builder
                                 .add_is_borrowed(int_ty.clone(), size, arr, *idx)
                                 .unwrap();
                             bools.push(b);
