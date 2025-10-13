@@ -4,7 +4,6 @@ from abc import ABC
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 from semver import Version
 
