@@ -265,7 +265,8 @@ class ModelImport:
                 case model.Apply(symbol, args):
                     extension, op_name = split_extension_name(symbol)
                 case _:
-                    error = "The operation of a custom node must be a symbol application."
+                    error = "The operation of a custom node must be a symbol "
+                    "application."
                     raise ModelImportError(error, node)
 
             return self.add_node(
