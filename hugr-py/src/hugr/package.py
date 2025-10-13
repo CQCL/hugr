@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Generic, TypeVar, cast
 from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
-from hugr.hugr.base import Hugr
 import hugr.model as model
 from hugr.envelope import (
     EnvelopeConfig,
@@ -17,6 +16,7 @@ from hugr.envelope import (
     read_envelope,
     read_envelope_str,
 )
+from hugr.hugr.base import Hugr
 from hugr.ops import FuncDecl, FuncDefn, Op
 
 if TYPE_CHECKING:
