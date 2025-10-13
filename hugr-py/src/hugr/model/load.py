@@ -147,7 +147,7 @@ class ModelImport:
 
             match in_ports, out_ports:
                 case [[], []]:
-                    assert False
+                    raise AssertionError
                 case _, [out_port]:
                     for in_port in in_ports:
                         self.hugr.add_link(out_port, in_port)
@@ -205,7 +205,8 @@ class ModelImport:
                 case [body]:
                     pass
                 case _:
-                    raise ModelImportError("DFG node expects a dataflow region.", node)
+                    error = "DFG node expects a dataflow region."
+                    raise ModelImportError(error, node)
 
             signature = self.import_signature(node.signature)
             node_id = self.add_node(
@@ -219,7 +220,8 @@ class ModelImport:
                 case [body]:
                     pass
                 case _:
-                    raise ModelImportError("Loop node expects a dataflow region.", node)
+                    error = "Loop node expects a dataflow region."
+                    raise ModelImportError(error, node)
 
             match body.signature:
                 case model.Apply("core.fn", [_, body_outputs]):
@@ -239,9 +241,8 @@ class ModelImport:
                 case [just_inputs, just_outputs]:
                     pass
                 case _:
-                    raise ModelImportError(
-                        "TailLoop body expects sum type with two variants.", node
-                    )
+                    error = "TailLoop body expects sum type with two variants."
+                    raise ModelImportError(error, node)
 
             node_id = self.add_node(
                 node,
@@ -260,10 +261,8 @@ class ModelImport:
                 case model.Apply(symbol, args):
                     extension, op_name = split_extension_name(symbol)
                 case _:
-                    raise ModelImportError(
-                        "The operation of a custom node must be a symbol application.",
-                        node,
-                    )
+                    error = "The operation of a custom node must be a symbol application."
+                    raise ModelImportError(error, node)
 
             return self.add_node(
                 node,
@@ -425,7 +424,7 @@ class ModelImport:
         param_types: list[TypeParam] = []
 
         for index, param in enumerate(symbol.params):
-            bound = bounds[param.name] if param.name in bounds else TypeBound.Linear
+            bound = bounds.get(param.name, TypeBound.Linear)
             type = self.import_type_param(param.type, bound=bound)
             self.local_vars[param.name] = LocalVarData(index, type)
             param_types.append(type)
@@ -669,7 +668,8 @@ class ModelImport:
             case model.Apply(
                 "collections.array.const", [_, array_item_type, array_items]
             ):
-                raise NotImplementedError("Import array constants")
+                error = "Import array constants"
+                raise NotImplementedError(error)
             case model.Apply(
                 "compat.const_json",
                 [
@@ -677,7 +677,8 @@ class ModelImport:
                 ],
             ):
                 # TODO
-                raise NotImplementedError("Import json encoded constants")
+                error = "Import json encoded constants"
+                raise NotImplementedError(error)
             case _:
                 error = "Unsupported constant value."
                 raise ModelImportError(error, term)
@@ -734,7 +735,8 @@ def group_seq_parts(
 def import_closed_list(term: model.Term) -> Generator[model.Term]:
     for part in term.to_list_parts():
         if isinstance(part, model.Splice):
-            raise ModelImportError("Expected closed list.", term)
+            error = "Expected closed list."
+            raise ModelImportError(error, term)
         else:
             yield part
 
@@ -742,7 +744,8 @@ def import_closed_list(term: model.Term) -> Generator[model.Term]:
 def import_closed_tuple(term: model.Term) -> Generator[model.Term]:
     for part in term.to_tuple_parts():
         if isinstance(part, model.Splice):
-            raise ModelImportError("Expected closed tuple.", term)
+            error = "Expected closed tuple."
+            raise ModelImportError(error, term)
         else:
             yield part
 
@@ -754,4 +757,4 @@ def split_extension_name(name: str) -> tuple[str, str]:
         case [id]:
             return ("", id)
         case _:
-            assert False
+            raise AssertionError
