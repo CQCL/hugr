@@ -597,9 +597,9 @@ class ModelImport:
 
             try:
                 decoded = json.loads(value)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as err:
                 error = "Failed to decode JSON metadata."
-                raise ModelImportError(error, node)
+                raise ModelImportError(error, node) from err
 
             metadata[key] = decoded
 
