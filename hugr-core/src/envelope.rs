@@ -208,7 +208,7 @@ struct EnvelopeReader<R> {
 
 impl<R: BufRead> EnvelopeReader<R> {
     fn new(mut reader: R, registry: &ExtensionRegistry) -> Result<Self, HeaderError> {
-        let header = EnvelopeHeader::read_new(&mut reader)?;
+        let header = EnvelopeHeader::read(&mut reader)?;
         let reader = match header.zstd {
             #[cfg(feature = "zstd")]
             true => Either::Right(std::io::BufReader::new(zstd::Decoder::new(reader)?)),
