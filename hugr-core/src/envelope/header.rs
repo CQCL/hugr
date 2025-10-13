@@ -251,9 +251,15 @@ impl From<HeaderError> for EnvelopeError {
     fn from(err: HeaderError) -> Self {
         match err {
             HeaderError::IO { source } => EnvelopeError::IO { source },
-            HeaderError::MagicNumber { expected, found } => todo!(),
-            HeaderError::InvalidFormatDescriptor { descriptor } => todo!(),
-            HeaderError::FlagUnsupported { flag_ids } => todo!(),
+            HeaderError::MagicNumber { expected, found } => {
+                EnvelopeError::MagicNumber { expected, found }
+            }
+            HeaderError::InvalidFormatDescriptor { descriptor } => {
+                EnvelopeError::InvalidFormatDescriptor { descriptor }
+            }
+            HeaderError::FlagUnsupported { flag_ids } => {
+                EnvelopeError::FlagUnsupported { flag_ids }
+            }
         }
     }
 }
