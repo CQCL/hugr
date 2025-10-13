@@ -1,16 +1,13 @@
+import json
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
-from typing import List, Tuple, Dict, Any
-import json
+from typing import Any
 
 import hugr.model as model
 from hugr import val
 from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
-from hugr.std.int import IntVal
-from hugr.std.float import FloatVal
-from hugr.std.collections.array import ArrayVal, Array
 from hugr.ops import (
     DFG,
     Case,
@@ -18,11 +15,13 @@ from hugr.ops import (
     Custom,
     FuncDecl,
     FuncDefn,
-    Op,
-    TailLoop,
     Input,
+    Op,
     Output,
+    TailLoop,
 )
+from hugr.std.float import FloatVal
+from hugr.std.int import IntVal
 from hugr.tys import (
     BoundedNatArg,
     BoundedNatParam,
@@ -413,7 +412,7 @@ class ModelImport:
     def enter_symbol(self, symbol: model.Symbol) -> PolyFuncType:
         assert len(self.local_vars) == 0
 
-        bounds: Dict[str, TypeBound] = {}
+        bounds: dict[str, TypeBound] = {}
 
         for constraint in symbol.constraints:
             match constraint:
@@ -423,7 +422,7 @@ class ModelImport:
                     error = "Constraint other than `core.nonlinear` on a variable."
                     raise ModelImportError(error, constraint)
 
-        param_types: List[TypeParam] = []
+        param_types: list[TypeParam] = []
 
         for index, param in enumerate(symbol.params):
             bound = bounds[param.name] if param.name in bounds else TypeBound.Linear
@@ -578,9 +577,8 @@ class ModelImport:
 
         return [import_part(part) for part in term.to_list_parts()]
 
-    def import_meta_json(self, node: model.Node) -> Dict[str, Any]:
+    def import_meta_json(self, node: model.Node) -> dict[str, Any]:
         """Collects the `core.meta_json` metadata on the given node."""
-
         metadata = {}
 
         for meta in node.meta:
@@ -641,7 +639,7 @@ class ModelImport:
 
         return data
 
-    def import_meta_order_keys(self, node: model.Node) -> List[int]:
+    def import_meta_order_keys(self, node: model.Node) -> list[int]:
         """Collects all order hint keys in the metadata of a node."""
         keys = []
 
@@ -696,8 +694,8 @@ class LocalVarData:
 class RegionOrderHints:
     input_keys: list[int] = field(default_factory=list)
     output_keys: list[int] = field(default_factory=list)
-    edges: List[Tuple[int, int]] = field(default_factory=list)
-    key_to_node: Dict[int, Node] = field(default_factory=dict)
+    edges: list[tuple[int, int]] = field(default_factory=list)
+    key_to_node: dict[int, Node] = field(default_factory=dict)
 
     def add_node_keys(self, node: Node, keys: Iterable[int]):
         for key in keys:
