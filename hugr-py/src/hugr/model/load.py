@@ -234,14 +234,14 @@ class ModelImport:
                     error = "Tail loop body expects `(core.fn _ _)` signature."
                     raise ModelImportError(error, node)
 
-            match list(import_closed_list(body_outputs)):
+            match list(_import_closed_list(body_outputs)):
                 case [model.Apply("core.adt", [variants]), *rest]:
                     pass
                 case _:
                     error = "TailLoop body expects `(core.adt _)` as first target type."
                     raise ModelImportError(error, node)
 
-            match list(import_closed_list(variants)):
+            match list(_import_closed_list(variants)):
                 case [just_inputs, just_outputs]:
                     pass
                 case _:
@@ -263,7 +263,7 @@ class ModelImport:
         def import_custom_node(op: model.Term) -> Node:
             match op:
                 case model.Apply(symbol, args):
-                    extension, op_name = split_extension_name(symbol)
+                    extension, op_name = _split_extension_name(symbol)
                 case _:
                     error = "The operation of a custom node must be a symbol "
                     "application."
@@ -292,12 +292,12 @@ class ModelImport:
                     error = "Conditional node expects `(core.fn _ _)` signature."
                     raise ModelImportError(error, node)
 
-            match list(import_closed_list(inputs)):
+            match list(_import_closed_list(inputs)):
                 case [model.Apply("core.adt", [variants]), *other_inputs]:
                     sum_ty = Sum(
                         [
                             self.import_type_row(variant)
-                            for variant in import_closed_list(variants)
+                            for variant in _import_closed_list(variants)
                         ]
                     )
                 case _:
@@ -481,7 +481,7 @@ class ModelImport:
                 return TupleParam(
                     [
                         self.import_type_param(item_type)
-                        for item_type in import_closed_list(item_types)
+                        for item_type in _import_closed_list(item_types)
                     ]
                 )
             case model.Apply("core.const", [runtime_type]):
@@ -496,7 +496,7 @@ class ModelImport:
         def import_list(term: model.Term) -> TypeArg:
             lists: list[TypeArg] = []
 
-            for group in group_seq_parts(term.to_list_parts()):
+            for group in _group_seq_parts(term.to_list_parts()):
                 if isinstance(group, list):
                     lists.append(
                         ListArg([self.import_type_arg(item) for item in group])
@@ -509,7 +509,7 @@ class ModelImport:
         def import_tuple(term: model.Term) -> TypeArg:
             tuples: list[TypeArg] = []
 
-            for group in group_seq_parts(term.to_list_parts()):
+            for group in _group_seq_parts(term.to_list_parts()):
                 if isinstance(group, list):
                     tuples.append(
                         TupleArg([self.import_type_arg(item) for item in group])
@@ -549,11 +549,11 @@ class ModelImport:
                 return Sum(
                     [
                         self.import_type_row(variant)
-                        for variant in import_closed_list(variants)
+                        for variant in _import_closed_list(variants)
                     ]
                 )
             case model.Apply(symbol, args):
-                extension, id = split_extension_name(symbol)
+                extension, id = _split_extension_name(symbol)
                 return Opaque(
                     id=id,
                     extension=extension,
@@ -723,7 +723,7 @@ class RegionOrderHints:
         return self.key_to_node[key]
 
 
-def group_seq_parts(
+def _group_seq_parts(
     parts: Iterable[model.SeqPart],
 ) -> Generator[model.Term | list[model.Term]]:
     group: list[model.Term] = []
@@ -741,7 +741,7 @@ def group_seq_parts(
         yield group
 
 
-def import_closed_list(term: model.Term) -> Generator[model.Term]:
+def _import_closed_list(term: model.Term) -> Generator[model.Term]:
     for part in term.to_list_parts():
         if isinstance(part, model.Splice):
             error = "Expected closed list."
@@ -750,7 +750,7 @@ def import_closed_list(term: model.Term) -> Generator[model.Term]:
             yield part
 
 
-def import_closed_tuple(term: model.Term) -> Generator[model.Term]:
+def _import_closed_tuple(term: model.Term) -> Generator[model.Term]:
     for part in term.to_tuple_parts():
         if isinstance(part, model.Splice):
             error = "Expected closed tuple."
@@ -759,7 +759,7 @@ def import_closed_tuple(term: model.Term) -> Generator[model.Term]:
             yield part
 
 
-def split_extension_name(name: str) -> tuple[str, str]:
+def _split_extension_name(name: str) -> tuple[str, str]:
     match name.rsplit(".", 1):
         case [extension, id]:
             return (extension, id)
