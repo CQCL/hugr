@@ -42,15 +42,17 @@ pub trait MergeDescriptions {
 }
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PackageDesc {
-    pub header: Option<EnvelopeHeader>,
+    pub header: EnvelopeHeader,
     modules: PartialVec<ModuleDescription>,
     packaged_extensions: PartialVec<ExtensionDescr>,
 }
 
 impl PackageDesc {
-    pub fn with_header(mut self, header: EnvelopeHeader) -> Self {
-        self.header = Some(header);
-        self
+    pub fn new(header: EnvelopeHeader) -> Self {
+        Self {
+            header,
+            ..Default::default()
+        }
     }
     pub fn with_n_modules(mut self, n: usize) -> Self {
         self.modules.set_len(n);
@@ -76,8 +78,6 @@ impl MergeDescriptions for PackageDesc {
     fn merge(mut self, other: Self) -> Self {
         self.modules.merge(other.modules);
         self.packaged_extensions.merge(other.packaged_extensions);
-
-        self.header = self.header.or(other.header);
         self
     }
 }
@@ -148,55 +148,3 @@ impl std::fmt::Display for ModuleDescription {
         todo!()
     }
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("{inner} while reading envelope: {partial_description}")]
-pub struct DescribedError<E, D> {
-    inner: Box<E>,
-    partial_description: D,
-}
-
-impl<E, D> DescribedError<E, D> {
-    pub fn new(inner: E, partial_description: D) -> Self {
-        Self {
-            inner: Box::new(inner),
-            partial_description,
-        }
-    }
-
-    pub fn merge_description(self, other: D) -> Self
-    where
-        D: MergeDescriptions,
-    {
-        Self {
-            inner: self.inner,
-            partial_description: self.partial_description.merge(other),
-        }
-    }
-}
-impl<O, D> DescribedError<O, D> {
-    fn from_other<E>(err: DescribedError<E, D>) -> Self
-    where
-        O: From<E>,
-    {
-        Self {
-            partial_description: err.partial_description,
-            inner: Box::new(O::from(*err.inner)),
-        }
-    }
-}
-pub type WithPackageDesc<E> = DescribedError<E, PackageDesc>;
-pub type WithModuleDesc<E> = DescribedError<E, ModuleDescription>;
-
-pub trait WrapError: Sized {
-    fn wrap<E, O>(&self, err: E) -> DescribedError<O, Self>
-    where
-        Self: Clone,
-        O: From<E>,
-    {
-        DescribedError::new(O::from(err), self.clone())
-    }
-}
-
-impl WrapError for PackageDesc {}
-impl WrapError for ModuleDescription {}
