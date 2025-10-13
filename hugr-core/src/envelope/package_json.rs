@@ -46,7 +46,10 @@ pub enum PackageEncodingError {
     /// Error raised while reading from a file.
     IOError(#[from] io::Error),
     /// Could not resolve the extension needed to encode the hugr.
+    #[deprecated(since = "0.24.1", note = "Not raised")]
     ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
+    /// Error resolving packaged extensions.
+    PackagedExtension(#[from] ExtensionResolutionError),
 }
 
 /// A private package structure implementing the serde traits.

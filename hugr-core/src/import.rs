@@ -213,7 +213,7 @@ fn get_generator(ctx: &Context<'_>) -> Option<String> {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
             (name == crate::envelope::GENERATOR_KEY)
-                .then_some(crate::envelope::format_generator(&json_val))
+                .then_some(crate::envelope::description::format_generator(&json_val))
         })
 }
 
@@ -250,12 +250,6 @@ pub fn import_hugr(
             });
         }
     }
-    // ctx.hugr
-    //     .resolve_extension_defs(extensions)
-    //     .map_err(|e| ImportError {
-    //         inner: ImportErrorInner::ExtensionResolution(e),
-    //         generator: get_generator(&ctx),
-    //     })?;
     Ok(ctx.hugr)
 }
 

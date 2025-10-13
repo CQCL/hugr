@@ -1,5 +1,5 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
-use crate::envelope::EnvelopeHeader;
+use crate::{HugrView, envelope::EnvelopeHeader, ops::OpType};
 
 #[derive(Clone, Debug, PartialEq)]
 struct PartialVec<T> {
@@ -45,7 +45,7 @@ pub trait MergeDescriptions {
 pub struct PackageDesc {
     pub header: EnvelopeHeader,
     modules: PartialVec<ModuleDescription>,
-    packaged_extensions: PartialVec<ExtensionDescr>,
+    packaged_extensions: PartialVec<ExtensionDesc>,
 }
 
 impl PackageDesc {
@@ -55,23 +55,38 @@ impl PackageDesc {
             ..Default::default()
         }
     }
-    pub fn with_n_modules(mut self, n: usize) -> Self {
+    pub fn set_n_modules(&mut self, n: usize) {
         self.modules.set_len(n);
-        self
     }
     pub fn n_modules(&self) -> usize {
         self.modules.len()
     }
-    pub fn with_module(mut self, index: usize, module: ModuleDescription) -> Self {
-        self.modules.set_index(index, module);
-        self
+    pub fn set_module(&mut self, index: usize, module: impl Into<ModuleDescription>) {
+        self.modules.set_index(index, module.into());
     }
-    pub fn with_n_packaged_extensions(mut self, n: usize) -> Self {
+    pub fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
+        self.packaged_extensions.set_index(index, ext.into());
+    }
+    pub fn set_n_packaged_extensions(&mut self, n: usize) {
         self.packaged_extensions.set_len(n);
-        self
     }
     pub fn n_packaged_extensions(&self) -> usize {
         self.packaged_extensions.len()
+    }
+
+    pub fn generator(&self) -> Option<String> {
+        let generators: Vec<String> = self
+            .modules
+            .vec
+            .iter()
+            .flatten()
+            .flat_map(|m| m.generator.clone())
+            .collect();
+        if generators.is_empty() {
+            return None;
+        }
+
+        Some(generators.join(", "))
     }
 }
 
@@ -83,20 +98,30 @@ impl MergeDescriptions for PackageDesc {
     }
 }
 
-#[derive(derive_more::Display, Debug, Clone, PartialEq)]
+#[derive(derive_more::Display, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[display("Extension {name} v{version}")]
-pub struct ExtensionDescr {
+pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
     pub version: String,
 }
 
-impl ExtensionDescr {
-    pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
+impl ExtensionDesc {
+    pub fn new(name: impl ToString, version: impl ToString) -> Self {
         Self {
-            name: name.into(),
-            version: version.into(),
+            name: name.to_string(),
+            version: version.to_string(),
+        }
+    }
+}
+
+impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
+    fn from(ext: &E) -> Self {
+        let ext = ext.as_ref();
+        Self {
+            name: ext.name.to_string(),
+            version: ext.version.to_string(),
         }
     }
 }
@@ -106,35 +131,90 @@ pub struct ModuleDescription {
     /// Generator specified in the module metadata.
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
-    pub used_extensions_metadata: Option<Vec<ExtensionDescr>>,
+    pub used_extensions_metadata: Option<Vec<ExtensionDesc>>,
     /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
-    pub used_extensions_resolved: Option<Vec<ExtensionDescr>>,
+    pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Public symbols defined in the module.
     pub public_symbols: Option<Vec<String>>,
 }
 
 impl ModuleDescription {
-    pub fn with_generator(mut self, generator: impl Into<String>) -> Self {
+    pub fn set_generator(&mut self, generator: impl Into<String>) {
         self.generator = Some(generator.into());
-        self
     }
-    pub fn with_used_extensions_metadata(
-        mut self,
-        used_extensions_metadata: impl IntoIterator<Item = ExtensionDescr>,
-    ) -> Self {
+    pub fn set_used_extensions_metadata(
+        &mut self,
+        used_extensions_metadata: impl IntoIterator<Item = ExtensionDesc>,
+    ) {
         self.used_extensions_metadata = Some(used_extensions_metadata.into_iter().collect());
-        self
     }
-    pub fn with_used_extensions_resolved(
-        mut self,
-        used_extensions_resolved: impl IntoIterator<Item = ExtensionDescr>,
-    ) -> Self {
+    pub fn set_used_extensions_resolved(
+        &mut self,
+        used_extensions_resolved: impl IntoIterator<Item = ExtensionDesc>,
+    ) {
         self.used_extensions_resolved = Some(used_extensions_resolved.into_iter().collect());
-        self
     }
-    pub fn with_public_symbols(mut self, public_symbols: Vec<String>) -> Self {
+    pub fn set_public_symbols(&mut self, public_symbols: Vec<String>) {
         self.public_symbols = Some(public_symbols);
-        self
+    }
+
+    pub fn load_generator(&mut self, hugr: &impl HugrView) {
+        if let Some(val) = hugr.get_metadata(hugr.module_root(), crate::envelope::GENERATOR_KEY) {
+            self.set_generator(format_generator(val));
+        }
+    }
+
+    pub fn load_used_extensions_metadata(&mut self, hugr: &impl HugrView) {
+        let Some(exts) = hugr.get_metadata(hugr.module_root(), USED_EXTENSIONS_KEY) else {
+            return; // No used extensions metadata, nothing to check
+        };
+        let Some(used_exts): Option<Vec<ExtensionDesc>> = serde_json::from_value(exts.clone()).ok()
+        else {
+            // TODO don't fail silently
+            return;
+        };
+        self.used_extensions_metadata = Some(used_exts);
+    }
+
+    pub fn load_used_extensions_resolved(&mut self, hugr: &impl HugrView) {
+        self.used_extensions_resolved = Some(
+            hugr.extensions()
+                .iter()
+                .map(|ext| ExtensionDesc::new(&ext.name, &ext.version))
+                .collect(),
+        )
+    }
+
+    pub fn load_public_symbols(&mut self, hugr: &impl HugrView) {
+        let symbols = hugr
+            .children(hugr.module_root())
+            .filter_map(|n| match hugr.get_optype(n) {
+                OpType::FuncDecl(decl) if *decl.visibility() == crate::Visibility::Public => {
+                    Some(decl.func_name().to_string())
+                }
+                OpType::FuncDefn(defn) if *defn.visibility() == crate::Visibility::Public => {
+                    Some(defn.func_name().to_string())
+                }
+                _ => None,
+            })
+            .collect();
+
+        self.public_symbols = Some(symbols);
+    }
+
+    fn load_from_hugr(&mut self, hugr: &impl HugrView) {
+        self.load_generator(hugr);
+        self.load_used_extensions_metadata(hugr);
+        self.load_used_extensions_resolved(hugr);
+        self.load_public_symbols(hugr);
+    }
+}
+
+impl<H: HugrView> From<&H> for ModuleDescription {
+    fn from(hugr: &H) -> Self {
+        let mut desc = ModuleDescription::default();
+        desc.load_from_hugr(hugr);
+        desc
     }
 }
 
@@ -147,5 +227,53 @@ impl std::fmt::Display for PackageDesc {
 impl std::fmt::Display for ModuleDescription {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
+    }
+}
+
+/// Key used to store the name of the generator that produced the envelope.
+pub const GENERATOR_KEY: &str = "core.generator";
+/// Key used to store the list of used extensions in the metadata of a HUGR.
+pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
+
+/// Get the name of the generator from the metadata of the HUGR modules.
+///
+/// If multiple modules have different generators, a comma-separated list is returned in
+/// module order.
+/// If no generator is found, `None` is returned.
+pub(super) fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
+    let generators: Vec<String> = modules
+        .iter()
+        .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
+        .map(format_generator)
+        .collect();
+    if generators.is_empty() {
+        return None;
+    }
+
+    Some(generators.join(", "))
+}
+
+/// Format a generator value from the metadata.
+pub(crate) fn format_generator(json_val: &serde_json::Value) -> String {
+    match json_val {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Object(obj) => {
+            if let (Some(name), version) = (
+                obj.get("name").and_then(|v| v.as_str()),
+                obj.get("version").and_then(|v| v.as_str()),
+            ) {
+                if let Some(version) = version {
+                    // Expected format: {"name": "generator", "version": "1.0.0"}
+                    format!("{name}-v{version}")
+                } else {
+                    name.to_string()
+                }
+            } else {
+                // just print the whole object as a string
+                json_val.to_string()
+            }
+        }
+        // Raw JSON string fallback
+        _ => json_val.to_string(),
     }
 }
