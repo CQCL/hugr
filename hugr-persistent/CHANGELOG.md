@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.0...hugr-persistent-v0.3.1) - 2025-10-13
+
+### Bug Fixes
+
+- *(test)* No extension serialisation in persistent-hugr testing ([#2612](https://github.com/CQCL/hugr/pull/2612))
+
+### New Features
+
+- *(persistent)* Redesign CommitStateSpace, bound Commit lifetime ([#2534](https://github.com/CQCL/hugr/pull/2534))
+
 ## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.2.3...hugr-persistent-v0.3.0) - 2025-09-30
 
 ### Miscellaneous Tasks

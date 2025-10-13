@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.23.0...hugr-passes-v0.24.0) - 2025-10-13
+
+### New Features
+
+- Add handler for copying / discarding borrow arrays to default lineariser ([#2602](https://github.com/CQCL/hugr/pull/2602))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.4...hugr-passes-v0.23.0) - 2025-09-30
 
 ### Bug Fixes

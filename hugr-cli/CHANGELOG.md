@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.23.0...hugr-cli-v0.24.0) - 2025-10-13
+
+### Documentation
+
+- update cli readme ([#2601](https://github.com/CQCL/hugr/pull/2601))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.2...hugr-cli-v0.22.3) - 2025-09-11
 
 ### New Features
