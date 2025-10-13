@@ -671,14 +671,15 @@ class ModelImport:
             ):
                 return FloatVal(float_value)
             case model.Apply(
-                "collections.array.const", [_, array_item_type, array_items]
+                "collections.array.const", [_, _array_item_type, _array_items]
             ):
+                # TODO
                 error = "Import array constants"
                 raise NotImplementedError(error)
             case model.Apply(
                 "compat.const_json",
                 [
-                    model.Literal(str() as json),
+                    model.Literal(str() as _json),
                 ],
             ):
                 # TODO
