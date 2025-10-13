@@ -1,3 +1,4 @@
+//! Description of the contents of a HUGR envelope used for debugging and error reporting.
 use crate::envelope::EnvelopeHeader;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -207,9 +207,14 @@ impl ZstdConfig {
         self.level.map_or(default, |l| i32::from(l.get()))
     }
 }
+
+#[derive(Debug, Error, derive_more::Display)]
+#[display("Error reading the envelope header. {_0}")]
+pub struct HeaderError(HeaderErrorInner);
+
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum HeaderError {
+pub(super) enum HeaderErrorInner {
     /// Bad magic number.
     #[error(
         "Bad magic number. expected 0x{:X} found 0x{:X}",
@@ -246,21 +251,33 @@ pub enum HeaderError {
         /// The unrecognized flag bits.
         flag_ids: Vec<usize>,
     },
+    #[cfg(not(feature = "zstd"))]
+    /// Envelope encoding required zstd compression, but the feature is not enabled.
+    #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
+    ZstdUnsupported,
 }
 impl From<HeaderError> for EnvelopeError {
     fn from(err: HeaderError) -> Self {
-        match err {
-            HeaderError::IO { source } => EnvelopeError::IO { source },
-            HeaderError::MagicNumber { expected, found } => {
+        match err.0 {
+            HeaderErrorInner::IO { source } => EnvelopeError::IO { source },
+            HeaderErrorInner::MagicNumber { expected, found } => {
                 EnvelopeError::MagicNumber { expected, found }
             }
-            HeaderError::InvalidFormatDescriptor { descriptor } => {
+            HeaderErrorInner::InvalidFormatDescriptor { descriptor } => {
                 EnvelopeError::InvalidFormatDescriptor { descriptor }
             }
-            HeaderError::FlagUnsupported { flag_ids } => {
+            HeaderErrorInner::FlagUnsupported { flag_ids } => {
                 EnvelopeError::FlagUnsupported { flag_ids }
             }
+            #[cfg(not(feature = "zstd"))]
+            HeaderErrorInner::ZstdUnsupported => EnvelopeError::ZstdUnsupported,
         }
+    }
+}
+
+impl<T: Into<HeaderErrorInner>> From<T> for HeaderError {
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }
 impl EnvelopeHeader {
@@ -306,10 +323,11 @@ impl EnvelopeHeader {
         let mut magic = [0; 8];
         reader.read_exact(&mut magic)?;
         if magic != MAGIC_NUMBERS {
-            return Err(HeaderError::MagicNumber {
+            return Err(HeaderErrorInner::MagicNumber {
                 expected: MAGIC_NUMBERS.try_into().unwrap(),
                 found: magic,
-            });
+            }
+            .into());
         }
 
         // Next is the format descriptor.
@@ -317,9 +335,10 @@ impl EnvelopeHeader {
         reader.read_exact(&mut format_bytes)?;
         let format_discriminant = format_bytes[0] as usize;
         let Some(format) = EnvelopeFormat::from_repr(format_discriminant) else {
-            return Err(HeaderError::InvalidFormatDescriptor {
+            return Err(HeaderErrorInner::InvalidFormatDescriptor {
                 descriptor: format_discriminant,
-            });
+            }
+            .into());
         };
 
         // Next is the flags byte.
@@ -333,7 +352,7 @@ impl EnvelopeHeader {
         let other_flags = (flags ^ DEFAULT_FLAGS) & !ZSTD_FLAG;
         if other_flags != 0 {
             let flag_ids = (0..8).filter(|i| other_flags & (1 << i) != 0).collect_vec();
-            return Err(HeaderError::FlagUnsupported { flag_ids });
+            return Err(HeaderErrorInner::FlagUnsupported { flag_ids }.into());
         }
 
         Ok(Self { format, zstd })
@@ -391,7 +410,7 @@ mod tests {
         invalid_magic[7] = 0xFF;
         assert_matches!(
             EnvelopeHeader::read(&mut invalid_magic.as_slice()),
-            Err(EnvelopeError::MagicNumber { .. })
+            Err(HeaderError(HeaderErrorInner::MagicNumber { .. }))
         );
 
         // Unrecognised flags
@@ -399,7 +418,7 @@ mod tests {
         unrecognised_flags[9] |= 0b0001_0010;
         assert_matches!(
             EnvelopeHeader::read(&mut unrecognised_flags.as_slice()),
-            Err(EnvelopeError::FlagUnsupported { flag_ids })
+            Err(HeaderError(HeaderErrorInner::FlagUnsupported { flag_ids }))
             => assert_eq!(flag_ids, vec![1, 4])
         );
     }
