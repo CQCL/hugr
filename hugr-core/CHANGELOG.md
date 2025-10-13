@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.23.0...hugr-core-v0.24.0) - 2025-10-13
+
+### Bug Fixes
+
+- Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/pull/2606))
+
+### New Features
+
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.4...hugr-core-v0.23.0) - 2025-09-30
 
 ### Bug Fixes
