@@ -232,18 +232,18 @@ impl HugrView for PersistentHugr {
 
         // Children may be modified by later commits, but only if the parent is a
         // dataflow parent.
-        let it = if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
+        if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
             // we must filter out children nodes that are invalidated by later commits, and
             // on the other hand add nodes in those commits
             // TODO: The ordering of the children may not be preserved! But is preserved for
             // the first two children, which we care the most about.
             // see https://github.com/CQCL/hugr/issues/2618
-            Either::Left(IterValidNodes::new(self, children.fuse()))
+            let iter = IterValidNodes::new(self, children.fuse());
+            Either::Left(DoubleEndedIteratorAdapter::from(iter))
         } else {
             // children are precisely children of the commit hugr
             Either::Right(children)
-        };
-        DoubleEndedIteratorAdapter::from(it)
+        }
     }
 
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {

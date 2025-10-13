@@ -9,10 +9,16 @@ pub(super) struct PersistentHugrCache {
 }
 
 impl PersistentHugrCache {
+    /// Remove the cached list of children of `commit`.
+    ///
+    /// This should be called whenever the children of `commit` may have
+    /// changed.
     pub fn invalidate_children(&mut self, commit: CommitId) {
         self.children_cache.remove(&commit);
     }
 
+    /// Get the cached list of children of `commit`, or compute and cache them
+    /// using the callable.
     pub fn children_or_insert(
         &mut self,
         commit: CommitId,
