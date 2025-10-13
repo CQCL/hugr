@@ -200,14 +200,14 @@ where
     }
 }
 
-struct EnvelopeReader<'e, R> {
+struct EnvelopeReader<R> {
     description: PackageDesc,
     reader: MaybeZstdRead<R>,
-    registry: &'e ExtensionRegistry,
+    registry: ExtensionRegistry,
 }
 
-impl<'e, R: BufRead> EnvelopeReader<'e, R> {
-    fn new(mut reader: R, registry: &'e ExtensionRegistry) -> Result<Self, HeaderError> {
+impl<R: BufRead> EnvelopeReader<R> {
+    fn new(mut reader: R, registry: &ExtensionRegistry) -> Result<Self, HeaderError> {
         let header = EnvelopeHeader::read_new(&mut reader)?;
         let reader = match header.zstd {
             #[cfg(feature = "zstd")]
@@ -219,7 +219,7 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
         Ok(Self {
             description: PackageDesc::new(header),
             reader: MaybeZstdRead(reader),
-            registry,
+            registry: registry.clone(),
         })
     }
 
@@ -231,6 +231,10 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
         &self.description.header
     }
 
+    fn register_packaged(&mut self, extensions: &ExtensionRegistry) {
+        self.registry.extend(extensions);
+    }
+
     pub fn read(&mut self) -> Result<Package, PayloadError> {
         let mut package = match self.header().format {
             EnvelopeFormat::PackageJson => self.from_json_reader()?,
@@ -240,10 +244,10 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
             }
         };
 
-        package
-            .modules
-            .iter_mut()
-            .try_for_each(check_breaking_extensions)?;
+        for module in package.modules.iter_mut() {
+            check_breaking_extensions(&module)?;
+            module.resolve_extension_defs(&self.registry)?;
+        }
         Ok(package)
     }
 
@@ -258,17 +262,18 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
             extensions: pkg_extensions,
         } = serde_json::from_value(val.clone())?;
         let mut modules = modules.into_iter().map(|h| h.0).collect_vec();
-        let pkg_extensions =
-            ExtensionRegistry::new_with_extension_resolution(pkg_extensions, &self.registry.into())
-                .map_err(|err| WithGenerator::new(err, &modules))?;
+        let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
+            pkg_extensions,
+            &crate::extension::resolution::WeakExtensionRegistry::from(&self.registry),
+        )
+        .map_err(|err| WithGenerator::new(err, &modules))?;
 
         // Resolve the operations in the modules using the defined registries.
-        let mut combined_registry = self.registry.clone();
-        combined_registry.extend(&pkg_extensions);
+        self.register_packaged(&pkg_extensions);
 
         modules
             .iter_mut()
-            .try_for_each(|module| module.resolve_extension_defs(&combined_registry))
+            .try_for_each(|module| module.resolve_extension_defs(&self.registry))
             .map_err(|err| WithGenerator::new(err, &modules))?;
 
         Ok(Package {
@@ -283,12 +288,13 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
         let model_package = hugr_model::v0::binary::read_from_reader(&mut self.reader, &bump)?;
 
         let packaged_extensions = if self.header().format == EnvelopeFormat::ModelWithExtensions {
-            ExtensionRegistry::load_json(&mut self.reader, self.registry)?
+            ExtensionRegistry::load_json(&mut self.reader, &self.registry)?
         } else {
             ExtensionRegistry::new([])
         };
+        self.register_packaged(&packaged_extensions);
 
-        let package = import_package(&model_package, packaged_extensions, self.registry)?;
+        let package = import_package(&model_package, packaged_extensions, &self.registry)?;
 
         Ok(package)
     }
@@ -309,6 +315,7 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
         } else {
             ExtensionRegistry::new([])
         };
+        self.register_packaged(&packaged_extensions);
 
         // Read the package into a string, then parse it.
         //
@@ -320,7 +327,7 @@ impl<'e, R: BufRead> EnvelopeReader<'e, R> {
         let bump = Bump::default();
         let model_package = ast_package.resolve(&bump)?;
 
-        let package = import_package(&model_package, packaged_extensions, self.registry)?;
+        let package = import_package(&model_package, packaged_extensions, &self.registry)?;
 
         Ok(package)
     }
