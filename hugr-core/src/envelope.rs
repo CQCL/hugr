@@ -99,13 +99,6 @@ pub struct WithGenerator<E: std::fmt::Display> {
 }
 
 impl<E: std::fmt::Display> WithGenerator<E> {
-    fn new(err: E, modules: &[impl HugrView]) -> Self {
-        Self {
-            inner: Box::new(err),
-            generator: description::get_generator(modules),
-        }
-    }
-
     /// Get a reference to the inner error.
     pub fn inner(&self) -> &E {
         &self.inner
@@ -814,29 +807,5 @@ pub(crate) mod test {
         ]);
         hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
-    }
-
-    #[test]
-    fn test_with_generator_error_message() {
-        let test_ext = Extension::new(ExtensionId::new_unchecked("test"), Version::new(1, 0, 0));
-        let registry = ExtensionRegistry::new([Arc::new(test_ext)]);
-
-        let mut hugr = simple_package().modules.remove(0);
-
-        // Set a generator name in the metadata
-        let generator_name = json!({ "name": "TestGenerator", "version": "1.2.3" });
-        hugr.set_metadata(hugr.module_root(), GENERATOR_KEY, generator_name.clone());
-
-        // Set incompatible extension version in metadata
-        let used_exts = json!([{ "name": "test", "version": "2.0.0" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
-
-        // Create the error and wrap it with WithGenerator
-        let err = check_breaking_extensions_against_registry(&hugr, &registry).unwrap_err();
-        let with_gen = WithGenerator::new(err, &[&hugr]);
-
-        let err_msg = with_gen.to_string();
-        assert!(err_msg.contains("Extension 'test' version mismatch"));
-        assert!(err_msg.contains("TestGenerator-v1.2.3"));
     }
 }

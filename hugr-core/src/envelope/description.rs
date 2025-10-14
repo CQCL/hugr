@@ -235,24 +235,6 @@ pub const GENERATOR_KEY: &str = "core.generator";
 /// Key used to store the list of used extensions in the metadata of a HUGR.
 pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 
-/// Get the name of the generator from the metadata of the HUGR modules.
-///
-/// If multiple modules have different generators, a comma-separated list is returned in
-/// module order.
-/// If no generator is found, `None` is returned.
-pub(super) fn get_generator<H: HugrView>(modules: &[H]) -> Option<String> {
-    let generators: Vec<String> = modules
-        .iter()
-        .filter_map(|hugr| hugr.get_metadata(hugr.module_root(), GENERATOR_KEY))
-        .map(format_generator)
-        .collect();
-    if generators.is_empty() {
-        return None;
-    }
-
-    Some(generators.join(", "))
-}
-
 /// Format a generator value from the metadata.
 pub(crate) fn format_generator(json_val: &serde_json::Value) -> String {
     match json_val {
