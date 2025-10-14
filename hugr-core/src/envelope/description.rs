@@ -44,7 +44,7 @@ pub trait MergeDescriptions {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PackageDesc {
     pub header: EnvelopeHeader,
-    modules: PartialVec<ModuleDescription>,
+    modules: PartialVec<ModuleDesc>,
     packaged_extensions: PartialVec<ExtensionDesc>,
 }
 
@@ -61,7 +61,7 @@ impl PackageDesc {
     pub fn n_modules(&self) -> usize {
         self.modules.len()
     }
-    pub fn set_module(&mut self, index: usize, module: impl Into<ModuleDescription>) {
+    pub fn set_module(&mut self, index: usize, module: impl Into<ModuleDesc>) {
         self.modules.set_index(index, module.into());
     }
     pub fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
@@ -127,7 +127,7 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct ModuleDescription {
+pub struct ModuleDesc {
     /// Generator specified in the module metadata.
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
@@ -138,7 +138,7 @@ pub struct ModuleDescription {
     pub public_symbols: Option<Vec<String>>,
 }
 
-impl ModuleDescription {
+impl ModuleDesc {
     pub fn set_generator(&mut self, generator: impl Into<String>) {
         self.generator = Some(generator.into());
     }
@@ -210,9 +210,9 @@ impl ModuleDescription {
     }
 }
 
-impl<H: HugrView> From<&H> for ModuleDescription {
+impl<H: HugrView> From<&H> for ModuleDesc {
     fn from(hugr: &H) -> Self {
-        let mut desc = ModuleDescription::default();
+        let mut desc = ModuleDesc::default();
         desc.load_from_hugr(hugr);
         desc
     }
@@ -224,7 +224,7 @@ impl std::fmt::Display for PackageDesc {
     }
 }
 
-impl std::fmt::Display for ModuleDescription {
+impl std::fmt::Display for ModuleDesc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }

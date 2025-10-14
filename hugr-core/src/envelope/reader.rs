@@ -1,6 +1,7 @@
 use std::io::{BufRead, Read};
 use std::str::FromStr as _;
 
+use hugr_model::v0::table;
 use itertools::{Either, Itertools as _};
 
 use crate::envelope::description::PackageDesc;
@@ -8,7 +9,7 @@ use crate::envelope::header::{EnvelopeFormat, HeaderError};
 use crate::envelope::{EnvelopeError, EnvelopeHeader, ExtensionBreakingError};
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::extension::{Extension, ExtensionRegistry};
-use crate::import::import_package;
+use crate::import::import_described_hugr;
 use crate::package::Package;
 
 use super::{
@@ -61,9 +62,9 @@ where
 /// To read a package from an envelope, first create an `EnvelopeReader` using
 /// [`EnvelopeReader::new`], then call [`EnvelopeReader::read`].
 pub struct EnvelopeReader<R> {
-    pub(crate) description: PackageDesc,
-    pub(crate) reader: MaybeZstdRead<R>,
-    pub(crate) registry: ExtensionRegistry,
+    description: PackageDesc,
+    reader: MaybeZstdRead<R>,
+    registry: ExtensionRegistry,
 }
 
 impl<R: BufRead> EnvelopeReader<R> {
@@ -176,9 +177,8 @@ impl<R: BufRead> EnvelopeReader<R> {
         };
         self.register_packaged(&packaged_extensions);
 
-        let package = import_package(&model_package, packaged_extensions, &self.registry)?;
-
-        Ok(package)
+        self.import_package(&model_package, packaged_extensions)
+            .map_err(Into::into)
     }
 
     /// Read a HUGR model text payload from a reader.
@@ -197,7 +197,6 @@ impl<R: BufRead> EnvelopeReader<R> {
         } else {
             ExtensionRegistry::new([])
         };
-        self.register_packaged(&packaged_extensions);
 
         // Read the package into a string, then parse it.
         //
@@ -209,8 +208,31 @@ impl<R: BufRead> EnvelopeReader<R> {
         let bump = Bump::default();
         let model_package = ast_package.resolve(&bump)?;
 
-        let package = import_package(&model_package, packaged_extensions, &self.registry)?;
+        self.import_package(&model_package, packaged_extensions)
+            .map_err(Into::into)
+    }
 
+    fn import_package(
+        &mut self,
+        package: &table::Package,
+        packaged_extensions: ExtensionRegistry,
+    ) -> Result<Package, crate::import::ImportError> {
+        self.description.set_n_modules(package.modules.len());
+
+        let modules = package
+            .modules
+            .iter()
+            .enumerate()
+            .map(|(index, module)| {
+                let (desc, module) = import_described_hugr(module, &self.registry);
+                self.description.set_module(index, desc);
+                module
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // This does not panic since the import already requires a module root.
+        let mut package = Package::new(modules);
+        package.extensions = packaged_extensions;
         Ok(package)
     }
 }
