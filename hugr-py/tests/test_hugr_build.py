@@ -197,7 +197,7 @@ def test_build_inter_graph(snapshot):
     validate(h.hugr, snap=snapshot)
 
     assert _SubPort(h.input_node.out(-1)) in h.hugr._links
-    assert h.hugr.num_outgoing(h.input_node) == 2  # doesn't count state order
+    assert h.hugr.num_outgoing(h.input_node) == 3
     assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
     assert len(list(h.hugr.incoming_order_links(nested))) == 1
     assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
@@ -215,7 +215,6 @@ def test_ancestral_sibling():
 @pytest.mark.parametrize(
     "val",
     [
-        val.Function(simple_id().hugr),
         val.Sum(1, tys.Sum([[INT_T], [tys.Bool, INT_T]]), [val.TRUE, IntVal(34)]),
         val.Tuple(val.TRUE, IntVal(23)),
     ],
@@ -233,8 +232,8 @@ def test_poly_function(direct_call: bool) -> None:
     f_id = mod.declare_function(
         "id",
         tys.PolyFuncType(
-            [tys.TypeTypeParam(tys.TypeBound.Any)],
-            tys.FunctionType.endo([tys.Variable(0, tys.TypeBound.Any)]),
+            [tys.TypeTypeParam(tys.TypeBound.Linear)],
+            tys.FunctionType.endo([tys.Variable(0, tys.TypeBound.Linear)]),
         ),
     )
 
@@ -293,6 +292,20 @@ def test_literals() -> None:
     validate(mod.hugr)
 
 
+def test_const_type() -> None:
+    mod = Module()
+
+    mod.declare_function(
+        "const_type",
+        tys.PolyFuncType(
+            [tys.ConstParam(tys.Qubit)],
+            tys.FunctionType([], [tys.Qubit]),
+        ),
+    )
+
+    validate(mod.hugr)
+
+
 @pytest.mark.parametrize("direct_call", [True, False])
 def test_mono_function(direct_call: bool) -> None:
     mod = Module()
@@ -308,6 +321,24 @@ def test_mono_function(direct_call: bool) -> None:
         load = f_main.load_function(f_id)
         call = f_main.add(ops.CallIndirect()(load, q))
     f_main.set_outputs(call)
+
+    validate(mod.hugr)
+
+
+def test_static_output() -> None:
+    mod = Module()
+
+    mod.declare_function(
+        "declared",
+        tys.PolyFuncType(
+            [],
+            tys.FunctionType.endo([]),
+        ),
+    )
+
+    func = mod.define_function("defined", [], [])
+    func.declare_outputs([])
+    func.set_outputs()
 
     validate(mod.hugr)
 
@@ -346,6 +377,7 @@ def test_invalid_recursive_function() -> None:
         f_recursive.set_outputs(f_recursive.input_node[0])
 
 
+@pytest.mark.skip("Value::Function is deprecated and not supported by model encoding.")
 def test_higher_order(snapshot) -> None:
     noop_fn = Dfg(tys.Qubit)
     noop_fn.set_outputs(noop_fn.add(ops.Noop()(noop_fn.input_node[0])))
@@ -466,3 +498,32 @@ def test_html_labels(snapshot) -> None:
     f.set_outputs(b)
 
     validate(f.hugr, snap=snapshot)
+
+
+# https://github.com/CQCL/hugr/issues/2438
+def test_fndef_output_ports(snapshot):
+    mod = Module()
+    main = mod.define_function("main", [], [tys.Unit, tys.Unit, tys.Unit, tys.Unit])
+    unit = main.add_op(ops.MakeTuple())
+    main.set_outputs(*4 * [unit])
+
+    assert mod.hugr.num_out_ports(main) == 1
+
+    validate(mod.hugr, snap=snapshot)
+
+
+def test_render_subgraph(snapshot):
+    dfg = Dfg(tys.Qubit)
+    (q,) = dfg.inputs()
+    tagged_q = dfg.add(ops.Left(tys.Either([tys.Qubit], [tys.Qubit, INT_T]))(q))
+    with dfg.add_conditional(tagged_q, dfg.load(val.TRUE)) as cond:
+        with cond.add_case(0) as case0:
+            q, b = case0.inputs()
+            case0.set_outputs(q, b)
+        with cond.add_case(1) as case1:
+            q, _i, b = case1.inputs()
+            case1.set_outputs(q, b)
+    dfg.set_outputs(*cond[:2])
+    h = dfg.hugr
+    dot = h.render_dot(root=Node(10))
+    assert snapshot == dot.source

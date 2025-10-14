@@ -188,7 +188,7 @@ mod test {
         use crate::extension::ExtensionId;
         use crate::proptest::RecursionDepth;
         use crate::proptest::any_nonempty_string;
-        use crate::types::type_param::TypeArg;
+        use crate::types::proptest_utils::any_serde_type_arg;
         use crate::types::{CustomType, TypeBound};
         use ::proptest::collection::vec;
         use ::proptest::prelude::*;
@@ -224,7 +224,7 @@ mod test {
                     Just(vec![]).boxed()
                 } else {
                     // a TypeArg may contain a CustomType, so we descend here
-                    vec(any_with::<TypeArg>(depth.descend()), 0..3).boxed()
+                    vec(any_serde_type_arg(depth.descend()), 0..3).boxed()
                 };
                 (any_nonempty_string(), args, any::<ExtensionId>(), bound)
                     .prop_map(|(id, args, extension, bound)| {

@@ -1,6 +1,36 @@
 # Changelog
 
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.23.0...hugr-cli-v0.24.0) - 2025-10-13
+
+### Documentation
+
+- update cli readme ([#2601](https://github.com/CQCL/hugr/pull/2601))
+
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.2...hugr-cli-v0.22.3) - 2025-09-11
+
+### New Features
+
+- *(hugr-cli)* CliError::validate helper ([#2507](https://github.com/CQCL/hugr/pull/2507))
+
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.1...hugr-cli-v0.22.2) - 2025-08-06
+
+### New Features
+
+- *(cli)* Deprecate HugrInputArgs::get_hugr ([#2506](https://github.com/CQCL/hugr/pull/2506))
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.21.0...hugr-cli-v0.22.0) - 2025-07-24
+
+### New Features
+
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.2...hugr-cli-v0.21.0) - 2025-07-09
+
+### New Features
+
+- [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-cli-v0.20.1...hugr-cli-v0.20.2) - 2025-06-25
 
 ### New Features

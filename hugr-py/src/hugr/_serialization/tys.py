@@ -125,6 +125,14 @@ class TupleParam(BaseTypeParam):
         return tys.TupleParam(params=deser_it(self.params))
 
 
+class ConstParam(BaseTypeParam):
+    tp: Literal["ConstType"] = "ConstType"
+    ty: Type
+
+    def deserialize(self) -> tys.ConstParam:
+        return tys.ConstParam(ty=self.ty.deserialize())
+
+
 class TypeParam(RootModel):
     """A type parameter."""
 
@@ -135,7 +143,8 @@ class TypeParam(RootModel):
         | FloatParam
         | BytesParam
         | ListParam
-        | TupleParam,
+        | TupleParam
+        | ConstParam,
         WrapValidator(_json_custom_error_validator),
     ] = Field(discriminator="tp")
 
@@ -412,15 +421,15 @@ class PolyFuncType(BaseType):
 
 class TypeBound(Enum):
     Copyable = "C"
-    Any = "A"
+    Linear = "A"
 
     @staticmethod
     def join(*bs: TypeBound) -> TypeBound:
         """Computes the least upper bound for a sequence of bounds."""
         res = TypeBound.Copyable
         for b in bs:
-            if b == TypeBound.Any:
-                return TypeBound.Any
+            if b == TypeBound.Linear:
+                return TypeBound.Linear
             if res == TypeBound.Copyable:
                 res = b
         return res
@@ -429,8 +438,8 @@ class TypeBound(Enum):
         match self:
             case TypeBound.Copyable:
                 return "Copyable"
-            case TypeBound.Any:
-                return "Any"
+            case TypeBound.Linear:
+                return "Linear"
 
 
 class Opaque(BaseType):

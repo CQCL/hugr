@@ -3,10 +3,9 @@
 //!
 //! Supports all regular array operations apart from `clone` and `discard`.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use delegate::delegate;
-use lazy_static::lazy_static;
 
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
@@ -96,28 +95,35 @@ pub type VArrayFromArray = GenericArrayConvert<ValueArray, FROM, Array>;
 /// A value array extension value.
 pub type VArrayValue = GenericArrayValue<ValueArray>;
 
-lazy_static! {
-    /// Extension for value array operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_type(
-                    VALUE_ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Any.into()],
-                    "Fixed-length value array".into(),
-                    // Value arrays are copyable iff their elements are
-                    TypeDefBound::from_params(vec![1]),
-                    extension_ref,
-                )
-                .unwrap();
+/// Extension for value array operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                VALUE_ARRAY_TYPENAME,
+                vec![TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                "Fixed-length value array".into(),
+                // Value arrays are copyable iff their elements are
+                TypeDefBound::from_params(vec![1]),
+                extension_ref,
+            )
+            .unwrap();
 
-            VArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            VArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            VArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
-            VArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
-            VArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
-        })
-    };
-}
+        VArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+        VArrayRepeatDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        VArrayScanDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        VArrayToArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        VArrayFromArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+    })
+});
 
 #[typetag::serde(name = "VArrayValue")]
 impl CustomConst for VArrayValue {

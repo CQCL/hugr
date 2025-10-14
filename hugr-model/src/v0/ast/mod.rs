@@ -25,7 +25,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 
 use super::table::{self};
-use super::{LinkName, Literal, RegionKind, SymbolName, VarName};
+use super::{LinkName, Literal, RegionKind, SymbolName, VarName, Visibility};
 
 mod parse;
 mod print;
@@ -199,6 +199,8 @@ impl Operation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Symbol {
+    /// The visibility of the symbol.
+    pub visibility: Option<Visibility>,
     /// The name of the symbol.
     pub name: SymbolName,
     /// The parameters of the symbol.

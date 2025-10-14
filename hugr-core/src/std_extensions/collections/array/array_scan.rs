@@ -57,14 +57,14 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         // array<N, T1>, (T1, *A -> T2, *A), *A, -> array<N, T2>, *A
         let params = vec![
             TypeParam::max_nat_type(),
-            TypeBound::Any.into(),
-            TypeBound::Any.into(),
-            TypeParam::new_list_type(TypeBound::Any),
+            TypeBound::Linear.into(),
+            TypeBound::Linear.into(),
+            TypeParam::new_list_type(TypeBound::Linear),
         ];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let t1 = Type::new_var_use(1, TypeBound::Any);
-        let t2 = Type::new_var_use(2, TypeBound::Any);
-        let s = TypeRV::new_row_var_use(3, TypeBound::Any);
+        let t1 = Type::new_var_use(1, TypeBound::Linear);
+        let t2 = Type::new_var_use(2, TypeBound::Linear);
+        let s = TypeRV::new_row_var_use(3, TypeBound::Linear);
         PolyFuncTypeRV::new(
             params,
             FuncTypeBase::<RowVariable>::new(

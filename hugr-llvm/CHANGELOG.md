@@ -1,9 +1,53 @@
 # Changelog
+
+
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.23.0...hugr-llvm-v0.24.0) - 2025-10-13
+
+### New Features
+
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.4...hugr-llvm-v0.23.0) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
+### Testing
+
+- Add framework for LLVM execution tests involving panics ([#2568](https://github.com/CQCL/hugr/pull/2568))
+
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.1...hugr-llvm-v0.22.2) - 2025-08-06
+
+### Bug Fixes
+
+- added public func getter for EmitFuncContext ([#2482](https://github.com/CQCL/hugr/pull/2482))
+- *(hugr-llvm)* Set llvm function linkage based on Visibility hugr node field ([#2502](https://github.com/CQCL/hugr/pull/2502))
+# Changelog
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.2...hugr-llvm-v0.21.0) - 2025-07-09
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
 
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.20.1...hugr-llvm-v0.20.2) - 2025-06-25
 

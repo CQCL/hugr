@@ -125,7 +125,7 @@ where
     Input {
         /// The validation error that occurred.
         #[source]
-        err: ValidationError<N>,
+        err: Box<ValidationError<N>>,
         /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
@@ -134,13 +134,19 @@ where
     Output {
         /// The validation error that occurred.
         #[source]
-        err: ValidationError<N>,
+        err: Box<ValidationError<N>>,
         /// A pretty-printed representation of the HUGR that failed validation.
         pretty_hugr: String,
     },
     /// An error from the underlying pass.
     #[error(transparent)]
-    Underlying(#[from] E),
+    Underlying(Box<E>),
+}
+
+impl<N: HugrNode, E> From<E> for ValidatePassError<N, E> {
+    fn from(err: E) -> Self {
+        Self::Underlying(Box::new(err))
+    }
 }
 
 /// Runs an underlying pass, but with validation of the Hugr
@@ -172,12 +178,12 @@ where
 
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Input {
-            err,
+            err: Box::new(err),
             pretty_hugr,
         })?;
-        let res = self.0.run(hugr).map_err(ValidatePassError::Underlying)?;
+        let res = self.0.run(hugr)?;
         self.validation_impl(hugr, |err, pretty_hugr| ValidatePassError::Output {
-            err,
+            err: Box::new(err),
             pretty_hugr,
         })?;
         Ok(res)
@@ -228,14 +234,14 @@ pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
     if cfg!(test) {
         ValidatingPass::new(pass).run(hugr)
     } else {
-        pass.run(hugr).map_err(ValidatePassError::Underlying)
+        Ok(pass.run(hugr)?)
     }
 }
 
 #[cfg(test)]
 mod test {
+    use hugr_core::ops::Value;
     use itertools::{Either, Itertools};
-    use std::convert::Infallible;
 
     use hugr_core::builder::{
         Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder, ModuleBuilder,
@@ -245,9 +251,10 @@ mod test {
     use hugr_core::ops::{DFG, Input, OpType, Output, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::types::{Signature, TypeRow};
-    use hugr_core::{Hugr, HugrView, IncomingPort};
+    use hugr_core::{Hugr, HugrView, IncomingPort, Node, NodeIndex};
 
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
+    use crate::dead_code::DeadCodeElimError;
     use crate::untuple::{UntupleRecursive, UntupleResult};
     use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
 
@@ -268,26 +275,45 @@ mod test {
         let id2 = id2.finish_with_outputs(inps).unwrap();
         let hugr = mb.finish_hugr().unwrap();
 
-        let dce = DeadCodeElimPass::default().with_entry_points([id1.node()]);
-        let cfold =
-            ConstantFoldPass::default().with_inputs(id2.node(), [(0, ConstUsize::new(2).into())]);
+        let c_usz = Value::from(ConstUsize::new(2));
+        let not_a_node = Node::from(portgraph::NodeIndex::new(
+            hugr.nodes().map(Node::index).max().unwrap() + 1,
+        ));
+        assert!(!hugr.contains_node(not_a_node));
+        let dce = DeadCodeElimPass::default().with_entry_points([not_a_node]);
+        let cfold = ConstantFoldPass::default().with_inputs(id2.node(), [(0, c_usz.clone())]);
 
         cfold.run(&mut hugr.clone()).unwrap();
 
-        let exp_err = ConstFoldError::MissingEntryPoint { node: id2.node() };
-        let r: Result<_, Either<Infallible, ConstFoldError>> =
+        let dce_err = DeadCodeElimError::NodeNotFound(not_a_node);
+        let r: Result<_, Either<DeadCodeElimError, ConstFoldError>> =
             dce.clone().then(cfold.clone()).run(&mut hugr.clone());
-        assert_eq!(r, Err(Either::Right(exp_err.clone())));
+        assert_eq!(r, Err(Either::Left(dce_err.clone())));
 
-        let r = dce
+        let r: Result<_, Either<_, _>> = cfold
             .clone()
-            .map_err(|inf| match inf {})
+            .with_inputs(id1.node(), [(0, c_usz)])
+            .then(dce.clone())
+            .run(&mut hugr.clone());
+        assert_eq!(r, Err(Either::Right(dce_err)));
+
+        // Avoid wrapping in Either by mapping both to same Error
+        let r = dce
+            .map_err(|e| match e {
+                DeadCodeElimError::NodeNotFound(node) => ConstFoldError::MissingEntryPoint { node },
+            })
             .then(cfold.clone())
             .run(&mut hugr.clone());
-        assert_eq!(r, Err(exp_err));
+        assert_eq!(
+            r,
+            Err(ConstFoldError::MissingEntryPoint { node: not_a_node })
+        );
 
-        let r2: Result<_, Either<_, _>> = cfold.then(dce).run(&mut hugr.clone());
-        r2.unwrap();
+        // Or where second supports Into first
+        let v = ValidatingPass::new(cfold.clone());
+        let r: Result<_, ValidatePassError<Node, ConstFoldError>> =
+            v.then(cfold).run(&mut hugr.clone());
+        r.unwrap();
     }
 
     #[test]
@@ -318,7 +344,7 @@ mod test {
         assert_eq!(h, backup); // Did nothing
 
         let r = ValidatingPass::new(cfold).run(&mut h);
-        assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if e == err));
+        assert!(matches!(r, Err(ValidatePassError::Input { err: e, .. }) if *e == err));
     }
 
     #[test]

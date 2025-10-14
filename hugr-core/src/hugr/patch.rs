@@ -13,6 +13,7 @@ pub mod simple_replace;
 
 use crate::HugrView;
 use crate::core::HugrNode;
+use crate::hugr::views::NodesIter;
 use itertools::Itertools;
 pub use port_types::{BoundaryPort, HostPort, ReplacementPort};
 pub use simple_replace::{SimpleReplacement, SimpleReplacementError};
@@ -21,6 +22,8 @@ use super::HugrMut;
 use super::views::ExtractionResult;
 
 /// Verify that a patch application would succeed.
+// TODO: This trait should be parametrised on `H: NodesIter` to match the
+// generality of [`Patch`], see https://github.com/CQCL/hugr/issues/2546.
 pub trait PatchVerification {
     /// The type of Error with which this Rewrite may fail
     type Error: std::error::Error;
@@ -37,7 +40,7 @@ pub trait PatchVerification {
     /// The nodes invalidated by the rewrite. Deprecated: implement
     /// [Self::invalidated_nodes] instead. The default returns the empty
     /// iterator; this should be fine as there are no external calls.
-    #[deprecated(note = "Use/implement invalidated_nodes instead")]
+    #[deprecated(note = "Use/implement invalidated_nodes instead", since = "0.20.2")]
     fn invalidation_set(&self) -> impl Iterator<Item = Self::Node> {
         std::iter::empty()
     }
@@ -66,9 +69,9 @@ pub trait PatchVerification {
 ///
 /// ### When to implement
 ///
-/// For patches that work on any `H: HugrMut`, prefer implementing [`PatchHugrMut`] instead. This
-/// will automatically implement this trait.
-pub trait Patch<H: HugrView>: PatchVerification<Node = H::Node> {
+/// For patches that work on any `H: HugrMut`, prefer implementing
+/// [`PatchHugrMut`] instead. This will automatically implement this trait.
+pub trait Patch<H: NodesIter>: PatchVerification<Node = H::Node> {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 

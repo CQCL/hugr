@@ -1,6 +1,75 @@
 # Changelog
 
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.23.0...hugr-passes-v0.24.0) - 2025-10-13
+
+### New Features
+
+- Add handler for copying / discarding borrow arrays to default lineariser ([#2602](https://github.com/CQCL/hugr/pull/2602))
+
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.4...hugr-passes-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### New Features
+
+- [**breaking**] DeadCodeElimPass reports error on non-existent entry_points ([#2566](https://github.com/CQCL/hugr/pull/2566))
+- Normalize CFGs ([#2591](https://github.com/CQCL/hugr/pull/2591))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.3...hugr-passes-v0.22.4) - 2025-09-24
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.2...hugr-passes-v0.22.3) - 2025-09-11
+
+### New Features
+
+- SiblingSubgraph supports function calls ([#2528](https://github.com/CQCL/hugr/pull/2528))
+
+## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.22.0...hugr-passes-v0.22.1) - 2025-07-28
+
+### New Features
+
+- Include copy_discard_array in DelegatingLinearizer::default ([#2479](https://github.com/CQCL/hugr/pull/2479))
+- Inline calls to functions not on cycles in the call graph ([#2450](https://github.com/CQCL/hugr/pull/2450))
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.21.0...hugr-passes-v0.22.0) - 2025-07-24
+
+### New Features
+
+- ReplaceTypes allows linearizing inside Op replacements ([#2435](https://github.com/CQCL/hugr/pull/2435))
+- Add pass for DFG inlining ([#2460](https://github.com/CQCL/hugr/pull/2460))
+
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.2...hugr-passes-v0.21.0) - 2025-07-09
+
+### Bug Fixes
+
+- DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
+
+### New Features
+
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
+
+### Refactor
+
+- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-passes-v0.20.1...hugr-passes-v0.20.2) - 2025-06-25
 
 ### Bug Fixes

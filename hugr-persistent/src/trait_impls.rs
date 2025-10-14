@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeSet, HashMap, VecDeque},
+    iter::FusedIterator,
+};
 
 use itertools::{Either, Itertools};
 
@@ -13,20 +16,25 @@ use hugr_core::{
             render::{self, MermaidFormatter, NodeLabel},
         },
     },
-    ops::OpType,
+    ops::{OpTag, OpTrait, OpType},
 };
+
+use crate::{CommitId, persistent_hugr::NodeStatus};
 
 use super::{
     InvalidCommit, PatchNode, PersistentHugr, PersistentReplacement, state_space::CommitData,
 };
 
+mod utils;
+use utils::DoubleEndedIteratorAdapter;
+
 impl Patch<PersistentHugr> for PersistentReplacement {
-    type Outcome = ();
+    type Outcome = CommitId;
     const UNCHANGED_ON_FAILURE: bool = true;
 
     fn apply(self, h: &mut PersistentHugr) -> Result<Self::Outcome, Self::Error> {
         match h.try_add_replacement(self) {
-            Ok(_) => Ok(()),
+            Ok(commit) => Ok(commit),
             Err(
                 InvalidCommit::UnknownParent(_)
                 | InvalidCommit::IncompatibleHistory(_, _)
@@ -37,9 +45,9 @@ impl Patch<PersistentHugr> for PersistentReplacement {
     }
 }
 
-impl<R> HugrInternals for PersistentHugr<R> {
+impl HugrInternals for PersistentHugr {
     type RegionPortgraph<'p>
-        = portgraph::MultiPortGraph
+        = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
 
@@ -61,8 +69,9 @@ impl<R> HugrInternals for PersistentHugr<R> {
         (hugr.into_region_portgraph(parent), node_map)
     }
 
-    fn node_metadata_map(&self, node: Self::Node) -> &hugr::NodeMetadataMap {
-        self.as_state_space().node_metadata_map(node)
+    fn node_metadata_map(&self, PatchNode(commit_id, node): Self::Node) -> &hugr::NodeMetadataMap {
+        let cm = self.get_commit(commit_id);
+        cm.node_metadata_map(node)
     }
 }
 
@@ -71,7 +80,7 @@ impl<R> HugrInternals for PersistentHugr<R> {
 // the whole extracted HUGR in memory. We are currently prioritizing correctness
 // and clarity over performance and will optimise some of these operations in
 // the future as bottlenecks are encountered. (see #2248)
-impl<R> HugrView for PersistentHugr<R> {
+impl HugrView for PersistentHugr {
     fn entrypoint(&self) -> Self::Node {
         // The entrypoint remains unchanged throughout the patch history, and is
         // found in the base hugr.
@@ -97,25 +106,31 @@ impl<R> HugrView for PersistentHugr<R> {
     }
 
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node> {
-        assert!(self.contains_node(node), "invalid node");
-        let (hugr, node_map) = self.apply_all();
-        let parent = hugr.get_parent(node_map[&node])?;
-        let parent_inv = node_map
-            .iter()
-            .find_map(|(&k, &v)| (v == parent).then_some(k))
-            .expect("parent not found in node map");
-        Some(parent_inv)
+        debug_assert!(self.contains_node(node), "invalid node");
+
+        if node.owner() == self.base() {
+            self.base_hugr()
+                .get_parent(node.1)
+                .map(|n| PatchNode(self.base(), n))
+        } else {
+            // all nodes in children commits are applied on the sibling DFG of the
+            // entrypoint
+            // TODO: generalise this for the case that commits introduce nested DFGs.
+            Some(self.entrypoint())
+        }
     }
 
-    fn get_optype(&self, node: Self::Node) -> &OpType {
-        self.as_state_space().get_optype(node)
+    fn get_optype(&self, PatchNode(commit_id, node): Self::Node) -> &OpType {
+        let cm = self.get_commit(commit_id);
+        cm.get_optype(node)
     }
 
     fn num_nodes(&self) -> usize {
         let mut num_nodes = 0isize;
-        for commit in self.all_commit_ids() {
-            num_nodes += self.inserted_nodes(commit).count() as isize;
-            num_nodes -= self.deleted_nodes(commit).count() as isize;
+        for id in self.all_commit_ids() {
+            let commit = self.get_commit(id);
+            num_nodes += commit.inserted_nodes().count() as isize;
+            num_nodes -= self.deleted_nodes(commit.id()).count() as isize;
         }
         num_nodes as usize
     }
@@ -124,8 +139,9 @@ impl<R> HugrView for PersistentHugr<R> {
         self.to_hugr().num_edges()
     }
 
-    fn num_ports(&self, node: Self::Node, dir: Direction) -> usize {
-        self.as_state_space().num_ports(node, dir)
+    fn num_ports(&self, PatchNode(commit_id, node): Self::Node, dir: Direction) -> usize {
+        let cm = self.get_commit(commit_id);
+        cm.num_ports(node, dir)
     }
 
     fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone {
@@ -148,38 +164,44 @@ impl<R> HugrView for PersistentHugr<R> {
             .filter(|&n| self.contains_node(n))
     }
 
-    fn node_ports(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = Port> + Clone {
-        self.as_state_space().node_ports(node, dir)
+    fn node_ports(
+        &self,
+        PatchNode(commit_id, node): Self::Node,
+        dir: Direction,
+    ) -> impl Iterator<Item = Port> + Clone {
+        let cm = self.get_commit(commit_id);
+        cm.node_ports(node, dir)
     }
 
-    fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = Port> + Clone {
-        self.as_state_space().all_node_ports(node)
+    fn all_node_ports(
+        &self,
+        PatchNode(commit_id, node): Self::Node,
+    ) -> impl Iterator<Item = Port> + Clone {
+        let cm = self.get_commit(commit_id);
+        cm.all_node_ports(node)
     }
 
     fn linked_ports(
         &self,
-        node: Self::Node,
+        PatchNode(commit_id, node): Self::Node,
         port: impl Into<Port>,
     ) -> impl Iterator<Item = (Self::Node, Port)> + Clone {
         let port = port.into();
         let mut ret_ports = Vec::new();
-        if !self.is_value_port(node, port) {
+        let cm = self.get_commit(commit_id);
+        if !cm.is_value_port(node, port) {
             // currently non-value ports are not modified by patches
-            let commit_id = node.0;
-            let to_patch_node = |(node, port)| (PatchNode(commit_id, node), port);
-            ret_ports.extend(
-                self.commit_hugr(commit_id)
-                    .linked_ports(node.1, port)
-                    .map(to_patch_node),
-            );
+            let to_patch_node = |(node, port)| (cm.to_patch_node(node), port);
+            ret_ports.extend(cm.commit_hugr().linked_ports(node, port).map(to_patch_node));
         } else {
             match port.as_directed() {
                 Either::Left(incoming) => {
-                    let (out_node, out_port) = self.single_outgoing_port(node, incoming);
+                    let (out_node, out_port) =
+                        self.single_outgoing_port(cm.to_patch_node(node), incoming);
                     ret_ports.push((out_node, out_port.into()))
                 }
                 Either::Right(outgoing) => ret_ports.extend(
-                    self.all_incoming_ports(node, outgoing)
+                    self.all_incoming_ports(cm.to_patch_node(node), outgoing)
                         .map(|(node, port)| (node, port.into())),
                 ),
             }
@@ -203,14 +225,25 @@ impl<R> HugrView for PersistentHugr<R> {
     }
 
     fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone {
-        let (hugr, node_map) = self.apply_all();
-        let children = hugr.children(node_map[&node]).collect_vec();
-        let inv_node_map: HashMap<_, _> = node_map.into_iter().map(|(k, v)| (v, k)).collect();
-        children.into_iter().map(move |child| {
-            *inv_node_map
-                .get(&child)
-                .expect("node not found in node map")
-        })
+        let cm = self.get_commit(node.owner());
+        let commit_hugr = cm.commit_hugr();
+        // The children in the current commit
+        let children = commit_hugr.children(node.1).map(|n| cm.to_patch_node(n));
+
+        // Children may be modified by later commits, but only if the parent is a
+        // dataflow parent.
+        if OpTag::DataflowParent.is_superset(self.get_optype(node).tag()) {
+            // we must filter out children nodes that are invalidated by later commits, and
+            // on the other hand add nodes in those commits
+            // TODO: The ordering of the children may not be preserved! But is preserved for
+            // the first two children, which we care the most about.
+            // see https://github.com/CQCL/hugr/issues/2618
+            let iter = IterValidNodes::new(self, children.fuse());
+            Either::Left(DoubleEndedIteratorAdapter::from(iter))
+        } else {
+            // children are precisely children of the commit hugr
+            Either::Right(children)
+        }
     }
 
     fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
@@ -238,7 +271,7 @@ impl<R> HugrView for PersistentHugr<R> {
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn mermaid_string_with_config(&self, config: render::RenderConfig<Self::Node>) -> String {
         self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
@@ -317,11 +350,80 @@ impl<R> HugrView for PersistentHugr<R> {
     }
 }
 
+/// An iterator over nodes in a `PersistentHugr` that filters out invalid nodes.
+///
+/// For any invalid node encountered, it will traverse and return the nodes in
+/// the commit deleting the node instead.
+#[derive(Debug, Clone)]
+pub struct IterValidNodes<'a, I> {
+    /// The original iterator over nodes.
+    nodes_iter: I,
+    /// Nodes discovered in commits deleting nodes in the original iterator.
+    discovered_nodes: VecDeque<PatchNode>,
+    /// Commits discovered that delete nodes in the original iterator.
+    discovered_commits: VecDeque<CommitId>,
+    /// Commits discovered across all time, to make sure we only process each
+    /// commit once.
+    processed_commits: BTreeSet<CommitId>,
+    /// The persistent hugr that the nodes belong to.
+    hugr: &'a PersistentHugr,
+}
+
+impl<'a, I> IterValidNodes<'a, I> {
+    fn new(hugr: &'a PersistentHugr, nodes_iter: impl IntoIterator<IntoIter = I>) -> Self {
+        Self {
+            nodes_iter: nodes_iter.into_iter(),
+            discovered_nodes: VecDeque::new(),
+            discovered_commits: VecDeque::new(),
+            processed_commits: BTreeSet::new(),
+            hugr,
+        }
+    }
+}
+
+impl<I: FusedIterator<Item = PatchNode>> Iterator for IterValidNodes<'_, I> {
+    type Item = PatchNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let Some(node) = self
+                .nodes_iter
+                .next()
+                .or_else(|| self.discovered_nodes.pop_front())
+            else {
+                break;
+            };
+            match self.hugr.node_status(node) {
+                NodeStatus::Deleted(commit_id) => {
+                    if self.processed_commits.insert(commit_id) {
+                        self.discovered_commits.push_back(commit_id);
+                    }
+                }
+                NodeStatus::ReplacementIO | NodeStatus::Valid => return Some(node),
+            }
+        }
+
+        // Add nodes in next commit to queue
+        let next_commit_id = self.discovered_commits.pop_front()?;
+        let next_commit = self.hugr.get_commit(next_commit_id);
+
+        self.discovered_nodes.extend(
+            next_commit
+                .inserted_nodes()
+                .map(|n| next_commit.to_patch_node(n)),
+        );
+
+        self.next()
+    }
+}
+
+impl<I: FusedIterator<Item = PatchNode>> FusedIterator for IterValidNodes<'_, I> {}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
-    use crate::{CommitStateSpace, state_space::CommitId};
+    use crate::tests::TestStateSpace;
 
     use super::super::tests::test_state_space;
     use super::*;
@@ -330,12 +432,11 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    fn test_mermaid_string(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-        let (state_space, [commit1, commit2, _commit3, commit4]) = test_state_space;
+    fn test_mermaid_string(test_state_space: TestStateSpace) {
+        let [commit1, commit2, _commit3, commit4] = test_state_space.commits();
 
-        let hugr = state_space
-            .try_extract_hugr([commit1, commit2, commit4])
-            .unwrap();
+        let hugr =
+            PersistentHugr::try_new([commit1.clone(), commit2.clone(), commit4.clone()]).unwrap();
 
         let mermaid_str = hugr
             .mermaid_format()
@@ -351,15 +452,20 @@ mod tests {
     }
 
     #[rstest]
-    fn test_hierarchy(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-        let (state_space, [commit1, commit2, _commit3, commit4]) = test_state_space;
+    fn test_hierarchy(test_state_space: TestStateSpace) {
+        let [commit1, commit2, _commit3, commit4] = test_state_space.commits();
 
-        let hugr = state_space
-            .try_extract_hugr([commit1, commit2, commit4])
-            .unwrap();
+        let hugr =
+            PersistentHugr::try_new([commit1.clone(), commit2.clone(), commit4.clone()]).unwrap();
 
-        let commit2_nodes = hugr.nodes().filter(|&n| n.0 == commit2).collect_vec();
-        let commit4_nodes = hugr.nodes().filter(|&n| n.0 == commit4).collect_vec();
+        let commit2_nodes = hugr
+            .nodes()
+            .filter(|&n| n.owner() == commit2.id())
+            .collect_vec();
+        let commit4_nodes = hugr
+            .nodes()
+            .filter(|&n| n.owner() == commit4.id())
+            .collect_vec();
 
         let all_children: HashSet<_> = hugr.children(hugr.entrypoint()).collect();
 
@@ -373,24 +479,35 @@ mod tests {
                 extracted_hugr.get_parent(node_map[&n]),
                 hugr.get_parent(n).map(|p| node_map[&p])
             );
+            let mut extracted_children = extracted_hugr.children(node_map[&n]);
+            let mut children = hugr.children(n).map(|c| node_map[&c]);
+            // TODO: The ordering of the children may not be preserved! But is preserved for
+            // the first two children, which we care the most about.
+            // see https://github.com/CQCL/hugr/issues/2618
+            for _ in 0..2 {
+                assert_eq!(extracted_children.next(), children.next());
+            }
             assert_eq!(
-                extracted_hugr.children(node_map[&n]).collect_vec(),
-                hugr.children(n).map(|c| node_map[&c]).collect_vec()
+                extracted_children.collect::<BTreeSet<_>>(),
+                children.collect::<BTreeSet<_>>()
             );
             assert_eq!(
-                extracted_hugr.descendants(node_map[&n]).collect_vec(),
-                hugr.descendants(n).map(|c| node_map[&c]).collect_vec()
+                extracted_hugr
+                    .descendants(node_map[&n])
+                    .collect::<BTreeSet<_>>(),
+                hugr.descendants(n)
+                    .map(|c| node_map[&c])
+                    .collect::<BTreeSet<_>>()
             );
         }
     }
 
     #[rstest]
-    fn test_linked_ports(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-        let (state_space, [commit1, commit2, _commit3, commit4]) = test_state_space;
+    fn test_linked_ports(test_state_space: TestStateSpace) {
+        let [commit1, commit2, _commit3, commit4] = test_state_space.commits();
 
-        let hugr = state_space
-            .try_extract_hugr([commit1, commit2, commit4])
-            .unwrap();
+        let hugr =
+            PersistentHugr::try_new([commit1.clone(), commit2.clone(), commit4.clone()]).unwrap();
         let (extracted_hugr, node_map) = hugr.apply_all();
 
         for n in hugr.nodes() {
@@ -441,17 +558,17 @@ mod tests {
     }
 
     #[rstest]
-    fn test_extract_hugr(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-        let (state_space, [commit1, commit2, _commit3, commit4]) = test_state_space;
+    fn test_extract_hugr(test_state_space: TestStateSpace) {
+        let [commit1, commit2, _commit3, commit4] = test_state_space.commits();
 
-        let hugr = state_space
-            .try_extract_hugr([commit1, commit2, commit4])
-            .unwrap();
+        let hugr =
+            PersistentHugr::try_new([commit1.clone(), commit2.clone(), commit4.clone()]).unwrap();
         let extracted_hugr = hugr.to_hugr();
 
         assert_eq!(
             hugr.module_root(),
-            PatchNode(state_space.base(), state_space.base_hugr().module_root())
+            hugr.base_commit()
+                .to_patch_node(hugr.base_hugr().module_root())
         );
 
         assert_eq!(hugr.num_nodes(), extracted_hugr.num_nodes());

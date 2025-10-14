@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define i8* @_hl.main.1() {
+define private i8* @_hl.main.1() {
 alloca_block:
   %"0" = alloca i8*, align 8
   %"5_0" = alloca i8*, align 8

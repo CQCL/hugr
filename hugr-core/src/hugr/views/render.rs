@@ -17,7 +17,7 @@ use crate::{Hugr, HugrView, Node};
 /// Additional options are available in the [`MermaidFormatter`] struct.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-#[deprecated(note = "Use `MermaidFormatter` instead")]
+#[deprecated(note = "Use `MermaidFormatter` instead", since = "0.20.2")]
 pub struct RenderConfig<N = Node> {
     /// Show the node index in the graph nodes.
     pub node_indices: bool,
@@ -46,7 +46,7 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
     /// Create a new [`MermaidFormatter`] from a [`RenderConfig`].
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     pub fn from_render_config(config: RenderConfig<H::Node>, hugr: &'h H) -> Self {
         let node_labels = if config.node_indices {
             NodeLabel::Numeric
@@ -155,7 +155,7 @@ pub enum UnsupportedRenderConfig {
     CustomNodeLabels,
 }
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<'h, H: HugrInternals + ?Sized> TryFrom<MermaidFormatter<'h, H>> for RenderConfig<H::Node> {
     type Error = UnsupportedRenderConfig;
 
@@ -235,7 +235,7 @@ pub enum NodeLabel<N: HugrNode = Node> {
     Custom(HashMap<N, String>),
 }
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl<N> Default for RenderConfig<N> {
     fn default() -> Self {
         Self {
@@ -340,8 +340,8 @@ pub(in crate::hugr) fn edge_style<'a>(
     config: MermaidFormatter<'_>,
 ) -> Box<
     dyn FnMut(
-            <MultiPortGraph as LinkView>::LinkEndpoint,
-            <MultiPortGraph as LinkView>::LinkEndpoint,
+            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
+            <MultiPortGraph<u32, u32, u32> as LinkView>::LinkEndpoint,
         ) -> EdgeStyle
         + 'a,
 > {
@@ -413,7 +413,7 @@ mod tests {
         let h = simple_dfg_hugr();
         let config: MermaidFormatter =
             MermaidFormatter::new(&h).with_node_labels(NodeLabel::Custom(HashMap::new()));
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         {
             assert!(RenderConfig::try_from(config).is_err());
         }

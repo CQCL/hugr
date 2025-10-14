@@ -1,14 +1,10 @@
-//! Version 0 (unstable).
-//!
-//! **Warning**: This module is still under development and is expected to change.
-//! It is included in the library to allow for early experimentation, and for
-//! the core and model to converge incrementally.
+//! Version 0.
 //!
 //! This module defines representations of the hugr IR as plain data, designed
-//! to be as independent of implementation details as feasible. It can be used
-//! by the core compiler, alternative implementations or tooling that does not
-//! need the power/complexity of the full compiler. We provide the following
-//! in-memory representations:
+//! to be as independent of implementation details of the compiler as feasible.
+//! It can be used by the core compiler, alternative implementations or tooling
+//! that does not need the power/complexity of the full compiler. We provide the
+//! following in-memory representations:
 //!
 //! - [Table]: Efficient intermediate data structure to facilitate conversions.
 //! - [AST]: Abstract syntax tree that uses direct references rather than table indices.
@@ -28,18 +24,22 @@
 //!
 //! Nodes are organised into __regions__ and do not have any explicit ordering
 //! between them; any schedule that respects the data dependencies between nodes
-//! is valid. Regions come in three different kinds. __Module regions__ form the
+//! is valid. Previous designs included order-edges that could be added between nodes
+//! to further constrain the ordering; as long as this system is still used, order hint
+//! metadata can be used to encode the additional ordering constraints.
+//!
+//! Regions come in three different kinds. __Module regions__ form the
 //! top level of a module and can only contain symbols. __Dataflow regions__
 //! describe how data flows from the region's __source__ ports to the region's
-//! __target__ ports. __Controlflow regions__ are control flow graphs containing
-//! dataflow __blocks__, with control flow originating from the region's source
-//! ports and ending in the region's target ports.
+//! __target__ ports and are restricted to contain instructions. __Controlflow regions__
+//! are control flow graphs containing dataflow __blocks__, with control flow originating
+//! from the region's source ports and ending in the region's target ports.
 //!
 //! __Terms__ form a meta language that is used to describe types, parameters and metadata that
-//! are known statically. To allow types to be parameterized by values, types and values
-//! are treated uniformly as terms, enabling a restricted form of dependent typing.
-//! Terms are extensible declaratively via __constructors__.
-//! __Constraints__ can be used to express more complex validation rules.
+//! are known statically. To allow types to be parameterized by statically known values, types
+//! and static values are treated uniformly as terms, enabling a restricted form of dependent typing.
+//! Terms are extensible declaratively via __constructors__. __Constraints__ can be used to express
+//! more complex validation rules.
 //!
 //! # Remaining Mismatch with `hugr-core`
 //!
@@ -48,15 +48,39 @@
 //! development. However, there are still some mismatches with `hugr-core` that are not
 //! addressed by conversions in import/export:
 //!
-//! - Some static types can not yet be represented in `hugr-core` although they should be.
+//! - Some terms can not yet be represented in `hugr-core` although they should be.
+//!   Importing such terms will result in an error that declares these terms as currently
+//!   unsupported.
+//! - In particular `hugr-core` (as of `v0.22.3`) only allows to define custom runtime types but
+//!   can not represent custom term constructors for static types. Implementing support for
+//!   static `Term`s in `hugr-core` will allow to use the term system for extensible metadata
+//!   and constants. Once that is implemented, the hugr IR will have a unified extension mechanism.
+//! - `hugr-core` uses a JSON encoding for metadata which is supported by `hugr-model` via the
+//!   `compat.meta_json` metadata constructor. `hugr-model` further allows to declare custom
+//!   metadata constructors so that metadata can be composed of terms. These are currently not
+//!   supported in `hugr-core` beyond a few exceptions which are hard-coded into the import/export
+//!   process.
+//! - `hugr-core` uses JSON encoded constants. Similarly to metadata, `hugr-model` provides a
+//!   compatibility mechanism via the `compat.const_json` constant constructor but also allows
+//!   to declare custom constant constructors. Import/export has hard-coded support for a small
+//!   fixed set of these for now.
+//! - In `hugr-core` a constant is a `Value`, included in the hugr graph via a `Const` node.
+//!   A `LoadConst` node connects to the `Const` node via a static edge. `Value`s are separate
+//!   from `Term`s in `hugr-core` and can not refer to local variables or to function nodes.
+//!   In `hugr-model` the `Const` node is not needed: The `core.load_const` operation takes
+//!   the constant's description as a term argument. This enables `hugr-model` constants to
+//!   depend on local variables and to refer to functions in the module (removing the need
+//!   for a separate `LoadFunc` operation).
+//! - `Value`s in `hugr-core` have a single representation for every constant. The encoding
+//!   of constants as terms in `hugr-model` can use different constructors for the same type
+//!   of constant value. This can be useful for large constants by enabling efficient encodings.
+//!   For example, a constant array of integers could have a constructor taking a byte string
+//!   that consists of the integer values, which is significantly more economical than a generic
+//!   representation of arrays that has a term for every element.
 //! - The model does not have types with a copy bound as `hugr-core` does, and instead uses
 //!   a more general form of type constraints ([#1556]). Similarly, the model does not have
 //!   bounded naturals. We perform a conversion for compatibility where possible, but this does
 //!   not fully cover all potential cases of bounds.
-//! - `hugr-model` allows to declare term constructors that serve as blueprints for constructing
-//!   runtime values. This allows constants to have potentially multiple representations,
-//!   which can be essential in case of very large constants that require efficient encodings.
-//!   `hugr-core` is more restricted, requiring a canonical representation for constant values.
 //! - `hugr-model` has support for passing closed regions as static parameters to operations,
 //!   which allows for higher-order operations that require their function arguments to be
 //!   statically known. We currently do not yet support converting this to `hugr-core`.
@@ -65,19 +89,13 @@
 //!   `hugr-core` restricts connectivity so that in any group of connected ports there is at
 //!   most one output port (for dataflow) or at most one input port (for control flow). In
 //!   these cases, there is no mismatch.
-//! - `hugr-core` only allows to define type aliases, but not aliases for other terms.
-//! - `hugr-model` has no concept of order edges, encoding a strong preference that ordering
-//!   requirements be encoded within the dataflow paradigm.
-//! - Both `hugr-model` and `hugr-core` support metadata, but they use different encodings.
-//!   `hugr-core` encodes metadata as JSON objects, while `hugr-model` uses terms. Using
-//!   terms has the advantage that metadata can be validated with the same type checking
-//!   mechanism as the rest of the model ([#1553]).
-//! - `hugr-model` have a root region that corresponds to a root `Module` in `hugr-core`.
-//!   `hugr-core` however can have nodes with different operations as their root ([#1554]).
+//! - `hugr-core` only allows to define type aliases, but not aliases for other terms. The
+//!   alias system is under-developed in both `hugr-core` and `hugr-model` and will need some
+//!   considerable design and implementation work (or to be removed if deemed unnecessary).
+//!   See [#2558].
 //!
 //! [#1556]: https://github.com/CQCL/hugr/discussions/1556
-//! [#1553]: https://github.com/CQCL/hugr/issues/1553
-//! [#1554]: https://github.com/CQCL/hugr/issues/1554
+//! [#2558]: https://github.com/CQCL/hugr/issues/2558
 //! [Text]: crate::v0::ast
 //! [Binary]: crate::v0::binary
 //! [Table]: crate::v0::table
@@ -90,6 +108,15 @@ use pyo3::types::PyAnyMethods as _;
 use smol_str::SmolStr;
 use std::sync::Arc;
 use table::LinkIndex;
+
+/// Describes how a function or symbol should be acted upon by a linker
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Visibility {
+    /// The linker should ignore this function or symbol
+    Private,
+    /// The linker should act upon this function or symbol
+    Public,
+}
 
 /// Core function types.
 ///
@@ -278,6 +305,26 @@ pub const COMPAT_CONST_JSON: &str = "compat.const_json";
 /// - **Result:** `core.meta`
 pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
 
+/// Metadata constructor for order hint keys on input nodes.
+///
+/// When the sources of a dataflow region are represented by an input operation
+/// within the region, this metadata can be attached the region to give the
+/// input node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_INPUT_KEY: &str = "core.order_hint.input_key";
+
+/// Metadata constructor for order hint keys on output nodes.
+///
+/// When the targets of a dataflow region are represented by an output operation
+/// within the region, this metadata can be attached the region to give the
+/// output node an order hint key.
+///
+/// - **Parameter:** `?key : core.nat`
+/// - **Result:** `core.meta`
+pub const ORDER_HINT_OUTPUT_KEY: &str = "core.order_hint.output_key";
+
 /// Metadata constructor for order hints.
 ///
 /// When this metadata is attached to a dataflow region, it can indicate a
@@ -292,6 +339,18 @@ pub const ORDER_HINT_KEY: &str = "core.order_hint.key";
 /// - **Parameter:** `?after : core.nat`
 /// - **Result:** `core.meta`
 pub const ORDER_HINT_ORDER: &str = "core.order_hint.order";
+
+/// Metadata constructor for symbol titles.
+///
+/// The names of functions in `hugr-core` are currently not used for symbol
+/// resolution, but rather serve as a short description of the function.
+/// As such, there is no requirement for uniqueness or formatting.
+/// This metadata can be used to preserve that name when serializing through
+/// `hugr-model`.
+///
+/// - **Parameter:** `?title: core.str`
+/// - **Result:** `core.meta`
+pub const CORE_TITLE: &str = "core.title";
 
 pub mod ast;
 pub mod binary;

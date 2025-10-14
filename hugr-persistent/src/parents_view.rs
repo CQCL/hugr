@@ -11,7 +11,9 @@ use hugr_core::{
     ops::OpType,
 };
 
-use super::{CommitStateSpace, PatchNode, state_space::CommitId};
+use crate::Commit;
+
+use super::{PatchNode, state_space::CommitId};
 
 /// A HugrView on the (disjoint) union of all parent HUGRs of a commit.
 ///
@@ -23,13 +25,10 @@ pub(crate) struct ParentsView<'a> {
 }
 
 impl<'a> ParentsView<'a> {
-    pub(crate) fn from_commit<R>(
-        commit_id: CommitId,
-        state_space: &'a CommitStateSpace<R>,
-    ) -> Self {
+    pub(crate) fn from_commit(commit: &'a Commit) -> Self {
         let mut hugrs = BTreeMap::new();
-        for parent in state_space.parents(commit_id) {
-            hugrs.insert(parent, state_space.commit_hugr(parent));
+        for parent in commit.parents() {
+            hugrs.insert(parent.id(), parent.commit_hugr());
         }
         Self { hugrs }
     }
@@ -37,7 +36,7 @@ impl<'a> ParentsView<'a> {
 
 impl HugrInternals for ParentsView<'_> {
     type RegionPortgraph<'p>
-        = portgraph::MultiPortGraph
+        = portgraph::MultiPortGraph<u32, u32, u32>
     where
         Self: 'p;
 
@@ -200,7 +199,7 @@ impl HugrView for ParentsView<'_> {
         unimplemented!()
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn mermaid_string_with_config(&self, _config: render::RenderConfig<Self::Node>) -> String {
         unimplemented!()
     }

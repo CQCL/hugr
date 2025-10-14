@@ -14,7 +14,9 @@ use hugr_core::{
 use itertools::Itertools as _;
 
 /// A Fat Node is a [Node] along with a reference to the [`HugrView`] whence it
-/// originates. It carries a type `OT`, the [`OpType`] of that node. `OT` may be
+/// originates.
+///
+/// It carries a type `OT`, the [`OpType`] of that node. `OT` may be
 /// general, i.e. exactly [`OpType`], or specifec, e.g. [`FuncDefn`].
 ///
 /// We provide a [Deref<Target=OT>] impl, so it can be used in place of `OT`.
@@ -339,7 +341,7 @@ impl<OT, H> NodeIndex for &FatNode<'_, OT, H> {
 /// TODO: Add the remaining [`HugrView`] equivalents that make sense.
 pub trait FatExt: HugrView {
     /// Try to create a specific [`FatNode`] for a given [Node].
-    fn try_fat<OT>(&self, node: Self::Node) -> Option<FatNode<OT, Self, Self::Node>>
+    fn try_fat<OT>(&self, node: Self::Node) -> Option<FatNode<'_, OT, Self, Self::Node>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {
@@ -347,7 +349,7 @@ pub trait FatExt: HugrView {
     }
 
     /// Create a general [`FatNode`] for a given [Node].
-    fn fat_optype(&self, node: Self::Node) -> FatNode<OpType, Self, Self::Node> {
+    fn fat_optype(&self, node: Self::Node) -> FatNode<'_, OpType, Self, Self::Node> {
         FatNode::new_optype(self, node)
     }
 
@@ -358,8 +360,8 @@ pub trait FatExt: HugrView {
         &self,
         node: Self::Node,
     ) -> Option<(
-        FatNode<Input, Self, Self::Node>,
-        FatNode<Output, Self, Self::Node>,
+        FatNode<'_, Input, Self, Self::Node>,
+        FatNode<'_, Output, Self, Self::Node>,
     )> {
         self.fat_optype(node).get_io()
     }
@@ -368,17 +370,17 @@ pub trait FatExt: HugrView {
     fn fat_children(
         &self,
         node: Self::Node,
-    ) -> impl Iterator<Item = FatNode<OpType, Self, Self::Node>> {
+    ) -> impl Iterator<Item = FatNode<'_, OpType, Self, Self::Node>> {
         self.children(node).map(|x| self.fat_optype(x))
     }
 
     /// Try to create a specific [`FatNode`] for the root of a [`HugrView`].
-    fn fat_root(&self) -> Option<FatNode<Module, Self, Self::Node>> {
+    fn fat_root(&self) -> Option<FatNode<'_, Module, Self, Self::Node>> {
         self.try_fat(self.module_root())
     }
 
     /// Try to create a specific [`FatNode`] for the entrypoint of a [`HugrView`].
-    fn fat_entrypoint<OT>(&self) -> Option<FatNode<OT, Self, Self::Node>>
+    fn fat_entrypoint<OT>(&self) -> Option<FatNode<'_, OT, Self, Self::Node>>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
     {

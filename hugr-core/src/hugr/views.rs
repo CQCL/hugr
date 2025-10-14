@@ -1,6 +1,7 @@
 //! Read-only access into HUGR graphs and subgraphs.
 
 mod impls;
+mod nodes_iter;
 pub mod petgraph;
 pub mod render;
 mod rerooted;
@@ -14,8 +15,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 pub use self::petgraph::PetgraphWrapper;
-#[allow(deprecated)]
+#[expect(deprecated)]
 use self::render::{MermaidFormatter, RenderConfig};
+pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
@@ -397,8 +399,8 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    #[deprecated(note = "Use `mermaid_format` instead")]
-    #[allow(deprecated)]
+    #[deprecated(note = "Use `mermaid_format` instead", since = "0.20.2")]
+    #[expect(deprecated)]
     fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
 
     /// Return the mermaid representation of the underlying hierarchical graph
@@ -417,14 +419,14 @@ pub trait HugrView: HugrInternals {
     /// encouraged to provide an implementation of this method overriding the default
     /// and no longer rely on [HugrView::mermaid_string_with_config].
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let config = match RenderConfig::try_from(formatter) {
             Ok(config) => config,
             Err(e) => {
                 panic!("Unsupported format option: {e}");
             }
         };
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         self.mermaid_string_with_config(config)
     }
 
@@ -438,7 +440,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    fn mermaid_format(&self) -> MermaidFormatter<Self> {
+    fn mermaid_format(&self) -> MermaidFormatter<'_, Self> {
         MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
     }
 
@@ -675,7 +677,7 @@ impl HugrView for Hugr {
         self.graph.all_neighbours(node.into_portgraph()).map_into()
     }
 
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
         self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }

@@ -5,10 +5,9 @@ mod list_fold;
 use std::hash::{Hash, Hasher};
 
 use std::str::FromStr;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use itertools::Itertools;
-use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
@@ -167,7 +166,7 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Any);
+    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -181,7 +180,7 @@ impl ListOp {
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
         use ListOp::{get, insert, length, pop, push, set};
-        let e = Type::new_var_use(0, TypeBound::Any);
+        let e = Type::new_var_use(0, TypeBound::Linear);
         let l = self.list_type(list_type_def, 0);
         match self {
             pop => self
@@ -286,24 +285,23 @@ impl MakeOpDef for ListOp {
     }
 }
 
-lazy_static! {
-    /// Extension for list operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_type(
+/// Extension for list operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
                 LIST_TYPENAME,
                 vec![ListOp::TP],
                 "Generic dynamically sized list of type T.".into(),
                 TypeDefBound::from_params(vec![0]),
-                extension_ref
+                extension_ref,
             )
             .unwrap();
 
-            // The list type must be defined before the operations are added.
-            ListOp::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+        // The list type must be defined before the operations are added.
+        ListOp::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 impl MakeRegisteredOp for ListOp {
     fn extension_id(&self) -> ExtensionId {

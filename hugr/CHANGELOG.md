@@ -1,5 +1,178 @@
 # Changelog
 
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-v0.23.0...hugr-v0.24.0) - 2025-10-13
+
+### Bug Fixes
+
+- Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/pull/2606))
+
+### New Features
+
+- Add handler for copying / discarding borrow arrays to default lineariser ([#2602](https://github.com/CQCL/hugr/pull/2602))
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-v0.22.4...hugr-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+- [**breaking**] test extension version compatibility on ModelWithExts ([#2587](https://github.com/CQCL/hugr/pull/2587))
+- *(core)* check used extension versions against resolved extensions ([#2588](https://github.com/CQCL/hugr/pull/2588))
+- [**breaking**] model import loads Package extensions ([#2590](https://github.com/CQCL/hugr/pull/2590))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### New Features
+
+- [**breaking**] DeadCodeElimPass reports error on non-existent entry_points ([#2566](https://github.com/CQCL/hugr/pull/2566))
+- add trait+funcs for linking Hugrs explicitly by Node ([#2521](https://github.com/CQCL/hugr/pull/2521))
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- [**breaking**] Return error instead of panicking in DFGWrapper::add_{in,out}put ([#2571](https://github.com/CQCL/hugr/pull/2571))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+- Normalize CFGs ([#2591](https://github.com/CQCL/hugr/pull/2591))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-v0.22.3...hugr-v0.22.4) - 2025-09-24
+
+### Bug Fixes
+
+- DeadCodeElim keeps consumers of linear outputs ([#2560](https://github.com/CQCL/hugr/pull/2560))
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+
+### New Features
+
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+
+## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-v0.22.2...hugr-v0.22.3) - 2025-09-11
+
+### Bug Fixes
+
+- SiblingSubgraph::try_from_nodes not including disconnected components ([#2549](https://github.com/CQCL/hugr/pull/2549))
+
+### Documentation
+
+- Clarify docs for SiblingSubgraph::{inputs, outputs} ([#2508](https://github.com/CQCL/hugr/pull/2508))
+
+### New Features
+
+- SiblingSubgraph supports function calls ([#2528](https://github.com/CQCL/hugr/pull/2528))
+- Add unchecked constructor for SiblingSubgraph ([#2526](https://github.com/CQCL/hugr/pull/2526))
+- Add extend_inputs function for DFGs ([#2536](https://github.com/CQCL/hugr/pull/2536))
+- Loosen bound on Patch trait ([#2545](https://github.com/CQCL/hugr/pull/2545))
+- Add HugrMut::insert(_view)_forest ([#2518](https://github.com/CQCL/hugr/pull/2518))
+
+## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-v0.22.1...hugr-v0.22.2) - 2025-08-06
+
+### New Features
+
+- Type of constants in `core` `Term`s. ([#2411](https://github.com/CQCL/hugr/pull/2411))
+- Support LineConvexChecker ([#2487](https://github.com/CQCL/hugr/pull/2487))
+
+## [0.22.1](https://github.com/CQCL/hugr/compare/hugr-v0.22.0...hugr-v0.22.1) - 2025-07-28
+
+### New Features
+
+- Include copy_discard_array in DelegatingLinearizer::default ([#2479](https://github.com/CQCL/hugr/pull/2479))
+- Inline calls to functions not on cycles in the call graph ([#2450](https://github.com/CQCL/hugr/pull/2450))
+
+## [0.22.0](https://github.com/CQCL/hugr/compare/hugr-v0.21.0...hugr-v0.22.0) - 2025-07-24
+
+This release fixes multiple inconsistencies between the serialization formats
+and improves the error messages when loading unsupported envelopes.
+
+We now also support nodes with up to `2^32` connections to the same port (up from `2^16`).
+
+### Bug Fixes
+
+- Ensure SumTypes have the same json encoding in -rs and -py ([#2465](https://github.com/CQCL/hugr/pull/2465))
+
+### New Features
+
+- ReplaceTypes allows linearizing inside Op replacements ([#2435](https://github.com/CQCL/hugr/pull/2435))
+- Add pass for DFG inlining ([#2460](https://github.com/CQCL/hugr/pull/2460))
+- Export entrypoint metadata in Python and fix bug in import ([#2434](https://github.com/CQCL/hugr/pull/2434))
+- Names of private functions become `core.title` metadata. ([#2448](https://github.com/CQCL/hugr/pull/2448))
+- [**breaking**] Use binary envelopes for operation lower_func encoding  ([#2447](https://github.com/CQCL/hugr/pull/2447))
+- [**breaking**] Update portgraph dependency to 0.15 ([#2455](https://github.com/CQCL/hugr/pull/2455))
+- Detect and fail on unrecognised envelope flags ([#2453](https://github.com/CQCL/hugr/pull/2453))
+- include generator metatada in model import and cli validate errors ([#2452](https://github.com/CQCL/hugr/pull/2452))
+- [**breaking**] Add `insert_region` to HugrMut ([#2463](https://github.com/CQCL/hugr/pull/2463))
+- Non-region entrypoints in `hugr-model`. ([#2467](https://github.com/CQCL/hugr/pull/2467))
+
+## [0.21.0](https://github.com/CQCL/hugr/compare/hugr-v0.20.2...hugr-v0.21.0) - 2025-07-09
+
+
+This release includes a long list of changes:
+
+- The HUGR model serialization format is now stable, and should be preferred over the old JSON format.
+- Type parameters and type arguments are now unified into a single `Term` type.
+- Function definitions can no longer be nested inside dataflow regions. Now they must be defined at the top level module.
+- Function definitions and declarations now have a `Visibility` field, which define whether they are visible in the public API of the module.
+- And many more fixes and improvements.
+
+### Bug Fixes
+
+- DeadFuncElimPass+CallGraph w/ non-module-child entrypoint ([#2390](https://github.com/CQCL/hugr/pull/2390))
+- Fixed two bugs in import/export of function operations ([#2324](https://github.com/CQCL/hugr/pull/2324))
+- Model import should perform extension resolution ([#2326](https://github.com/CQCL/hugr/pull/2326))
+- [**breaking**] Fixed bugs in model CFG handling and improved CFG signatures ([#2334](https://github.com/CQCL/hugr/pull/2334))
+- Use List instead of Tuple in conversions for TypeArg/TypeRow ([#2378](https://github.com/CQCL/hugr/pull/2378))
+- Do extension resolution on loaded extensions from the model format ([#2389](https://github.com/CQCL/hugr/pull/2389))
+- Make JSON Schema checks actually work again ([#2412](https://github.com/CQCL/hugr/pull/2412))
+- Order hints on input and output nodes. ([#2422](https://github.com/CQCL/hugr/pull/2422))
+
+### Documentation
+
+- Hide hugr-persistent docs ([#2357](https://github.com/CQCL/hugr/pull/2357))
+
+### New Features
+
+- [**breaking**] Split `TypeArg::Sequence` into tuples and lists. ([#2140](https://github.com/CQCL/hugr/pull/2140))
+- [**breaking**] Added float and bytes literal to core and python bindings. ([#2289](https://github.com/CQCL/hugr/pull/2289))
+- [**breaking**] More helpful error messages in model import ([#2272](https://github.com/CQCL/hugr/pull/2272))
+- [**breaking**] Better error reporting in `hugr-cli`. ([#2318](https://github.com/CQCL/hugr/pull/2318))
+- [**breaking**] Merge `TypeParam` and `TypeArg` into one `Term` type in Rust ([#2309](https://github.com/CQCL/hugr/pull/2309))
+- *(persistent)* Add serialisation for CommitStateSpace ([#2344](https://github.com/CQCL/hugr/pull/2344))
+- add TryFrom impls for TypeArg/TypeRow ([#2366](https://github.com/CQCL/hugr/pull/2366))
+- Add `MakeError` op ([#2377](https://github.com/CQCL/hugr/pull/2377))
+- Open lists and tuples in `Term` ([#2360](https://github.com/CQCL/hugr/pull/2360))
+- Call `FunctionBuilder::add_{in,out}put` for any AsMut<Hugr> ([#2376](https://github.com/CQCL/hugr/pull/2376))
+- Add Root checked methods to DataflowParentID ([#2382](https://github.com/CQCL/hugr/pull/2382))
+- Add PersistentWire type ([#2361](https://github.com/CQCL/hugr/pull/2361))
+- Add `BorrowArray` extension ([#2395](https://github.com/CQCL/hugr/pull/2395))
+- [**breaking**] Add Visibility to FuncDefn/FuncDecl. ([#2143](https://github.com/CQCL/hugr/pull/2143))
+- *(per)* [**breaking**] Support empty wires in commits ([#2349](https://github.com/CQCL/hugr/pull/2349))
+- [**breaking**] hugr-model use explicit Option<Visibility>, with ::Unspecified in capnp ([#2424](https://github.com/CQCL/hugr/pull/2424))
+- [**breaking**] No nested FuncDefns (or AliasDefns) ([#2256](https://github.com/CQCL/hugr/pull/2256))
+- [**breaking**] Rename 'Any' type bound to 'Linear' ([#2421](https://github.com/CQCL/hugr/pull/2421))
+
+### Refactor
+
+- [**breaking**] remove deprecated runtime extension errors ([#2369](https://github.com/CQCL/hugr/pull/2369))
+- [**breaking**] Reduce error type sizes ([#2420](https://github.com/CQCL/hugr/pull/2420))
+- [**breaking**] move PersistentHugr into separate crate ([#2277](https://github.com/CQCL/hugr/pull/2277))
+
+### Testing
+
+- Check hugr json serializations against the schema (again) ([#2216](https://github.com/CQCL/hugr/pull/2216))
+
 ## [0.20.2](https://github.com/CQCL/hugr/compare/hugr-v0.20.1...hugr-v0.20.2) - 2025-06-25
 
 ### Bug Fixes

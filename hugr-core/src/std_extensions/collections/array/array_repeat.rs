@@ -52,9 +52,9 @@ impl<AK: ArrayKind> FromStr for GenericArrayRepeatDef<AK> {
 impl<AK: ArrayKind> GenericArrayRepeatDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let t = Type::new_var_use(1, TypeBound::Any);
+        let t = Type::new_var_use(1, TypeBound::Linear);
         let func = Type::new_function(Signature::new(vec![], vec![t.clone()]));
         let array_ty =
             AK::instantiate_ty(array_def, n, t).expect("Array type instantiation failed");

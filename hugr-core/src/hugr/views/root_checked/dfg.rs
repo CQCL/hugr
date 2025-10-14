@@ -6,14 +6,13 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::{
-    IncomingPort, OutgoingPort, PortIndex,
+    IncomingPort, OutgoingPort, Port, PortIndex,
     hugr::HugrMut,
     ops::{
-        DFG, FuncDefn, Input, OpTrait, OpType, Output,
-        dataflow::IOTrait,
+        OpParent, OpTrait, OpType,
         handle::{DataflowParentID, DfgID},
     },
-    types::{NoRV, Signature, TypeBase},
+    types::{NoRV, Signature, Type, TypeBase},
 };
 
 use super::RootChecked;
@@ -144,6 +143,73 @@ macro_rules! impl_dataflow_parent_methods {
 
                 Ok(())
             }
+
+            /// Add copyable inputs to the DFG to modify its signature.
+            ///
+            /// Append new inputs to the DFG. These will not be connected to any op and
+            /// must be copyable. This will recursively update the signatures of all
+            /// ancestors of the entrypoint.
+            ///
+            /// ### Arguments
+            ///
+            /// * `new_inputs`: The new input types to append to the signature.
+            ///
+            /// Returns an `InvalidSignature` error if the new_input types are not
+            /// copyable.
+            ///
+            /// ### Panics
+            ///
+            /// Panics if the DFG is not trivially nested, i.e. if there is an ancestor
+            /// DFG of the entrypoint that has more than one inner DFG.
+            pub fn extend_inputs<'a>(
+                &mut self,
+                new_inputs: impl IntoIterator<Item = &'a Type>,
+            ) -> Result<(), InvalidSignature> {
+                let Self(hugr, _) = self;
+                let curr_sig = hugr
+                    .get_optype(hugr.entrypoint())
+                    .inner_function_type()
+                    .expect("valid DFG graph")
+                    .into_owned();
+
+                let n_inputs = curr_sig.input_count();
+
+                let new_inputs: Vec<_> = new_inputs
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, t)| {
+                        if t.copyable() {
+                            Ok(t)
+                        } else {
+                            let p = IncomingPort::from(n_inputs + i);
+                            Err(InvalidSignature::ExpectedCopyable(p.into()))
+                        }
+                    })
+                    .try_collect()?;
+
+                let new_sig = Signature::new(curr_sig.input.extend(new_inputs), curr_sig.output);
+
+                // Update the signatures of the IO and their ancestors
+                let mut node = hugr.entrypoint();
+                let mut is_ancestor = false;
+                while matches!(hugr.get_optype(node), OpType::FuncDefn(_) | OpType::DFG(_)) {
+                    let [inner_inp, inner_out] = hugr.get_io(node).expect("valid DFG graph");
+                    for node in [node, inner_inp, inner_out] {
+                        update_signature(hugr, node, &new_sig);
+                    }
+                    if is_ancestor {
+                        update_inner_dfg_links(hugr, node);
+                    }
+                    if let Some(parent) = hugr.get_parent(node) {
+                        node = parent;
+                        is_ancestor = true;
+                    } else {
+                        break;
+                    }
+                }
+
+                Ok(())
+            }
         }
     };
 }
@@ -179,20 +245,19 @@ fn disconnect_all<H: HugrMut>(hugr: &mut H, node: H::Node) {
 }
 
 fn update_signature<H: HugrMut>(hugr: &mut H, node: H::Node, new_sig: &Signature) {
-    let new_op: OpType = match hugr.get_optype(node) {
-        OpType::DFG(_) => DFG {
-            signature: new_sig.clone(),
+    match hugr.optype_mut(node) {
+        OpType::DFG(dfg) => {
+            dfg.signature = new_sig.clone();
         }
-        .into(),
-        OpType::FuncDefn(fn_def_op) => {
-            FuncDefn::new(fn_def_op.func_name().clone(), new_sig.clone()).into()
+        OpType::FuncDefn(fn_def_op) => *fn_def_op.signature_mut() = new_sig.clone().into(),
+        OpType::Input(inp) => {
+            inp.types = new_sig.input().clone();
         }
-        OpType::Input(_) => Input::new(new_sig.input().clone()).into(),
-        OpType::Output(_) => Output::new(new_sig.output().clone()).into(),
+        OpType::Output(out) => out.types = new_sig.output().clone(),
         _ => panic!("only update signature of DFG, FuncDefn, Input, or Output"),
     };
+    let new_op = hugr.get_optype(node);
     hugr.set_num_ports(node, new_op.input_count(), new_op.output_count());
-    hugr.replace_op(node, new_op);
 }
 
 fn check_valid_inputs<V>(
@@ -271,6 +336,9 @@ pub enum InvalidSignature {
     /// Error when an input is used multiple times in the new signature
     #[error("Input at position {0} is duplicated in new signature")]
     DuplicateInput(usize),
+    /// Expected a copyable type at the given port
+    #[error("Type at port {0:?} must be copyable")]
+    ExpectedCopyable(Port),
 }
 
 #[cfg(test)]
@@ -285,6 +353,7 @@ mod test {
     use crate::hugr::views::root_checked::RootChecked;
     use crate::ops::handle::NodeHandle;
     use crate::ops::{NamedOp, OpParent};
+    use crate::std_extensions::arithmetic::float_types::float64_type;
     use crate::types::Signature;
     use crate::utils::test_quantum_extension::cx_gate;
     use crate::{Hugr, HugrView};
@@ -599,5 +668,33 @@ mod test {
         }
 
         assert_snapshot!(hugr.mermaid_string());
+    }
+
+    #[test]
+    fn test_extend_inputs() {
+        // Create an empty DFG
+        let dfg_builder = DFGBuilder::new(endo_sig(vec![qb_t()])).unwrap();
+        let [wire] = dfg_builder.input_wires_arr();
+        let mut hugr = dfg_builder.finish_hugr_with_outputs(vec![wire]).unwrap();
+
+        // Wrap in RootChecked
+        let mut dfg_view = RootChecked::<&mut Hugr, DataflowParentID>::try_new(&mut hugr).unwrap();
+
+        // Extend the inputs
+        let new_inputs = vec![bool_t(), float64_type()];
+        dfg_view.extend_inputs(&new_inputs).unwrap();
+        assert_eq!(
+            dfg_view.hugr().inner_function_type().unwrap(),
+            Signature::new(vec![qb_t(), bool_t(), float64_type()], vec![qb_t()])
+        );
+
+        let new_inputs_fail = vec![qb_t()];
+        let err = dfg_view.extend_inputs(&new_inputs_fail);
+        assert_eq!(
+            err,
+            Err(InvalidSignature::ExpectedCopyable(
+                IncomingPort::from(3).into()
+            ))
+        );
     }
 }

@@ -3,13 +3,15 @@ use derive_more::{Display, Error, From};
 use itertools::Itertools;
 use std::io;
 
-use super::{ExtensionBreakingError, WithGenerator, check_breaking_extensions};
+use super::WithGenerator;
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::package::Package;
 use crate::{Extension, Hugr};
 
 /// Read a Package in json format from an io reader.
+/// Returns package and the combined extension registry
+/// of the provided registry and the package extensions.
 pub(super) fn from_json_reader(
     reader: impl io::Read,
     extension_registry: &ExtensionRegistry,
@@ -31,10 +33,6 @@ pub(super) fn from_json_reader(
     let mut combined_registry = extension_registry.clone();
     combined_registry.extend(&pkg_extensions);
 
-    for module in &modules {
-        check_breaking_extensions(module, &combined_registry)
-            .map_err(|err| WithGenerator::new(err, &modules))?;
-    }
     modules
         .iter_mut()
         .try_for_each(|module| module.resolve_extension_defs(&combined_registry))
@@ -77,15 +75,14 @@ pub(super) fn to_json_writer<'h>(
 /// Error raised while loading a package.
 #[derive(Debug, Display, Error, From)]
 #[non_exhaustive]
+#[display("Error reading or writing a package in JSON format.")]
 pub enum PackageEncodingError {
     /// Error raised while parsing the package json.
-    JsonEncoding(serde_json::Error),
+    JsonEncoding(#[from] serde_json::Error),
     /// Error raised while reading from a file.
-    IOError(io::Error),
+    IOError(#[from] io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    ExtensionResolution(WithGenerator<ExtensionResolutionError>),
-    /// Error raised while checking for breaking extension version mismatch.
-    ExtensionVersion(WithGenerator<ExtensionBreakingError>),
+    ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
 }
 
 /// A private package structure implementing the serde traits.

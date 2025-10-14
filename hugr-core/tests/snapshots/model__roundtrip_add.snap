@@ -8,11 +8,11 @@ expression: ast
 
 (import core.meta.description)
 
-(import core.nat)
-
 (import core.fn)
 
 (import arithmetic.int.types.int)
+
+(import core.nat)
 
 (declare-operation
   arithmetic.int.iadd
@@ -25,6 +25,7 @@ expression: ast
       "addition modulo 2^N (signed and unsigned versions are the same op)")))
 
 (define-func
+  public
   example.add
   (core.fn
     [(arithmetic.int.types.int 6) (arithmetic.int.types.int 6)]

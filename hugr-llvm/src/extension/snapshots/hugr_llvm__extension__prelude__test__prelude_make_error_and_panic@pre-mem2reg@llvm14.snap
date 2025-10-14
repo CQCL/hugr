@@ -8,7 +8,7 @@ source_filename = "test_context"
 @0 = private unnamed_addr constant [7 x i8] c"Error!\00", align 1
 @prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
-define void @_hl.main.1() {
+define private void @_hl.main.1() {
 alloca_block:
   %"7_0" = alloca i8*, align 8
   %"5_0" = alloca i64, align 8

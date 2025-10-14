@@ -7,7 +7,7 @@ use crate::v0::{Literal, RegionKind};
 
 use super::{
     LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolName, Term,
-    VarName,
+    VarName, Visibility,
 };
 
 struct Printer<'a> {
@@ -369,6 +369,12 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
 }
 
 fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
+    match symbol.visibility {
+        None => (),
+        Some(Visibility::Private) => printer.text("private"),
+        Some(Visibility::Public) => printer.text("public"),
+    }
+
     print_symbol_name(printer, &symbol.name);
 
     for param in &symbol.params {

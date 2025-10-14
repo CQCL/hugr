@@ -1,0 +1,57 @@
+cff-version: 1.2.0
+
+# Basic information about the software
+title: "HUGR: A Quantum-Classical Intermediate Representation"
+message: >-
+  HUGR can be cited as below. For an up-to-date definition
+  of the specification, see the [HUGR
+  specification](https://github.com/CQCL/hugr/blob/main/specification/hugr.md)
+keywords:
+  - quantum computing
+  - compilers
+url: "https://github.com/cqcl/hugr"
+repository-code: "https://github.com/cqcl/hugr"
+license: Apache-2.0
+date-released: 2024-01-15
+
+# When exporting a citation, link to the extended abstract on arXiv
+preferred-citation:
+  type: article
+  title: "HUGR: A Quantum-Classical Intermediate Representation"
+  url: "https://arxiv.org/abs/2510.11420"
+  # These are the authors included in the publication.
+  # This list is missing people that joined the project after the publication.
+  #
+  # See <https://github.com/CQCL/hugr/graphs/contributors> for the full list of contributors.
+  authors:
+    - family-names: "Koch"
+      given-names: "Mark"
+      orcid: "https://orcid.org/0000-0001-8511-2703"
+    - family-names: "Borgna"
+      given-names: "Agustín"
+      orcid: "https://orcid.org/0000-0002-1688-1370"
+    - family-names: "Sivarajah"
+      given-names: "Seyon"
+      orcid: "https://orcid.org/0000-0002-7332-5485"
+    - family-names: "Lawrence"
+      given-names: "Alan"
+      orcid: "https://orcid.org/0009-0000-1663-7397"
+    - family-names: "Edgington"
+      given-names: "Alec"
+      orcid: "https://orcid.org/0000-0002-0508-6988"
+    - family-names: "Wilson"
+      given-names: "Douglas"
+    - family-names: "Roy"
+      given-names: "Craig"
+      orcid: "https://orcid.org/0009-0002-6034-2910"
+    - family-names: "Mondada"
+      given-names: "Luca"
+      orcid: "https://orcid.org/0000-0002-7496-7711"
+    - family-names: "Heidemann"
+      given-names: "Lukas"
+      orcid: "https://orcid.org/0000-0002-7137-2368"
+    - family-names: "Duncan"
+      given-names: "Ross"
+      orcid: "https://orcid.org/0000-0001-6758-1573"
+  doi: 10.48550/arXiv.2510.11420
+  year: 2025

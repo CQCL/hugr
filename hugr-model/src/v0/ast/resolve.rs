@@ -1,6 +1,6 @@
 use bumpalo::{Bump, collections::Vec as BumpVec};
-use fxhash::FxHashMap;
 use itertools::zip_eq;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 use super::{
@@ -289,11 +289,13 @@ impl<'a> Context<'a> {
 
     fn resolve_symbol(&mut self, symbol: &'a Symbol) -> BuildResult<&'a table::Symbol<'a>> {
         let name = symbol.name.as_ref();
+        let visibility = &symbol.visibility;
         let params = self.resolve_params(&symbol.params)?;
         let constraints = self.resolve_terms(&symbol.constraints)?;
         let signature = self.resolve_term(&symbol.signature)?;
 
         Ok(self.bump.alloc(table::Symbol {
+            visibility,
             name,
             params,
             constraints,
@@ -363,6 +365,7 @@ impl<'a> Context<'a> {
 /// Error that may occur in [`Module::resolve`].
 #[derive(Debug, Clone, Error)]
 #[non_exhaustive]
+#[error("Error resolving model module")]
 pub enum ResolveError {
     /// Unknown variable.
     #[error("unknown var: {0}")]

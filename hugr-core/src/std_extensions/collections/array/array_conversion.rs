@@ -76,9 +76,9 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind>
 {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Any.into()];
+        let params = vec![TypeParam::max_nat_type(), TypeBound::Linear.into()];
         let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let element_ty = Type::new_var_use(1, TypeBound::Any);
+        let element_ty = Type::new_var_use(1, TypeBound::Linear);
 
         let this_ty = AK::instantiate_ty(array_def, size.clone(), element_ty.clone())
             .expect("Array type instantiation failed");

@@ -50,6 +50,9 @@ class StaticArrayVal(val.ExtensionValue):
         self.name = name
 
     def to_value(self) -> val.Extension:
+        # Encode the nested values as JSON strings directly, to mirror what
+        # happens when loading (where we can't decode the constant payload back
+        # into specialized `Value`s).
         serial_val = {
             "value": {
                 "values": [v._to_serial_root() for v in self.v],

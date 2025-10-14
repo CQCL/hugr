@@ -5,26 +5,24 @@ use crate::{
     std_extensions::logic::LogicOp,
     types::Signature,
 };
-use lazy_static::lazy_static;
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
+    sync::LazyLock,
 };
 
 use crate::Hugr;
 use rstest::{fixture, rstest};
 
-lazy_static! {
-    static ref TEST_CASE_DIR: PathBuf = {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join(file!())
-            .parent()
-            .unwrap()
-            .join("testcases")
-    };
-}
+static TEST_CASE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join(file!())
+        .parent()
+        .unwrap()
+        .join("testcases")
+});
 
 #[test]
 fn test_case_dir_exists() {

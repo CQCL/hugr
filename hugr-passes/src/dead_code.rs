@@ -1,13 +1,10 @@
 //! Pass for removing dead code, i.e. that computes values that are then discarded
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::{HugrView, hugr::hugrmut::HugrMut, ops::OpType};
-use std::convert::Infallible;
-use std::fmt::{Debug, Formatter};
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    sync::Arc,
-};
+use hugr_core::{HugrView, Node, hugr::hugrmut::HugrMut, ops::OpType};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt::{Debug, Display, Formatter};
+use std::sync::Arc;
 
 use crate::ComposablePass;
 
@@ -83,6 +80,15 @@ impl PreserveNode {
     }
 }
 
+/// Errors from [DeadCodeElimPass]
+#[derive(Clone, Debug, thiserror::Error, PartialEq)]
+#[non_exhaustive]
+pub enum DeadCodeElimError<N: Display = Node> {
+    /// A node specified to [DeadCodeElimPass::with_entry_points] was not found
+    #[error("Node {_0} does not exist in the Hugr")]
+    NodeNotFound(N),
+}
+
 impl<H: HugrView> DeadCodeElimPass<H> {
     /// Allows setting a callback that determines whether a node must be preserved
     /// (even when its result is not used)
@@ -101,12 +107,15 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         self
     }
 
-    fn find_needed_nodes(&self, h: &H) -> HashSet<H::Node> {
+    fn find_needed_nodes(&self, h: &H) -> Result<HashSet<H::Node>, DeadCodeElimError<H::Node>> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
         q.push_front(h.entrypoint());
         while let Some(n) = q.pop_front() {
+            if !h.contains_node(n) {
+                return Err(DeadCodeElimError::NodeNotFound(n));
+            }
             if !needed.insert(n) {
                 continue;
             }
@@ -133,15 +142,22 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                 // BBs are reachable above.
                 q.push_back(src);
             }
+            // Also keep consumers of any linear outputs
+            if let Some(sig) = h.signature(n) {
+                for op in sig.output_ports() {
+                    if !sig.out_port_type(op).unwrap().copyable() {
+                        q.extend(h.linked_inputs(n, op).map(|(n, _inp)| n))
+                    }
+                }
+            }
         }
-        needed
+        Ok(needed)
     }
 
     fn must_preserve(&self, h: &H, cache: &mut HashMap<H::Node, bool>, n: H::Node) -> bool {
         if let Some(res) = cache.get(&n) {
             return *res;
         }
-        #[allow(deprecated)]
         let res = match self.preserve_callback.as_ref()(h, n) {
             PreserveNode::MustKeep => true,
             PreserveNode::CanRemoveIgnoringChildren => false,
@@ -155,11 +171,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
 }
 
 impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
-    type Error = Infallible;
+    type Error = DeadCodeElimError<H::Node>;
     type Result = ();
 
-    fn run(&self, hugr: &mut H) -> Result<(), Infallible> {
-        let needed = self.find_needed_nodes(&*hugr);
+    fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
+        let needed = self.find_needed_nodes(&*hugr)?;
         let remove = hugr
             .entry_descendants()
             .filter(|n| !needed.contains(n))
@@ -174,11 +190,16 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
 mod test {
     use std::sync::Arc;
 
-    use hugr_core::Hugr;
-    use hugr_core::builder::{CFGBuilder, Container, Dataflow, DataflowSubContainer, HugrBuilder};
-    use hugr_core::extension::prelude::{ConstUsize, usize_t};
+    use hugr_core::builder::{
+        CFGBuilder, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, endo_sig, inout_sig,
+    };
+    use hugr_core::extension::prelude::{ConstUsize, bool_t, qb_t, usize_t};
+    use hugr_core::extension::{ExtensionId, Version};
+    use hugr_core::ops::ExtensionOp;
     use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
     use hugr_core::types::Signature;
+    use hugr_core::{Extension, Hugr};
     use hugr_core::{HugrView, ops::Value, type_row};
     use itertools::Itertools;
 
@@ -300,5 +321,63 @@ mod test {
                 [OpTag::Input, OpTag::Output, OpTag::LoadConst]
             );
         }
+    }
+
+    #[test]
+    fn preserve_linear() {
+        // A simple linear alloc/measure. Note we do *not* model ordering among allocations for this test.
+        let test_ext = Extension::new_arc(
+            ExtensionId::new_unchecked("test_qext"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                e.add_op("new".into(), "".into(), inout_sig(vec![], qb_t()), w)
+                    .unwrap();
+                e.add_op("gate".into(), "".into(), endo_sig(qb_t()), w)
+                    .unwrap();
+                e.add_op("measure".into(), "".into(), inout_sig(qb_t(), bool_t()), w)
+                    .unwrap();
+                e.add_op("not".into(), "".into(), endo_sig(bool_t()), w)
+                    .unwrap();
+            },
+        );
+        let [new, gate, measure, not] = ["new", "gate", "measure", "not"]
+            .map(|n| ExtensionOp::new(test_ext.get_op(n).unwrap().clone(), []).unwrap());
+        let mut dfb = DFGBuilder::new(endo_sig(qb_t())).unwrap();
+        // Unused new...measure, can be removed
+        let qn = dfb.add_dataflow_op(new.clone(), []).unwrap().outputs();
+        let [_] = dfb
+            .add_dataflow_op(measure.clone(), qn)
+            .unwrap()
+            .outputs_arr();
+
+        // Free (measure) the input, so not connected to the output
+        let [q_in] = dfb.input_wires_arr();
+        let [h_in] = dfb
+            .add_dataflow_op(gate.clone(), [q_in])
+            .unwrap()
+            .outputs_arr();
+        let [b] = dfb.add_dataflow_op(measure, [h_in]).unwrap().outputs_arr();
+        // Operate on the bool only, can be removed as not linear:
+        dfb.add_dataflow_op(not, [b]).unwrap();
+
+        // Alloc a new qubit and output that
+        let q = dfb.add_dataflow_op(new, []).unwrap().outputs();
+        let outs = dfb.add_dataflow_op(gate, q).unwrap().outputs();
+        let mut h = dfb.finish_hugr_with_outputs(outs).unwrap();
+        DeadCodeElimPass::default().run(&mut h).unwrap();
+        // This was failing before https://github.com/CQCL/hugr/pull/2560:
+        h.validate().unwrap();
+
+        // Remove one new and measure, and a "not"; keep both gates
+        // (cannot remove the other gate or measure even tho results not needed).
+        // Removing the gate because the measure-result is not used is beyond (current) DeadCodeElim.
+        let ext_ops = h
+            .nodes()
+            .filter_map(|n| h.get_optype(n).as_extension_op())
+            .map(ExtensionOp::unqualified_id);
+        assert_eq!(
+            ext_ops.sorted().collect_vec(),
+            ["gate", "gate", "measure", "new"]
+        );
     }
 }

@@ -1,7 +1,7 @@
 //! Basic integer types
 
 use std::num::NonZeroU64;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use crate::ops::constant::ValueName;
 use crate::types::{Term, TypeName};
@@ -14,7 +14,6 @@ use crate::{
         type_param::{TermTypeError, TypeArg, TypeParam},
     },
 };
-use lazy_static::lazy_static;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.int.types");
 /// Extension version.
@@ -46,14 +45,14 @@ pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
     int_custom_type(width_arg.into(), &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
 
-lazy_static! {
-    /// Array of valid integer types, indexed by log width of the integer.
-    pub static ref INT_TYPES: [Type; LOG_WIDTH_BOUND as usize] = (0..LOG_WIDTH_BOUND)
+/// Array of valid integer types, indexed by log width of the integer.
+pub static INT_TYPES: LazyLock<[Type; LOG_WIDTH_BOUND as usize]> = LazyLock::new(|| {
+    (0..LOG_WIDTH_BOUND)
         .map(|i| int_type(Term::from(u64::from(i))))
         .collect::<Vec<_>>()
         .try_into()
-        .unwrap();
-}
+        .unwrap()
+});
 
 /// Returns whether `n` is a valid `log_width` for an [`int_type`].
 #[must_use]
@@ -80,8 +79,8 @@ pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermTypeError> {
     match arg {
         TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TermTypeError::TypeMismatch {
-            term: arg.clone(),
-            type_: LOG_WIDTH_TYPE_PARAM,
+            term: Box::new(arg.clone()),
+            type_: Box::new(LOG_WIDTH_TYPE_PARAM),
         }),
     }
 }
@@ -206,10 +205,8 @@ fn extension() -> Arc<Extension> {
     })
 }
 
-lazy_static! {
-    /// Lazy reference to int types extension.
-    pub static ref EXTENSION: Arc<Extension> = extension();
-}
+/// Lazy reference to int types extension.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
 
 /// get an integer type with width corresponding to a type variable with id `var_id`
 pub(super) fn int_tv(var_id: usize) -> Type {

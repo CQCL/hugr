@@ -11,11 +11,11 @@ use inkwell::{
     basic_block::BasicBlock,
     builder::Builder,
     context::Context,
-    module::Module,
+    module::{Linkage, Module},
     types::{BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue, GlobalValue, IntValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
-use itertools::zip_eq;
+use itertools::{Itertools, zip_eq};
 
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
@@ -107,6 +107,11 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     /// returned from [`EmitFuncContext::finish`].
     pub fn push_todo_func(&mut self, node: FatNode<'_, FuncDefn, H>) {
         self.todo.insert(node.node());
+    }
+
+    /// Returns the current [FunctionValue] being emitted.
+    pub fn func(&self) -> FunctionValue<'c> {
+        self.func
     }
 
     /// Returns the internal [Builder]. Callers must ensure that it is
@@ -351,4 +356,86 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     let right = either_ty.build_tag(builder, 1, vec![ok_value])?;
     let either = builder.build_select(is_ok, right, left, "")?;
     Ok(either)
+}
+/// Helper to outline LLVM IR into a function call instead of inlining it every time.
+///
+/// The first time this helper is called with a given function name, a function is built
+/// using the provided closure. Future invocations with the same name will just emit calls
+/// to this function.
+///
+/// The return type is specified by `ret_type`, and if `Some` then the closure must return
+/// a value of that type, which will be returned from the function. Otherwise, the function
+/// will return void.
+pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    func_name: &str,
+    args: [BasicValueEnum<'c>; N],
+    ret_type: Option<BasicTypeEnum<'c>>,
+    go: impl FnOnce(
+        &mut EmitFuncContext<'c, '_, H>,
+        [BasicValueEnum<'c>; N],
+    ) -> Result<Option<BasicValueEnum<'c>>>,
+) -> Result<Option<BasicValueEnum<'c>>> {
+    let func = match ctx.get_current_module().get_function(func_name) {
+        Some(func) => func,
+        None => {
+            let arg_tys = args.iter().map(|v| v.get_type().into()).collect_vec();
+            let sig = match ret_type {
+                Some(ret_ty) => ret_ty.fn_type(&arg_tys, false),
+                None => ctx.iw_context().void_type().fn_type(&arg_tys, false),
+            };
+            let func =
+                ctx.get_current_module()
+                    .add_function(func_name, sig, Some(Linkage::Internal));
+            let bb = ctx.iw_context().append_basic_block(func, "");
+            let args = (0..N)
+                .map(|i| func.get_nth_param(i as u32).unwrap())
+                .collect_array()
+                .unwrap();
+
+            let curr_bb = ctx.builder().get_insert_block().unwrap();
+            let curr_func = ctx.func;
+
+            ctx.builder().position_at_end(bb);
+            ctx.func = func;
+            let ret_val = go(ctx, args)?;
+            if ctx
+                .builder()
+                .get_insert_block()
+                .unwrap()
+                .get_terminator()
+                .is_none()
+            {
+                ctx.builder()
+                    .build_return(ret_val.as_ref().map::<&dyn BasicValue, _>(|v| v))?;
+            }
+
+            ctx.builder().position_at_end(curr_bb);
+            ctx.func = curr_func;
+            func
+        }
+    };
+    let call_site =
+        ctx.builder()
+            .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
+    let result = call_site.try_as_basic_value().left();
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_func_getter() {
+        // Use TestContext for consistent test setup
+        let test_ctx = crate::test::test_ctx(-1);
+        let emit_context = test_ctx.get_emit_module_context();
+        let func_type = emit_context.iw_context().void_type().fn_type(&[], false);
+        let function = emit_context
+            .module()
+            .add_function("test_func", func_type, None);
+        let func_context = super::EmitFuncContext::new(emit_context, function).unwrap();
+
+        // Assert the getter returns the correct function
+        assert_eq!(func_context.func(), function);
+    }
 }

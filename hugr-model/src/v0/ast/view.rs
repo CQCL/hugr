@@ -91,11 +91,13 @@ impl<'a> View<'a, table::SeqPart> for SeqPart {
 
 impl<'a> View<'a, table::Symbol<'a>> for Symbol {
     fn view(module: &'a table::Module<'a>, id: table::Symbol<'a>) -> Option<Self> {
+        let visibility = id.visibility.clone();
         let name = SymbolName::new(id.name);
         let params = module.view(id.params)?;
         let constraints = module.view(id.constraints)?;
         let signature = module.view(id.signature)?;
         Some(Symbol {
+            visibility,
             name,
             params,
             constraints,

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter, defaultdict
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
@@ -50,9 +51,10 @@ BitChar = Literal["0", "1"]
 
 
 @dataclass
-class QsysShot:
+class QsysShot(Sequence):
     """Results from a single shot execution."""
 
+    #: List of tagged results, where each result is a tuple of tag and data value.
     entries: list[TaggedResult] = field(default_factory=list)
 
     def __init__(self, entries: Iterable[TaggedResult] | None = None):
@@ -119,6 +121,15 @@ class QsysShot:
             tags[tag].append(data)
         return dict(tags)
 
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def __getitem__(self, index: int | slice) -> TaggedResult | list[TaggedResult]:
+        return self.entries[index]
+
+    def __iter__(self) -> Iterator[TaggedResult]:
+        return iter(self.entries)
+
 
 @deprecated("Use QsysShot instead.")
 class HResult(QsysShot):
@@ -133,9 +144,10 @@ def _cast_primitive_bit(data: DataValue) -> BitChar:
 
 
 @dataclass
-class QsysResult:
+class QsysResult(Sequence):
     """Results accumulated over multiple shots."""
 
+    #: List of QsysShot objects, each representing a single shot's results.
     results: list[QsysShot]
 
     def __init__(
@@ -190,6 +202,15 @@ class QsysResult:
                 msg = "All shots must have the same registers."
                 raise ValueError(msg)
         return dict(shot_dct)
+
+    def __len__(self) -> int:
+        return len(self.results)
+
+    def __getitem__(self, index: int | slice) -> QsysShot | list[QsysShot]:
+        return self.results[index]
+
+    def __iter__(self) -> Iterator[QsysShot]:
+        return iter(self.results)
 
     def to_pytket(self) -> BackendResult:
         """Convert results to a pytket BackendResult.

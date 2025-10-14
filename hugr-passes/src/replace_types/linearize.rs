@@ -5,17 +5,22 @@ use hugr_core::builder::{
     HugrBuilder, inout_sig,
 };
 use hugr_core::extension::{SignatureError, TypeDef};
+use hugr_core::std_extensions::collections::array::array_type_def;
+use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
 use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
-use super::{NodeTemplate, ParametricType, handlers::linearize_value_array};
+use super::handlers::{copy_discard_array, copy_discard_borrow_array, linearize_value_array};
+use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
-/// target.  Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
+/// target.
+///
+/// Used to restore Hugr validity when a [`ReplaceTypes`](super::ReplaceTypes)
 /// results in types of such outports changing from [Copyable] to linear (i.e.
-/// [`hugr_core::types::TypeBound::Any`]).
+/// [`hugr_core::types::TypeBound::Linear`]).
 ///
 /// Note that this is not really effective before [monomorphization]: if a
 /// function polymorphic over a [Copyable] becomes called with a
@@ -52,12 +57,10 @@ pub trait Linearizer {
         src: Wire,
         targets: &[(Node, IncomingPort)],
     ) -> Result<(), LinearizeError> {
-        let sig = hugr.signature(src.node()).unwrap();
-        let typ = sig.port_type(src.source()).unwrap();
         let (tgt_node, tgt_inport) = if targets.len() == 1 {
             *targets.first().unwrap()
         } else {
-            // Fail fast if the edges are nonlocal. (TODO transform to local edges!)
+            // Fail fast if the edges are nonlocal.
             let src_parent = hugr
                 .get_parent(src.node())
                 .expect("Root node cannot have out edges");
@@ -74,11 +77,12 @@ pub trait Linearizer {
                     tgt_parent,
                 });
             }
-            let typ = typ.clone(); // Stop borrowing hugr in order to add_hugr to it
+            let sig = hugr.signature(src.node()).unwrap();
+            let typ = sig.port_type(src.source()).unwrap().clone();
             let copy_discard_op = self
                 .copy_discard_op(&typ, targets.len())?
                 .add_hugr(hugr, src_parent)
-                .map_err(|e| LinearizeError::NestedTemplateError(typ, e))?;
+                .map_err(|e| LinearizeError::NestedTemplateError(Box::new(typ), Box::new(e)))?;
             for (n, (tgt_node, tgt_port)) in targets.iter().enumerate() {
                 hugr.connect(copy_discard_op, n, *tgt_node, *tgt_port);
             }
@@ -125,6 +129,8 @@ impl Default for DelegatingLinearizer {
     fn default() -> Self {
         let mut res = Self::new_empty();
         res.register_callback(value_array_type_def(), linearize_value_array);
+        res.register_callback(array_type_def(), copy_discard_array);
+        res.register_callback(borrow_array_type_def(), copy_discard_borrow_array);
         res
     }
 }
@@ -140,15 +146,16 @@ pub struct CallbackHandler<'a>(#[allow(dead_code)] &'a DelegatingLinearizer);
 #[non_exhaustive]
 pub enum LinearizeError {
     #[error("Need copy/discard op for {_0}")]
-    NeedCopyDiscard(Type),
+    NeedCopyDiscard(Box<Type>),
     #[error("Copy/discard op for {typ} with {num_outports} outputs had wrong signature {sig:?}")]
     WrongSignature {
-        typ: Type,
+        typ: Box<Type>,
         num_outports: usize,
-        sig: Option<Signature>,
+        sig: Option<Box<Signature>>,
     },
     #[error(
-        "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent})"
+        "Cannot add nonlocal edge for linear type from {src} (with parent {src_parent}) to {tgt} (with parent {tgt_parent}).
+  Try using LocalizeEdges pass first."
     )]
     NoLinearNonLocalEdges {
         src: Node,
@@ -163,14 +170,14 @@ pub enum LinearizeError {
     /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
     /// or [Alias](TypeEnum::Alias)es.
     #[error("Cannot linearize type {_0}")]
-    UnsupportedType(Type),
+    UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
     #[error("Type {_0} is copyable")]
-    CopyableType(Type),
+    CopyableType(Box<Type>),
     /// Error may be returned by a callback for e.g. a container because it could
     /// not generate a [`NodeTemplate`] because of a problem with an element
     #[error("Could not generate NodeTemplate for contained type {0} because {1}")]
-    NestedTemplateError(Type, BuildError),
+    NestedTemplateError(Box<Type>, Box<BuildError>),
 }
 
 impl DelegatingLinearizer {
@@ -206,7 +213,7 @@ impl DelegatingLinearizer {
     ) -> Result<(), LinearizeError> {
         let typ = Type::new_extension(cty.clone());
         if typ.copyable() {
-            return Err(LinearizeError::CopyableType(typ));
+            return Err(LinearizeError::CopyableType(Box::new(typ)));
         }
         check_sig(&copy, &typ, 2)?;
         check_sig(&discard, &typ, 0)?;
@@ -247,9 +254,9 @@ impl DelegatingLinearizer {
 fn check_sig(tmpl: &NodeTemplate, typ: &Type, num_outports: usize) -> Result<(), LinearizeError> {
     tmpl.check_signature(&typ.clone().into(), &vec![typ.clone(); num_outports].into())
         .map_err(|sig| LinearizeError::WrongSignature {
-            typ: typ.clone(),
+            typ: Box::new(typ.clone()),
             num_outports,
-            sig,
+            sig: sig.map(Box::new),
         })
 }
 
@@ -260,7 +267,7 @@ impl Linearizer for DelegatingLinearizer {
         num_outports: usize,
     ) -> Result<NodeTemplate, LinearizeError> {
         if typ.copyable() {
-            return Err(LinearizeError::CopyableType(typ.clone()));
+            return Err(LinearizeError::CopyableType(Box::new(typ.clone())));
         }
         assert!(num_outports != 1);
 
@@ -338,14 +345,14 @@ impl Linearizer for DelegatingLinearizer {
                     let copy_discard_fn = self
                         .copy_discard_parametric
                         .get(&cty.into())
-                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(typ.clone()))?;
+                        .ok_or_else(|| LinearizeError::NeedCopyDiscard(Box::new(typ.clone())))?;
                     let tmpl = copy_discard_fn(cty.args(), num_outports, &CallbackHandler(self))?;
                     check_sig(&tmpl, typ, num_outports)?;
                     Ok(tmpl)
                 }
             }
             TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
-            _ => Err(LinearizeError::UnsupportedType(typ.clone())),
+            _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
 }
@@ -367,11 +374,11 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        inout_sig,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, inout_sig,
     };
 
-    use hugr_core::extension::prelude::{option_type, usize_t};
+    use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
@@ -379,23 +386,27 @@ mod test {
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
+    use hugr_core::std_extensions::collections::borrow_array::borrow_array_type;
     use hugr_core::std_extensions::collections::value_array::{
         VArrayOpDef, VArrayRepeat, VArrayScan, VArrayScanDef, value_array_type,
         value_array_type_def,
     };
     use hugr_core::types::type_param::TypeParam;
     use hugr_core::types::{
-        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeEnum, TypeRow,
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
     };
     use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
-    use crate::replace_types::{LinearizeError, NodeTemplate, ReplaceTypesError};
+    use crate::replace_types::{
+        LinearizeError, NodeTemplate, ReplaceTypesError, ReplacementOptions,
+    };
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
+    const COPY_T: &str = "Copy";
 
     struct NWayCopySigFn(Type);
     impl CustomSignatureFunc for NWayCopySigFn {
@@ -429,6 +440,16 @@ mod test {
                         .instantiate([])
                         .unwrap(),
                 );
+                e.add_type(
+                    COPY_T.into(),
+                    vec![],
+                    String::new(),
+                    TypeDefBound::copyable(),
+                    w,
+                )
+                .unwrap()
+                .instantiate([])
+                .unwrap();
                 e.add_op(
                     "discard".into(),
                     String::new(),
@@ -648,9 +669,9 @@ mod test {
         assert_eq!(
             bad_copy,
             Err(LinearizeError::WrongSignature {
-                typ: lin_t.clone(),
+                typ: Box::new(lin_t.clone()),
                 num_outports: 2,
-                sig: sig3.clone()
+                sig: sig3.clone().map(Box::new)
             })
         );
 
@@ -663,9 +684,9 @@ mod test {
         assert_eq!(
             bad_discard,
             Err(LinearizeError::WrongSignature {
-                typ: lin_t.clone(),
+                typ: Box::new(lin_t.clone()),
                 num_outports: 0,
-                sig: sig3.clone()
+                sig: sig3.clone().map(Box::new)
             })
         );
 
@@ -685,9 +706,9 @@ mod test {
             replacer.run(&mut h),
             Err(ReplaceTypesError::LinearizeError(
                 LinearizeError::WrongSignature {
-                    typ: lin_t.clone(),
+                    typ: Box::new(lin_t.clone()),
                     num_outports: 2,
-                    sig: sig3.clone()
+                    sig: sig3.clone().map(Box::new)
                 }
             ))
         );
@@ -842,14 +863,98 @@ mod test {
         let r = lower_discard_to_call.run(&mut backup.clone());
         // Note the error (or success) can be quite fragile, according to what the `discard_fn`
         // Node points at in the (hidden here) inner Hugr built by the array linearization helper.
-        assert!(matches!(
-            r,
-            Err(ReplaceTypesError::LinearizeError(
-                LinearizeError::NestedTemplateError(
-                    nested_t,
-                    BuildError::NodeNotFound { node } // Note `..` would be somewhat less fragile
+        if let Err(ReplaceTypesError::LinearizeError(LinearizeError::NestedTemplateError(
+            nested_t,
+            build_err,
+        ))) = r
+        {
+            assert_eq!(*nested_t, lin_t);
+            assert!(matches!(
+                *build_err, BuildError::NodeNotFound { node } if node == discard_fn
+            ));
+        } else {
+            panic!("Expected error");
+        }
+    }
+
+    #[test]
+    fn use_in_op_callback() {
+        let (e, mut lowerer) = ext_lowerer();
+        let drop_ext = Extension::new_arc(
+            IdentList::new_unchecked("DropExt"),
+            Version::new(0, 0, 0),
+            |e, w| {
+                e.add_op(
+                    "drop".into(),
+                    String::new(),
+                    PolyFuncTypeRV::new(
+                        [TypeBound::Linear.into()], // It won't *lower* for any type tho!
+                        Signature::new(Type::new_var_use(0, TypeBound::Linear), vec![]),
+                    ),
+                    w,
                 )
-            )) if nested_t == lin_t && node == discard_fn
-        ));
+                .unwrap();
+            },
+        );
+        let drop_op = drop_ext.get_op("drop").unwrap();
+        lowerer.replace_parametrized_op_with(
+            drop_op,
+            |args| {
+                let [TypeArg::Runtime(ty)] = args else {
+                    panic!("Expected just one type")
+                };
+                // The Hugr here is invalid, so we have to pull it out manually
+                let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+                let h = std::mem::take(dfb.hugr_mut());
+                Some(NodeTemplate::CompoundOp(Box::new(h)))
+            },
+            ReplacementOptions::default().with_linearization(true),
+        );
+
+        let build_hugr = |ty: Type| {
+            let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+            let [inp] = dfb.input_wires_arr();
+            let drop_op = drop_ext
+                .instantiate_extension_op("drop", [ty.into()])
+                .unwrap();
+            dfb.add_dataflow_op(drop_op, [inp]).unwrap();
+            dfb.finish_hugr().unwrap()
+        };
+        // We can drop a tuple of 2* lin_t
+        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
+        let mut h = build_hugr(Type::new_tuple(vec![lin_t.clone(); 2]));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert_eq!(exts.clone().count(), 2);
+        assert!(exts.all(|eo| eo.qualified_id() == "TestExt.discard"));
+
+        // We can drop a borrow array of lin_t
+        let mut h = build_hugr(borrow_array_type(4, lin_t));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+
+        // We can drop a borrow array of usize
+        let mut h = build_hugr(borrow_array_type(4, usize_t()));
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+
+        // We cannot drop a qubit
+        let mut h = build_hugr(qb_t());
+        assert_eq!(
+            lowerer.run(&mut h).unwrap_err(),
+            ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
+        );
+
+        // We cannot drop an array of qubits
+        let mut h = build_hugr(borrow_array_type(4, qb_t()));
+        assert_eq!(
+            lowerer.run(&mut h).unwrap_err(),
+            ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
+        );
     }
 }

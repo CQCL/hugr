@@ -28,13 +28,19 @@ impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
     pub fn run(&mut self) -> Result<()> {
         if self.input_args.hugr_json {
+            #[allow(deprecated)]
             let hugr = self.input_args.get_hugr()?;
+            let generator = hugr::envelope::get_generator(&[&hugr]);
+
             hugr.validate()
                 .map_err(PackageValidationError::Validation)
-                .map_err(CliError::Validate)?;
+                .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
             let package = self.input_args.get_package()?;
-            package.validate().map_err(CliError::Validate)?;
+            let generator = hugr::envelope::get_generator(&package.modules);
+            package
+                .validate()
+                .map_err(|val_err| CliError::validation(generator, val_err))?;
         };
 
         info!("{VALID_PRINT}");

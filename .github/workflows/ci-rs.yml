@@ -31,43 +31,23 @@ jobs:
   changes:
     name: Check for changes
     runs-on: ubuntu-latest
-    # Required permissions
     permissions:
       pull-requests: read
-    # Set job outputs to values from filter step
-    # These outputs are always true when running after a merge to main, or if the PR has a `run-ci-checks` label.
     outputs:
-      rust: ${{ steps.filter.outputs.rust == 'true' || steps.override.outputs.out == 'true' }}
-      python: ${{ steps.filter.outputs.python == 'true' || steps.override.outputs.out == 'true' }}
-      model: ${{ steps.filter.outputs.model == 'true' || steps.override.outputs.out == 'true' }}
-      llvm: ${{ steps.filter.outputs.llvm == 'true' || steps.override.outputs.out == 'true' }}
+      rust: ${{ steps.filter.outputs.rust }}
+      llvm: ${{ steps.filter.outputs.llvm }}
+      model: ${{ steps.filter.outputs.model }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Override label
-        id: override
-        run: |
-          echo "Label contains run-ci-checks: $OVERRIDE_LABEL"
-          if [ "$OVERRIDE_LABEL" == "true" ]; then
-            echo "Overriding due to label 'run-ci-checks'"
-            echo "out=true" >> $GITHUB_OUTPUT
-          elif [ "$DEFAULT_BRANCH" == "true" ]; then
-            echo "Overriding due to running on the default branch"
-            echo "out=true" >> $GITHUB_OUTPUT
-          fi
-        env:
-          OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
-          DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/check-changes
         id: filter
-        with:
-          filters: .github/change-filters.yml
 
   check:
     needs: changes
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -94,7 +74,7 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -110,10 +90,11 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
+          mode: instrumentation
 
   # Run tests on Rust stable
   tests-stable-no-features:
@@ -122,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -130,15 +111,15 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
-        run: cargo test --verbose  --no-default-features --no-run
+        run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: cargo nextest r --verbose  --no-default-features
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -148,7 +129,7 @@ jobs:
     name: tests (Rust stable, all features)
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -156,27 +137,27 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
-        run: cargo test --verbose  --all-features --no-run
+        run: cargo nextest r --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: cargo nextest r --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
       - name: Build hugr-persistent
         if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo test -p hugr-persistent --verbose --no-run
+        run: cargo nextest r -p hugr-persistent --verbose --no-run
       - name: Tests hugr-persistent
         if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo test -p hugr-persistent --verbose
+        run: cargo nextest r -p hugr-persistent --verbose
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -199,7 +180,7 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -207,24 +188,25 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
-        run: cargo test --verbose  --no-default-features --no-run
+        run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: cargo nextest r --verbose  --no-default-features
       - name: Build with all features
-        run: cargo test --verbose  --all-features --no-run
+        run: cargo nextest r --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: cargo nextest r --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
@@ -233,7 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install MSRV toolchain
         id: toolchain
@@ -284,9 +266,9 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Download the hugr binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug
@@ -310,7 +292,7 @@ jobs:
     name: Keep hugr-model capnp schema updated
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -342,13 +324,13 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
           # TODO: Pinned due to <https://github.com/CQCL/hugr/issues/2227>
-          toolchain: "nightly-2025-05-14"
+          toolchain: "nightly"
           components: llvm-tools-preview
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2

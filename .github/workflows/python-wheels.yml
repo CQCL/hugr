@@ -59,15 +59,15 @@ jobs:
           - runner: ubuntu-latest
             target: ppc64le
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
@@ -75,7 +75,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
@@ -101,15 +101,15 @@ jobs:
           - runner: ubuntu-latest
             target: armv7
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -117,7 +117,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -139,8 +139,8 @@ jobs:
           - runner: windows-latest
             target: x86
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
           architecture: ${{ matrix.platform.target }}
@@ -148,7 +148,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --release --strip --out ../dist
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
@@ -169,22 +169,22 @@ jobs:
           - runner: macos-14
             target: aarch64
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: 3.x
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist --find-interpreter
+          args: --release --strip --out ../dist --find-interpreter
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --release --strip --out ../dist -i python3.13t
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
@@ -198,7 +198,7 @@ jobs:
     if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build sdist
         uses: PyO3/maturin-action@v1
         with:
@@ -224,9 +224,9 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
       - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-path: 'wheels-*/*'
       - name: Publish to PyPI

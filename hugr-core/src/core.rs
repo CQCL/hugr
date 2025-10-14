@@ -34,7 +34,7 @@ pub struct Node {
 )]
 #[serde(transparent)]
 pub struct Port {
-    offset: portgraph::PortOffset,
+    offset: portgraph::PortOffset<u32>,
 }
 
 /// A trait for getting the undirected index of a port.
@@ -139,7 +139,7 @@ impl Port {
 
     /// Returns the port as a portgraph `PortOffset`.
     #[inline]
-    pub(crate) fn pg_offset(self) -> portgraph::PortOffset {
+    pub(crate) fn pg_offset(self) -> portgraph::PortOffset<u32> {
         self.offset
     }
 }
@@ -273,6 +273,46 @@ impl<N: HugrNode> Wire<N> {
 impl<N: HugrNode> std::fmt::Display for Wire<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Wire({}, {})", self.0, self.1.index)
+    }
+}
+
+/// Marks [FuncDefn](crate::ops::FuncDefn)s and [FuncDecl](crate::ops::FuncDecl)s as
+/// to whether they should be considered for linking.
+#[derive(
+    Clone,
+    Debug,
+    derive_more::Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
+#[non_exhaustive]
+pub enum Visibility {
+    /// Function is visible or exported
+    Public,
+    /// Function is hidden, for use within the hugr only
+    Private,
+}
+
+impl From<hugr_model::v0::Visibility> for Visibility {
+    fn from(value: hugr_model::v0::Visibility) -> Self {
+        match value {
+            hugr_model::v0::Visibility::Private => Self::Private,
+            hugr_model::v0::Visibility::Public => Self::Public,
+        }
+    }
+}
+
+impl From<Visibility> for hugr_model::v0::Visibility {
+    fn from(value: Visibility) -> Self {
+        match value {
+            Visibility::Public => hugr_model::v0::Visibility::Public,
+            Visibility::Private => hugr_model::v0::Visibility::Private,
+        }
     }
 }
 

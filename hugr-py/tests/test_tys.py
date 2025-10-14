@@ -4,6 +4,7 @@ import pytest
 
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
+from hugr.std.collections.borrow_array import BorrowArray, BorrowArrayVal
 from hugr.std.collections.list import List, ListVal
 from hugr.std.collections.static_array import StaticArray, StaticArrayVal
 from hugr.std.collections.value_array import ValueArray, ValueArrayVal
@@ -16,6 +17,7 @@ from hugr.tys import (
     BoundedNatParam,
     BytesArg,
     BytesParam,
+    ConstParam,
     Either,
     ExtType,
     FloatArg,
@@ -90,17 +92,18 @@ def test_tys_sum_str(ty: Type, string: str, repr_str: str):
 @pytest.mark.parametrize(
     ("param", "string"),
     [
-        (TypeTypeParam(TypeBound.Any), "Any"),
+        (TypeTypeParam(TypeBound.Linear), "Linear"),
         (BoundedNatParam(3), "Nat(3)"),
         (BoundedNatParam(None), "Nat"),
         (StringParam(), "String"),
         (FloatParam(), "Float"),
         (BytesParam(), "Bytes"),
         (
-            TupleParam([TypeTypeParam(TypeBound.Any), BoundedNatParam(3)]),
-            "(Any, Nat(3))",
+            TupleParam([TypeTypeParam(TypeBound.Linear), BoundedNatParam(3)]),
+            "(Linear, Nat(3))",
         ),
         (ListParam(StringParam()), "[String]"),
+        (ConstParam(Qubit), "Const(Qubit)"),
     ],
 )
 def test_params_str(param: TypeParam, string: str):
@@ -136,7 +139,8 @@ def test_args_str(arg: TypeArg, string: str):
         (Array(Bool, 3), "array<3, Type(Bool)>"),
         (StaticArray(Bool), "static_array<Type(Bool)>"),
         (ValueArray(Bool, 3), "value_array<3, Type(Bool)>"),
-        (Variable(2, TypeBound.Any), "$2"),
+        (BorrowArray(Bool, 3), "borrow_array<3, Type(Bool)>"),
+        (Variable(2, TypeBound.Linear), "$2"),
         (RowVariable(4, TypeBound.Copyable), "$4"),
         (USize(), "USize"),
         (INT_T, "int<5>"),
@@ -145,10 +149,10 @@ def test_args_str(arg: TypeArg, string: str):
         (FunctionType([Bool, Qubit], [Qubit, Bool]), "Bool, Qubit -> Qubit, Bool"),
         (
             PolyFuncType(
-                [TypeTypeParam(TypeBound.Any), BoundedNatParam(7)],
+                [TypeTypeParam(TypeBound.Linear), BoundedNatParam(7)],
                 FunctionType([_int_tv(1)], [Variable(0, TypeBound.Copyable)]),
             ),
-            "∀ Any, Nat(7). int<$1> -> $0",
+            "∀ Linear, Nat(7). int<$1> -> $0",
         ),
     ],
 )
@@ -179,12 +183,12 @@ def test_array():
     ls = Array(Bool, 3)
     assert ls.ty == Bool
     assert ls.size == 3
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ls = Array(ty_var, len_var)
     assert ls.ty == ty_var
     assert ls.size is None
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ar_val = ArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
@@ -192,7 +196,7 @@ def test_array():
 
 
 def test_value_array():
-    ty_var = Variable(0, TypeBound.Any)
+    ty_var = Variable(0, TypeBound.Linear)
     len_var = VariableArg(1, BoundedNatParam())
 
     ls = ValueArray(Bool, 3)
@@ -203,11 +207,30 @@ def test_value_array():
     ls = ValueArray(ty_var, len_var)
     assert ls.ty == ty_var
     assert ls.size is None
-    assert ls.type_bound() == TypeBound.Any
+    assert ls.type_bound() == TypeBound.Linear
 
     ar_val = ValueArrayVal([val.TRUE, val.FALSE], Bool)
     assert ar_val.v == [val.TRUE, val.FALSE]
     assert ar_val.ty == ValueArray(Bool, 2)
+
+
+def test_borrow_array():
+    ty_var = Variable(0, TypeBound.Copyable)
+    len_var = VariableArg(1, BoundedNatParam())
+
+    ls = BorrowArray(Bool, 3)
+    assert ls.ty == Bool
+    assert ls.size == 3
+    assert ls.type_bound() == TypeBound.Linear
+
+    ls = BorrowArray(ty_var, len_var)
+    assert ls.ty == ty_var
+    assert ls.size is None
+    assert ls.type_bound() == TypeBound.Linear
+
+    ar_val = BorrowArrayVal([val.TRUE, val.FALSE], Bool)
+    assert ar_val.v == [val.TRUE, val.FALSE]
+    assert ar_val.ty == BorrowArray(Bool, 2)
 
 
 def test_static_array():
