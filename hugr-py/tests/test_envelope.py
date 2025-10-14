@@ -30,18 +30,27 @@ def package() -> Package:
     return Package([mod.hugr, mod2.hugr])
 
 
-def test_envelope(package: Package):
-    # Binary compression roundtrip
-    for format in [
+@pytest.mark.parametrize(
+    "compression", [None, 0], ids=["compression:None", "compression:0"]
+)
+@pytest.mark.parametrize(
+    "format",
+    [
         EnvelopeFormat.JSON,
         EnvelopeFormat.MODEL,
         EnvelopeFormat.MODEL_WITH_EXTS,
-    ]:
-        for compression in [None, 0]:
-            encoded = package.to_bytes(EnvelopeConfig(format=format, zstd=compression))
-            decoded = Package.from_bytes(encoded)
-            assert decoded == package
+    ],
+)
+def test_envelope_binary(
+    package: Package, compression: int | None, format: EnvelopeFormat
+):
+    # Binary compression roundtrip
+    encoded = package.to_bytes(EnvelopeConfig(format=format, zstd=compression))
+    decoded = Package.from_bytes(encoded)
+    assert decoded == package
 
+
+def test_envelope_text(package: Package):
     # String roundtrip
     encoded_str = package.to_str(EnvelopeConfig.TEXT)
     decoded = Package.from_str(encoded_str)
