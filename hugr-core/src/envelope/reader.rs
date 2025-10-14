@@ -143,21 +143,14 @@ impl<R: BufRead> EnvelopeReader<R> {
             modules,
             extensions: pkg_extensions,
         } = serde_json::from_value(val.clone())?;
-        let mut modules = modules.into_iter().map(|h| h.0).collect_vec();
+        let modules = modules.into_iter().map(|h| h.0).collect_vec();
         let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
             pkg_extensions,
             &crate::extension::resolution::WeakExtensionRegistry::from(&self.registry),
-        )
-        .map_err(|err| WithGenerator::new(err, &modules))?;
+        )?;
 
         // Resolve the operations in the modules using the defined registries.
         self.register_packaged(&pkg_extensions);
-
-        modules
-            .iter_mut()
-            .try_for_each(|module| module.resolve_extension_defs(&self.registry))
-            .map_err(|err| WithGenerator::new(err, &modules))?;
-
         Ok(Package {
             modules,
             extensions: pkg_extensions,
