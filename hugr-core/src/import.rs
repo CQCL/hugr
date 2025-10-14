@@ -1658,7 +1658,7 @@ impl<'a> Context<'a> {
     /// Import a [`Signature`] or [`FuncValueType`].
     ///
     /// When importing a [`Signature`] the lists of input and output types need
-    /// to be closed. In constrast [`FuncValueType`] admits importing open lists
+    /// to be closed. In contrast [`FuncValueType`] admits importing open lists
     /// of input and output types via "row variables".
     ///
     /// Function types are not special-cased in `hugr-model` but are represented
@@ -1980,19 +1980,19 @@ impl<'a> Context<'a> {
             let items = values
                 .iter()
                 .zip(variant.iter())
-                .map(|(value, typ)| self.import_value(*value, *typ))
+                .map(|(value, ty)| self.import_value(*value, *ty))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let typ = {
+            let ty = {
                 // TODO: Import as a `SumType` directly and avoid the copy.
-                let typ: Type = self.import_type(type_id)?;
-                match typ.as_type_enum() {
+                let ty: Type = self.import_type(type_id)?;
+                match ty.as_type_enum() {
                     TypeEnum::Sum(sum) => sum.clone(),
                     _ => unreachable!(),
                 }
             };
 
-            return Ok(Value::sum(*tag as _, items, typ).unwrap());
+            return Ok(Value::sum(*tag as _, items, ty).unwrap());
         }
 
         match term_data {
