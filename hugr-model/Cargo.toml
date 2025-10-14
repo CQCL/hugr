@@ -22,15 +22,16 @@ capnp = { workspace = true }
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 indexmap.workspace = true
 itertools.workspace = true
-ordered-float = { workspace = true }
+ordered-float = { workspace = true, features = ["arbitrary"] }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 pretty = { workspace = true }
 rustc-hash.workspace = true
 semver = { workspace = true }
-smol_str = { workspace = true, features = ["serde"] }
+smol_str = { workspace = true, features = ["serde", "arbitrary"] }
 thiserror.workspace = true
 pyo3 = { workspace = true, optional = true, features = ["extension-module"] }
+arbitrary = { version = "1", optional = true, features = ["derive"] }
 
 [features]
 pyo3 = ["dep:pyo3"]
