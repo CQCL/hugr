@@ -111,9 +111,16 @@ impl<R: BufRead> EnvelopeReader<R> {
             }
         };
 
-        for module in package.modules.iter_mut() {
+        for (index, module) in package.modules.iter_mut().enumerate() {
+            // overwrite the description with the actual module read,
+            // cheap so ok to repeat.
+            self.description.set_module(index, &module);
             check_breaking_extensions(&module)?;
             module.resolve_extension_defs(&self.registry)?;
+        }
+
+        for (index, ext) in package.extensions.iter().enumerate() {
+            self.description.set_packaged_extension(index, ext);
         }
         Ok(package)
     }
