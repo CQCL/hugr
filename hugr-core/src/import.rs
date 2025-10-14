@@ -1093,7 +1093,9 @@ impl<'a> Context<'a> {
         ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
             let func_name = ctx.import_title_metadata(node_id)?.unwrap_or(symbol.name);
-
+            if visibility == model::Visibility::Public {
+                ctx.description.extend_public_symbols([func_name.into()]);
+            }
             let optype =
                 OpType::FuncDefn(FuncDefn::new_vis(func_name, signature, visibility.into()));
 
@@ -1124,7 +1126,9 @@ impl<'a> Context<'a> {
         ))?;
         self.import_poly_func_type(node_id, *symbol, |ctx, signature| {
             let func_name = ctx.import_title_metadata(node_id)?.unwrap_or(symbol.name);
-
+            if visibility == model::Visibility::Public {
+                ctx.description.extend_public_symbols([func_name.into()]);
+            }
             let optype =
                 OpType::FuncDecl(FuncDecl::new_vis(func_name, signature, visibility.into()));
             let node = ctx.make_node(node_id, optype, parent)?;

@@ -126,6 +126,13 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
     }
 }
 
+fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterator<Item = T>) {
+    if let Some(existing) = vec {
+        existing.extend(items);
+    } else {
+        vec.replace(items.into_iter().collect());
+    }
+}
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ModuleDesc {
     /// Generator specified in the module metadata.
@@ -148,14 +155,29 @@ impl ModuleDesc {
     ) {
         self.used_extensions_metadata = Some(used_extensions_metadata.into_iter().collect());
     }
+    pub fn extend_used_extensions_metadata(
+        &mut self,
+        exts: impl IntoIterator<Item = ExtensionDesc>,
+    ) {
+        extend_option_vec(&mut self.used_extensions_metadata, exts);
+    }
     pub fn set_used_extensions_resolved(
         &mut self,
         used_extensions_resolved: impl IntoIterator<Item = ExtensionDesc>,
     ) {
         self.used_extensions_resolved = Some(used_extensions_resolved.into_iter().collect());
     }
-    pub fn set_public_symbols(&mut self, public_symbols: Vec<String>) {
-        self.public_symbols = Some(public_symbols);
+    pub fn extend_used_extensions_resolved(
+        &mut self,
+        exts: impl IntoIterator<Item = ExtensionDesc>,
+    ) {
+        extend_option_vec(&mut self.used_extensions_resolved, exts);
+    }
+    pub fn set_public_symbols(&mut self, symbols: impl IntoIterator<Item = String>) {
+        self.public_symbols = Some(symbols.into_iter().collect());
+    }
+    pub fn extend_public_symbols(&mut self, symbols: impl IntoIterator<Item = String>) {
+        extend_option_vec(&mut self.public_symbols, symbols);
     }
 
     pub fn load_generator(&mut self, hugr: &impl HugrView) {
