@@ -6,15 +6,17 @@ use itertools::{Either, Itertools as _};
 
 use crate::envelope::description::PackageDesc;
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
-use crate::envelope::{EnvelopeError, EnvelopeHeader, ExtensionBreakingError};
-use crate::extension::resolution::ExtensionResolutionError;
-use crate::extension::{Extension, ExtensionRegistry};
-use crate::import::import_described_hugr;
+use crate::envelope::{
+    EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
+};
+use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
+use crate::extension::{Extension, ExtensionRegistry, ExtensionRegistryLoadError};
+use crate::import::{ImportError, import_described_hugr};
 use crate::package::Package;
 
 use super::{
-    ModelBinaryReadError, ModelTextReadError, WithGenerator, check_breaking_extensions,
-    check_model_version, package_json::PackageEncodingError,
+    WithGenerator, check_breaking_extensions, check_model_version,
+    package_json::PackageEncodingError,
 };
 use thiserror::Error;
 
@@ -154,7 +156,7 @@ impl<R: BufRead> EnvelopeReader<R> {
         let modules = modules.into_iter().map(|h| h.0).collect_vec();
         let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
             pkg_extensions,
-            &crate::extension::resolution::WeakExtensionRegistry::from(&self.registry),
+            &WeakExtensionRegistry::from(&self.registry),
         )?;
 
         // Resolve the operations in the modules using the defined registries.
@@ -259,39 +261,6 @@ enum PayloadErrorInner {
     /// Error resolving extensions while decoding the payload.
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
-
-impl From<ModelTextReadError> for EnvelopeError {
-    fn from(value: ModelTextReadError) -> Self {
-        match value {
-            ModelTextReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelTextReadError::ParseString(e) => e.into(),
-            ModelTextReadError::Import(e) => e.into(),
-            ModelTextReadError::ExtensionLoad(e) => e.into(),
-            ModelTextReadError::ExtensionDeserialize(e) => e.into(),
-            ModelTextReadError::StringRead(e) => e.into(),
-            ModelTextReadError::ResolveError(e) => e.into(),
-        }
-    }
-}
-
-impl From<ModelBinaryReadError> for EnvelopeError {
-    fn from(value: ModelBinaryReadError) -> Self {
-        match value {
-            ModelBinaryReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelBinaryReadError::ParseString(e) => e.into(),
-            ModelBinaryReadError::ReadBinary(e) => e.into(),
-            ModelBinaryReadError::Import(e) => e.into(),
-            ModelBinaryReadError::Extensions(e) => e.into(),
-        }
-    }
-}
-
 impl From<PayloadError> for EnvelopeError {
     fn from(value: PayloadError) -> Self {
         match value.0 {
@@ -311,5 +280,58 @@ impl From<PayloadError> for EnvelopeError {
 impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
     fn from(value: T) -> Self {
         Self(value.into())
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+enum ModelTextReadError {
+    ParseString(#[from] hugr_model::v0::ast::ParseError),
+    Import(#[from] ImportError),
+    ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
+    FormatUnsupported(#[from] FormatUnsupportedError),
+    ExtensionDeserialize(#[from] serde_json::Error),
+    StringRead(#[from] std::io::Error),
+    ResolveError(#[from] hugr_model::v0::ast::ResolveError),
+}
+impl From<ModelTextReadError> for EnvelopeError {
+    fn from(value: ModelTextReadError) -> Self {
+        match value {
+            ModelTextReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
+                format: e.format,
+                feature: e.feature,
+            },
+            ModelTextReadError::ParseString(e) => e.into(),
+            ModelTextReadError::Import(e) => e.into(),
+            ModelTextReadError::ExtensionLoad(e) => e.into(),
+            ModelTextReadError::ExtensionDeserialize(e) => e.into(),
+            ModelTextReadError::StringRead(e) => e.into(),
+            ModelTextReadError::ResolveError(e) => e.into(),
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+#[error(transparent)]
+enum ModelBinaryReadError {
+    ParseString(#[from] hugr_model::v0::ast::ParseError),
+    ReadBinary(#[from] hugr_model::v0::binary::ReadError),
+    Import(#[from] ImportError),
+    Extensions(#[from] crate::extension::ExtensionRegistryLoadError),
+    FormatUnsupported(#[from] FormatUnsupportedError),
+}
+
+impl From<ModelBinaryReadError> for EnvelopeError {
+    fn from(value: ModelBinaryReadError) -> Self {
+        match value {
+            ModelBinaryReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
+                format: e.format,
+                feature: e.feature,
+            },
+            ModelBinaryReadError::ParseString(e) => e.into(),
+            ModelBinaryReadError::ReadBinary(e) => e.into(),
+            ModelBinaryReadError::Import(e) => e.into(),
+            ModelBinaryReadError::Extensions(e) => e.into(),
+        }
     }
 }

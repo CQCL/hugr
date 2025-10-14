@@ -313,15 +313,6 @@ pub enum EnvelopeError {
     ExtensionLoading(#[from] ExtensionResolutionError),
 }
 
-#[derive(Debug, Error)]
-#[error(transparent)]
-enum ModelBinaryReadError {
-    ParseString(#[from] hugr_model::v0::ast::ParseError),
-    ReadBinary(#[from] hugr_model::v0::binary::ReadError),
-    Import(#[from] ImportError),
-    Extensions(#[from] crate::extension::ExtensionRegistryLoadError),
-    FormatUnsupported(#[from] FormatUnsupportedError),
-}
 
 #[derive(Debug, Error)]
 #[error(
@@ -348,17 +339,7 @@ fn check_model_version(format: EnvelopeFormat) -> Result<(), FormatUnsupportedEr
     Ok(())
 }
 
-#[derive(Debug, Error)]
-#[error(transparent)]
-enum ModelTextReadError {
-    ParseString(#[from] hugr_model::v0::ast::ParseError),
-    Import(#[from] ImportError),
-    ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
-    FormatUnsupported(#[from] FormatUnsupportedError),
-    ExtensionDeserialize(#[from] serde_json::Error),
-    StringRead(#[from] std::io::Error),
-    ResolveError(#[from] hugr_model::v0::ast::ResolveError),
-}
+
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
 fn write_impl<'h>(
     writer: impl Write,
