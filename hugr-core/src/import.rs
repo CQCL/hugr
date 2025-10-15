@@ -1140,12 +1140,12 @@ impl<'a> Context<'a> {
 
     /// Import a node with a custom operation.
     ///
-    /// A custom operation in `hugr-model` referred to by a symbol application
-    /// term. The name of the symbol specifies the name of the custom operation,
-    /// and the arguments supplied to the symbol are the arguments to be passed
-    /// to the custom operation. This method imports the custom operations as
-    /// [`OpaqueOp`]s. The [`OpaqueOp`]s are then resolved later against the
-    /// [`ExtensionRegistry`].
+    /// A custom operation in `hugr-model` is referred to by a symbol
+    /// application term. The name of the symbol specifies the name of the
+    /// custom operation, and the arguments supplied to the symbol are the
+    /// arguments to be passed to the custom operation. This method imports the
+    /// custom operations as [`OpaqueOp`]s. The [`OpaqueOp`]s are then resolved
+    /// later against the [`ExtensionRegistry`].
     ///
     /// Some operations that needed to be builtins in `hugr-core` are custom
     /// operations in `hugr-model`. This method detects these and converts them
