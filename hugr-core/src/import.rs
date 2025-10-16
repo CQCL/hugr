@@ -261,6 +261,7 @@ pub(crate) fn import_described_hugr(
     if let Some(exts) = get_used_exts(&ctx) {
         ctx.description.set_used_extensions_metadata(exts);
     }
+    ctx.description.set_num_nodes(module.nodes.len());
     let import_steps: [fn(&mut Context) -> _; 3] = [
         |ctx| ctx.import_root(),
         |ctx| ctx.link_ports(),

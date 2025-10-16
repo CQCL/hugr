@@ -147,6 +147,8 @@ pub struct GeneratorMetadata {
 }
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ModuleDesc {
+    /// Number of nodes in the module.
+    pub num_nodes: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
     pub entrypoint: Option<(Node, OpType)>,
     /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
@@ -160,6 +162,9 @@ pub struct ModuleDesc {
 }
 
 impl ModuleDesc {
+    pub fn set_num_nodes(&mut self, num_nodes: usize) {
+        self.num_nodes = Some(num_nodes);
+    }
     pub fn set_entrypoint(&mut self, node: Node, optype: OpType) {
         self.entrypoint = Some((node, optype));
     }
@@ -244,7 +249,11 @@ impl ModuleDesc {
         self.set_entrypoint(node, hugr.get_optype(node).clone());
     }
 
+    pub fn load_num_nodes(&mut self, hugr: &impl HugrView) {
+        self.set_num_nodes(hugr.num_nodes());
+    }
     fn load_from_hugr(&mut self, hugr: &impl HugrView<Node = Node>) {
+        self.load_num_nodes(hugr);
         self.load_entrypoint(hugr);
         self.load_generator(hugr);
         self.load_used_extensions_metadata(hugr);
@@ -261,17 +270,7 @@ impl<H: HugrView<Node = Node>> From<&H> for ModuleDesc {
     }
 }
 
-// impl std::fmt::Display for PackageDesc {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         todo!()
-//     }
-// }
-
-// impl std::fmt::Display for ModuleDesc {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         todo!()
-//     }
-// }
+// TODO centralise all core metadata keys in one place.
 
 /// Key used to store the name of the generator that produced the envelope.
 pub const GENERATOR_KEY: &str = "core.generator";
