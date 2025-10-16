@@ -313,7 +313,6 @@ pub enum EnvelopeError {
     ExtensionLoading(#[from] ExtensionResolutionError),
 }
 
-
 #[derive(Debug, Error)]
 #[error(
     "The envelope format {format} is not supported.{}",
@@ -338,7 +337,6 @@ fn check_model_version(format: EnvelopeFormat) -> Result<(), FormatUnsupportedEr
     }
     Ok(())
 }
-
 
 /// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
 fn write_impl<'h>(

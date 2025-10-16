@@ -115,11 +115,11 @@ impl<R: BufRead> EnvelopeReader<R> {
         };
 
         for (index, module) in package.modules.iter_mut().enumerate() {
+            check_breaking_extensions(&module)?;
+            module.resolve_extension_defs(&self.registry)?;
             // overwrite the description with the actual module read,
             // cheap so ok to repeat.
             self.description.set_module(index, &module);
-            check_breaking_extensions(&module)?;
-            module.resolve_extension_defs(&self.registry)?;
         }
 
         for (index, ext) in package.extensions.iter().enumerate() {
@@ -226,9 +226,9 @@ impl<R: BufRead> EnvelopeReader<R> {
             .iter()
             .enumerate()
             .map(|(index, module)| {
-                let (desc, module) = import_described_hugr(module, &self.registry);
+                let (desc, result) = import_described_hugr(module, &self.registry);
                 self.description.set_module(index, desc);
-                module
+                result
             })
             .collect::<Result<Vec<_>, _>>()?;
 

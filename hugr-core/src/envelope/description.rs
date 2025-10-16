@@ -1,5 +1,7 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
-use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType};
+use semver::Version;
+
+use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType, types::Signature};
 
 #[derive(Clone, Debug, PartialEq)]
 struct PartialVec<T> {
@@ -43,13 +45,13 @@ pub trait MergeDescriptions {
 }
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PackageDesc {
-    pub header: EnvelopeHeader,
+    pub(super) header: EnvelopeHeader,
     modules: PartialVec<ModuleDesc>,
     packaged_extensions: PartialVec<ExtensionDesc>,
 }
 
 impl PackageDesc {
-    pub(crate) fn new(header: EnvelopeHeader) -> Self {
+    pub(super) fn new(header: EnvelopeHeader) -> Self {
         Self {
             header,
             ..Default::default()
@@ -57,6 +59,10 @@ impl PackageDesc {
     }
     pub(crate) fn set_n_modules(&mut self, n: usize) {
         self.modules.set_len(n);
+    }
+
+    pub fn header(&self) -> String {
+        self.header.to_string()
     }
     pub fn n_modules(&self) -> usize {
         self.modules.len()
@@ -111,14 +117,14 @@ pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
-    pub version: String,
+    pub version: Version,
 }
 
 impl ExtensionDesc {
-    pub fn new(name: impl ToString, version: impl ToString) -> Self {
+    pub fn new(name: impl ToString, version: impl Into<Version>) -> Self {
         Self {
             name: name.to_string(),
-            version: version.to_string(),
+            version: version.into(),
         }
     }
 }
@@ -128,7 +134,7 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
         let ext = ext.as_ref();
         Self {
             name: ext.name.to_string(),
-            version: ext.version.to_string(),
+            version: ext.version.clone(),
         }
     }
 }
@@ -224,7 +230,7 @@ impl ModuleDesc {
         self.set_used_extensions_resolved(
             hugr.extensions()
                 .iter()
-                .map(|ext| ExtensionDesc::new(&ext.name, &ext.version)),
+                .map(|ext| ExtensionDesc::new(&ext.name, ext.version.clone())),
         )
     }
 
@@ -233,10 +239,10 @@ impl ModuleDesc {
             .children(hugr.module_root())
             .filter_map(|n| match hugr.get_optype(n) {
                 OpType::FuncDecl(decl) if *decl.visibility() == crate::Visibility::Public => {
-                    Some(decl.func_name().to_string())
+                    Some(func_symbol(decl.func_name(), decl.signature()))
                 }
                 OpType::FuncDefn(defn) if *defn.visibility() == crate::Visibility::Public => {
-                    Some(defn.func_name().to_string())
+                    Some(func_symbol(defn.func_name(), defn.signature()))
                 }
                 _ => None,
             });
@@ -262,6 +268,9 @@ impl ModuleDesc {
     }
 }
 
+fn func_symbol(name: &str, signature: &crate::types::PolyFuncType) -> String {
+    format!("{name}: {}", signature)
+}
 impl<H: HugrView<Node = Node>> From<&H> for ModuleDesc {
     fn from(hugr: &H) -> Self {
         let mut desc = ModuleDesc::default();
