@@ -1,5 +1,5 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
-use crate::{HugrView, envelope::EnvelopeHeader, ops::OpType};
+use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType};
 
 #[derive(Clone, Debug, PartialEq)]
 struct PartialVec<T> {
@@ -49,25 +49,25 @@ pub struct PackageDesc {
 }
 
 impl PackageDesc {
-    pub fn new(header: EnvelopeHeader) -> Self {
+    pub(crate) fn new(header: EnvelopeHeader) -> Self {
         Self {
             header,
             ..Default::default()
         }
     }
-    pub fn set_n_modules(&mut self, n: usize) {
+    pub(crate) fn set_n_modules(&mut self, n: usize) {
         self.modules.set_len(n);
     }
     pub fn n_modules(&self) -> usize {
         self.modules.len()
     }
-    pub fn set_module(&mut self, index: usize, module: impl Into<ModuleDesc>) {
+    pub(crate) fn set_module(&mut self, index: usize, module: impl Into<ModuleDesc>) {
         self.modules.set_index(index, module.into());
     }
-    pub fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
+    pub(crate) fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
         self.packaged_extensions.set_index(index, ext.into());
     }
-    pub fn set_n_packaged_extensions(&mut self, n: usize) {
+    pub(crate) fn set_n_packaged_extensions(&mut self, n: usize) {
         self.packaged_extensions.set_len(n);
     }
     pub fn n_packaged_extensions(&self) -> usize {
@@ -87,6 +87,13 @@ impl PackageDesc {
         }
 
         Some(generators.join(", "))
+    }
+    pub fn modules(&self) -> impl Iterator<Item = &Option<ModuleDesc>> {
+        self.modules.vec.iter()
+    }
+
+    pub fn packaged_extensions(&self) -> impl Iterator<Item = &Option<ExtensionDesc>> {
+        self.packaged_extensions.vec.iter()
     }
 }
 
@@ -134,18 +141,28 @@ fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterato
     }
 }
 #[derive(Debug, Clone, PartialEq, Default)]
+pub struct GeneratorMetadata {
+    pub identifier: Option<String>,
+    pub used_extensions: Option<Vec<ExtensionDesc>>,
+}
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ModuleDesc {
+    /// The entrypoint node and the corresponding operation type.
+    pub entrypoint: Option<(Node, OpType)>,
+    /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
+    pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Generator specified in the module metadata.
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
     pub used_extensions_metadata: Option<Vec<ExtensionDesc>>,
-    /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
-    pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Public symbols defined in the module.
     pub public_symbols: Option<Vec<String>>,
 }
 
 impl ModuleDesc {
+    pub fn set_entrypoint(&mut self, node: Node, optype: OpType) {
+        self.entrypoint = Some((node, optype));
+    }
     pub fn set_generator(&mut self, generator: impl Into<String>) {
         self.generator = Some(generator.into());
     }
@@ -195,15 +212,14 @@ impl ModuleDesc {
             // TODO don't fail silently
             return;
         };
-        self.used_extensions_metadata = Some(used_exts);
+        self.set_used_extensions_metadata(used_exts);
     }
 
     pub fn load_used_extensions_resolved(&mut self, hugr: &impl HugrView) {
-        self.used_extensions_resolved = Some(
+        self.set_used_extensions_resolved(
             hugr.extensions()
                 .iter()
-                .map(|ext| ExtensionDesc::new(&ext.name, &ext.version))
-                .collect(),
+                .map(|ext| ExtensionDesc::new(&ext.name, &ext.version)),
         )
     }
 
@@ -218,13 +234,18 @@ impl ModuleDesc {
                     Some(defn.func_name().to_string())
                 }
                 _ => None,
-            })
-            .collect();
+            });
 
-        self.public_symbols = Some(symbols);
+        self.set_public_symbols(symbols);
     }
 
-    fn load_from_hugr(&mut self, hugr: &impl HugrView) {
+    pub fn load_entrypoint(&mut self, hugr: &impl HugrView<Node = Node>) {
+        let node = hugr.entrypoint();
+        self.set_entrypoint(node, hugr.get_optype(node).clone());
+    }
+
+    fn load_from_hugr(&mut self, hugr: &impl HugrView<Node = Node>) {
+        self.load_entrypoint(hugr);
         self.load_generator(hugr);
         self.load_used_extensions_metadata(hugr);
         self.load_used_extensions_resolved(hugr);
@@ -232,7 +253,7 @@ impl ModuleDesc {
     }
 }
 
-impl<H: HugrView> From<&H> for ModuleDesc {
+impl<H: HugrView<Node = Node>> From<&H> for ModuleDesc {
     fn from(hugr: &H) -> Self {
         let mut desc = ModuleDesc::default();
         desc.load_from_hugr(hugr);
@@ -240,17 +261,17 @@ impl<H: HugrView> From<&H> for ModuleDesc {
     }
 }
 
-impl std::fmt::Display for PackageDesc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
+// impl std::fmt::Display for PackageDesc {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         todo!()
+//     }
+// }
 
-impl std::fmt::Display for ModuleDesc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
+// impl std::fmt::Display for ModuleDesc {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         todo!()
+//     }
+// }
 
 /// Key used to store the name of the generator that produced the envelope.
 pub const GENERATOR_KEY: &str = "core.generator";

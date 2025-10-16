@@ -376,6 +376,7 @@ impl<'a> Context<'a> {
         // Set the entrypoint
         if let Some([]) = self.match_symbol(meta_item, model::CORE_ENTRYPOINT)? {
             self.hugr.set_entrypoint(node);
+            self.description.load_entrypoint(&self.hugr);
         }
 
         Ok(())
