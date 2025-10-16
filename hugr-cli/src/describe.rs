@@ -123,7 +123,7 @@ impl DescribeArgs {
 
         match (
             args.generator_used_extensions,
-            desc.used_extensions_metadata,
+            desc.used_extensions_generator,
         ) {
             (true, Some(exts)) => {
                 let ext_rows: Vec<ExtensionRow> = exts.iter().cloned().map(Into::into).collect();

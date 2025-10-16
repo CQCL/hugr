@@ -1,10 +1,11 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
 use semver::Version;
 
-use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType, types::Signature};
+use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 struct PartialVec<T> {
+    #[serde(flatten)]
     vec: Vec<Option<T>>,
 }
 impl<T> Default for PartialVec<T> {
@@ -40,14 +41,19 @@ impl<T: Clone> PartialVec<T> {
     }
 }
 
-pub trait MergeDescriptions {
-    fn merge(self, other: Self) -> Self;
-}
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
 pub struct PackageDesc {
+    #[serde(serialize_with = "header_serialize")]
     pub(super) header: EnvelopeHeader,
     modules: PartialVec<ModuleDesc>,
     packaged_extensions: PartialVec<ExtensionDesc>,
+}
+
+fn header_serialize<S>(header: &EnvelopeHeader, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&header.to_string())
 }
 
 impl PackageDesc {
@@ -103,14 +109,6 @@ impl PackageDesc {
     }
 }
 
-impl MergeDescriptions for PackageDesc {
-    fn merge(mut self, other: Self) -> Self {
-        self.modules.merge(other.modules);
-        self.packaged_extensions.merge(other.packaged_extensions);
-        self
-    }
-}
-
 #[derive(derive_more::Display, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[display("Extension {name} v{version}")]
 pub struct ExtensionDesc {
@@ -146,12 +144,8 @@ fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterato
         vec.replace(items.into_iter().collect());
     }
 }
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct GeneratorMetadata {
-    pub identifier: Option<String>,
-    pub used_extensions: Option<Vec<ExtensionDesc>>,
-}
-#[derive(Debug, Clone, PartialEq, Default)]
+
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
 pub struct ModuleDesc {
     /// Number of nodes in the module.
     pub num_nodes: Option<usize>,
@@ -162,7 +156,7 @@ pub struct ModuleDesc {
     /// Generator specified in the module metadata.
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
-    pub used_extensions_metadata: Option<Vec<ExtensionDesc>>,
+    pub used_extensions_generator: Option<Vec<ExtensionDesc>>,
     /// Public symbols defined in the module.
     pub public_symbols: Option<Vec<String>>,
 }
@@ -177,17 +171,17 @@ impl ModuleDesc {
     pub fn set_generator(&mut self, generator: impl Into<String>) {
         self.generator = Some(generator.into());
     }
-    pub fn set_used_extensions_metadata(
+    pub fn set_used_extensions_generator(
         &mut self,
         used_extensions_metadata: impl IntoIterator<Item = ExtensionDesc>,
     ) {
-        self.used_extensions_metadata = Some(used_extensions_metadata.into_iter().collect());
+        self.used_extensions_generator = Some(used_extensions_metadata.into_iter().collect());
     }
     pub fn extend_used_extensions_metadata(
         &mut self,
         exts: impl IntoIterator<Item = ExtensionDesc>,
     ) {
-        extend_option_vec(&mut self.used_extensions_metadata, exts);
+        extend_option_vec(&mut self.used_extensions_generator, exts);
     }
     pub fn set_used_extensions_resolved(
         &mut self,
@@ -214,7 +208,7 @@ impl ModuleDesc {
         }
     }
 
-    pub fn load_used_extensions_metadata(&mut self, hugr: &impl HugrView) {
+    pub fn load_used_extensions_generator(&mut self, hugr: &impl HugrView) {
         let Some(exts) = hugr.get_metadata(hugr.module_root(), USED_EXTENSIONS_KEY) else {
             return; // No used extensions metadata, nothing to check
         };
@@ -223,7 +217,7 @@ impl ModuleDesc {
             // TODO don't fail silently
             return;
         };
-        self.set_used_extensions_metadata(used_exts);
+        self.set_used_extensions_generator(used_exts);
     }
 
     pub fn load_used_extensions_resolved(&mut self, hugr: &impl HugrView) {
@@ -262,7 +256,7 @@ impl ModuleDesc {
         self.load_num_nodes(hugr);
         self.load_entrypoint(hugr);
         self.load_generator(hugr);
-        self.load_used_extensions_metadata(hugr);
+        self.load_used_extensions_generator(hugr);
         self.load_used_extensions_resolved(hugr);
         self.load_public_symbols(hugr);
     }
