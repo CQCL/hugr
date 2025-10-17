@@ -4,8 +4,8 @@ use semver::Version;
 use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType};
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(transparent)]
 struct PartialVec<T> {
-    #[serde(flatten)]
     vec: Vec<Option<T>>,
 }
 impl<T> Default for PartialVec<T> {
@@ -145,12 +145,45 @@ fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterato
     }
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Entrypoint {
+    pub node: Node,
+    #[serde(serialize_with = "op_serialize")]
+    pub optype: OpType,
+}
+
+impl Entrypoint {
+    pub fn new(node: Node, optype: OpType) -> Self {
+        Self { node, optype }
+    }
+}
+
+pub fn op_string(op: &OpType) -> String {
+    match op {
+        OpType::FuncDefn(defn) => format!(
+            "FuncDefn({})",
+            func_symbol(defn.func_name(), defn.signature())
+        ),
+        OpType::FuncDecl(decl) => format!(
+            "FuncDecl({})",
+            func_symbol(decl.func_name(), decl.signature())
+        ),
+        _ => format!("{op}"),
+    }
+}
+fn op_serialize<S>(op_type: &OpType, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(op_string(op_type).as_str())
+}
+
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
 pub struct ModuleDesc {
     /// Number of nodes in the module.
     pub num_nodes: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
-    pub entrypoint: Option<(Node, OpType)>,
+    pub entrypoint: Option<Entrypoint>,
     /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
     pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Generator specified in the module metadata.
@@ -166,7 +199,7 @@ impl ModuleDesc {
         self.num_nodes = Some(num_nodes);
     }
     pub fn set_entrypoint(&mut self, node: Node, optype: OpType) {
-        self.entrypoint = Some((node, optype));
+        self.entrypoint = Some(Entrypoint::new(node, optype));
     }
     pub fn set_generator(&mut self, generator: impl Into<String>) {
         self.generator = Some(generator.into());

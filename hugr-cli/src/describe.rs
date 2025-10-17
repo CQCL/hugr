@@ -4,6 +4,7 @@ use std::io::BufReader;
 use crate::hugr_io::HugrInputArgs;
 use anyhow::Result;
 use clap::Parser;
+use clio::Output;
 use hugr::NodeIndex;
 use hugr::envelope::EnvelopeReader;
 use hugr::envelope::description::{ExtensionDesc, ModuleDesc};
@@ -29,6 +30,14 @@ pub struct DescribeArgs {
     #[command(flatten)]
     /// Configure module description
     pub module_args: ModuleArgs,
+
+    #[arg(long, default_value = "false")]
+    /// Output in json format
+    pub json: bool,
+
+    /// Output file. Use '-' for stdout.
+    #[clap(short, long, value_parser, default_value = "-")]
+    pub output: Output,
 }
 
 /// Arguments for reading a HUGR input.
@@ -62,7 +71,10 @@ impl DescribeArgs {
         let buffer = BufReader::new(&mut self.input_args.input);
 
         let (desc, res) = EnvelopeReader::new(buffer, &extensions)?.read();
-
+        if self.json {
+            serde_json::to_writer_pretty(&mut self.output, &desc)?;
+            return Ok(());
+        }
         if let Err(err) = res {
             eprintln!("{err}");
 
@@ -172,18 +184,13 @@ struct ModuleSummary {
     generator: Option<String>,
 }
 
-fn op_string(op: OpType) -> String {
-    match op {
-        OpType::FuncDefn(defn) => format!("FuncDefn({})", defn.func_name()),
-        OpType::FuncDecl(decl) => format!("FuncDecl({})", decl.func_name()),
-        _ => format!("{op}"),
-    }
-}
-
 impl From<ModuleDesc> for ModuleSummary {
     fn from(desc: ModuleDesc) -> Self {
-        let (entrypoint_node, entrypoint_op) = if let Some((n, op)) = desc.entrypoint {
-            (Some(n.index()), Some(op_string(op)))
+        let (entrypoint_node, entrypoint_op) = if let Some(ep) = desc.entrypoint {
+            (
+                Some(ep.node.index()),
+                Some(hugr::envelope::description::op_string(&ep.optype)),
+            )
         } else {
             (None, None)
         };
