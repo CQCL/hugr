@@ -28,3 +28,6 @@ precise-builds = true
 
 tag-namespace = "hugr-cli-v"
 create-release = false
+
+# for testing only
+pr-run-mode = "upload"
