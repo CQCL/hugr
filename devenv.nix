@@ -20,6 +20,7 @@ in
       pkgs.graphviz
       pkgs.cargo-insta
       pkgs.cargo-nextest
+      pkgs.cargo-dist
       pkgs.capnproto
 
       # These are required for hugr-llvm to be able to link to llvm.
