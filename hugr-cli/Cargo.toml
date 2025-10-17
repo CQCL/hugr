@@ -21,6 +21,7 @@ clap-verbosity-flag.workspace = true
 derive_more = { workspace = true, features = ["display", "error", "from"] }
 hugr = { path = "../hugr", version = "0.24.0" }
 serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
 clio = { workspace = true, features = ["clap-parse"] }
 anyhow.workspace = true
 thiserror.workspace = true

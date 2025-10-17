@@ -27,7 +27,7 @@ const ZSTD_FLAG: u8 = 0b0000_0001;
 #[display("EnvelopeHeader({format}{})",
     if *zstd { ", zstd compressed" } else { "" },
 )]
-pub(super) struct EnvelopeHeader {
+pub struct EnvelopeHeader {
     /// The format used for the payload.
     pub format: EnvelopeFormat,
     /// Whether the payload is compressed with zstd.

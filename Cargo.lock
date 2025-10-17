@@ -1238,6 +1238,7 @@ dependencies = [
  "hugr",
  "predicates",
  "rstest",
+ "serde",
  "serde_json",
  "tabled",
  "tempfile",

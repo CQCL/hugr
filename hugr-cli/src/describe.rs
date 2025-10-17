@@ -7,9 +7,9 @@ use clap::Parser;
 use clio::Output;
 use hugr::NodeIndex;
 use hugr::envelope::EnvelopeReader;
-use hugr::envelope::description::{ExtensionDesc, ModuleDesc};
+use hugr::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use hugr::extension::Version;
-use hugr::ops::OpType;
+use hugr::package::Package;
 use tabled::Tabled;
 use tabled::derive::display;
 
@@ -43,26 +43,31 @@ pub struct DescribeArgs {
 /// Arguments for reading a HUGR input.
 #[derive(Debug, clap::Args)]
 pub struct ModuleArgs {
-    /// Describe specified module (0-based index) in detail.
-    #[arg(long)]
-    pub module: Option<usize>,
-
-    #[arg(long, default_value = "true")]
+    #[arg(long, default_value = "false")]
     /// Display resolved extensions used by the module.
-    /// Requires module to be specified.
-    pub resolved_extensions: bool,
+    pub no_resolved_extensions: bool,
 
-    #[arg(long, default_value = "true")]
+    #[arg(long, default_value = "false")]
     /// Display public symbols in the module.
-    /// Requires module to be specified.
     pub public_symbols: bool,
 
     #[arg(long, default_value = "false")]
     /// Display claimed extensions set by generator in module metadata.
-    ///  Requires module to be specified.
     pub generator_used_extensions: bool,
 }
-
+impl ModuleArgs {
+    fn filter_module(&self, module: &mut ModuleDesc) {
+        if self.no_resolved_extensions {
+            module.used_extensions_resolved = None;
+        }
+        if !self.public_symbols {
+            module.public_symbols = None;
+        }
+        if !self.generator_used_extensions {
+            module.used_extensions_generator = None;
+        }
+    }
+}
 impl DescribeArgs {
     /// Convert a HUGR between different envelope formats
     pub fn run_describe(&mut self) -> Result<()> {
@@ -70,85 +75,101 @@ impl DescribeArgs {
         let extensions = self.input_args.load_extensions()?;
         let buffer = BufReader::new(&mut self.input_args.input);
 
-        let (desc, res) = EnvelopeReader::new(buffer, &extensions)?.read();
-        if self.json {
-            serde_json::to_writer_pretty(&mut self.output, &desc)?;
-            return Ok(());
-        }
-        if let Err(err) = res {
-            eprintln!("{err}");
+        let (mut desc, res) = EnvelopeReader::new(buffer, &extensions)?.read();
 
-            println!("\nPartial description:");
+        // clear fields that have not been requested
+        for module in desc.modules.iter_mut().flatten() {
+            self.module_args.filter_module(module);
         }
+        if !self.packaged_extensions {
+            desc.packaged_extensions.clear();
+        }
+
+        if self.json {
+            self.output_json(desc, &res)?;
+        } else {
+            self.print_description(desc);
+        }
+
+        // bubble up any errors
+        let _ = res?;
+        Ok(())
+    }
+
+    fn print_description(&mut self, desc: PackageDesc) {
         let header = desc.header();
         println!(
             "{header}\nPackage contains {} module(s) and {} extension(s)",
             desc.n_modules(),
             desc.n_packaged_extensions()
         );
-        let mut modules: Vec<_> = desc.modules().collect();
-        if let Some(idx) = self.module_args.module {
-            modules = vec![modules.remove(idx)];
-        }
-
-        let summaries: Vec<ModuleSummary> = modules
+        let summaries: Vec<ModuleSummary> = desc
+            .modules
             .iter()
-            .map(|m| (*m).clone().unwrap_or_default().into())
+            .map(|m| m.as_ref().map(Into::into).unwrap_or_default())
             .collect();
-
         let summary_table = tabled::Table::builder(summaries).index().build();
         println!("{summary_table}");
 
-        if self.module_args.module.is_some() {
-            // only show detailed info if a specific module is requested
-            self.display_module(modules.remove(0).clone().unwrap())?;
+        for (i, module) in desc.modules.into_iter().enumerate() {
+            println!("\nModule {i}:");
+            if let Some(module) = module {
+                self.display_module(module);
+            }
         }
+        if self.packaged_extensions {
+            println!("Packaged extensions:");
+            let ext_rows: Vec<ExtensionRow> = desc
+                .packaged_extensions
+                .into_iter()
+                .flatten()
+                .map(Into::into)
+                .collect();
+            let ext_table = tabled::Table::new(ext_rows);
+            println!("{ext_table}");
+        }
+    }
 
+    fn output_json<E: std::error::Error>(
+        &mut self,
+        package_desc: PackageDesc,
+        res: &Result<Package, E>,
+    ) -> Result<(), anyhow::Error> {
+        let err_str = res.as_ref().err().map(|e| format!("{e}"));
+        let json_desc = JsonDescription {
+            package_desc,
+            error: err_str,
+        };
+        serde_json::to_writer_pretty(&mut self.output, &json_desc)?;
         Ok(())
     }
 
-    fn display_module(&self, desc: ModuleDesc) -> Result<()> {
-        let args = &self.module_args;
-        match (args.resolved_extensions, desc.used_extensions_resolved) {
-            (true, Some(exts)) => {
-                let ext_rows: Vec<ExtensionRow> = exts.iter().cloned().map(Into::into).collect();
-                let ext_table = tabled::Table::new(ext_rows);
-                println!("Resolved extensions:\n{ext_table}");
-            }
-            (true, None) => {
-                println!("No resolved extensions information available.");
-            }
-            _ => {}
+    fn display_module(&self, desc: ModuleDesc) {
+        if let Some(exts) = desc.used_extensions_resolved {
+            let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
+            let ext_table = tabled::Table::new(ext_rows);
+            println!("Resolved extensions:\n{ext_table}");
         }
 
-        match (args.public_symbols, desc.public_symbols) {
-            (true, Some(syms)) => {
-                let sym_table =
-                    tabled::Table::new(syms.into_iter().map(|s| SymbolRow { symbol: s }));
-                println!("Public symbols:\n{sym_table}");
-            }
-            (true, None) => {
-                println!("No public symbols information available.");
-            }
-            _ => {}
+        if let Some(syms) = desc.public_symbols {
+            let sym_table = tabled::Table::new(syms.into_iter().map(|s| SymbolRow { symbol: s }));
+            println!("Public symbols:\n{sym_table}");
         }
 
-        match (
-            args.generator_used_extensions,
-            desc.used_extensions_generator,
-        ) {
-            (true, Some(exts)) => {
-                let ext_rows: Vec<ExtensionRow> = exts.iter().cloned().map(Into::into).collect();
-                let ext_table = tabled::Table::new(ext_rows);
-                println!("Generator-claimed extensions:\n{ext_table}");
-            }
-            (true, None) => {
-                println!("No generator-claimed extensions information available.");
-            }
-            _ => {}
+        if let Some(exts) = desc.used_extensions_generator {
+            let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
+            let ext_table = tabled::Table::new(ext_rows);
+            println!("Generator-claimed extensions:\n{ext_table}");
         }
-        Ok(())
     }
+}
+
+#[derive(serde::Serialize)]
+struct JsonDescription {
+    #[serde(flatten)]
+    package_desc: PackageDesc,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 #[derive(Tabled)]
@@ -184,9 +205,9 @@ struct ModuleSummary {
     generator: Option<String>,
 }
 
-impl From<ModuleDesc> for ModuleSummary {
-    fn from(desc: ModuleDesc) -> Self {
-        let (entrypoint_node, entrypoint_op) = if let Some(ep) = desc.entrypoint {
+impl From<&ModuleDesc> for ModuleSummary {
+    fn from(desc: &ModuleDesc) -> Self {
+        let (entrypoint_node, entrypoint_op) = if let Some(ep) = &desc.entrypoint {
             (
                 Some(ep.node.index()),
                 Some(hugr::envelope::description::op_string(&ep.optype)),
@@ -198,7 +219,7 @@ impl From<ModuleDesc> for ModuleSummary {
             num_nodes: desc.num_nodes,
             entrypoint_node,
             entrypoint_op,
-            generator: desc.generator,
+            generator: desc.generator.clone(),
         }
     }
 }

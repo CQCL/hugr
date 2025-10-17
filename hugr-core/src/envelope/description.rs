@@ -3,50 +3,24 @@ use semver::Version;
 
 use crate::{HugrView, Node, envelope::EnvelopeHeader, ops::OpType};
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize)]
-#[serde(transparent)]
-struct PartialVec<T> {
-    vec: Vec<Option<T>>,
+type PartialVec<T> = Vec<Option<T>>;
+fn set_partial_len<T: Clone>(vec: &mut PartialVec<T>, n: usize) {
+    vec.resize(n, None);
 }
-impl<T> Default for PartialVec<T> {
-    fn default() -> Self {
-        Self { vec: Vec::new() }
+fn set_partial_index<T: Clone>(vec: &mut PartialVec<T>, index: usize, value: T) {
+    if index >= vec.len() {
+        set_partial_len(vec, index + 1);
     }
-}
-
-impl<T: Clone> PartialVec<T> {
-    fn set_len(&mut self, n: usize) {
-        self.vec.resize(n, None);
-    }
-    fn set_index(&mut self, index: usize, value: T) {
-        if index >= self.vec.len() {
-            self.vec.resize(index + 1, None);
-        }
-        self.vec[index] = Some(value);
-    }
-    fn len(&self) -> usize {
-        self.vec.len()
-    }
-    fn into_vec(self) -> Vec<Option<T>> {
-        self.vec
-    }
-
-    fn merge(&mut self, other: Self) {
-        self.set_len(self.len().max(other.len()));
-        for (i, item) in other.vec.into_iter().enumerate() {
-            if let Some(item) = item {
-                self.set_index(i, item);
-            }
-        }
-    }
+    vec[index] = Some(value);
 }
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
 pub struct PackageDesc {
     #[serde(serialize_with = "header_serialize")]
-    pub(super) header: EnvelopeHeader,
-    modules: PartialVec<ModuleDesc>,
-    packaged_extensions: PartialVec<ExtensionDesc>,
+    pub header: EnvelopeHeader,
+    pub modules: PartialVec<ModuleDesc>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub packaged_extensions: PartialVec<ExtensionDesc>,
 }
 
 fn header_serialize<S>(header: &EnvelopeHeader, serializer: S) -> Result<S::Ok, S::Error>
@@ -64,23 +38,23 @@ impl PackageDesc {
         }
     }
     pub(crate) fn set_n_modules(&mut self, n: usize) {
-        self.modules.set_len(n);
+        set_partial_len(&mut self.modules, n);
     }
 
-    pub fn header(&self) -> String {
-        self.header.to_string()
+    pub fn header(&self) -> EnvelopeHeader {
+        self.header
     }
     pub fn n_modules(&self) -> usize {
         self.modules.len()
     }
     pub(crate) fn set_module(&mut self, index: usize, module: impl Into<ModuleDesc>) {
-        self.modules.set_index(index, module.into());
+        set_partial_index(&mut self.modules, index, module.into());
     }
     pub(crate) fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
-        self.packaged_extensions.set_index(index, ext.into());
+        set_partial_index(&mut self.packaged_extensions, index, ext.into());
     }
     pub(crate) fn set_n_packaged_extensions(&mut self, n: usize) {
-        self.packaged_extensions.set_len(n);
+        set_partial_len(&mut self.packaged_extensions, n);
     }
     pub fn n_packaged_extensions(&self) -> usize {
         self.packaged_extensions.len()
@@ -89,7 +63,6 @@ impl PackageDesc {
     pub fn generator(&self) -> Option<String> {
         let generators: Vec<String> = self
             .modules
-            .vec
             .iter()
             .flatten()
             .flat_map(|m| m.generator.clone())
@@ -101,11 +74,11 @@ impl PackageDesc {
         Some(generators.join(", "))
     }
     pub fn modules(&self) -> impl Iterator<Item = &Option<ModuleDesc>> {
-        self.modules.vec.iter()
+        self.modules.iter()
     }
 
     pub fn packaged_extensions(&self) -> impl Iterator<Item = &Option<ExtensionDesc>> {
-        self.packaged_extensions.vec.iter()
+        self.packaged_extensions.iter()
     }
 }
 
@@ -181,16 +154,22 @@ where
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
 pub struct ModuleDesc {
     /// Number of nodes in the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub num_nodes: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub entrypoint: Option<Entrypoint>,
     /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_metadata`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Generator specified in the module metadata.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub used_extensions_generator: Option<Vec<ExtensionDesc>>,
     /// Public symbols defined in the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_symbols: Option<Vec<String>>,
 }
 
