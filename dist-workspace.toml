@@ -25,3 +25,6 @@ install-path = "CARGO_HOME"
 install-updater = false
 # default is false, set to prevent hugr-llvm and hugr-py builds
 precise-builds = true
+
+tag-namespace = "hugr-cli-v"
+create-release = false
