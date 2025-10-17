@@ -23,11 +23,15 @@ targets = [
 install-path = "CARGO_HOME"
 # Whether to install an updater program
 install-updater = false
+
+# ---- NON-DEFAULT SETTINGS BELOW ----
+# https://axodotdev.github.io/cargo-dist/book/reference/config.html
+
 # default is false, set to prevent hugr-llvm and hugr-py builds
 precise-builds = true
 
+# only trigger for hugr-cli release tags
 tag-namespace = "hugr-cli-v"
-create-release = false
 
-# for testing only
-pr-run-mode = "upload"
+# Don't create a github release automatically, upload to existing release-plz Release
+create-release = false
