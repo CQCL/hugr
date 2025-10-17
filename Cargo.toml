@@ -123,3 +123,8 @@ serde_json.opt-level = 3
 serde_json.debug = 1
 jsonschema.opt-level = 3
 jsonschema.debug = 1
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

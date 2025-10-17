@@ -76,6 +76,7 @@ version_group = "hugr"
 name = "hugr-cli"
 release = true
 version_group = "hugr"
+git_release_draft = true
 
 [[package]]
 name = "hugr-model"
