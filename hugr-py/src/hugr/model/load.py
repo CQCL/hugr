@@ -12,6 +12,7 @@ from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
 from hugr.ops import (
     DFG,
+    Call,
     Case,
     Conditional,
     Custom,
@@ -88,6 +89,7 @@ class ModelImport:
 
     module: model.Module
     symbols: dict[str, model.Node]
+    fn_nodes: dict[str, Node]
     hugr: Hugr
 
     def __init__(self, module: model.Module):
@@ -98,6 +100,7 @@ class ModelImport:
         self.hugr = Hugr()
         self.linked_ports = ({}, {})
         self.static_edges = []
+        self.fn_nodes = {}
 
         for node in module.root.children:
             symbol_name = node.operation.symbol_name()
@@ -111,9 +114,13 @@ class ModelImport:
 
             self.symbols[symbol_name] = node
 
-    def add_node(self, node: model.Node, operation: Op, parent: Node) -> Node:
+    def add_node(
+        self, node: model.Node, operation: Op, parent: Node, num_outs: int | None = None
+    ) -> Node:
         metadata = self.import_meta_json(node)
-        node_id = self.hugr.add_node(operation, parent, metadata=metadata)
+        node_id = self.hugr.add_node(
+            op=operation, parent=parent, num_outs=num_outs, metadata=metadata
+        )
         self.record_in_links(node_id, node.inputs)
         self.record_out_links(node_id, node.outputs)
         if model.Apply("core.entrypoint") in node.meta:
@@ -161,7 +168,7 @@ class ModelImport:
             out_port_offset = self.hugr.num_out_ports(src) - 1
             out_port = OutPort(node=src, offset=out_port_offset)
 
-            in_port_offset = self.hugr.num_in_ports(dst) - 1
+            in_port_offset = self.hugr.num_in_ports(dst)
             in_port = InPort(node=dst, offset=in_port_offset)
 
             self.hugr.add_link(out_port, in_port)
@@ -255,6 +262,27 @@ class ModelImport:
                     "application."
                     raise ModelImportError(error, node)
 
+            if symbol == "core.call":
+                input_types, output_types, func = args
+                match func:
+                    case model.Apply(symbol, args):
+                        sig = self.import_signature(node.signature)
+                        callnode = self.add_node(
+                            node,
+                            Call(
+                                signature=PolyFuncType([], sig),  # TODO params
+                                instantiation=sig,
+                                type_args=[self.import_type_arg(arg) for arg in args],
+                            ),
+                            parent,
+                        )
+                        self.static_edges.append((self.fn_nodes[symbol], callnode))
+                        return callnode
+                    case _:
+                        error = "The function of a Call node must be a symbol "
+                        "application."
+                        raise ModelImportError(error, node)
+
             return self.add_node(
                 node,
                 Custom(
@@ -347,8 +375,10 @@ class ModelImport:
                     f_name=f_name, signature=signature, visibility=symbol.visibility
                 ),
                 self.hugr.module_root,
+                1,
             )
             self.exit_symbol()
+            self.fn_nodes[f_name] = node_id
             return node_id
 
         def import_define_func(symbol: model.Symbol) -> Node:
@@ -365,6 +395,7 @@ class ModelImport:
                     visibility=symbol.visibility,
                 ),
                 self.hugr.module_root,
+                1,
             )
 
             match node.regions:
@@ -376,6 +407,7 @@ class ModelImport:
 
             self.import_dfg_region(body, node_id)
             self.exit_symbol()
+            self.fn_nodes[f_name] = node_id
             return node_id
 
         match node.operation:
