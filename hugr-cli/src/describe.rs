@@ -1,5 +1,5 @@
 //! Convert between different HUGR envelope formats.
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 
 use crate::hugr_io::HugrInputArgs;
 use anyhow::Result;
@@ -81,14 +81,14 @@ impl DescribeArgs {
         for module in desc.modules.iter_mut().flatten() {
             self.module_args.filter_module(module);
         }
-        if !self.packaged_extensions {
-            desc.packaged_extensions.clear();
-        }
 
         if self.json {
+            if !self.packaged_extensions {
+                desc.packaged_extensions.clear();
+            }
             self.output_json(desc, &res)?;
         } else {
-            self.print_description(desc);
+            self.print_description(desc)?;
         }
 
         // bubble up any errors
@@ -96,29 +96,30 @@ impl DescribeArgs {
         Ok(())
     }
 
-    fn print_description(&mut self, desc: PackageDesc) {
+    fn print_description(&mut self, desc: PackageDesc) -> Result<()> {
         let header = desc.header();
-        println!(
+        writeln!(
+            self.output,
             "{header}\nPackage contains {} module(s) and {} extension(s)",
             desc.n_modules(),
             desc.n_packaged_extensions()
-        );
+        )?;
         let summaries: Vec<ModuleSummary> = desc
             .modules
             .iter()
             .map(|m| m.as_ref().map(Into::into).unwrap_or_default())
             .collect();
         let summary_table = tabled::Table::builder(summaries).index().build();
-        println!("{summary_table}");
+        writeln!(self.output, "{summary_table}")?;
 
         for (i, module) in desc.modules.into_iter().enumerate() {
-            println!("\nModule {i}:");
+            writeln!(self.output, "\nModule {i}:")?;
             if let Some(module) = module {
-                self.display_module(module);
+                self.display_module(module)?;
             }
         }
         if self.packaged_extensions {
-            println!("Packaged extensions:");
+            writeln!(self.output, "Packaged extensions:")?;
             let ext_rows: Vec<ExtensionRow> = desc
                 .packaged_extensions
                 .into_iter()
@@ -126,15 +127,16 @@ impl DescribeArgs {
                 .map(Into::into)
                 .collect();
             let ext_table = tabled::Table::new(ext_rows);
-            println!("{ext_table}");
+            writeln!(self.output, "{ext_table}")?;
         }
+        Ok(())
     }
 
     fn output_json<E: std::error::Error>(
         &mut self,
         package_desc: PackageDesc,
         res: &Result<Package, E>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<()> {
         let err_str = res.as_ref().err().map(|e| format!("{e}"));
         let json_desc = JsonDescription {
             package_desc,
@@ -144,23 +146,25 @@ impl DescribeArgs {
         Ok(())
     }
 
-    fn display_module(&self, desc: ModuleDesc) {
+    fn display_module(&mut self, desc: ModuleDesc) -> Result<()> {
         if let Some(exts) = desc.used_extensions_resolved {
             let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
             let ext_table = tabled::Table::new(ext_rows);
-            println!("Resolved extensions:\n{ext_table}");
+            writeln!(self.output, "Resolved extensions:\n{ext_table}")?;
         }
 
         if let Some(syms) = desc.public_symbols {
             let sym_table = tabled::Table::new(syms.into_iter().map(|s| SymbolRow { symbol: s }));
-            println!("Public symbols:\n{sym_table}");
+            writeln!(self.output, "Public symbols:\n{sym_table}")?;
         }
 
         if let Some(exts) = desc.used_extensions_generator {
             let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
             let ext_table = tabled::Table::new(ext_rows);
-            println!("Generator-claimed extensions:\n{ext_table}");
+            writeln!(self.output, "Generator-claimed extensions:\n{ext_table}")?;
         }
+
+        Ok(())
     }
 }
 
