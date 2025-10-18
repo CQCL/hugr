@@ -52,6 +52,7 @@ from hugr.tys import (
     TypeParam,
     TypeTypeParam,
     Variable,
+    _QubitDef,
 )
 
 ImportContext = model.Term | model.Node | model.Region | str
@@ -570,6 +571,8 @@ class ModelImport:
                         for variant in _import_closed_list(variants)
                     ]
                 )
+            case model.Apply("prelude.qubit", []):
+                return _QubitDef()
             case model.Apply(symbol, args):
                 extension, id = _split_extension_name(symbol)
                 return Opaque(
