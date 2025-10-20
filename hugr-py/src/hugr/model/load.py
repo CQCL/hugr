@@ -105,6 +105,21 @@ def _collect_meta_json(node: model.Node) -> dict[str, Any]:
     return metadata
 
 
+def _find_meta_title(node: model.Node) -> str | None:
+    """Searches for `core.title` metadata on the given node."""
+    for meta in node.meta:
+        match meta:
+            case model.Apply("core.title", [model.Literal(str() as title)]):
+                return title
+            case model.Apply("core.title"):
+                error = "Invalid instance of `core.title` metadata."
+                raise ModelImportError(error, meta)
+            case _:
+                pass
+
+    return None
+
+
 class ModelImport:
     """Helper to import a Hugr."""
 
@@ -386,9 +401,10 @@ class ModelImport:
                 raise ModelImportError(error, node)
 
     def import_node_in_module(self, node: model.Node) -> Node | None:
+        """Import a model Node at the Hugr Module level."""
+
         def import_declare_func(symbol: model.Symbol) -> Node:
-            title = self.import_meta_title(node)
-            f_name = symbol.name if title is None else title
+            f_name = _find_meta_title(node) or symbol.name
             signature = self.enter_symbol(symbol)
             node_id = self.add_node(
                 node,
@@ -403,8 +419,7 @@ class ModelImport:
             return node_id
 
         def import_define_func(symbol: model.Symbol) -> Node:
-            title = self.import_meta_title(node)
-            f_name = symbol.name if title is None else title
+            f_name = _find_meta_title(node) or symbol.name
             signature = self.enter_symbol(symbol)
             node_id = self.add_node(
                 node,
@@ -621,20 +636,6 @@ class ModelImport:
                 return self.import_type(part)
 
         return [import_part(part) for part in term.to_list_parts()]
-
-    def import_meta_title(self, node: model.Node) -> str | None:
-        """Searches for `core.title` metadata on the given node."""
-        for meta in node.meta:
-            match meta:
-                case model.Apply("core.title", [model.Literal(str() as title)]):
-                    return title
-                case model.Apply("core.title"):
-                    error = "Invalid instance of `core.title` metadata."
-                    raise ModelImportError(error, meta)
-                case _:
-                    pass
-
-        return None
 
     def import_meta_order_region(self, region: model.Region) -> "RegionOrderHints":
         """Searches for order hint metadata on the given region."""
