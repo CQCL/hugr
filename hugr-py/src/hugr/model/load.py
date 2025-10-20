@@ -493,9 +493,9 @@ class ModelImport:
                 raise ModelImportError(error, term)
 
     def lookup_var(self, name: str) -> "LocalVarData":
-        if name in self.local_vars:
+        if name not in self.local_vars:
             error = f"Unknown variable `{name}`."
-            raise ImportError(error)
+            raise ModelImportError(error)
 
         return self.local_vars[name]
 
