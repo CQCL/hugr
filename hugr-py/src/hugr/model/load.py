@@ -110,7 +110,7 @@ class ModelImport:
 
     local_vars: dict[str, "LocalVarData"]
     current_symbol: str | None
-    linked_ports: tuple[dict[str, list[InPort]], dict[str, list[OutPort]]]
+    linked_ports: dict[str, tuple[list[InPort], list[OutPort]]]
     static_edges: list[tuple[Node, Node]]
 
     module: model.Module
@@ -124,7 +124,7 @@ class ModelImport:
         self.module = module
         self.symbols = {}
         self.hugr = Hugr()
-        self.linked_ports = ({}, {})
+        self.linked_ports = {}
         self.static_edges = []
         self.fn_nodes = {}
 
@@ -157,28 +157,17 @@ class ModelImport:
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
-        link_ports_in = self.linked_ports[0]
-
         for offset, link in enumerate(links):
             in_port = InPort(node=node, offset=offset)
-            link_ports_in.setdefault(link, []).append(in_port)
+            self.linked_ports.setdefault(link, ([], []))[0].append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
-        link_ports_out = self.linked_ports[1]
-
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
-            link_ports_out.setdefault(link, []).append(out_port)
+            self.linked_ports.setdefault(link, ([], []))[1].append(out_port)
 
     def link_ports(self):
-        link_ports_in, link_ports_out = self.linked_ports
-
-        links = link_ports_in.keys() | link_ports_out.keys()
-
-        for link in links:
-            in_ports = link_ports_in[link]
-            out_ports = link_ports_out[link]
-
+        for link, (in_ports, out_ports) in self.linked_ports.items():
             match in_ports, out_ports:
                 case [[], []]:
                     raise AssertionError
