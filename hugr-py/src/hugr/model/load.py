@@ -143,6 +143,7 @@ class ModelImport:
     def add_node(
         self, node: model.Node, operation: Op, parent: Node, num_outs: int | None = None
     ) -> Node:
+        """Add a model Node to the Hugr and record its in- and out-links."""
         node_id = self.hugr.add_node(
             op=operation,
             parent=parent,
