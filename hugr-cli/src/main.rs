@@ -37,6 +37,7 @@ fn main() {
 
     if let Err(err) = result {
         error!("{:?}", err);
+        // TODO include description if verbosity is high enough
         std::process::exit(1);
     }
 }

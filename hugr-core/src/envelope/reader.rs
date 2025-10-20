@@ -10,7 +10,7 @@ use crate::envelope::{
     EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
 };
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::{Extension, ExtensionRegistry, ExtensionRegistryLoadError};
+use crate::extension::{Extension, ExtensionRegistry};
 use crate::import::{ImportError, import_described_hugr};
 use crate::package::Package;
 
@@ -63,7 +63,7 @@ where
 ///
 /// To read a package from an envelope, first create an `EnvelopeReader` using
 /// [`EnvelopeReader::new`], then call [`EnvelopeReader::read`].
-pub struct EnvelopeReader<R> {
+pub(super) struct EnvelopeReader<R> {
     description: PackageDesc,
     reader: MaybeZstdRead<R>,
     registry: ExtensionRegistry,
@@ -77,7 +77,7 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// - If the header is invalid.
     /// - If zstd decompression is requested but the `zstd` feature is not
     ///   enabled.
-    pub fn new(mut reader: R, registry: &ExtensionRegistry) -> Result<Self, HeaderError> {
+    pub(super) fn new(mut reader: R, registry: &ExtensionRegistry) -> Result<Self, HeaderError> {
         let header = EnvelopeHeader::read(&mut reader)?;
         let reader = match header.zstd {
             #[cfg(feature = "zstd")]
@@ -137,7 +137,7 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// # Errors
     ///
     /// - If reading the package payload fails.
-    pub fn read(mut self) -> (PackageDesc, Result<Package, PayloadError>) {
+    pub(super) fn read(mut self) -> (PackageDesc, Result<Package, PayloadError>) {
         let res = self.read_impl();
 
         (self.description, res)

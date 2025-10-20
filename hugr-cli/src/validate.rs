@@ -36,8 +36,8 @@ impl ValArgs {
                 .map_err(PackageValidationError::Validation)
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
-            let package = self.input_args.get_package()?;
-            let generator = hugr::envelope::get_generator(&package.modules);
+            let (desc, package) = self.input_args.get_described_package()?;
+            let generator = desc.generator();
             package
                 .validate()
                 .map_err(|val_err| CliError::validation(generator, val_err))?;

@@ -38,13 +38,16 @@ pub mod description;
 mod header;
 mod package_json;
 mod reader;
-pub use reader::EnvelopeReader;
+use reader::EnvelopeReader;
+pub use reader::PayloadError;
 
 pub mod serde_with;
 
 pub use header::{EnvelopeConfig, EnvelopeFormat, MAGIC_NUMBERS, ZstdConfig};
 pub use package_json::PackageEncodingError;
 
+use crate::envelope::description::PackageDesc;
+use crate::envelope::header::HeaderError;
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::{Hugr, HugrView};
 use crate::{
@@ -118,7 +121,7 @@ impl<E: std::fmt::Display> WithGenerator<E> {
 /// - `reader`: The reader to read the envelope from.
 /// - `registry`: An extension registry with additional extensions to use when
 ///   decoding the HUGR, if they are not already included in the package.
-#[deprecated(since = "0.24.1", note = "Use EnvelopeReader::new and .read() instead")]
+#[deprecated(since = "0.24.1", note = "Use read_described_envelope instead")]
 pub fn read_envelope(
     reader: impl BufRead,
     registry: &ExtensionRegistry,
@@ -128,6 +131,45 @@ pub fn read_envelope(
     let package = reader.read().1?;
 
     Ok((config, package))
+}
+
+/// Read a HUGR envelope from a reader.
+///
+/// Returns the deserialized package and a high level description of the envelope.
+///
+/// Parameters:
+/// - `reader`: The reader to read the envelope from.
+/// - `registry`: An extension registry with additional extensions to use when
+///   decoding the HUGR, if they are not already included in the package.
+pub fn read_described_envelope(
+    reader: impl BufRead,
+    registry: &ExtensionRegistry,
+) -> Result<(PackageDesc, Package), ReadError> {
+    let reader = EnvelopeReader::new(reader, registry)?;
+    let (desc, res) = reader.read();
+    match res {
+        Ok(pkg) => Ok((desc, pkg)),
+        Err(e) => Err(ReadError::Payload {
+            source: e,
+            partial_description: desc,
+        }),
+    }
+}
+
+/// Errors during reading a HUGR envelope.
+#[derive(Debug, Error)]
+pub enum ReadError {
+    /// Error reading the envelope header.
+    #[error(transparent)]
+    EnvelopeHeader(#[from] HeaderError),
+    /// Error reading the package payload.
+    #[error("Error reading package payload in envelope.")]
+    Payload {
+        /// The source error.
+        source: PayloadError,
+        /// Partial description of the envelope read before the error occurred.
+        partial_description: PackageDesc,
+    },
 }
 
 /// Write a HUGR package into an envelope, using the specified configuration.

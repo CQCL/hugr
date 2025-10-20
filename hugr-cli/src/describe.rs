@@ -1,12 +1,12 @@
 //! Convert between different HUGR envelope formats.
-use std::io::{BufReader, Write};
+use std::io::Write;
 
 use crate::hugr_io::HugrInputArgs;
 use anyhow::Result;
 use clap::Parser;
 use clio::Output;
 use hugr::NodeIndex;
-use hugr::envelope::EnvelopeReader;
+use hugr::envelope::ReadError;
 use hugr::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use hugr::extension::Version;
 use hugr::package::Package;
@@ -71,11 +71,14 @@ impl ModuleArgs {
 impl DescribeArgs {
     /// Convert a HUGR between different envelope formats
     pub fn run_describe(&mut self) -> Result<()> {
-        // TODO reuse code from hugr_io
-        let extensions = self.input_args.load_extensions()?;
-        let buffer = BufReader::new(&mut self.input_args.input);
-
-        let (mut desc, res) = EnvelopeReader::new(buffer, &extensions)?.read();
+        let (mut desc, res) = match self.input_args.get_described_package() {
+            Ok((d, p)) => (d, Ok(p)),
+            Err(crate::CliError::ReadEnvelope(ReadError::Payload {
+                source,
+                partial_description,
+            })) => (partial_description, Err(source)), // keep error for later
+            Err(e) => return Err(e.into()),
+        };
 
         // clear fields that have not been requested
         for module in desc.modules.iter_mut().flatten() {
