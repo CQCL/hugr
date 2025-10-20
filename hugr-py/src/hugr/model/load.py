@@ -80,6 +80,31 @@ class ModelImportError(Exception):
         super().__init__(f"{message}\n{location_error}")
 
 
+def _collect_meta_json(node: model.Node) -> dict[str, Any]:
+    """Collects the `core.meta_json` metadata on the given node."""
+    metadata = {}
+
+    for meta in node.meta:
+        match meta:
+            case model.Apply(
+                "compat.meta_json",
+                [model.Literal(str() as key), model.Literal(str() as value)],
+            ):
+                pass
+            case _:
+                continue
+
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as err:
+            error = "Failed to decode JSON metadata."
+            raise ModelImportError(error, node) from err
+
+        metadata[key] = decoded
+
+    return metadata
+
+
 class ModelImport:
     """Helper to import a Hugr."""
 
@@ -118,9 +143,11 @@ class ModelImport:
     def add_node(
         self, node: model.Node, operation: Op, parent: Node, num_outs: int | None = None
     ) -> Node:
-        metadata = self.import_meta_json(node)
         node_id = self.hugr.add_node(
-            op=operation, parent=parent, num_outs=num_outs, metadata=metadata
+            op=operation,
+            parent=parent,
+            num_outs=num_outs,
+            metadata=_collect_meta_json(node),
         )
         self.record_in_links(node_id, node.inputs)
         self.record_out_links(node_id, node.outputs)
@@ -601,30 +628,6 @@ class ModelImport:
                 return self.import_type(part)
 
         return [import_part(part) for part in term.to_list_parts()]
-
-    def import_meta_json(self, node: model.Node) -> dict[str, Any]:
-        """Collects the `core.meta_json` metadata on the given node."""
-        metadata = {}
-
-        for meta in node.meta:
-            match meta:
-                case model.Apply(
-                    "compat.meta_json",
-                    [model.Literal(str() as key), model.Literal(str() as value)],
-                ):
-                    pass
-                case _:
-                    continue
-
-            try:
-                decoded = json.loads(value)
-            except json.JSONDecodeError as err:
-                error = "Failed to decode JSON metadata."
-                raise ModelImportError(error, node) from err
-
-            metadata[key] = decoded
-
-        return metadata
 
     def import_meta_title(self, node: model.Node) -> str | None:
         """Searches for `core.title` metadata on the given node."""
