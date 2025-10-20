@@ -157,16 +157,19 @@ class ModelImport:
         return node_id
 
     def record_in_links(self, node: Node, links: Iterable[str]):
+        """Record a bunch of links entering the given Hugr Node with the given names."""
         for offset, link in enumerate(links):
             in_port = InPort(node=node, offset=offset)
             self.linked_ports.setdefault(link, ([], []))[0].append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
+        """Record a bunch of links exiting the given Hugr Node with the given names."""
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
             self.linked_ports.setdefault(link, ([], []))[1].append(out_port)
 
     def link_ports(self):
+        """Add links to the Hugr according to the recorded data."""
         for link, (in_ports, out_ports) in self.linked_ports.items():
             match in_ports, out_ports:
                 case [[], []]:
