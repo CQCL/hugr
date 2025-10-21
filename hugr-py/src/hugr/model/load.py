@@ -210,6 +210,7 @@ class ModelImport:
             self.hugr.add_link(out_port, in_port)
 
     def import_dfg_region(self, region: model.Region, parent: Node):
+        """Import an entire DFG region from the model into the Hugr."""
         signature = self.import_signature(region.signature)
 
         input_node = self.hugr.add_node(Input(signature.input), parent=parent)
@@ -233,6 +234,8 @@ class ModelImport:
             self.hugr.add_order_link(src_node, tgt_node)
 
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
+        """Import a model Node within a DFG region."""
+
         def import_dfg_node() -> Node:
             match node.regions:
                 case [body]:
