@@ -141,6 +141,7 @@ pub fn read_envelope(
 /// - `reader`: The reader to read the envelope from.
 /// - `registry`: An extension registry with additional extensions to use when
 ///   decoding the HUGR, if they are not already included in the package.
+// TODO deprecate and rename to read_envelope when removing old version
 pub fn read_described_envelope(
     reader: impl BufRead,
     registry: &ExtensionRegistry,
@@ -170,6 +171,15 @@ pub enum ReadError {
         /// Partial description of the envelope read before the error occurred.
         partial_description: PackageDesc,
     },
+}
+
+impl From<ReadError> for EnvelopeError {
+    fn from(err: ReadError) -> Self {
+        match err {
+            ReadError::EnvelopeHeader(e) => e.into(),
+            ReadError::Payload { source, .. } => source.into(),
+        }
+    }
 }
 
 /// Write a HUGR package into an envelope, using the specified configuration.
@@ -627,9 +637,9 @@ pub(crate) mod test {
             }
         }
 
-        let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
-
+        let (desc, new_package) =
+            read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
+        let decoded_config = desc.header.config();
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
         assert_eq!(package, new_package);
@@ -656,8 +666,9 @@ pub(crate) mod test {
         let config = EnvelopeConfig { format, zstd: None };
         package.store(&mut buffer, config).unwrap();
 
-        let (decoded_config, new_package) =
-            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
+        let (desc, new_package) =
+            read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
+        let decoded_config = desc.header.config();
 
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
