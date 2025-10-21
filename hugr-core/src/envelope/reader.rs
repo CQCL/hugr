@@ -236,10 +236,10 @@ impl<R: BufRead> EnvelopeReader<R> {
     }
 }
 
-#[derive(Error, Debug, derive_more::Display)]
+#[derive(Error, Debug)]
 #[non_exhaustive]
 /// Error decoding an envelope payload.
-#[display("Error reading the envelope payload. {_0}")]
+#[error(transparent)]
 pub struct PayloadError(PayloadErrorInner);
 
 #[derive(Error, Debug)]
