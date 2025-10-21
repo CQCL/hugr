@@ -53,7 +53,7 @@ pub struct ModuleArgs {
 
     #[arg(long, default_value = "false")]
     /// Display claimed extensions set by generator in module metadata.
-    pub generator_used_extensions: bool,
+    pub generator_claimed_extensions: bool,
 }
 impl ModuleArgs {
     fn filter_module(&self, module: &mut ModuleDesc) {
@@ -63,7 +63,7 @@ impl ModuleArgs {
         if !self.public_symbols {
             module.public_symbols = None;
         }
-        if !self.generator_used_extensions {
+        if !self.generator_claimed_extensions {
             module.used_extensions_generator = None;
         }
     }
@@ -164,7 +164,7 @@ impl DescribeArgs {
         if let Some(exts) = desc.used_extensions_generator {
             let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
             let ext_table = tabled::Table::new(ext_rows);
-            writeln!(self.output, "Generator-claimed extensions:\n{ext_table}")?;
+            writeln!(self.output, "Generator claimed extensions:\n{ext_table}")?;
         }
 
         Ok(())
