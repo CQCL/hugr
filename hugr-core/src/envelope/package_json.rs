@@ -1,8 +1,9 @@
+#![allow(deprecated)] // remove when WithGenerator is removed, cannot place on enum
+
 //! Encoding / decoding of Package json, used in the `PackageJson` envelope format.
 use derive_more::{Display, Error, From};
 use std::io;
 
-use super::WithGenerator;
 use crate::extension::ExtensionRegistry;
 use crate::extension::resolution::ExtensionResolutionError;
 
@@ -46,8 +47,7 @@ pub enum PackageEncodingError {
     /// Error raised while reading from a file.
     IOError(#[from] io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    #[deprecated(since = "0.24.1", note = "Not raised")]
-    ExtensionResolution(#[from] WithGenerator<ExtensionResolutionError>),
+    ExtensionResolution(#[from] super::WithGenerator<ExtensionResolutionError>),
     /// Error resolving packaged extensions.
     PackagedExtension(#[from] ExtensionResolutionError),
 }

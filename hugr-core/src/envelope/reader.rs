@@ -14,10 +14,7 @@ use crate::extension::{Extension, ExtensionRegistry};
 use crate::import::{ImportError, import_described_hugr};
 use crate::package::Package;
 
-use super::{
-    WithGenerator, check_breaking_extensions, check_model_version,
-    package_json::PackageEncodingError,
-};
+use super::{check_breaking_extensions, check_model_version, package_json::PackageEncodingError};
 use thiserror::Error;
 
 use hugr_model::v0::bumpalo::Bump;
@@ -267,11 +264,7 @@ impl From<PayloadError> for EnvelopeError {
             PayloadErrorInner::JsonRead(e) => e.into(),
             PayloadErrorInner::ModelBinary(e) => e.into(),
             PayloadErrorInner::ModelText(e) => e.into(),
-            PayloadErrorInner::ExtensionsBreaking(e) => WithGenerator {
-                inner: Box::new(e),
-                generator: None,
-            }
-            .into(),
+            PayloadErrorInner::ExtensionsBreaking(_) => unreachable!("not raised"),
             PayloadErrorInner::ExtensionResolution(e) => e.into(),
         }
     }
