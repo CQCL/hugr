@@ -335,7 +335,7 @@ class ModelImport:
 
         def import_cfg() -> Node:
             # TODO
-            return Node(0)
+            raise NotImplementedError("Cannot import CFG node.")
 
         def import_conditional() -> Node:
             match node.signature:
