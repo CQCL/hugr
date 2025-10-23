@@ -301,37 +301,43 @@ class ModelImport:
                     "application."
                     raise ModelImportError(error, node)
 
-            if symbol == "core.call":
-                input_types, output_types, func = args
-                match func:
-                    case model.Apply(symbol, args):
-                        sig = self.import_signature(node.signature)
-                        callnode = self.add_node(
-                            node,
-                            Call(
-                                signature=PolyFuncType([], sig),  # TODO params
-                                instantiation=sig,
-                                type_args=[self.import_type_arg(arg) for arg in args],
-                            ),
-                            parent,
-                        )
-                        self.static_edges.append((self.fn_nodes[symbol], callnode))
-                        return callnode
-                    case _:
-                        error = "The function of a Call node must be a symbol "
-                        "application."
-                        raise ModelImportError(error, node)
-
-            return self.add_node(
-                node,
-                Custom(
-                    op_name=op_name,
-                    extension=extension,
-                    signature=self.import_signature(node.signature),
-                    args=[self.import_type_arg(arg) for arg in args],
-                ),
-                parent,
-            )
+            match symbol:
+                case "core.call":
+                    input_types, output_types, func = args
+                    match func:
+                        case model.Apply(symbol, args):
+                            sig = self.import_signature(node.signature)
+                            callnode = self.add_node(
+                                node,
+                                Call(
+                                    signature=PolyFuncType([], sig),  # TODO params
+                                    instantiation=sig,
+                                    type_args=[
+                                        self.import_type_arg(arg) for arg in args
+                                    ],
+                                ),
+                                parent,
+                            )
+                            self.static_edges.append((self.fn_nodes[symbol], callnode))
+                            return callnode
+                        case _:
+                            error = "The function of a Call node must be a symbol "
+                            "application."
+                            raise ModelImportError(error, node)
+                case "core.load_const":
+                    pass  # TODO
+                # TODO others
+                case _:
+                    return self.add_node(
+                        node,
+                        Custom(
+                            op_name=op_name,
+                            extension=extension,
+                            signature=self.import_signature(node.signature),
+                            args=[self.import_type_arg(arg) for arg in args],
+                        ),
+                        parent,
+                    )
 
         def import_cfg() -> Node:
             # TODO
