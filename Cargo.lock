@@ -440,9 +440,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.49"
+version = "4.5.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4512b90fa68d3a9932cea5184017c5d200f5921df706d45e853537dea51508f"
+checksum = "0c2cfd7bf8a6017ddaa4e32ffe7403d547790db06bd171c1c53926faab501623"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -460,9 +460,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.49"
+version = "4.5.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0025e98baa12e766c67ba13ff4695a887a1eba19569aad00a472546795bd6730"
+checksum = "0a4c05b9e80c5ccd3a7ef080ad7b6ba7d6fc00a985b8b157197075677c82c7a0"
 dependencies = [
  "anstream",
  "anstyle",
@@ -732,18 +732,18 @@ dependencies = [
 
 [[package]]
 name = "derive_more"
-version = "1.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
 dependencies = [
  "derive_more-impl",
 ]
 
 [[package]]
 name = "derive_more-impl"
-version = "1.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb7330aeadfbe296029522e6c40f315320aba36fc43a5b3632f3795348f3bd22"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1234,7 +1234,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clio",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "hugr",
  "predicates",
  "rstest",
@@ -1254,7 +1254,7 @@ dependencies = [
  "cgmath",
  "cool_asserts",
  "delegate",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
@@ -1296,7 +1296,7 @@ dependencies = [
  "anyhow",
  "cc",
  "delegate",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "hugr-core",
  "hugr-llvm",
  "inkwell",
@@ -1315,7 +1315,7 @@ dependencies = [
  "base64",
  "bumpalo",
  "capnp",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "indexmap 2.12.0",
  "insta",
  "itertools 0.14.0",
@@ -1338,7 +1338,7 @@ name = "hugr-passes"
 version = "0.24.0"
 dependencies = [
  "ascent",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "hugr-core",
  "itertools 0.14.0",
  "pastey",
@@ -1356,7 +1356,7 @@ name = "hugr-persistent"
 version = "0.3.1"
 dependencies = [
  "delegate",
- "derive_more 1.0.0",
+ "derive_more 2.0.1",
  "hugr-core",
  "insta",
  "itertools 0.14.0",
@@ -2341,9 +2341,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.27.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa8e48c12afdeb26aa4be4e5c49fb5e11c3efa0878db783a960eea2b9ac6dd19"
+checksum = "7ba0117f4212101ee6544044dae45abe1083d30ce7b29c4b5cbdfa2354e07383"
 dependencies = [
  "indoc",
  "libc",
@@ -2358,18 +2358,18 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.27.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc1989dbf2b60852e0782c7487ebf0b4c7f43161ffe820849b56cf05f945cee1"
+checksum = "4fc6ddaf24947d12a9aa31ac65431fb1b851b8f4365426e182901eabfb87df5f"
 dependencies = [
  "target-lexicon",
 ]
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.27.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c808286da7500385148930152e54fb6883452033085bf1f857d85d4e82ca905c"
+checksum = "025474d3928738efb38ac36d4744a74a400c901c7596199e20e45d98eb194105"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -2377,9 +2377,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros"
-version = "0.27.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83a0543c16be0d86cf0dbf2e2b636ece9fd38f20406bb43c255e0bc368095f92"
+checksum = "2e64eb489f22fe1c95911b77c44cc41e7c19f3082fc81cce90f657cdc42ffded"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2389,9 +2389,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.27.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a00da2ce064dcd582448ea24a5a26fa9527e0483103019b741ebcbe632dcd29"
+checksum = "100246c0ecf400b475341b8455a9213344569af29a3c841d29270e53102e0fcf"
 dependencies = [
  "heck",
  "proc-macro2",
