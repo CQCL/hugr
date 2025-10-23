@@ -28,11 +28,11 @@ classifiers = [
 
 dependencies = [
     "graphviz>=0.20.3",
-    "pydantic>=2.8,<2.12",
-    "pydantic-extra-types>=2.9.0",
-    "semver>=3.0.2",
+    "pydantic~=2.8",
+    "pydantic-extra-types~=2.9",
+    "semver~=3.0",
     "typing-extensions~=4.12",
-    "pyzstd>=0.16.2,<0.18.0",
+    "pyzstd~=0.18.0",
 ]
 
 [project.optional-dependencies]
