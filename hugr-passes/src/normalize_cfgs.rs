@@ -798,14 +798,8 @@ mod test {
         let func_children = child_tags_ext_ids(&h, func);
         assert_eq!(
             func_children.into_iter().sorted().collect_vec(),
-            ["Cfg", "Dfg", "Input", "Output",]
-        );
-        assert_eq!(
-            child_tags_ext_ids(&h, func)
-                .into_iter()
-                .sorted()
-                .collect_vec(),
             [
+                "Cfg",
                 "Const",
                 "Input",
                 "LoadConst",
