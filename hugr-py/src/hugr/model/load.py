@@ -3,7 +3,7 @@
 import json
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import hugr.model as model
 from hugr import val
@@ -11,11 +11,14 @@ from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
 from hugr.ops import (
+    CFG,
     DFG,
     Call,
     Case,
     Conditional,
     Custom,
+    DataflowBlock,
+    ExitBlock,
     FuncDecl,
     FuncDefn,
     Input,
@@ -233,6 +236,74 @@ class ModelImport:
             tgt_node = order_data.get_node_by_key(tgt_key)
             self.hugr.add_order_link(src_node, tgt_node)
 
+    def import_block(self, block: model.Node, parent: Node):
+        # 1. Add the DataFlowBlock node:
+        match block.signature:
+            case model.Apply("core.ctrl", [ctrl_inputs, ctrl_outputs]):
+                pass
+            case _:
+                error = f"Invalid signature for {block}."
+                raise ModelImportError(error)
+        match list(ctrl_inputs.to_list_parts()):
+            case [inputs]:
+                pass
+            case _:
+                error = f"DFB inputs should be singleton list: {ctrl_inputs}."
+                raise ModelImportError(error)
+        assert isinstance(inputs, model.Term)
+        block_node = self.add_node(
+            block,
+            # TODO The translation here seems to be underdetermined. It could be
+            # DataflowBlock(
+            #     self.import_type_row(inputs),
+            #     Sum(ts),
+            #     ss,
+            # ),
+            # where the ctrl_outputs have been expressed as:
+            # [[*ts[0], *ss], [*ts[1], *ss], ...]
+            # with ss some common suffix of the lists in ctrl_outputs. But how do we
+            # decide on that common suffix? Below we take it to be empty.
+            DataflowBlock(
+                self.import_type_row(inputs),
+                Sum(
+                    [
+                        self.import_type_row(cast(model.Term, output))
+                        for output in ctrl_outputs.to_list_parts()
+                    ]
+                ),
+                [],
+            ),
+            parent,
+        )
+        # 2. Import the dataflow region:
+        [block_region] = block.regions
+        self.import_dfg_region(block_region, block_node)
+
+    def import_cfg_region(
+        self, region: model.Region, signature: FunctionType, parent: Node
+    ):
+        """Import an entire CFG region from the model into the Hugr."""
+        [entry_link] = region.sources
+        entry_block_idx = None
+        for i, child in enumerate(region.children):
+            if entry_link in child.inputs:
+                entry_block_idx = i
+                break
+        assert entry_block_idx is not None
+        entry_block = region.children[entry_block_idx]
+
+        # 1. Import the entry block:
+        self.import_block(entry_block, parent)
+
+        # 2. Create the exit node:
+        exit_node = self.hugr.add_node(ExitBlock(signature.output), parent)
+        self.record_in_links(exit_node, region.targets)
+
+        # 3. Import the other blocks:
+        for i, child in enumerate(region.children):
+            if i != entry_block_idx:
+                self.import_block(child, parent)
+
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
         """Import a model Node within a DFG region."""
 
@@ -341,8 +412,19 @@ class ModelImport:
                     )
 
         def import_cfg() -> Node:
-            # TODO
-            raise NotImplementedError("Cannot import CFG node.")
+            match node.regions:
+                case [body]:
+                    pass
+                case _:
+                    error = "CFG node expects a control-flow region."
+                    raise ModelImportError(error, node)
+
+            signature = self.import_signature(node.signature)
+            node_id = self.add_node(
+                node, CFG(signature.input, signature.output), parent
+            )
+            self.import_cfg_region(body, signature, node_id)
+            return node_id
 
         def import_conditional() -> Node:
             match node.signature:
