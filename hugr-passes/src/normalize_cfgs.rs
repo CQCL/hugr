@@ -169,13 +169,13 @@ pub fn normalize_cfg<H: HugrMut>(
         }
     }
     let ancestor_block = |h: &H, mut n: H::Node| {
-        loop {
-            let p = h.get_parent(n).unwrap();
+        while let Some(p) = h.get_parent(n) {
             if p == cfg_node {
-                return n;
+                return Some(n);
             }
             n = p;
         }
+        None
     };
 
     // Further normalizations with effects outside the CFG
@@ -225,7 +225,7 @@ pub fn normalize_cfg<H: HugrMut>(
             .children(entry)
             .filter(|n| {
                 h.output_neighbours(*n)
-                    .any(|succ| ancestor_block(h, succ) != entry)
+                    .any(|succ| ancestor_block(h, succ).unwrap() != entry)
             })
             .collect::<Vec<_>>();
         // Move entry block contents into DFG.
@@ -276,7 +276,7 @@ pub fn normalize_cfg<H: HugrMut>(
         h.output_neighbours(*pred).count() == 1
          && // Allow only if no node in `pred` has nonlocal inputs
             h.children(*pred)
-                .all(|ch| h.input_neighbours(ch).all(|n| ancestor_block(h, n) == *pred))
+                .all(|ch| h.input_neighbours(ch).all(|n| ancestor_block(h, n).is_none_or(|src| src == *pred)))
     }) {
         // Code in that predecessor can be moved outside (into a new DFG after the CFG),
         // and the predecessor deleted
