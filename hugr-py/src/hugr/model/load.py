@@ -11,11 +11,14 @@ from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
 from hugr.ops import (
+    CFG,
     DFG,
     Call,
     Case,
     Conditional,
     Custom,
+    DataflowBlock,
+    ExitBlock,
     FuncDecl,
     FuncDefn,
     Input,
@@ -233,6 +236,51 @@ class ModelImport:
             tgt_node = order_data.get_node_by_key(tgt_key)
             self.hugr.add_order_link(src_node, tgt_node)
 
+    def import_block(self, block: model.Node, parent: Node):
+        # 1. Add the DataFlowBlock node:
+        sig = block.signature
+        assert sig.symbol == "core.ctrl"
+        [inputs, outputs] = sig.args
+        [real_input] = list(inputs.to_list_parts())
+        block_node = self.add_node(
+            block,
+            DataflowBlock(
+                self.import_type_row(real_input),
+                Sum(
+                    [self.import_type_row(output) for output in outputs.to_list_parts()]
+                ),
+            ),
+            parent,
+        )
+        # 2. Import the dataflow region:
+        [block_region] = block.regions
+        self.import_dfg_region(block_region, block_node)
+
+    def import_cfg_region(
+        self, region: model.Region, signature: FunctionType, parent: Node
+    ):
+        """Import an entire CFG region from the model into the Hugr."""
+        [entry_link] = region.sources
+        entry_block_idx = None
+        for i, child in enumerate(region.children):
+            if entry_link in child.inputs:
+                entry_block_idx = i
+                break
+        assert entry_block_idx is not None
+        entry_block = region.children[entry_block_idx]
+
+        # 1. Import the entry block:
+        self.import_block(entry_block, parent)
+
+        # 2. Create the exit node:
+        exit_node = self.hugr.add_node(ExitBlock(signature.output), parent)
+        self.record_in_links(exit_node, region.targets)
+
+        # 3. Import the other blocks:
+        for i, child in enumerate(region.children):
+            if i != entry_block_idx:
+                self.import_block(child, parent)
+
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
         """Import a model Node within a DFG region."""
 
@@ -340,8 +388,19 @@ class ModelImport:
                     )
 
         def import_cfg() -> Node:
-            # TODO
-            raise NotImplementedError("Cannot import CFG node.")
+            match node.regions:
+                case [body]:
+                    pass
+                case _:
+                    error = "CFG node expects a control-flow region."
+                    raise ModelImportError(error, node)
+
+            signature = self.import_signature(node.signature)
+            node_id = self.add_node(
+                node, CFG(signature.input, signature.output), parent
+            )
+            self.import_cfg_region(body, signature, node_id)
+            return node_id
 
         def import_conditional() -> Node:
             match node.signature:
