@@ -123,6 +123,45 @@ def _find_meta_title(node: model.Node) -> str | None:
     return None
 
 
+def _find_meta_order_region(region: model.Region) -> "RegionOrderHints":
+    """Searches for order hint metadata on the given region."""
+    data = RegionOrderHints()
+
+    for meta in region.meta:
+        match meta:
+            case model.Apply(
+                "core.order_hint.input_key", [model.Literal(int() as key)]
+            ):
+                data.input_keys.append(key)
+            case model.Apply(
+                "core.order_hint.output_key", [model.Literal(int() as key)]
+            ):
+                data.output_keys.append(key)
+            case model.Apply(
+                "core.order_hint.order",
+                [model.Literal(int() as before), model.Literal(int() as after)],
+            ):
+                data.edges.append((before, after))
+            case _:
+                pass
+
+    return data
+
+
+def _collect_meta_order_keys(node: model.Node) -> list[int]:
+    """Collects all order hint keys in the metadata of a node."""
+    keys = []
+
+    for meta in node.meta:
+        match meta:
+            case model.Apply("core.order_hint.key", [model.Literal(int() as key)]):
+                keys.append(key)
+            case _:
+                pass
+
+    return keys
+
+
 class ModelImport:
     """Helper to import a Hugr."""
 
@@ -222,13 +261,13 @@ class ModelImport:
         output_node = self.hugr.add_node(Output(signature.output), parent=parent)
         self.record_in_links(output_node, region.targets)
 
-        order_data = self.import_meta_order_region(region)
+        order_data = _find_meta_order_region(region)
         order_data.add_node_keys(input_node, order_data.input_keys)
         order_data.add_node_keys(output_node, order_data.output_keys)
 
         for child in region.children:
             child_id = self.import_node_in_dfg(child, parent)
-            child_order_keys = self.import_meta_order_keys(child)
+            child_order_keys = _collect_meta_order_keys(child)
             order_data.add_node_keys(child_id, child_order_keys)
 
         for src_key, tgt_key in order_data.edges:
@@ -732,43 +771,6 @@ class ModelImport:
                 return self.import_type(part)
 
         return [import_part(part) for part in term.to_list_parts()]
-
-    def import_meta_order_region(self, region: model.Region) -> "RegionOrderHints":
-        """Searches for order hint metadata on the given region."""
-        data = RegionOrderHints()
-
-        for meta in region.meta:
-            match meta:
-                case model.Apply(
-                    "core.order_hint.input_key", [model.Literal(int() as key)]
-                ):
-                    data.input_keys.append(key)
-                case model.Apply(
-                    "core.order_hint.output_key", [model.Literal(int() as key)]
-                ):
-                    data.output_keys.append(key)
-                case model.Apply(
-                    "core.order_hint.order",
-                    [model.Literal(int() as before), model.Literal(int() as after)],
-                ):
-                    data.edges.append((before, after))
-                case _:
-                    pass
-
-        return data
-
-    def import_meta_order_keys(self, node: model.Node) -> list[int]:
-        """Collects all order hint keys in the metadata of a node."""
-        keys = []
-
-        for meta in node.meta:
-            match meta:
-                case model.Apply("core.order_hint.key", [model.Literal(int() as key)]):
-                    keys.append(key)
-                case _:
-                    pass
-
-        return keys
 
     def import_value(self, term: model.Term) -> val.Value:
         match term:
