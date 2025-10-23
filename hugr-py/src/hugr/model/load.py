@@ -397,7 +397,11 @@ class ModelImport:
                             "application."
                             raise ModelImportError(error, node)
                 case "core.load_const":
-                    pass  # TODO
+                    # TODO If the constant refers directly to a function, import this as
+                    # the LoadFunc operation.
+                    # Otherwise, import as a Const and a LoadConst node:
+                    # TODO
+                    pass
                 # TODO others
                 case _:
                     return self.add_node(
