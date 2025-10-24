@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-v0.23.0...hugr-v0.24.0) - 2025-10-13
 
 ### Bug Fixes
