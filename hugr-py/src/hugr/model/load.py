@@ -16,12 +16,14 @@ from hugr.ops import (
     Call,
     Case,
     Conditional,
+    Const,
     Custom,
     DataflowBlock,
     ExitBlock,
     FuncDecl,
     FuncDefn,
     Input,
+    LoadConst,
     Op,
     Output,
     TailLoop,
@@ -415,8 +417,15 @@ class ModelImport:
                     # TODO If the constant refers directly to a function, import this as
                     # the LoadFunc operation.
                     # Otherwise, import as a Const and a LoadConst node:
-                    # TODO
-                    pass
+                    arg0, arg1 = args
+                    datatype = self.import_type(arg0)
+                    v = self.import_value(arg1)
+                    assert arg1.symbol == "core.const.adt"
+                    const_node = self.hugr.add_node(Const(v), parent, 1)
+                    loadconst_node = self.add_node(node, LoadConst(datatype), parent)
+                    self.hugr.add_link(
+                        OutPort(const_node, 0), InPort(loadconst_node, 0)
+                    )
                 # TODO others
                 case _:
                     return self.add_node(
@@ -777,6 +786,17 @@ class ModelImport:
                 # TODO
                 error = "Import json encoded constants"
                 raise NotImplementedError(error)
+            case model.Apply("core.const.adt", [variants, types, tag, values]):
+                return val.Sum(
+                    tag=tag.value,
+                    typ=Sum(
+                        variant_rows=[
+                            self.import_type(t) for t in types.to_list_parts()
+                        ]
+                    ),
+                    vals=[self.import_value(v) for v in values.to_tuple_parts()],
+                )
+                raise NotImplementedError()
             case _:
                 error = "Unsupported constant value."
                 raise ModelImportError(error, term)
