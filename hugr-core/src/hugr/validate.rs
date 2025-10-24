@@ -57,8 +57,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             self.validate_node(node)?;
         }
 
-        // Hierarchy and children. No type variables declared outside the root.
-        self.validate_subtree(self.hugr.entrypoint(), &[])?;
+        // Hierarchy and children. No type variables declared by the module root.
+        self.validate_subtree(self.hugr.module_root(), &[])?;
 
         self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
@@ -600,13 +600,9 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         }
 
         // Check port connections.
-        //
-        // Root nodes are ignored, as they cannot have connected edges.
-        if node != self.hugr.entrypoint() {
-            for dir in Direction::BOTH {
-                for port in self.hugr.node_ports(node, dir) {
-                    self.validate_port(node, port, op_type, var_decls)?;
-                }
+        for dir in Direction::BOTH {
+            for port in self.hugr.node_ports(node, dir) {
+                self.validate_port(node, port, op_type, var_decls)?;
             }
         }
 
