@@ -818,6 +818,29 @@ class ModelImport:
                 # TODO
                 error = "Import json encoded constants"
                 raise NotImplementedError(error)
+            case model.Apply("core.const.adt", [variants, _types, tag, values]):
+                match tag:
+                    case model.Literal(int() as tagval):
+                        pass
+                    case _:
+                        error = f"Unexpected tag: {tag}"
+                        raise ModelImportError(error)
+                return val.Sum(
+                    tag=tagval,
+                    typ=Sum(
+                        variant_rows=[
+                            [
+                                self.import_type(cast(model.Term, t))
+                                for t in cast(model.Term, variant).to_list_parts()
+                            ]
+                            for variant in variants.to_list_parts()
+                        ]
+                    ),
+                    vals=[
+                        self.import_value(cast(model.Term, v))
+                        for v in values.to_tuple_parts()
+                    ],
+                )
             case _:
                 error = "Unsupported constant value."
                 raise ModelImportError(error, term)
