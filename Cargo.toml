@@ -94,7 +94,7 @@ wyhash = "0.6.0"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
-pyo3 = ">= 0.23.4, < 0.26"
+pyo3 = ">= 0.23.4, < 0.27"
 portgraph = { version = "0.15.2" }
 petgraph = { version = ">= 0.8.1, < 0.9", default-features = false }
 
