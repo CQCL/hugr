@@ -38,7 +38,7 @@ pub trait PatchVerification {
     fn verify(&self, h: &impl HugrView<Node = Self::Node>) -> Result<(), Self::Error>;
 
     /// The nodes invalidated by the rewrite. Deprecated: implement
-    /// [Self::invalidated_nodes] instead. The default returns the empty
+    /// [PatchVerification::invalidated_nodes] instead. The default returns the empty
     /// iterator; this should be fine as there are no external calls.
     #[deprecated(note = "Use/implement invalidated_nodes instead", since = "0.20.2")]
     fn invalidation_set(&self) -> impl Iterator<Item = Self::Node> {
@@ -82,7 +82,7 @@ pub trait Patch<H: NodesIter>: PatchVerification<Node = H::Node> {
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
-    /// Returns [`Self::Outcome`] if successful. If
+    /// Returns [`Patch::Outcome`] if successful. If
     /// [`Patch::UNCHANGED_ON_FAILURE`] is true, then `h` must be unchanged if Err
     /// is returned. See also [`PatchVerification::verify`]
     ///
@@ -115,16 +115,17 @@ pub trait PatchHugrMut: PatchVerification {
     /// The type returned on successful application of the rewrite.
     type Outcome;
 
-    /// If `true`, [self.apply]'s of this rewrite guarantee that they do not
-    /// mutate the Hugr when they return an Err. If `false`, there is no
-    /// guarantee; the Hugr should be assumed invalid when Err is returned.
+    /// If `true`, [`PatchHugrMut::apply_hugr_mut`]'s of this rewrite guarantee
+    /// that they do not mutate the Hugr when they return an Err. If `false`,
+    /// there is no guarantee; the Hugr should be assumed invalid when Err is
+    /// returned.
     const UNCHANGED_ON_FAILURE: bool;
 
     /// Mutate the specified Hugr, or fail with an error.
     ///
-    /// Returns [`Self::Outcome`] if successful. If [`self.unchanged_on_failure`]
-    /// is true, then `h` must be unchanged if Err is returned. See also
-    /// [self.verify]
+    /// Returns [`PatchHugrMut::Outcome`] if successful. If
+    /// [`PatchHugrMut::UNCHANGED_ON_FAILURE`] is true, then `h` must be
+    /// unchanged if Err is returned. See also [PatchVerification::verify]
     ///
     /// # Panics
     ///

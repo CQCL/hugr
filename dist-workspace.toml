@@ -1,0 +1,37 @@
+[workspace]
+members = ["cargo:."]
+
+# Config for 'dist'
+[dist]
+# The preferred dist version to use in CI (Cargo.toml SemVer syntax)
+cargo-dist-version = "0.30.0"
+# CI backends to support
+ci = "github"
+# The installers to generate for each app
+# installers = ["shell", "powershell"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+]
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
+# Whether to install an updater program
+install-updater = false
+
+# ---- NON-DEFAULT SETTINGS BELOW ----
+# https://axodotdev.github.io/cargo-dist/book/reference/config.html
+
+# default is false, set to prevent hugr-llvm and hugr-py builds
+precise-builds = true
+
+# only trigger for hugr-cli release tags
+tag-namespace = "hugr-cli-v"
+
+# Don't create a github release automatically, upload to existing release-plz Release
+create-release = false
