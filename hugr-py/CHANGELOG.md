@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.0...hugr-py-v0.14.1) (2025-10-27)
+
+
+### Bug Fixes
+
+* **py:** loosen dependencies to allow for 3.14 support ([#2634](https://github.com/CQCL/hugr/issues/2634)) ([35b5b7b](https://github.com/CQCL/hugr/commit/35b5b7b3607e8d92b49b3ff4520ef8972e517308))
+
 ## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.1...hugr-py-v0.14.0) (2025-10-13)
 
 
