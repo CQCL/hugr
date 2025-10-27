@@ -6,7 +6,6 @@ from typing_extensions import Self
 
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
-from hugr.ops import Op
 
 
 class ComposablePass(Protocol):
