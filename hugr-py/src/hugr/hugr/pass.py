@@ -1,0 +1,16 @@
+from typing import Protocol, Self
+from hugr.hugr.base import Hugr
+
+
+class ComposablePass(Protocol):
+    def __call__(self, hugr: Hugr) -> None: ...
+
+    def then(self, other: Self) -> Self: ...
+
+    def with_entrypoint(self) -> Self: ...
+
+    @property
+    def is_global(self) -> bool: ...
+
+    @property
+    def is_recursive(self) -> bool: ...
