@@ -16,12 +16,14 @@ from hugr.ops import (
     Call,
     Case,
     Conditional,
+    Const,
     Custom,
     DataflowBlock,
     ExitBlock,
     FuncDecl,
     FuncDefn,
     Input,
+    LoadConst,
     Op,
     Output,
     TailLoop,
@@ -54,6 +56,7 @@ from hugr.tys import (
     TypeBound,
     TypeParam,
     TypeTypeParam,
+    Unit,
     Variable,
     _QubitDef,
 )
@@ -439,8 +442,22 @@ class ModelImport:
                     # TODO If the constant refers directly to a function, import this as
                     # the LoadFunc operation.
                     # Otherwise, import as a Const and a LoadConst node:
-                    # TODO
-                    pass
+                    match args:
+                        case [type_arg, value_arg]:
+                            datatype = self.import_type(type_arg)
+                        case [value_arg]:
+                            # Treat type_arg as Wildcard ==> Unit type
+                            datatype = Unit
+                        case _:
+                            error = f"Unexpected arguments to core.load_const: {args}"
+                            raise ModelImportError(error, node)
+                    v = self.import_value(value_arg)
+                    const_node = self.hugr.add_node(Const(v), parent, 1)
+                    loadconst_node = self.add_node(node, LoadConst(datatype), parent)
+                    self.hugr.add_link(
+                        OutPort(const_node, 0), InPort(loadconst_node, 0)
+                    )
+                    return loadconst_node  # TODO What about const_node?
                 # TODO others
                 case _:
                     return self.add_node(
