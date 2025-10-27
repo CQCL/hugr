@@ -1,6 +1,7 @@
 """The main HUGR structure."""
 
 from .base import Hugr, NodeData
+from .composable_pass import ComposablePass
 from .node_port import (
     Direction,
     InPort,
@@ -10,11 +11,12 @@ from .node_port import (
 )
 
 __all__ = [
-    "Hugr",
-    "NodeData",
+    "ComposablePass",
     "Direction",
+    "Hugr",
     "InPort",
-    "Wire",
-    "OutPort",
     "Node",
+    "NodeData",
+    "OutPort",
+    "Wire",
 ]
