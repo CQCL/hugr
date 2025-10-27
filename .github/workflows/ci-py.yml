@@ -111,7 +111,7 @@ jobs:
           enable-cache: true
 
       - name: Download the hugr binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: hugr_binary
           path: ${{env.HUGR_BIN_DIR}}
