@@ -13,12 +13,8 @@ __all__ = [
     "Hugr",
     "NodeData",
     "Direction",
-    "Hugr",
     "InPort",
     "Wire",
     "OutPort",
     "Node",
-    "NodeData",
-    "OutPort",
-    "Wire",
 ]
