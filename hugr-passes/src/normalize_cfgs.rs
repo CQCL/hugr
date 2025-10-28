@@ -224,8 +224,10 @@ pub fn normalize_cfg<H: HugrMut>(
         let nonlocal_srcs = h
             .children(entry)
             .filter(|n| {
-                h.output_neighbours(*n)
-                    .any(|succ| ancestor_block(h, succ).expect("Dom edges within entry, Ext within CFG") != entry)
+                h.output_neighbours(*n).any(|succ| {
+                    ancestor_block(h, succ).expect("Dom edges within entry, Ext within CFG")
+                        != entry
+                })
             })
             .collect::<Vec<_>>();
         // Move entry block contents into DFG.
