@@ -8,17 +8,17 @@ from .function import Module
 from .tracked_dfg import TrackedDfg
 
 __all__ = [
+    "ParentBuilder",
+    "Cfg",
     "Block",
     "Case",
-    "Cfg",
+    "If",
     "Conditional",
+    "TailLoop",
+    "Function",
+    "Module",
+    "TrackedDfg",
+    "Dfg",
     "DefinitionBuilder",
     "DfBase",
-    "Dfg",
-    "Function",
-    "If",
-    "Module",
-    "ParentBuilder",
-    "TailLoop",
-    "TrackedDfg",
 ]
