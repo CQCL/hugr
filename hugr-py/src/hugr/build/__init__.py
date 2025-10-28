@@ -5,20 +5,22 @@ from .cfg import Block, Cfg
 from .cond_loop import Case, Conditional, If, TailLoop
 from .dfg import DefinitionBuilder, DfBase, Dfg, Function
 from .function import Module
+from .passes.composable_pass import ComposablePass
 from .tracked_dfg import TrackedDfg
 
 __all__ = [
-    "ParentBuilder",
-    "Cfg",
     "Block",
     "Case",
-    "If",
+    "Cfg",
+    "ComposablePass",
     "Conditional",
-    "TailLoop",
-    "Function",
-    "Module",
-    "TrackedDfg",
-    "Dfg",
     "DefinitionBuilder",
     "DfBase",
+    "Dfg",
+    "Function",
+    "If",
+    "Module",
+    "ParentBuilder",
+    "TailLoop",
+    "TrackedDfg",
 ]
