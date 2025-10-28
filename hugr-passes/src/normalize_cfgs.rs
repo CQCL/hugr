@@ -884,17 +884,19 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn nested_cfgs_pass() {
+    #[rstest]
+    fn nested_cfgs_pass(#[values(true, false)] nonlocal: bool) {
         //  --> Entry --> Loop --> Tail --> EXIT
         //        |       /  \
         //      (E->X)    \<-/
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", []).unwrap();
-        let qqu = vec![qb_t(), qb_t(), usize_t()];
+        let qqu = TypeRow::from(vec![qb_t(), qb_t(), usize_t()]);
         let qq = TypeRow::from(vec![qb_t(); 2]);
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
-        let mut entry = outer.entry_builder(vec![qq.clone()], type_row![]).unwrap();
+        let mut entry = outer
+            .entry_builder(vec![qq.clone()], usize_t().into())
+            .unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
         let (inner, inner_pred) = {
             let mut inner = entry
@@ -915,31 +917,33 @@ mod test {
             .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
             .unwrap()
             .outputs_arr();
-        let entry = entry.finish_with_outputs(entry_pred, []).unwrap();
+        let entry = entry.finish_with_outputs(entry_pred, [u]).unwrap();
 
         let loop_b = {
+            let qu = [qb_t(), usize_t()];
             let mut loop_b = outer
-                .block_builder(qq.clone(), [qb_t().into(), usize_t().into()], qb_t().into())
+                .block_builder(qqu, qu.clone().map(TypeRow::from), Vec::from(qu).into())
                 .unwrap();
-            let [q1, q2] = loop_b.input_wires_arr();
+            let [q1, q2, u_local] = loop_b.input_wires_arr();
             // u here is `dom` edge from entry block
             let [pred] = loop_b
-                .add_dataflow_op(tst_op, [q1, u])
+                .add_dataflow_op(tst_op, [q1, if nonlocal { u } else { u_local }])
                 .unwrap()
                 .outputs_arr();
-            loop_b.finish_with_outputs(pred, [q2]).unwrap()
+            loop_b.finish_with_outputs(pred, [q2, u_local]).unwrap()
         };
         outer.branch(&entry, 0, &loop_b).unwrap();
         outer.branch(&loop_b, 0, &loop_b).unwrap();
 
         let (tail_b, tail_pred) = {
             let uq = TypeRow::from(vec![usize_t(), qb_t()]);
+            let uqu = vec![usize_t(), qb_t(), usize_t()].into();
             let mut tail_b = outer
-                .block_builder(uq.clone(), vec![uq.clone()], type_row![])
+                .block_builder(uqu, vec![uq.clone()], type_row![])
                 .unwrap();
-            let [u, q] = tail_b.input_wires_arr();
+            let [u, q, _] = tail_b.input_wires_arr();
             let [br] = tail_b
-                .add_dataflow_op(Tag::new(0, vec![uq.clone()]), [u, q])
+                .add_dataflow_op(Tag::new(0, vec![uq]), [u, q])
                 .unwrap()
                 .outputs_arr();
             (tail_b.finish_with_outputs(br, []).unwrap(), br.node())
@@ -947,6 +951,7 @@ mod test {
         outer.branch(&loop_b, 1, &tail_b).unwrap();
         outer.branch(&tail_b, 0, &outer.exit_block()).unwrap();
         let mut h = outer.finish_hugr().unwrap();
+        // Sanity checks:
         assert_eq!(
             h.get_parent(h.get_parent(inner_pred).unwrap()),
             Some(inner.node())
