@@ -84,8 +84,8 @@ pub enum NormalizeCFGResult<N = Node> {
     CFGToDFG,
     /// The CFG was preserved, but the entry or exit blocks may have changed.
     CFGPreserved {
-        /// If `Some`, the Entry block that was removed (its contents moved to be siblings of the CFG)
-        entry_removed: Option<N>,
+        /// If `Some`, the new [DFG] containing what was previously in the entry block
+        entry_dfg: Option<N>,
         /// If `Some`, the new [DFG] of what was previously in the last block before the exit
         exit_dfg: Option<N>,
         /// The number of basic blocks merged together.
@@ -186,7 +186,7 @@ pub fn normalize_cfg<H: HugrMut>(
     // However, we only do this if the Entry block has just one successor (i.e. we can remove
     // the entry block altogether) - an extension would be to do this in other cases, preserving
     // the Entry block as an empty branch.
-    let mut entry_removed = None;
+    let mut entry_dfg = None;
     if let Some(succ) = h
         .output_neighbours(entry)
         .exactly_one()
@@ -217,58 +217,51 @@ pub fn normalize_cfg<H: HugrMut>(
             unpack_before_output(h, h.get_io(cfg_node).unwrap()[1], result_tys);
             return Ok(NormalizeCFGResult::CFGToDFG);
         }
-        // 1b. Move entry block outside/before the CFG; its successor becomes the entry block.
+        // 1b. Move entry block outside/before the CFG into a DFG; its successor becomes the entry block.
         let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
-        // Look for nonlocal edges from the entry block.
-        // We could just bail if there are any, but they are fairly easy to handle.
-        let nonlocal_srcs = h
+        // Look for nonlocal `Dom` edges from the entry block.
+        let has_nonlocals = h
             .children(entry)
-            .filter(|n| {
-                h.output_neighbours(*n)
-                    .any(|succ| ancestor_block(h, succ).unwrap() != entry)
-            })
-            .collect::<Vec<_>>();
-        // Move entry block contents into DFG.
-        let dfg = h.add_node_with_parent(
-            cfg_parent,
-            DFG {
-                signature: Signature::new(entry_blk.inputs.clone(), new_cfg_inputs.clone()),
-            },
-        );
-        let [_, entry_output] = h.get_io(entry).unwrap();
-        while let Some(n) = h.first_child(entry) {
-            h.set_parent(n, dfg);
-        }
-        h.move_before_sibling(succ, entry);
-        h.remove_node(entry);
-
-        unpack_before_output(h, entry_output, new_cfg_inputs.clone());
-
-        // Inputs to CFG go directly to DFG
-        for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
-            for src in h.linked_outputs(cfg_node, inp).collect::<Vec<_>>() {
-                h.connect(src.0, src.1, dfg, inp.index());
+            .flat_map(|n| h.output_neighbours(n))
+            .any(|succ| ancestor_block(h, succ).unwrap() != entry);
+        if !has_nonlocals {
+            // Move entry block contents into DFG.
+            let dfg = h.add_node_with_parent(
+                cfg_parent,
+                DFG {
+                    signature: Signature::new(entry_blk.inputs.clone(), new_cfg_inputs.clone()),
+                },
+            );
+            let [_, entry_output] = h.get_io(entry).unwrap();
+            while let Some(n) = h.first_child(entry) {
+                h.set_parent(n, dfg);
             }
-            h.disconnect(cfg_node, inp);
-        }
+            h.move_before_sibling(succ, entry);
+            h.remove_node(entry);
 
-        // Update input ports
-        let cfg_ty = cfg_ty_mut(h, cfg_node);
-        let inputs_to_add = new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
-        cfg_ty.signature.input = new_cfg_inputs;
-        h.add_ports(cfg_node, Direction::Incoming, inputs_to_add);
+            unpack_before_output(h, entry_output, new_cfg_inputs.clone());
 
-        // Wire outputs of DFG directly to CFG
-        for src in h.node_outputs(dfg).collect::<Vec<_>>() {
-            h.connect(dfg, src, cfg_node, src.index());
+            // Inputs to CFG go directly to DFG
+            for inp in h.node_inputs(cfg_node).collect::<Vec<_>>() {
+                for src in h.linked_outputs(cfg_node, inp).collect::<Vec<_>>() {
+                    h.connect(src.0, src.1, dfg, inp.index());
+                }
+                h.disconnect(cfg_node, inp);
+            }
+
+            // Update input ports
+            let cfg_ty = cfg_ty_mut(h, cfg_node);
+            let inputs_to_add =
+                new_cfg_inputs.len() as isize - cfg_ty.signature.input.len() as isize;
+            cfg_ty.signature.input = new_cfg_inputs;
+            h.add_ports(cfg_node, Direction::Incoming, inputs_to_add);
+
+            // Wire outputs of DFG directly to CFG
+            for src in h.node_outputs(dfg).collect::<Vec<_>>() {
+                h.connect(dfg, src, cfg_node, src.index());
+            }
+            entry_dfg = Some(dfg);
         }
-        // Inline DFG to ensure that any nonlocal (`Dom`) edges from it, become valid `Ext` edges
-        for n in nonlocal_srcs {
-            // With required Order edge. (Do this before inlining, in case n is Input.)
-            h.add_other_edge(n, cfg_node);
-        }
-        h.apply_patch(InlineDFG(dfg.into())).unwrap();
-        entry_removed = Some(entry);
     }
     // 2. If the exit node has a single predecessor and that predecessor has no other successors...
     let mut exit_dfg = None;
@@ -328,7 +321,7 @@ pub fn normalize_cfg<H: HugrMut>(
         exit_dfg = Some(dfg);
     }
     Ok(NormalizeCFGResult::CFGPreserved {
-        entry_removed,
+        entry_dfg,
         exit_dfg,
         num_merged,
     })
@@ -781,14 +774,13 @@ mod test {
         let res = normalize_cfg(&mut h).unwrap();
         h.validate().unwrap();
         let NormalizeCFGResult::CFGPreserved {
-            entry_removed,
+            entry_dfg: Some(dfg),
             exit_dfg: None,
             num_merged: 0,
         } = res
         else {
             panic!("Unexpected result");
         };
-        assert_eq!(entry_removed, Some(entry.node()));
         assert_eq!(
             h.children(h.entrypoint())
                 .map(|n| h.get_optype(n).tag())
@@ -799,8 +791,20 @@ mod test {
         let func_children = child_tags_ext_ids(&h, func);
         assert_eq!(
             func_children.into_iter().sorted().collect_vec(),
+            ["Cfg", "Dfg", "Input", "Output",]
+        );
+        assert_eq!(
+            h.children(func)
+                .filter(|n| h.get_optype(*n).is_dfg())
+                .collect_vec(),
+            [dfg]
+        );
+        assert_eq!(
+            child_tags_ext_ids(&h, dfg)
+                .into_iter()
+                .sorted()
+                .collect_vec(),
             [
-                "Cfg",
                 "Const",
                 "Input",
                 "LoadConst",
@@ -843,7 +847,7 @@ mod test {
         let res = normalize_cfg(&mut h).unwrap();
         h.validate().unwrap();
         let NormalizeCFGResult::CFGPreserved {
-            entry_removed: None,
+            entry_dfg: None,
             exit_dfg: Some(dfg),
             num_merged: 0,
         } = res
@@ -881,17 +885,19 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn nested_cfgs_pass() {
+    #[rstest]
+    fn nested_cfgs_pass(#[values(true, false)] nonlocal: bool) {
         //  --> Entry --> Loop --> Tail --> EXIT
         //        |       /  \
         //      (E->X)    \<-/
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", []).unwrap();
-        let qqu = vec![qb_t(), qb_t(), usize_t()];
+        let qqu = TypeRow::from(vec![qb_t(), qb_t(), usize_t()]);
         let qq = TypeRow::from(vec![qb_t(); 2]);
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
-        let mut entry = outer.entry_builder(vec![qq.clone()], type_row![]).unwrap();
+        let mut entry = outer
+            .entry_builder(vec![qq.clone()], usize_t().into())
+            .unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
         let (inner, inner_pred) = {
             let mut inner = entry
@@ -912,31 +918,33 @@ mod test {
             .add_dataflow_op(Tag::new(0, vec![qq.clone()]), [q1, q2])
             .unwrap()
             .outputs_arr();
-        let entry = entry.finish_with_outputs(entry_pred, []).unwrap();
+        let entry = entry.finish_with_outputs(entry_pred, [u]).unwrap();
 
         let loop_b = {
+            let qu = [qb_t(), usize_t()];
             let mut loop_b = outer
-                .block_builder(qq.clone(), [qb_t().into(), usize_t().into()], qb_t().into())
+                .block_builder(qqu, qu.clone().map(TypeRow::from), Vec::from(qu).into())
                 .unwrap();
-            let [q1, q2] = loop_b.input_wires_arr();
+            let [q1, q2, u_local] = loop_b.input_wires_arr();
             // u here is `dom` edge from entry block
             let [pred] = loop_b
-                .add_dataflow_op(tst_op, [q1, u])
+                .add_dataflow_op(tst_op, [q1, if nonlocal { u } else { u_local }])
                 .unwrap()
                 .outputs_arr();
-            loop_b.finish_with_outputs(pred, [q2]).unwrap()
+            loop_b.finish_with_outputs(pred, [q2, u_local]).unwrap()
         };
         outer.branch(&entry, 0, &loop_b).unwrap();
         outer.branch(&loop_b, 0, &loop_b).unwrap();
 
         let (tail_b, tail_pred) = {
             let uq = TypeRow::from(vec![usize_t(), qb_t()]);
+            let uqu = vec![usize_t(), qb_t(), usize_t()].into();
             let mut tail_b = outer
-                .block_builder(uq.clone(), vec![uq.clone()], type_row![])
+                .block_builder(uqu, vec![uq.clone()], type_row![])
                 .unwrap();
-            let [u, q] = tail_b.input_wires_arr();
+            let [u, q, _] = tail_b.input_wires_arr();
             let [br] = tail_b
-                .add_dataflow_op(Tag::new(0, vec![uq.clone()]), [u, q])
+                .add_dataflow_op(Tag::new(0, vec![uq]), [u, q])
                 .unwrap()
                 .outputs_arr();
             (tail_b.finish_with_outputs(br, []).unwrap(), br.node())
@@ -944,6 +952,7 @@ mod test {
         outer.branch(&loop_b, 1, &tail_b).unwrap();
         outer.branch(&tail_b, 0, &outer.exit_block()).unwrap();
         let mut h = outer.finish_hugr().unwrap();
+        // Sanity checks:
         assert_eq!(
             h.get_parent(h.get_parent(inner_pred).unwrap()),
             Some(inner.node())
@@ -952,47 +961,65 @@ mod test {
         assert_eq!(h.get_parent(tail_pred.node()), Some(tail_b.node()));
 
         let mut res = NormalizeCFGPass::default().run(&mut h).unwrap();
-
         h.validate().unwrap();
         assert_eq!(
             res.remove(&inner.node()),
             Some(NormalizeCFGResult::CFGToDFG)
         );
         let Some(NormalizeCFGResult::CFGPreserved {
-            entry_removed,
+            entry_dfg,
             exit_dfg: Some(tail_dfg),
             num_merged: 0,
         }) = res.remove(&h.entrypoint())
         else {
             panic!("Unexpected result")
         };
+
         assert!(res.is_empty());
-        assert_eq!(entry_removed, Some(entry.node()));
-        // Now contains only one CFG with one BB (self-loop)
+
         assert_eq!(
             h.nodes()
                 .filter(|n| h.get_optype(*n).is_cfg())
-                .exactly_one()
-                .ok(),
-            Some(h.entrypoint())
+                .collect_vec(),
+            vec![h.entrypoint()]
         );
-        let [entry, exit] = h.children(h.entrypoint()).collect_array().unwrap();
-        assert_eq!(h.output_neighbours(entry).collect_vec(), [entry, exit]);
+        let [loop_, exit] = if nonlocal {
+            let [entry, exit, loop_] = h.children(h.entrypoint()).collect_array().unwrap();
+            assert_eq!(h.get_parent(entry_pred.node()), Some(entry));
+            [loop_, exit]
+        } else {
+            h.children(h.entrypoint()).collect_array().unwrap()
+        };
+
+        assert_eq!(h.output_neighbours(loop_).collect_vec(), [loop_, exit]);
+
         // Inner CFG is now a DFG (and still sibling of entry_pred)...
         assert_eq!(h.get_parent(inner_pred), Some(inner.node()));
         assert_eq!(h.get_optype(inner.node()).tag(), OpTag::Dfg);
         assert_eq!(h.get_parent(inner.node()), h.get_parent(entry_pred.node()));
-
         // Predicates lifted appropriately...
         let func = h.get_parent(h.entrypoint()).unwrap();
-        assert_eq!(h.get_parent(entry_pred.node()), Some(func));
 
         assert_eq!(h.get_parent(tail_pred.node()), Some(tail_dfg));
         assert_eq!(h.get_optype(tail_dfg).tag(), OpTag::Dfg);
         assert_eq!(h.get_parent(tail_dfg), Some(func));
+        let lifted_preds = if nonlocal {
+            assert!(entry_dfg.is_none());
+            // entry_pred not lifted, still connected to output
+            let [output] = h
+                .output_neighbours(entry_pred.node())
+                .collect_array()
+                .unwrap();
+            assert_eq!(h.get_optype(output).tag(), OpTag::Output);
+            vec![inner_pred.node(), tail_pred.node()]
+        } else {
+            assert_eq!(h.get_parent(entry_dfg.unwrap()), Some(func));
+            assert_eq!(h.get_parent(entry_pred.node()), entry_dfg);
+            vec![inner_pred.node(), entry_pred.node(), tail_pred.node()]
+        };
 
         // ...and followed by UnpackTuple's
-        for n in [inner_pred, entry_pred.node(), tail_pred.node()] {
+        for n in lifted_preds {
             let [unpack] = h.output_neighbours(n).collect_array().unwrap();
             assert!(
                 h.get_optype(unpack)
