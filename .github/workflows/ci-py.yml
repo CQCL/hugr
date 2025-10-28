@@ -16,7 +16,7 @@ env:
   HUGR_BIN_DIR: ${{ github.workspace }}/target/debug
   HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
   # Pinned version for the uv package manager
-  UV_VERSION: "0.7.4"
+  UV_VERSION: "0.9.5"
   UV_FROZEN: 1
 
 jobs:
@@ -44,7 +44,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.13']
+        python-version: ['3.10', '3.14']
 
     steps:
       - uses: actions/checkout@v5
@@ -86,7 +86,7 @@ jobs:
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: hugr_binary
           path: target/debug/hugr
@@ -100,7 +100,7 @@ jobs:
       matrix:
         python-version:
           - { py: '3.10', coverage: false }
-          - { py: '3.13', coverage: true }
+          - { py: '3.14', coverage: true }
     steps:
       - uses: actions/checkout@v5
 
@@ -111,7 +111,7 @@ jobs:
           enable-cache: true
 
       - name: Download the hugr binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: hugr_binary
           path: ${{env.HUGR_BIN_DIR}}

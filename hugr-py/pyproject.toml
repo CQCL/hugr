@@ -1,6 +1,6 @@
 [project]
 name = "hugr"
-version = "0.14.0"
+version = "0.14.1"
 requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
@@ -28,11 +29,11 @@ classifiers = [
 
 dependencies = [
     "graphviz>=0.20.3",
-    "pydantic>=2.8,<2.12",
-    "pydantic-extra-types>=2.9.0",
-    "semver>=3.0.2",
+    "pydantic~=2.8",
+    "pydantic-extra-types~=2.9",
+    "semver~=3.0",
     "typing-extensions~=4.12",
-    "pyzstd>=0.16.2,<0.18.0",
+    "pyzstd~=0.18.0",
 ]
 
 [project.optional-dependencies]

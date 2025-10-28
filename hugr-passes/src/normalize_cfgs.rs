@@ -220,13 +220,12 @@ pub fn normalize_cfg<H: HugrMut>(
         }
         // 1b. Move entry block outside/before the CFG; its successor becomes the entry block.
         let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
-        // Look for nonlocal edges from the entry block.
-        // We could just bail if there are any, but they are fairly easy to handle.
+        // Look for nonlocal `Dom` edges from the entry block.
         let nonlocal_srcs = h
             .children(entry)
             .filter(|n| {
                 h.output_neighbours(*n)
-                    .any(|succ| ancestor_block(h, succ).unwrap() != entry)
+                    .any(|succ| ancestor_block(h, succ).expect("Dom edges within entry, Ext within CFG") != entry)
             })
             .collect::<Vec<_>>();
         // Move entry block contents into DFG.
@@ -274,10 +273,12 @@ pub fn normalize_cfg<H: HugrMut>(
     // 2. If the exit node has a single predecessor and that predecessor has no other successors...
     let mut exit_dfg = None;
     if let Some(pred) = h.input_neighbours(exit).exactly_one().ok().filter(|pred| {
+        // Allow only if there are no `Dom` edges into `pred`. (Ignore `Ext` edges.)
+        let src_nodes = h.children(*pred).flat_map(|ch| h.input_neighbours(ch));
         h.output_neighbours(*pred).count() == 1
-         && // Allow only if no node in `pred` has nonlocal inputs
-            h.children(*pred)
-                .all(|ch| h.input_neighbours(ch).all(|n| ancestor_block(h, n).is_none_or(|src| src == *pred)))
+            && src_nodes.dedup().all(|src| {
+                ancestor_block(h, src).is_none_or(|src| src == *pred) // Nones are `Ext` edges.
+            })
     }) {
         // Code in that predecessor can be moved outside (into a new DFG after the CFG),
         // and the predecessor deleted
