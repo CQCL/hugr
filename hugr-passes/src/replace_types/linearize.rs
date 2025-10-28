@@ -375,7 +375,7 @@ mod test {
 
     use hugr_core::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, inout_sig,
+        FunctionBuilder, HugrBuilder, inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
@@ -912,7 +912,7 @@ mod test {
         );
 
         let build_hugr = |ty: Type| {
-            let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
+            let mut dfb = FunctionBuilder::new("main", Signature::new(ty.clone(), vec![])).unwrap();
             let [inp] = dfb.input_wires_arr();
             let drop_op = drop_ext
                 .instantiate_extension_op("drop", [ty.into()])

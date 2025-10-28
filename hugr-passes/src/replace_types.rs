@@ -1117,8 +1117,8 @@ mod test {
     where
         GenericArrayValue<AK>: CustomConst,
     {
-        let mut dfb =
-            DFGBuilder::new(inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()))).unwrap();
+        let sig = inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()));
+        let mut dfb = FunctionBuilder::new("main", sig).unwrap();
         let c = dfb.add_load_value(GenericArrayValue::<AK>::new(
             usize_t(),
             vals.iter().map(|u| ConstUsize::new(*u).into()),
