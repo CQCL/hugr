@@ -10,9 +10,13 @@ from .node_port import (
 )
 
 __all__ = [
+    "Hugr",
+    "NodeData",
     "Direction",
     "Hugr",
     "InPort",
+    "Wire",
+    "OutPort",
     "Node",
     "NodeData",
     "OutPort",
