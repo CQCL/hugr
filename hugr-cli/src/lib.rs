@@ -63,9 +63,9 @@ pub enum CliCommand {
     External(Vec<OsString>),
 
     /// Describe the contents of a HUGR package.
-    /// 
-    /// If an error occurs during loading partial descriptions are printed,
-    /// for example if the first module is loaded and the second fails the
+    ///
+    /// If an error occurs during loading partial descriptions are printed.
+    /// For example if the first module is loaded and the second fails then
     /// only the first module will be described.
     Describe(describe::DescribeArgs),
 }
