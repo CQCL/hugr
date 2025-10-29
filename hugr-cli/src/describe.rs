@@ -24,7 +24,7 @@ pub struct DescribeArgs {
     #[command(flatten)]
     pub input_args: HugrInputArgs,
     /// Enumerate packaged extensions
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "Filter")]
     pub packaged_extensions: bool,
 
     #[command(flatten)]
@@ -43,15 +43,15 @@ pub struct DescribeArgs {
 /// Arguments for reading a HUGR input.
 #[derive(Debug, clap::Args)]
 pub struct ModuleArgs {
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "Filter")]
     /// Don't display resolved extensions used by the module.
     pub no_resolved_extensions: bool,
 
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "Filter")]
     /// Display public symbols in the module.
     pub public_symbols: bool,
 
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "Filter")]
     /// Display claimed extensions set by generator in module metadata.
     pub generator_claimed_extensions: bool,
 }
