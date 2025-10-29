@@ -101,11 +101,17 @@ impl DescribeArgs {
 
     fn print_description(&mut self, desc: PackageDesc) -> Result<()> {
         let header = desc.header();
+        let n_modules = desc.n_modules();
+        let n_extensions = desc.n_packaged_extensions();
+        let module_str = if n_modules == 1 { "module" } else { "modules" };
+        let extension_str = if n_extensions == 1 {
+            "extension"
+        } else {
+            "extensions"
+        };
         writeln!(
             self.output,
-            "{header}\nPackage contains {} module(s) and {} extension(s)",
-            desc.n_modules(),
-            desc.n_packaged_extensions()
+            "{header}\nPackage contains {n_modules} {module_str} and {n_extensions} {extension_str}",
         )?;
         let summaries: Vec<ModuleSummary> = desc
             .modules

@@ -140,7 +140,7 @@ fn test_describe_basic(empty_package_file: NamedTempFile, mut describe_cmd: Comm
     describe_cmd
         .assert()
         .success()
-        .stdout(contains("Package contains 0 module(s) and 0 extension(s)"));
+        .stdout(contains("Package contains 0 modules and 0 extensions"));
 }
 
 #[rstest]
@@ -213,7 +213,7 @@ fn test_describe_output_redirection(empty_package_file: NamedTempFile, mut descr
         output_file.path(),
     ]);
     describe_cmd.assert().success();
-    output_file.assert(contains("Package contains 0 module(s) and 0 extension(s)"));
+    output_file.assert(contains("Package contains 0 modules and 0 extensions"));
 }
 
 #[rstest]
