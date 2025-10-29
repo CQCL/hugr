@@ -62,7 +62,11 @@ pub enum CliCommand {
     #[command(external_subcommand)]
     External(Vec<OsString>),
 
-    /// Describe the contents of a HUGR envelope.
+    /// Describe the contents of a HUGR package.
+    /// 
+    /// If an error occurs during loading partial descriptions are printed,
+    /// for example if the first module is loaded and the second fails the
+    /// only the first module will be described.
     Describe(describe::DescribeArgs),
 }
 

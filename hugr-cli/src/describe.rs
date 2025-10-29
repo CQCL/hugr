@@ -1,4 +1,4 @@
-//! Convert between different HUGR envelope formats.
+//! Describe the contents of HUGR packages.
 use std::io::Write;
 
 use crate::hugr_io::HugrInputArgs;
@@ -13,7 +13,7 @@ use hugr::package::Package;
 use tabled::Tabled;
 use tabled::derive::display;
 
-/// Convert between different HUGR envelope formats.
+/// Describe the contents of a serialized HUGR package.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
 #[clap(about = "Describe the contents of a HUGR envelope.")]
@@ -23,7 +23,7 @@ pub struct DescribeArgs {
     /// Hugr input.
     #[command(flatten)]
     pub input_args: HugrInputArgs,
-    /// enumerate packaged extensions
+    /// Enumerate packaged extensions
     #[arg(long, default_value = "false")]
     pub packaged_extensions: bool,
 
@@ -69,7 +69,7 @@ impl ModuleArgs {
     }
 }
 impl DescribeArgs {
-    /// Convert a HUGR between different envelope formats
+    /// Load and describe the HUGR package.
     pub fn run_describe(&mut self) -> Result<()> {
         let (mut desc, res) = match self.input_args.get_described_package() {
             Ok((desc, pkg)) => (desc, Ok(pkg)),
