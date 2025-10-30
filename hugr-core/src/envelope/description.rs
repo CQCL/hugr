@@ -94,15 +94,23 @@ mod wrapper {
 pub use wrapper::DescribedPackage;
 pub(crate) use wrapper::{Described, ModuleDescResult, PackageDescResult, transpose};
 
-type PartialVec<T> = Vec<Option<T>>;
-fn set_partial_len<T: Clone>(vec: &mut PartialVec<T>, n: usize) {
+type OptionVec<T> = Vec<Option<T>>;
+fn set_option_vec_len<T: Clone>(vec: &mut OptionVec<T>, n: usize) {
     vec.resize(n, None);
 }
-fn set_partial_index<T: Clone>(vec: &mut PartialVec<T>, index: usize, value: T) {
+fn set_option_vec_index<T: Clone>(vec: &mut OptionVec<T>, index: usize, value: T) {
     if index >= vec.len() {
-        set_partial_len(vec, index + 1);
+        set_option_vec_len(vec, index + 1);
     }
     vec[index] = Some(value);
+}
+
+fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterator<Item = T>) {
+    if let Some(existing) = vec {
+        existing.extend(items);
+    } else {
+        vec.replace(items.into_iter().collect());
+    }
 }
 
 /// High-level description of a HUGR package.
@@ -112,10 +120,10 @@ pub struct PackageDesc {
     #[serde(serialize_with = "header_serialize")]
     pub header: EnvelopeHeader,
     /// Description of the modules in the package.
-    pub modules: PartialVec<ModuleDesc>,
+    pub modules: OptionVec<ModuleDesc>,
     /// Description of the extensions in the package.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub packaged_extensions: PartialVec<ExtensionDesc>,
+    pub packaged_extensions: OptionVec<ExtensionDesc>,
 }
 
 fn header_serialize<S>(header: &EnvelopeHeader, serializer: S) -> Result<S::Ok, S::Error>
@@ -136,7 +144,7 @@ impl PackageDesc {
 
     /// Sets the number of modules in the package.
     pub(crate) fn set_n_modules(&mut self, n: usize) {
-        set_partial_len(&mut self.modules, n);
+        set_option_vec_len(&mut self.modules, n);
     }
 
     /// Returns the package header.
@@ -151,12 +159,12 @@ impl PackageDesc {
 
     /// Sets a module description at the specified index.
     pub(crate) fn set_module(&mut self, index: usize, module: impl Into<ModuleDesc>) {
-        set_partial_index(&mut self.modules, index, module.into());
+        set_option_vec_index(&mut self.modules, index, module.into());
     }
 
     /// Sets a packaged extension description at the specified index.
     pub(crate) fn set_packaged_extension(&mut self, index: usize, ext: impl Into<ExtensionDesc>) {
-        set_partial_index(&mut self.packaged_extensions, index, ext.into());
+        set_option_vec_index(&mut self.packaged_extensions, index, ext.into());
     }
 
     /// Returns the number of packaged extensions in the package.
@@ -228,14 +236,6 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
             name: ext.name.to_string(),
             version: ext.version.clone(),
         }
-    }
-}
-
-fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterator<Item = T>) {
-    if let Some(existing) = vec {
-        existing.extend(items);
-    } else {
-        vec.replace(items.into_iter().collect());
     }
 }
 

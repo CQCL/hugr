@@ -64,6 +64,7 @@ use itertools::Itertools as _;
 use crate::import::ImportError;
 
 // TODO centralise all core metadata keys in one place.
+// https://github.com/CQCL/hugr/issues/2651
 
 /// Key used to store the name of the generator that produced the envelope.
 pub const GENERATOR_KEY: &str = "core.generator";
@@ -386,7 +387,7 @@ pub enum EnvelopeError {
         flag_ids: Vec<usize>,
     },
     /// Error raised while checking for breaking extension version mismatch.
-    // no longer used
+    #[deprecated(since = "0.24.1")]
     #[error(transparent)]
     #[allow(deprecated)]
     ExtensionVersion {
