@@ -77,8 +77,10 @@ fn test_convert_to_json(test_envelope_file: NamedTempFile, mut convert_cmd: Comm
     let output_content = std::fs::read(output_file.path()).expect("Failed to read output file");
     let reader = BufReader::new(output_content.as_slice());
     let registry = ExtensionRegistry::default();
-    let (desc, _) =
-        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+    let desc = read_described_envelope(reader, &registry)
+        .expect("Failed to read output envelope")
+        .description()
+        .clone();
     let config = desc.header.config();
 
     // Verify the format is correct
@@ -104,8 +106,10 @@ fn test_convert_to_model(test_envelope_file: NamedTempFile, mut convert_cmd: Com
     let output_content = std::fs::read(output_file.path()).expect("Failed to read output file");
     let reader = BufReader::new(output_content.as_slice());
     let registry = ExtensionRegistry::default();
-    let (desc, _) =
-        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+    let desc = read_described_envelope(reader, &registry)
+        .expect("Failed to read output envelope")
+        .description()
+        .clone();
     let config = desc.header.config();
     // Verify the format is correct
     assert_eq!(config.format, EnvelopeFormat::Model);
@@ -177,8 +181,10 @@ fn test_convert_model_text_format(test_envelope_file: NamedTempFile, mut convert
     let output_content = std::fs::read(output_file.path()).expect("Failed to read output file");
     let reader = BufReader::new(output_content.as_slice());
     let registry = ExtensionRegistry::default();
-    let (desc, _) =
-        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+    let desc = read_described_envelope(reader, &registry)
+        .expect("Failed to read output envelope")
+        .description()
+        .clone();
     let config = desc.header.config();
 
     // Verify the format is correct
@@ -197,14 +203,18 @@ fn test_format_roundtrip(test_package: Package) {
     let config_model = EnvelopeConfig::new(EnvelopeFormat::Model);
     let reader = BufReader::new(json_data.as_slice());
     let registry = ExtensionRegistry::default();
-    let (_, package) = read_described_envelope(reader, &registry).unwrap();
+    let package = read_described_envelope(reader, &registry)
+        .unwrap()
+        .into_inner();
 
     let mut model_data = Vec::new();
     hugr::envelope::write_envelope(&mut model_data, &package, config_model).unwrap();
 
     // Convert back to JSON
     let reader = BufReader::new(model_data.as_slice());
-    let (_, package_back) = read_described_envelope(reader, &registry).unwrap();
+    let package_back = read_described_envelope(reader, &registry)
+        .unwrap()
+        .into_inner();
 
     // Package should be the same after roundtrip conversion
     assert_eq!(test_package, package_back);
@@ -220,8 +230,10 @@ fn test_convert_text_flag(test_envelope_text: (String, Package), mut convert_cmd
 
     let reader = BufReader::new(stdout.as_slice());
     let registry = ExtensionRegistry::default();
-    let (desc, _) =
-        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+    let desc = read_described_envelope(reader, &registry)
+        .expect("Failed to read output envelope")
+        .description()
+        .clone();
     let config = desc.header.config();
 
     // Verify it's a text-based format
@@ -238,8 +250,10 @@ fn test_convert_binary_flag(test_envelope_text: (String, Package), mut convert_c
 
     let reader = BufReader::new(stdout.as_slice());
     let registry = ExtensionRegistry::default();
-    let (desc, _) =
-        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+    let desc = read_described_envelope(reader, &registry)
+        .expect("Failed to read output envelope")
+        .description()
+        .clone();
     let config = desc.header.config();
 
     // Verify it's a binary format (not ASCII printable)

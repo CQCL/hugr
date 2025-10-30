@@ -37,9 +37,10 @@ impl ValArgs {
                 .map_err(PackageValidationError::Validation)
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
-            let (desc, package) = self.input_args.get_described_package()?;
-            let generator = desc.generator();
-            package
+            let desc_pkg = self.input_args.get_described_package()?;
+            let generator = desc_pkg.description().generator();
+            desc_pkg
+                .into_inner()
                 .validate()
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         };

@@ -8,6 +8,92 @@ use crate::{
     ops::{DataflowOpTrait, OpType},
 };
 
+mod wrapper {
+    use super::ModuleDesc;
+
+    use super::PackageDesc;
+
+    /// Wrapper type associating a value with its description.
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct Described<T, D> {
+        val: T,
+        description: D,
+    }
+
+    impl<T, D> AsRef<T> for Described<T, D> {
+        fn as_ref(&self) -> &T {
+            &self.val
+        }
+    }
+
+    impl<T, D> AsMut<T> for Described<T, D> {
+        fn as_mut(&mut self) -> &mut T {
+            &mut self.val
+        }
+    }
+
+    impl<T, D> Described<T, D> {
+        /// Create a new described value.
+        pub fn new(val: T, description: D) -> Self {
+            Self { val, description }
+        }
+
+        /// Unwrap the described value, discarding the description.
+        pub fn into_inner(self) -> T {
+            self.val
+        }
+
+        /// Get a reference to the description.
+        pub fn description(&self) -> &D {
+            &self.description
+        }
+
+        /// Map the described value to another value, keeping the description.
+        pub fn map<F, U>(self, f: F) -> Described<U, D>
+        where
+            F: FnOnce(T) -> U,
+        {
+            Described {
+                val: f(self.val),
+                description: self.description,
+            }
+        }
+
+        /// Consume the described value and return the inner value and description.
+        pub fn into_parts(self) -> (T, D) {
+            (self.val, self.description)
+        }
+    }
+
+    /// Result type wrapped with a package description.
+    pub type PackageDescResult<T, E> = Described<Result<T, E>, PackageDesc>;
+
+    /// Result type wrapped with a module description.
+    pub type ModuleDescResult<T, E> = Described<Result<T, E>, ModuleDesc>;
+
+    /// Package wrapped with its description.
+    pub type DescribedPackage = Described<crate::package::Package, PackageDesc>;
+
+    /// Transpose a described result into a result of a described value or described error.
+    pub fn transpose<T, E, D>(
+        desc_result: Described<Result<T, E>, D>,
+    ) -> Result<Described<T, D>, Described<E, D>> {
+        match desc_result.val {
+            Ok(val) => Ok(Described {
+                val,
+                description: desc_result.description,
+            }),
+            Err(err) => Err(Described {
+                val: err,
+                description: desc_result.description,
+            }),
+        }
+    }
+}
+
+pub use wrapper::DescribedPackage;
+pub(crate) use wrapper::{Described, ModuleDescResult, PackageDescResult, transpose};
+
 type PartialVec<T> = Vec<Option<T>>;
 fn set_partial_len<T: Clone>(vec: &mut PartialVec<T>, n: usize) {
     vec.resize(n, None);
@@ -104,6 +190,14 @@ impl PackageDesc {
     /// Returns an iterator over the packaged extension descriptions.
     pub fn packaged_extensions(&self) -> impl Iterator<Item = &Option<ExtensionDesc>> {
         self.packaged_extensions.iter()
+    }
+
+    /// Wraps a value with this package description.
+    pub fn wrap<T>(self, val: T) -> Described<T, Self>
+    where
+        Self: Sized,
+    {
+        wrapper::Described::new(val, self)
     }
 }
 
@@ -332,6 +426,14 @@ impl ModuleDesc {
         self.load_public_symbols(hugr);
         // invalid used extensions metadata is ignored here, treated as not present
         self.load_used_extensions_generator(hugr).ok();
+    }
+
+    /// Wraps a value with this module description.
+    pub fn wrap<T>(self, val: T) -> Described<T, Self>
+    where
+        Self: Sized,
+    {
+        wrapper::Described::new(val, self)
     }
 }
 

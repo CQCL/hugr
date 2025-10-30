@@ -121,7 +121,9 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     write_envelope(&mut bytes, &package, EnvelopeConfig::new(format)).unwrap();
 
     let buff = std::io::BufReader::new(bytes.as_slice());
-    let (_, loaded_pkg) = read_described_envelope(buff, &std_reg()).unwrap();
+    let loaded_pkg = read_described_envelope(buff, &std_reg())
+        .unwrap()
+        .into_inner();
 
     assert_eq!(loaded_pkg.extensions.len(), 1);
     let read_ext = loaded_pkg.extensions.iter().next().unwrap();

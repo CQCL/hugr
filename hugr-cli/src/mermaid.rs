@@ -43,8 +43,9 @@ impl MermaidArgs {
 
     /// Write the mermaid diagram for a HUGR envelope.
     pub fn run_print_envelope(&mut self) -> Result<()> {
-        let (desc, package) = self.input_args.get_described_package()?;
-        let generator = desc.generator();
+        let desc_pkg = self.input_args.get_described_package()?;
+        let generator = desc_pkg.description().generator();
+        let package = desc_pkg.into_inner();
         if self.validate {
             package
                 .validate()

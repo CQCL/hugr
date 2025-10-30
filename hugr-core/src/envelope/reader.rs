@@ -5,7 +5,7 @@ use hugr_model::v0::table;
 use itertools::{Either, Itertools as _};
 
 use crate::HugrView as _;
-use crate::envelope::description::PackageDesc;
+use crate::envelope::description::{PackageDesc, PackageDescResult};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
 use crate::envelope::{
     EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
@@ -142,10 +142,10 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// # Errors
     ///
     /// - If reading the package payload fails.
-    pub(super) fn read(mut self) -> (PackageDesc, Result<Package, PayloadError>) {
+    pub(super) fn read(mut self) -> PackageDescResult<Package, PayloadError> {
         let res = self.read_impl();
 
-        (self.description, res)
+        self.description.wrap(res)
     }
 
     /// Read a Package in json format from an io reader.
@@ -229,7 +229,7 @@ impl<R: BufRead> EnvelopeReader<R> {
             .iter()
             .enumerate()
             .map(|(index, module)| {
-                let (desc, result) = import_described_hugr(module, &self.registry);
+                let (result, desc) = import_described_hugr(module, &self.registry).into_parts();
                 self.description.set_module(index, desc);
                 result
             })
@@ -289,6 +289,7 @@ impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
+#[non_exhaustive]
 enum ModelTextReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     Import(#[from] ImportError),
@@ -317,6 +318,7 @@ impl From<ModelTextReadError> for EnvelopeError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
+#[non_exhaustive]
 enum ModelBinaryReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     ReadBinary(#[from] hugr_model::v0::binary::ReadError),
@@ -372,7 +374,7 @@ mod test {
 
         let registry = ExtensionRegistry::new([]);
         let reader = EnvelopeReader::new(cursor, &registry).unwrap();
-        let (description, result) = reader.read();
+        let (result, description) = reader.read().into_parts();
 
         assert_matches!(result, Err(PayloadError(PayloadErrorInner::JsonRead(_))));
         assert_eq!(description.header, header);
@@ -390,7 +392,7 @@ mod test {
 
         let registry = ExtensionRegistry::new([]);
         let reader = EnvelopeReader::new(cursor, &registry).unwrap();
-        let (description, result) = reader.read();
+        let (result, description) = reader.read().into_parts();
 
         assert_matches!(result, Err(PayloadError(PayloadErrorInner::ModelText(_))));
         assert_eq!(description.header, header);
@@ -409,9 +411,13 @@ mod test {
 
         let registry = ExtensionRegistry::new([]);
         let reader = EnvelopeReader::new(cursor, &registry).unwrap();
-        let (description, result) = reader.read();
+        let desc_res = reader.read();
 
-        assert_matches!(result, Err(PayloadError(PayloadErrorInner::JsonRead(_))));
+        assert_matches!(
+            desc_res.as_ref(),
+            Err(PayloadError(PayloadErrorInner::JsonRead(_)))
+        );
+        let description = desc_res.description();
         assert_eq!(description.header, header);
         assert_eq!(description.n_modules(), 0); // No valid modules should be set
     }
