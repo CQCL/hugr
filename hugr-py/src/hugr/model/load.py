@@ -460,15 +460,17 @@ class ModelImport:
                     return loadconst_node  # TODO What about const_node?
                 # TODO others
                 case _:
+                    signature = self.import_signature(node.signature)
                     return self.add_node(
                         node,
                         Custom(
                             op_name=op_name,
                             extension=extension,
-                            signature=self.import_signature(node.signature),
+                            signature=signature,
                             args=[self.import_type_arg(arg) for arg in args],
                         ),
                         parent,
+                        len(signature.output),
                     )
 
         def import_cfg() -> Node:
