@@ -46,7 +46,7 @@ pub mod serde_with;
 pub use header::{EnvelopeConfig, EnvelopeFormat, EnvelopeHeader, MAGIC_NUMBERS, ZstdConfig};
 pub use package_json::PackageEncodingError;
 
-use crate::envelope::description::{Described, DescribedPackage, PackageDesc};
+use crate::envelope::description::PackageDesc;
 use crate::envelope::header::HeaderError;
 use crate::extension::resolution::ExtensionResolutionError;
 use crate::{Hugr, HugrView};
@@ -158,7 +158,7 @@ pub fn read_envelope(
 ) -> Result<(EnvelopeConfig, Package), EnvelopeError> {
     let reader = EnvelopeReader::new(reader, registry)?;
     let config = reader.description().header.config();
-    let package = reader.read().into_parts().0?;
+    let package = reader.read().1?;
 
     Ok((config, package))
 }
@@ -175,44 +175,39 @@ pub fn read_envelope(
 pub fn read_described_envelope(
     reader: impl BufRead,
     registry: &ExtensionRegistry,
-) -> Result<DescribedPackage, ReadError> {
-    let reader = EnvelopeReader::new(reader, registry)?;
-    description::transpose(reader.read()).map_err(|e| ReadError::Payload { inner: Box::new(e) })
+) -> Result<(PackageDesc, Package), ReadError> {
+    let reader = EnvelopeReader::new(reader, registry).map_err(Box::new)?;
+    let (desc, res) = reader.read();
+    match res {
+        Ok(pkg) => Ok((desc, pkg)),
+        Err(e) => Err(ReadError::Payload {
+            source: Box::new(e),
+            partial_description: desc,
+        }),
+    }
 }
 
 /// Errors during reading a HUGR envelope.
-#[derive(Debug, derive_more::Display)]
-#[non_exhaustive]
+#[derive(Debug, Error)]
 pub enum ReadError {
     /// Error reading the envelope header.
-    EnvelopeHeader(Box<HeaderError>),
+    #[error(transparent)]
+    EnvelopeHeader(#[from] Box<HeaderError>),
     /// Error reading the package payload.
-    #[display("Error reading package payload in envelope.")]
+    #[error("Error reading package payload in envelope.")]
     Payload {
         /// The source error.
-        inner: Box<Described<PayloadError, PackageDesc>>,
+        source: Box<PayloadError>,
+        /// Partial description of the envelope read before the error occurred.
+        partial_description: PackageDesc,
     },
-}
-impl From<HeaderError> for ReadError {
-    fn from(err: HeaderError) -> Self {
-        ReadError::EnvelopeHeader(Box::new(err))
-    }
-}
-
-impl std::error::Error for ReadError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            ReadError::EnvelopeHeader(e) => Some(&**e),
-            ReadError::Payload { inner } => Some((**inner).as_ref()),
-        }
-    }
 }
 
 impl From<ReadError> for EnvelopeError {
     fn from(err: ReadError) -> Self {
         match err {
             ReadError::EnvelopeHeader(e) => (*e).into(),
-            ReadError::Payload { inner } => (*inner).into_inner().into(),
+            ReadError::Payload { source, .. } => (*source).into(),
         }
     }
 }
@@ -656,12 +651,12 @@ pub(crate) mod test {
             }
         }
 
-        let desc_pkg =
+        let (desc, new_package) =
             read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
-        let decoded_config = desc_pkg.description().header.config();
+        let decoded_config = desc.header.config();
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
-        assert_eq!(&package, desc_pkg.as_ref());
+        assert_eq!(package, new_package);
     }
 
     #[rstest]
@@ -685,14 +680,14 @@ pub(crate) mod test {
         let config = EnvelopeConfig { format, zstd: None };
         package.store(&mut buffer, config).unwrap();
 
-        let desc_pkg =
+        let (desc, new_package) =
             read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
-        let decoded_config = desc_pkg.description().header.config();
+        let decoded_config = desc.header.config();
 
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
 
-        assert_eq!(&package, desc_pkg.as_ref());
+        assert_eq!(package, new_package);
     }
 
     /// Test helper to call `check_breaking_extensions_against_registry`

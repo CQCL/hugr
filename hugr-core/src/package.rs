@@ -68,7 +68,7 @@ impl Package {
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, EnvelopeError> {
         let extensions = extensions.unwrap_or(&STD_REG);
-        let pkg = read_described_envelope(reader, extensions)?.into_inner();
+        let (_, pkg) = read_described_envelope(reader, extensions)?;
         Ok(pkg)
     }
 

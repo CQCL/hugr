@@ -9,7 +9,7 @@ use crate::{
     Direction, Hugr, HugrView, Node, Port,
     envelope::{
         GENERATOR_KEY, USED_EXTENSIONS_KEY,
-        description::{ExtensionDesc, ModuleDesc, ModuleDescResult},
+        description::{ExtensionDesc, ModuleDesc},
     },
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
@@ -232,13 +232,14 @@ pub fn import_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> Result<Hugr, ImportError> {
-    import_described_hugr(module, extensions).into_inner()
+    let (_, res) = import_described_hugr(module, extensions);
+    res
 }
 
 pub(crate) fn import_described_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
-) -> ModuleDescResult<Hugr, ImportError> {
+) -> (ModuleDesc, Result<Hugr, ImportError>) {
     // TODO: Module should know about the number of edges, so that we can use a vector here.
     // For now we use a hashmap, which will be slower.
     let mut ctx = Context {
@@ -269,10 +270,10 @@ pub(crate) fn import_described_hugr(
 
     for step in import_steps {
         if let Err(e) = step(&mut ctx) {
-            return ctx.description.wrap(Err(ImportError { inner: e }));
+            return (ctx.description, Err(ImportError { inner: e }));
         }
     }
-    ctx.description.wrap(Ok(ctx.hugr))
+    (ctx.description, Ok(ctx.hugr))
 }
 
 struct Context<'a> {

@@ -49,7 +49,7 @@ pub struct ConvertArgs {
 impl ConvertArgs {
     /// Convert a HUGR between different envelope formats
     pub fn run_convert(&mut self) -> Result<()> {
-        let desc_pkg = self.input_args.get_described_package()?;
+        let (env_config, package) = self.input_args.get_described_package()?;
 
         // Handle text and binary format flags, which override the format option
         let mut config = if self.text {
@@ -67,7 +67,7 @@ impl ConvertArgs {
                     "model-text-exts" => EnvelopeFormat::ModelTextWithExtensions,
                     _ => Err(CliError::InvalidFormat(fmt.clone()))?,
                 },
-                None => desc_pkg.description().header.config().format, // Use input format if not specified
+                None => env_config.header.config().format, // Use input format if not specified
             };
             EnvelopeConfig::new(format)
         };
@@ -78,7 +78,7 @@ impl ConvertArgs {
         }
 
         // Write the package with the requested format
-        hugr::envelope::write_envelope(&mut self.output, desc_pkg.as_ref(), config)?;
+        hugr::envelope::write_envelope(&mut self.output, &package, config)?;
 
         Ok(())
     }

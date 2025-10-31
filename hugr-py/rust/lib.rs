@@ -57,9 +57,8 @@ fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
 /// Convert an envelope to a new envelope in JSON format.
 #[pyfunction]
 fn to_json_envelope(bytes: &[u8]) -> PyResult<Vec<u8>> {
-    let pkg = read_described_envelope(bytes, &STD_REG)
-        .map_err(|err| PyValueError::new_err(err.to_string()))?
-        .into_inner();
+    let (_, pkg) = read_described_envelope(bytes, &STD_REG)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
     let config_json = EnvelopeConfig::new(EnvelopeFormat::PackageJson);
     let mut json_data: Vec<u8> = Vec::new();
     write_envelope(&mut json_data, &pkg, config_json).unwrap();

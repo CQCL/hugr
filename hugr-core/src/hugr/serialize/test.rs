@@ -647,9 +647,7 @@ fn cfg_edge_ordering() {
     let _ = write_envelope(&mut data1, &pkg, EnvelopeConfig::text());
 
     let buff1 = Cursor::new(data1);
-    let pkg1 = read_described_envelope(buff1, &std_reg())
-        .unwrap()
-        .into_inner();
+    let (_, pkg1) = read_described_envelope(buff1, &std_reg()).unwrap();
     pkg1.validate().unwrap();
 }
 
