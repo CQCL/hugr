@@ -740,7 +740,18 @@ fn make_pg_subgraph<'h, H: HugrView>(
     portgraph::view::Subgraph<CheckerRegion<'h, H>>,
     H::RegionPortgraphNodes,
 ) {
-    let (region, node_map) = hugr.region_portgraph(hugr.entrypoint());
+    // Pick the hugr region that contains the boundary nodes.
+    // If the nodes are not in the same region, we'll fail the convexity check later on.
+    let mut nodes = inputs
+        .iter()
+        .flat_map(|inps| inps.iter().map(|(n, _)| *n))
+        .chain(outputs.iter().map(|(n, _)| *n));
+    let hugr_region = nodes
+        .next()
+        .and_then(|n| hugr.get_parent(n))
+        .unwrap_or(hugr.entrypoint());
+
+    let (region, node_map) = hugr.region_portgraph(hugr_region);
 
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
@@ -1511,6 +1522,8 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
 
@@ -1655,6 +1668,29 @@ mod tests {
         assert_eq!(hugr.num_nodes(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
         hugr.apply_patch(rep).unwrap();
         assert_eq!(hugr.num_nodes(), 4); // Module + Def + In + Out
+
+        Ok(())
+    }
+
+    /// Make a sibling subgraph from a constant and a LoadConst node.
+    #[test]
+    fn construct_load_const_subgraph() -> Result<(), InvalidSubgraph> {
+        let (hugr, func_root) = build_hugr().unwrap();
+
+        let const_node = hugr
+            .children(func_root)
+            .find(|&n| hugr.get_optype(n).is_const())
+            .unwrap();
+        let load_const_node = hugr
+            .children(func_root)
+            .find(|&n| hugr.get_optype(n).is_load_constant())
+            .unwrap();
+        let nodes: BTreeSet<_> = BTreeSet::from_iter([const_node, load_const_node]);
+
+        let sub = SiblingSubgraph::try_from_nodes(vec![const_node, load_const_node], &hugr)?;
+
+        let subgraph_nodes: BTreeSet<_> = sub.nodes().iter().copied().collect();
+        assert_eq!(subgraph_nodes, nodes);
 
         Ok(())
     }
