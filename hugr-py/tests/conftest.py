@@ -233,6 +233,26 @@ def validate(
                         assert op.lower_funcs == []
 
 
+def canonicalize_json(payload):
+    """Put json into a canonical form for hashing purposes.
+
+    Specifically, replace a general sum of empty rows with an explicit unit sum."""
+    if isinstance(payload, list):
+        return list(map(canonicalize_json, payload))
+    elif isinstance(payload, dict):
+        if (
+            set(payload.keys()) == {"t", "s", "rows"}
+            and payload["t"] == "Sum"
+            and payload["s"] == "General"
+            and not any(payload["rows"])
+        ):
+            return {"t": "Sum", "s": "Unit", "size": len(payload["rows"])}
+        else:
+            return {k: canonicalize_json(v) for k, v in payload.items()}
+    else:
+        return payload
+
+
 @dataclass(frozen=True, order=True)
 class _NodeHash:
     op: _OpHash
@@ -280,7 +300,7 @@ class _NodeHash:
             # StaticArrayVal's dictionary payload containing a SumValue
             # internally, see `test_val_static_array`).
             value_dict = op_type.val._to_serial_root().model_dump(mode="json")
-            op = _OpHash("Const", value_dict)
+            op = _OpHash("Const", canonicalize_json(value_dict))
         else:
             op = _OpHash(op_type.name())
 
