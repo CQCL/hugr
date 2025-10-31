@@ -1,6 +1,4 @@
 //! Describe the contents of HUGR packages.
-use std::io::Write;
-
 use crate::hugr_io::HugrInputArgs;
 use anyhow::Result;
 use clap::Parser;
@@ -10,6 +8,7 @@ use hugr::envelope::ReadError;
 use hugr::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use hugr::extension::Version;
 use hugr::package::Package;
+use std::io::Write;
 use tabled::Tabled;
 use tabled::derive::display;
 
@@ -31,9 +30,14 @@ pub struct DescribeArgs {
     /// Configure module description
     pub module_args: ModuleArgs,
 
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "JSON")]
     /// Output in json format
     pub json: bool,
+
+    #[arg(long, default_value = "false", help_heading = "JSON")]
+    /// Output JSON schema for the description format.
+    /// Can't be combined with --json.
+    pub json_schema: bool,
 
     /// Output file. Use '-' for stdout.
     #[clap(short, long, value_parser, default_value = "-")]
@@ -71,6 +75,12 @@ impl ModuleArgs {
 impl DescribeArgs {
     /// Load and describe the HUGR package.
     pub fn run_describe(&mut self) -> Result<()> {
+        if self.json_schema {
+            let schema = schemars::schema_for!(PackageDescriptionJson);
+            let schema_json = serde_json::to_string_pretty(&schema)?;
+            writeln!(self.output, "{schema_json}")?;
+            return Ok(());
+        }
         let (mut desc, res) = match self.input_args.get_described_package() {
             Ok((desc, pkg)) => (desc, Ok(pkg)),
             Err(crate::CliError::ReadEnvelope(ReadError::Payload {
@@ -143,7 +153,7 @@ impl DescribeArgs {
 
     fn output_json(&mut self, package_desc: PackageDesc, res: &Result<Package>) -> Result<()> {
         let err_str = res.as_ref().err().map(|e| format!("{e:?}"));
-        let json_desc = JsonDescription {
+        let json_desc = PackageDescriptionJson {
             package_desc,
             error: err_str,
         };
@@ -173,8 +183,8 @@ impl DescribeArgs {
     }
 }
 
-#[derive(serde::Serialize)]
-struct JsonDescription {
+#[derive(serde::Serialize, schemars::JsonSchema)]
+struct PackageDescriptionJson {
     #[serde(flatten)]
     package_desc: PackageDesc,
     #[serde(skip_serializing_if = "Option::is_none")]

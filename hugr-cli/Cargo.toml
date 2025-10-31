@@ -28,6 +28,8 @@ thiserror.workspace = true
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["fmt"] }
 tabled = "0.20.0"
+schemars = { workspace = true, features = ["derive"] }
+
 
 [lints]
 workspace = true

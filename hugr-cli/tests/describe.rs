@@ -274,3 +274,168 @@ fn test_describe_invalid_package_json(invalid_package: Vec<u8>, mut describe_cmd
         .stdout(contains("\"error\": \"Error reading a HUGR model payload")) // error included in JSON
         .stderr(contains("Error reading a HUGR model payload"));
 }
+
+#[rstest]
+fn test_schema(mut describe_cmd: Command) {
+    describe_cmd.arg("--json-schema");
+    let output = describe_cmd.assert().success().get_output().stdout.clone();
+    let schema: Value = serde_json::from_slice(&output).unwrap();
+    let expected = json!(
+    {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "PackageDescriptionJson",
+      "description": "High-level description of a HUGR package.",
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "header": {
+          "description": "Envelope header information.",
+          "type": "string"
+        },
+        "modules": {
+          "description": "Description of the modules in the package.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ModuleDesc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "packaged_extensions": {
+          "description": "Description of the extensions in the package.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ExtensionDesc"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "header",
+        "modules"
+      ],
+      "$defs": {
+        "Entrypoint": {
+          "description": "Description of the entrypoint of a module.",
+          "type": "object",
+          "properties": {
+            "node": {
+              "description": "Node id of the entrypoint.",
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "optype": {
+              "description": "Operation type of the entrypoint node.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "node",
+            "optype"
+          ]
+        },
+        "ExtensionDesc": {
+          "description": "High level description of an extension.",
+          "type": "object",
+          "properties": {
+            "name": {
+              "description": "Name of the extension.",
+              "type": "string"
+            },
+            "version": {
+              "description": "Version of the extension.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "version"
+          ]
+        },
+        "ModuleDesc": {
+          "description": "High-level description of a module in a HUGR package.",
+          "type": "object",
+          "properties": {
+            "entrypoint": {
+              "description": "The entrypoint node and the corresponding operation type.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Entrypoint"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "generator": {
+              "description": "Generator specified in the module metadata.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "num_nodes": {
+              "description": "Number of nodes in the module.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "minimum": 0
+            },
+            "public_symbols": {
+              "description": "Public symbols defined in the module.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "type": "string"
+              }
+            },
+            "used_extensions_generator": {
+              "description": "Generator specified used extensions in the module metadata.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/ExtensionDesc"
+              }
+            },
+            "used_extensions_resolved": {
+              "description": "Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_generator`.",
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/ExtensionDesc"
+              }
+            }
+          }
+        }
+      }
+    }
+
+    );
+
+    assert_eq!(schema, expected);
+}
