@@ -742,11 +742,11 @@ fn make_pg_subgraph<'h, H: HugrView>(
 ) {
     // Pick the hugr region that contains the boundary nodes.
     // If the nodes are not in the same region, we'll fail the convexity check later on.
-    let mut nodes = inputs
+    let mut io_nodes = inputs
         .iter()
         .flat_map(|inps| inps.iter().map(|(n, _)| *n))
         .chain(outputs.iter().map(|(n, _)| *n));
-    let hugr_region = nodes
+    let hugr_region = io_nodes
         .next()
         .and_then(|n| hugr.get_parent(n))
         .unwrap_or(hugr.entrypoint());
