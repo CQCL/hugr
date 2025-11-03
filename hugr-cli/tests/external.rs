@@ -1,7 +1,6 @@
 //! Tests for external subcommand support in hugr-cli.
 #![cfg(all(test, not(miri)))]
 
-use assert_cmd::Command;
 use predicates::str::contains;
 use std::env;
 use std::fs;
@@ -11,7 +10,7 @@ use tempfile::TempDir;
 
 #[test]
 fn test_missing_external_command() {
-    let mut cmd = Command::cargo_bin("hugr").unwrap();
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("hugr");
     cmd.arg("idontexist");
     cmd.assert()
         .failure()
@@ -33,7 +32,7 @@ fn test_external_command_invocation() {
     // Prepend tempdir to PATH
     let orig_path = env::var("PATH").unwrap();
     let new_path = format!("{}:{}", tempdir.path().display(), orig_path);
-    let mut cmd = Command::cargo_bin("hugr").unwrap();
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("hugr");
     cmd.env("PATH", new_path);
     cmd.arg("dummy");
     cmd.arg("foo");
