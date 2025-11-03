@@ -141,7 +141,7 @@ impl LinearizeArrayPass {
 
 #[cfg(test)]
 mod test {
-    use hugr_core::builder::{FunctionBuilder, ModuleBuilder};
+    use hugr_core::builder::ModuleBuilder;
     use hugr_core::extension::prelude::{ConstUsize, Noop};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{Const, OpType};
@@ -287,7 +287,7 @@ mod test {
             ),
         };
         let sig = Signature::new(src, tgt);
-        let mut builder = FunctionBuilder::new("main", sig).unwrap();
+        let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         let op: OpType = match dir {
             INTO => VArrayToArray::new(elem_ty.clone(), size).into(),
@@ -313,7 +313,7 @@ mod test {
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_clone(#[case] array_ty: Type) {
         let sig = Signature::new(array_ty.clone(), vec![array_ty; 2]);
-        let mut builder = FunctionBuilder::new("main", sig).unwrap();
+        let mut builder = DFGBuilder::new(sig).unwrap();
         let [arr] = builder.input_wires_arr();
         builder.set_outputs(vec![arr, arr]).unwrap();
 
@@ -329,7 +329,7 @@ mod test {
     #[case(value_array_type(2, Type::new_tuple(vec![usize_t(), value_array_type(4, usize_t())])))]
     fn implicit_discard(#[case] array_ty: Type) {
         let sig = Signature::new(array_ty, Type::EMPTY_TYPEROW);
-        let mut builder = FunctionBuilder::new("main", sig).unwrap();
+        let mut builder = DFGBuilder::new(sig).unwrap();
         builder.set_outputs(vec![]).unwrap();
 
         let mut hugr = builder.finish_hugr().unwrap();
