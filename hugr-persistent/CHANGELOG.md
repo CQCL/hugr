@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.1...hugr-persistent-v0.3.2) - 2025-11-03
+
+### New Features
+
+- *(persistent)* More efficient HugrView iterators for PersistentHugr ([#2595](https://github.com/CQCL/hugr/pull/2595))
+
 ## [0.3.1](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.0...hugr-persistent-v0.3.1) - 2025-10-13
 
 ### Bug Fixes
