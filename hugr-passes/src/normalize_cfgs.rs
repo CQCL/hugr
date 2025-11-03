@@ -220,7 +220,7 @@ pub fn normalize_cfg<H: HugrMut>(
         }
         // 1b. Move entry block outside/before the CFG; its successor becomes the entry block.
         let new_cfg_inputs = entry_blk.successor_input(0).unwrap();
-        // Look for nonlocal `Dom` edges from the entry block.
+        // Look for nonlocal `Dom` edges from the entry block. (Ignore `Ext` edges.)
         let nonlocal_srcs = h
             .children(entry)
             .filter(|n| {
