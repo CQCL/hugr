@@ -256,24 +256,6 @@ pub(super) enum HeaderErrorInner {
     #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     ZstdUnsupported,
 }
-impl From<HeaderError> for EnvelopeError {
-    fn from(err: HeaderError) -> Self {
-        match err.0 {
-            HeaderErrorInner::IO { source } => EnvelopeError::IO { source },
-            HeaderErrorInner::MagicNumber { expected, found } => {
-                EnvelopeError::MagicNumber { expected, found }
-            }
-            HeaderErrorInner::InvalidFormatDescriptor { descriptor } => {
-                EnvelopeError::InvalidFormatDescriptor { descriptor }
-            }
-            HeaderErrorInner::FlagUnsupported { flag_ids } => {
-                EnvelopeError::FlagUnsupported { flag_ids }
-            }
-            #[cfg(not(feature = "zstd"))]
-            HeaderErrorInner::ZstdUnsupported => EnvelopeError::ZstdUnsupported,
-        }
-    }
-}
 
 impl<T: Into<HeaderErrorInner>> From<T> for HeaderError {
     fn from(value: T) -> Self {

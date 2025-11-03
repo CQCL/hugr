@@ -49,7 +49,6 @@ pub use package_json::PackageEncodingError;
 use crate::Hugr;
 use crate::envelope::description::PackageDesc;
 use crate::envelope::header::HeaderError;
-use crate::extension::resolution::ExtensionResolutionError;
 use crate::{
     extension::{ExtensionRegistry, Version},
     package::Package,
@@ -60,8 +59,6 @@ use thiserror::Error;
 
 #[allow(unused_imports)]
 use itertools::Itertools as _;
-
-use crate::import::ImportError;
 
 // TODO centralise all core metadata keys in one place.
 // https://github.com/CQCL/hugr/issues/2651
@@ -195,26 +192,6 @@ pub(crate) fn write_envelope_impl<'h>(
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum EnvelopeError {
-    /// Bad magic number.
-    #[error(
-        "Bad magic number. expected 0x{:X} found 0x{:X}",
-        u64::from_be_bytes(*expected),
-        u64::from_be_bytes(*found)
-    )]
-    MagicNumber {
-        /// The expected magic number.
-        ///
-        /// See [`MAGIC_NUMBERS`].
-        expected: [u8; 8],
-        /// The magic number in the envelope.
-        found: [u8; 8],
-    },
-    /// The specified payload format is invalid.
-    #[error("Format descriptor {descriptor} is invalid.")]
-    InvalidFormatDescriptor {
-        /// The unsupported format.
-        descriptor: usize,
-    },
     /// The specified payload format is not supported.
     #[error("Payload format {format} is not supported.{}",
         match feature {
@@ -261,21 +238,7 @@ pub enum EnvelopeError {
         #[from]
         source: PackageEncodingError,
     },
-    /// Error importing a HUGR from a hugr-model payload.
-    #[error(transparent)]
-    ModelImport {
-        /// The source error.
-        #[from]
-        source: ImportError,
-        // TODO add generator to model import errors
-    },
-    /// Error reading a HUGR model payload.
-    #[error(transparent)]
-    ModelRead {
-        /// The source error.
-        #[from]
-        source: hugr_model::v0::binary::ReadError,
-    },
+
     /// Error writing a HUGR model payload.
     #[error(transparent)]
     ModelWrite {
@@ -283,27 +246,7 @@ pub enum EnvelopeError {
         #[from]
         source: hugr_model::v0::binary::WriteError,
     },
-    /// Error reading a HUGR model payload.
-    #[error("Model text parsing error")]
-    ModelTextRead {
-        /// The source error.
-        #[from]
-        source: hugr_model::v0::ast::ParseError,
-    },
-    /// Error reading a HUGR model payload.
-    #[error(transparent)]
-    ModelTextResolve {
-        /// The source error.
-        #[from]
-        source: hugr_model::v0::ast::ResolveError,
-    },
-    /// Error reading a list of extensions from the envelope.
-    #[error(transparent)]
-    ExtensionLoad {
-        /// The source error.
-        #[from]
-        source: crate::extension::ExtensionRegistryLoadError,
-    },
+
     /// The specified payload format is not supported.
     #[error(
         "The envelope configuration has unknown {}. Please update your HUGR version.",
@@ -313,18 +256,6 @@ pub enum EnvelopeError {
         /// The unrecognized flag bits.
         flag_ids: Vec<usize>,
     },
-    /// Error raised while checking for breaking extension version mismatch.
-    #[error(transparent)]
-    ExtensionVersion {
-        /// The source error.
-        #[from]
-        source: ExtensionBreakingError,
-    },
-
-    // for backwards compatibility
-    /// Extension resolution error.
-    #[error(transparent)]
-    ExtensionLoading(#[from] ExtensionResolutionError),
 }
 
 #[derive(Debug, Error)]

@@ -7,9 +7,7 @@ use itertools::{Either, Itertools as _};
 use crate::HugrView as _;
 use crate::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
-use crate::envelope::{
-    EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
-};
+use crate::envelope::{EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::{Extension, ExtensionRegistry};
 use crate::import::{ImportError, import_described_hugr};

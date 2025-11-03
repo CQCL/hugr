@@ -549,7 +549,6 @@ pub(crate) mod test {
     use super::*;
 
     use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
-    use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
@@ -632,12 +631,7 @@ pub(crate) mod test {
             BufReader::new(File::open(test_file!("hugr-0.hugr")).unwrap()),
             None,
         );
-        assert_matches!(
-            hugr,
-            Err(EnvelopeError::PackageEncoding {
-                source: PackageEncodingError::JsonEncoding(_)
-            })
-        );
+        assert_matches!(hugr, Err(ReadError::Payload { .. }));
     }
 
     #[test]
