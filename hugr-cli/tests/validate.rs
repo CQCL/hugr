@@ -25,7 +25,7 @@ use serde_json::json;
 
 #[fixture]
 fn cmd() -> Command {
-    Command::cargo_bin("hugr").unwrap()
+    assert_cmd::cargo::cargo_bin_cmd!("hugr")
 }
 
 #[fixture]

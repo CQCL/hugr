@@ -22,7 +22,7 @@ use std::io::BufReader;
 
 #[fixture]
 fn cmd() -> Command {
-    Command::cargo_bin("hugr").unwrap()
+    assert_cmd::cargo::cargo_bin_cmd!("hugr")
 }
 
 #[fixture]
@@ -259,7 +259,7 @@ fn test_format_conflicts(mut convert_cmd: Command) {
         .stderr(contains("cannot be used with"));
 
     // Test that --text and --binary cannot be combined
-    let mut convert_cmd = Command::cargo_bin("hugr").unwrap();
+    let mut convert_cmd = assert_cmd::cargo::cargo_bin_cmd!("hugr");
     convert_cmd.arg("convert");
     convert_cmd.args(["-", "--text", "--binary"]);
 
