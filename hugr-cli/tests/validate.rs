@@ -151,7 +151,7 @@ fn test_bad_json(mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error decoding HUGR envelope"))
+        .stderr(contains("Error reading package payload in envelope"))
         .stderr(contains("missing field"));
 }
 

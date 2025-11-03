@@ -7,7 +7,7 @@ use std::str::FromStr;
 use hugr::{
     Extension, Hugr,
     builder::{Dataflow as _, DataflowHugr as _},
-    envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
+    envelope::{EnvelopeConfig, EnvelopeFormat, read_described_envelope, write_envelope},
     extension::prelude::bool_t,
     package::Package,
     std_extensions::std_reg,
@@ -20,7 +20,11 @@ fn roundtrip(source: &str) -> Result<String> {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source)?;
     let package_table = package_ast.resolve(&bump)?;
-    let core = import_package(&package_table, Default::default(), &std_reg())?;
+    let reg = std_reg();
+    let mut core = import_package(&package_table, Default::default(), &reg)?;
+    for module in core.modules.iter_mut() {
+        module.resolve_extension_defs(&reg)?;
+    }
     let exported_table = export_package(&core.modules, &core.extensions, &bump);
     let exported_ast = exported_table.as_ast().unwrap();
 
@@ -117,7 +121,7 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     write_envelope(&mut bytes, &package, EnvelopeConfig::new(format)).unwrap();
 
     let buff = std::io::BufReader::new(bytes.as_slice());
-    let (_, loaded_pkg) = read_envelope(buff, &std_reg()).unwrap();
+    let (_, loaded_pkg) = read_described_envelope(buff, &std_reg()).unwrap();
 
     assert_eq!(loaded_pkg.extensions.len(), 1);
     let read_ext = loaded_pkg.extensions.iter().next().unwrap();

@@ -1,7 +1,7 @@
 //! Supporting Rust library for the hugr Python bindings.
 
 use hugr_core::{
-    envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
+    envelope::{EnvelopeConfig, EnvelopeFormat, read_described_envelope, write_envelope},
     std_extensions::STD_REG,
 };
 use hugr_model::v0::ast;
@@ -57,8 +57,8 @@ fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
 /// Convert an envelope to a new envelope in JSON format.
 #[pyfunction]
 fn to_json_envelope(bytes: &[u8]) -> PyResult<Vec<u8>> {
-    let (_, pkg) =
-        read_envelope(bytes, &STD_REG).map_err(|err| PyValueError::new_err(err.to_string()))?;
+    let (_, pkg) = read_described_envelope(bytes, &STD_REG)
+        .map_err(|err| PyValueError::new_err(err.to_string()))?;
     let config_json = EnvelopeConfig::new(EnvelopeFormat::PackageJson);
     let mut json_data: Vec<u8> = Vec::new();
     write_envelope(&mut json_data, &pkg, config_json).unwrap();
