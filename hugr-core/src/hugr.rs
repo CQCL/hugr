@@ -26,7 +26,7 @@ use thiserror::Error;
 
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
-use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
+use crate::envelope::{self, EnvelopeConfig, EnvelopeError, ReadError};
 use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
     resolve_op_types_extensions,
@@ -159,11 +159,11 @@ impl Hugr {
     pub fn load(
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         let pkg = Package::load(reader, extensions)?;
         match pkg.modules.into_iter().exactly_one() {
             Ok(hugr) => Ok(hugr),
-            Err(e) => Err(EnvelopeError::ExpectedSingleHugr { count: e.count() }),
+            Err(e) => Err(ReadError::ExpectedSingleHugr { count: e.count() }),
         }
     }
 
@@ -180,7 +180,7 @@ impl Hugr {
     pub fn load_str(
         envelope: impl AsRef<str>,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         Self::load(envelope.as_ref().as_bytes(), extensions)
     }
 

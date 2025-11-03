@@ -291,17 +291,6 @@ enum PayloadErrorInner {
     /// Error resolving extensions while decoding the payload.
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
-impl From<PayloadError> for EnvelopeError {
-    fn from(value: PayloadError) -> Self {
-        match value.0 {
-            PayloadErrorInner::JsonRead(e) => e.into(),
-            PayloadErrorInner::ModelBinary(e) => e.into(),
-            PayloadErrorInner::ModelText(e) => e.into(),
-            PayloadErrorInner::ExtensionsBreaking(e) => e.into(),
-            PayloadErrorInner::ExtensionResolution(e) => e.into(),
-        }
-    }
-}
 
 impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
     fn from(value: T) -> Self {
@@ -320,22 +309,6 @@ enum ModelTextReadError {
     StringRead(#[from] std::io::Error),
     ResolveError(#[from] hugr_model::v0::ast::ResolveError),
 }
-impl From<ModelTextReadError> for EnvelopeError {
-    fn from(value: ModelTextReadError) -> Self {
-        match value {
-            ModelTextReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelTextReadError::ParseString(e) => e.into(),
-            ModelTextReadError::Import(e) => e.into(),
-            ModelTextReadError::ExtensionLoad(e) => e.into(),
-            ModelTextReadError::ExtensionDeserialize(e) => e.into(),
-            ModelTextReadError::StringRead(e) => e.into(),
-            ModelTextReadError::ResolveError(e) => e.into(),
-        }
-    }
-}
 
 #[derive(Debug, Error)]
 #[error(transparent)]
@@ -345,21 +318,6 @@ enum ModelBinaryReadError {
     Import(#[from] ImportError),
     Extensions(#[from] crate::extension::ExtensionRegistryLoadError),
     FormatUnsupported(#[from] FormatUnsupportedError),
-}
-
-impl From<ModelBinaryReadError> for EnvelopeError {
-    fn from(value: ModelBinaryReadError) -> Self {
-        match value {
-            ModelBinaryReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelBinaryReadError::ParseString(e) => e.into(),
-            ModelBinaryReadError::ReadBinary(e) => e.into(),
-            ModelBinaryReadError::Import(e) => e.into(),
-            ModelBinaryReadError::Extensions(e) => e.into(),
-        }
-    }
 }
 
 #[cfg(test)]

@@ -2,7 +2,9 @@
 
 use std::io;
 
-use crate::envelope::{EnvelopeConfig, EnvelopeError, read_described_envelope, write_envelope};
+use crate::envelope::{
+    EnvelopeConfig, EnvelopeError, ReadError, read_described_envelope, write_envelope,
+};
 use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
 use crate::std_extensions::STD_REG;
@@ -66,7 +68,7 @@ impl Package {
     pub fn load(
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         let extensions = extensions.unwrap_or(&STD_REG);
         let (_, pkg) = read_described_envelope(reader, extensions)?;
         Ok(pkg)
@@ -85,7 +87,7 @@ impl Package {
     pub fn load_str(
         envelope: impl AsRef<str>,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         Self::load(envelope.as_ref().as_bytes(), extensions)
     }
 

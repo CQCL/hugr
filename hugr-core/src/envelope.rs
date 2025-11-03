@@ -128,6 +128,7 @@ pub fn read_described_envelope(
 
 /// Errors during reading a HUGR envelope.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ReadError {
     /// Error reading the envelope header.
     #[error(transparent)]
@@ -140,15 +141,16 @@ pub enum ReadError {
         /// Partial description of the envelope read before the error occurred.
         partial_description: PackageDesc,
     },
-}
-
-impl From<ReadError> for EnvelopeError {
-    fn from(err: ReadError) -> Self {
-        match err {
-            ReadError::EnvelopeHeader(e) => (*e).into(),
-            ReadError::Payload { source, .. } => (*source).into(),
-        }
-    }
+    /// Expected the envelope to contain a single HUGR.
+    #[error("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
+        "none".to_string()
+    } else {
+        count.to_string()
+    })]
+    ExpectedSingleHugr {
+        /// The number of HUGRs in the package.
+        count: usize,
+    },
 }
 
 /// Write a HUGR package into an envelope, using the specified configuration.
@@ -237,16 +239,7 @@ pub enum EnvelopeError {
     /// Envelope encoding required zstd compression, but the feature is not enabled.
     #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     ZstdUnsupported,
-    /// Expected the envelope to contain a single HUGR.
-    #[error("Expected an envelope containing a single hugr, but it contained {}.", if *count == 0 {
-        "none".to_string()
-    } else {
-        count.to_string()
-    })]
-    ExpectedSingleHugr {
-        /// The number of HUGRs in the package.
-        count: usize,
-    },
+
     /// JSON serialization error.
     #[error(transparent)]
     SerdeError {
