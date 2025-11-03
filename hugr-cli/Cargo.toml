@@ -53,3 +53,8 @@ name = "hugr"
 path = "src/main.rs"
 doc = false
 bench = false
+
+[package.metadata.binstall]
+# Override binstall default since there are multiple packages in the repo
+# https://github.com/cargo-bins/cargo-binstall/blob/main/SUPPORT.md#Defaults
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"
