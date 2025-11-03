@@ -9,7 +9,7 @@ use rstest::{fixture, rstest};
 
 #[fixture]
 fn cmd() -> Command {
-    let mut cmd = Command::cargo_bin("hugr").unwrap();
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("hugr");
     cmd.arg("gen-extensions");
     cmd
 }

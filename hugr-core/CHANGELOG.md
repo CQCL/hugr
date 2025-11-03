@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.24.0...hugr-core-v0.24.1) - 2025-11-03
+
+### Bug Fixes
+
+- validation outside entrypoint, normalize_cfgs w/ nonlocal edges ([#2633](https://github.com/CQCL/hugr/pull/2633))
+- SiblingSubgraph::try_from_nodes for non-entrypoint region ([#2655](https://github.com/CQCL/hugr/pull/2655))
+- Correct conversion of `table::Term::Tuple` to `ast::Term` ([#2653](https://github.com/CQCL/hugr/pull/2653))
+
+### New Features
+
+- track package descriptions when loading ([#2639](https://github.com/CQCL/hugr/pull/2639))
+- *(cli)* describe sub-command ([#2650](https://github.com/CQCL/hugr/pull/2650))
+
 ## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.23.0...hugr-core-v0.24.0) - 2025-10-13
 
 ### Bug Fixes

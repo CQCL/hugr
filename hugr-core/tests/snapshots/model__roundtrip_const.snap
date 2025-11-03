@@ -36,9 +36,9 @@ expression: ast
   (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%0 %1]
     (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])]))
-    ((core.load_const (core.const.adt [[] []] _ 0 [])) [] [%0]
+    ((core.load_const (core.const.adt [[] []] _ 0 (tuple))) [] [%0]
       (signature (core.fn [] [(core.adt [[] []])])))
-    ((core.load_const (core.const.adt [[] []] _ 1 [])) [] [%1]
+    ((core.load_const (core.const.adt [[] []] _ 1 (tuple))) [] [%1]
       (signature (core.fn [] [(core.adt [[] []])])))))
 
 (define-func
@@ -62,15 +62,16 @@ expression: ast
             arithmetic.float.types.float64]]
           _
           0
-          [(collections.array.const
-             5
-             (arithmetic.int.types.int 6)
-             [(arithmetic.int.const 6 1)
-              (arithmetic.int.const 6 2)
-              (arithmetic.int.const 6 3)
-              (arithmetic.int.const 6 4)
-              (arithmetic.int.const 6 5)])
-           (arithmetic.float.const_f64 -3.0)]))
+          (tuple
+            (collections.array.const
+              5
+              (arithmetic.int.types.int 6)
+              [(arithmetic.int.const 6 1)
+               (arithmetic.int.const 6 2)
+               (arithmetic.int.const 6 3)
+               (arithmetic.int.const 6 4)
+               (arithmetic.int.const 6 5)])
+            (arithmetic.float.const_f64 -3.0))))
       [] [%0]
       (signature
         (core.fn

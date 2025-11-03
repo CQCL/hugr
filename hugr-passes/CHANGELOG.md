@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-passes-v0.24.0...hugr-passes-v0.24.1) - 2025-11-03
+
+### Bug Fixes
+
+- validation outside entrypoint, normalize_cfgs w/ nonlocal edges ([#2633](https://github.com/CQCL/hugr/pull/2633))
+
 ## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.23.0...hugr-passes-v0.24.0) - 2025-10-13
 
 ### New Features

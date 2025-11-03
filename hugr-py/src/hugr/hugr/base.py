@@ -633,7 +633,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def num_out_ports(self, node: ToNode) -> int:
         """The number of outgoing ports of a node. See :meth:`num_ports`.
 
-        This value cound does not include order ports.
+        This value does not include order ports.
         """
         return self[node]._num_outs
 
