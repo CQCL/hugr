@@ -104,14 +104,15 @@ impl PackageDesc {
         Some(generators.join(", "))
     }
 
-    /// Returns an iterator over the module descriptions.
+    /// Returns an iterator over the module descriptions. Modules with
+    /// expected but missing descriptions yield `None`.
     pub fn modules(&self) -> impl Iterator<Item = &Option<ModuleDesc>> {
         self.modules.iter()
     }
 
-    /// Returns an iterator over the packaged extension descriptions.
-    pub fn packaged_extensions(&self) -> impl Iterator<Item = &Option<ExtensionDesc>> {
-        self.packaged_extensions.iter()
+    /// Returns an iterator over the packaged extension descriptions. Missing extensions are skipped.
+    pub fn packaged_extensions(&self) -> impl Iterator<Item = &ExtensionDesc> {
+        self.packaged_extensions.iter().flatten()
     }
 }
 
@@ -145,7 +146,7 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// Description of the entrypoint of a module.
 pub struct Entrypoint {
     /// Node id of the entrypoint.
@@ -184,7 +185,7 @@ where
     serializer.serialize_str(op_string(op_type).as_str())
 }
 
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 /// High-level description of a module in a HUGR package.
 pub struct ModuleDesc {
     /// Number of nodes in the module.
@@ -401,11 +402,7 @@ mod test {
     ) {
         empty_package_desc.set_packaged_extension(0, test_extension.clone());
         assert_eq!(
-            empty_package_desc
-                .packaged_extensions()
-                .next()
-                .unwrap()
-                .as_ref(),
+            empty_package_desc.packaged_extensions().next(),
             Some(&test_extension)
         );
     }
@@ -494,7 +491,7 @@ mod test {
 
         let extensions: Vec<_> = empty_package_desc.packaged_extensions().collect();
         assert_eq!(extensions.len(), 1);
-        assert_eq!(extensions[0].as_ref(), Some(&test_extension));
+        assert_eq!(extensions[0], &test_extension);
     }
 
     #[rstest]

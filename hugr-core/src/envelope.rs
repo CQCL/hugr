@@ -171,6 +171,12 @@ pub fn read_envelope(
 /// - `reader`: The reader to read the envelope from.
 /// - `registry`: An extension registry with additional extensions to use when
 ///   decoding the HUGR, if they are not already included in the package.
+///
+/// # Errors
+/// - [`ReadError::EnvelopeHeader`] if there was an error reading the envelope header.
+/// - [`ReadError::Payload`] if there was an error reading the package payload,
+///   including a partial description of the envelope read before the error occurred.
+///
 // TODO deprecate and rename to read_envelope when removing old version
 pub fn read_described_envelope(
     reader: impl BufRead,
@@ -384,7 +390,7 @@ pub enum EnvelopeError {
     /// Error raised while checking for breaking extension version mismatch.
     #[deprecated(since = "0.24.1")]
     #[error(transparent)]
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     ExtensionVersion {
         /// The source error.
         #[from]
