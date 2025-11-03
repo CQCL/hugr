@@ -1,12 +1,11 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
-use itertools::Itertools;
-use semver::Version;
-
 use crate::{
     HugrView, Node,
     envelope::{EnvelopeHeader, USED_EXTENSIONS_KEY},
     ops::{DataflowOpTrait, OpType},
 };
+use itertools::Itertools;
+use semver::Version;
 
 type OptionVec<T> = Vec<Option<T>>;
 fn set_option_vec_len<T: Clone>(vec: &mut OptionVec<T>, n: usize) {
@@ -28,15 +27,17 @@ fn extend_option_vec<T: Clone>(vec: &mut Option<Vec<T>>, items: impl IntoIterato
 }
 
 /// High-level description of a HUGR package.
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, schemars::JsonSchema)]
 pub struct PackageDesc {
     /// Envelope header information.
     #[serde(serialize_with = "header_serialize")]
+    #[schemars(with = "String")]
     pub header: EnvelopeHeader,
     /// Description of the modules in the package.
     pub modules: OptionVec<ModuleDesc>,
     /// Description of the extensions in the package.
     #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub packaged_extensions: OptionVec<ExtensionDesc>,
 }
 
@@ -117,12 +118,21 @@ impl PackageDesc {
 }
 
 /// High level description of an extension.
-#[derive(derive_more::Display, Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+#[derive(
+    derive_more::Display,
+    Debug,
+    Clone,
+    PartialEq,
+    serde::Deserialize,
+    serde::Serialize,
+    schemars::JsonSchema,
+)]
 #[display("Extension {name} v{version}")]
 pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
+    #[schemars(with = "String")]
     pub version: Version,
 }
 
@@ -146,11 +156,13 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 /// Description of the entrypoint of a module.
 pub struct Entrypoint {
     /// Node id of the entrypoint.
+    #[schemars(with = "u32")]
     pub node: Node,
+    #[schemars(with = "String")]
     #[serde(serialize_with = "op_serialize")]
     /// Operation type of the entrypoint node.
     pub optype: OpType,
@@ -185,26 +197,34 @@ where
     serializer.serialize_str(op_string(op_type).as_str())
 }
 
-#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 /// High-level description of a module in a HUGR package.
 pub struct ModuleDesc {
     /// Number of nodes in the module.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub num_nodes: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub entrypoint: Option<Entrypoint>,
     /// Extensions used in the module computed while resolving, expected to be a subset of `used_extensions_generator`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub used_extensions_resolved: Option<Vec<ExtensionDesc>>,
     /// Generator specified in the module metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub generator: Option<String>,
     /// Generator specified used extensions in the module metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub used_extensions_generator: Option<Vec<ExtensionDesc>>,
     /// Public symbols defined in the module.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub public_symbols: Option<Vec<String>>,
 }
 

@@ -91,6 +91,7 @@ pretty_assertions = "1.4.1"
 zstd = "0.13.2"
 relrc = "0.5.0"
 wyhash = "0.6.0"
+schemars = "1.0.4"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
