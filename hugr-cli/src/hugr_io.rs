@@ -2,7 +2,7 @@
 
 use clio::Input;
 use hugr::envelope::description::PackageDesc;
-use hugr::envelope::{EnvelopeConfig, read_described_envelope};
+use hugr::envelope::read_described_envelope;
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -50,19 +50,6 @@ impl HugrInputArgs {
     /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
         self.get_described_package().map(|(_, package)| package)
-    }
-
-    /// Read a hugr envelope from the input and return the envelope
-    /// configuration and the package encoded within.
-    ///
-    /// # Errors
-    ///
-    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
-    /// reading the input as a package will fail.
-    #[deprecated(since = "0.24.1", note = "Use get_described_envelope instead")]
-    pub fn get_envelope(&mut self) -> Result<(EnvelopeConfig, Package), CliError> {
-        let (desc, package) = self.get_described_package()?;
-        Ok((desc.header.config(), package))
     }
 
     /// Read a hugr envelope from the input and return the envelope

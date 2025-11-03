@@ -91,10 +91,6 @@ impl<R: BufRead> EnvelopeReader<R> {
         })
     }
 
-    pub(crate) fn description(&self) -> &PackageDesc {
-        &self.description
-    }
-
     fn header(&self) -> &EnvelopeHeader {
         &self.description.header
     }
@@ -184,12 +180,14 @@ impl<R: BufRead> EnvelopeReader<R> {
         let super::package_json::PackageDeser {
             modules,
             extensions: pkg_extensions,
-        } = serde_json::from_reader(&mut self.reader)?;
+        } = serde_json::from_reader(&mut self.reader)
+            .map_err(PackageEncodingError::JsonEncoding)?;
         let modules = modules.into_iter().map(|h| h.0).collect_vec();
         let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
             pkg_extensions,
             &WeakExtensionRegistry::from(&self.registry),
-        )?;
+        )
+        .map_err(PackageEncodingError::ExtensionResolution)?;
 
         // Resolve the operations in the modules using the defined registries.
         self.register_packaged(&pkg_extensions);
@@ -299,12 +297,7 @@ impl From<PayloadError> for EnvelopeError {
             PayloadErrorInner::JsonRead(e) => e.into(),
             PayloadErrorInner::ModelBinary(e) => e.into(),
             PayloadErrorInner::ModelText(e) => e.into(),
-            #[expect(deprecated)]
-            PayloadErrorInner::ExtensionsBreaking(e) => super::WithGenerator {
-                inner: Box::new(e),
-                generator: None,
-            }
-            .into(),
+            PayloadErrorInner::ExtensionsBreaking(e) => e.into(),
             PayloadErrorInner::ExtensionResolution(e) => e.into(),
         }
     }
