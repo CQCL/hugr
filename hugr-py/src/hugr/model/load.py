@@ -767,7 +767,8 @@ class ModelImport:
                 return Opaque(
                     id=id,
                     extension=extension,
-                    bound=TypeBound.Linear,
+                    # TODO How to determine the type bound (Copyable or Linear)?
+                    bound=TypeBound.Copyable,
                     args=[self.import_type_arg(arg) for arg in args],
                 )
             case model.Var(name):
