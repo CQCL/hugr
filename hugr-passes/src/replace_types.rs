@@ -237,6 +237,7 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
+    regions: Option<Vec<Node>>,
 }
 
 impl Default for ReplaceTypes {
@@ -298,6 +299,7 @@ impl ReplaceTypes {
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
+            regions: None,
         }
     }
 
@@ -433,6 +435,14 @@ impl ReplaceTypes {
         + 'static,
     ) {
         self.param_consts.insert(src_ty.into(), Arc::new(const_fn));
+    }
+
+    /// Set the regions of the Hugr to which this pass should be applied.
+    ///
+    /// If not set, the pass is applied to the whole Hugr.
+    /// Each call to overwrites any previous calls to `set_regions`.
+    pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
+        self.regions = Some(regions.into_iter().collect());
     }
 
     fn change_node(
@@ -600,11 +610,21 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Result = bool;
 
     fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
+        let temp: Vec<Node>; // keep alive
+        let regions = match self.regions {
+            Some(ref regs) => regs,
+            None => {
+                temp = vec![hugr.module_root()];
+                &temp
+            }
+        };
         let mut changed = false;
-        for n in hugr.entry_descendants().collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
-            if n != hugr.entrypoint() && changed {
-                self.linearize_outputs(hugr, n)?;
+        for region_root in regions {
+            for n in hugr.descendants(*region_root).collect::<Vec<_>>() {
+                changed |= self.change_node(hugr, n)?;
+                if n != hugr.entrypoint() && changed {
+                    self.linearize_outputs(hugr, n)?;
+                }
             }
         }
         Ok(changed)
@@ -1117,8 +1137,8 @@ mod test {
     where
         GenericArrayValue<AK>: CustomConst,
     {
-        let sig = inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()));
-        let mut dfb = FunctionBuilder::new("main", sig).unwrap();
+        let mut dfb =
+            DFGBuilder::new(inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()))).unwrap();
         let c = dfb.add_load_value(GenericArrayValue::<AK>::new(
             usize_t(),
             vals.iter().map(|u| ConstUsize::new(*u).into()),
