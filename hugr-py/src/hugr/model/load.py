@@ -24,6 +24,7 @@ from hugr.ops import (
     FuncDefn,
     Input,
     LoadConst,
+    LoadFunc,
     Op,
     Output,
     Tag,
@@ -442,23 +443,44 @@ class ModelImport:
                             "application."
                             raise ModelImportError(error, node)
                 case "core.load_const":
-                    match args:
-                        case [type_arg, value_arg]:
-                            datatype = self.import_type(type_arg)
-                        case [value_arg]:
-                            # Treat type_arg as Wildcard ==> Unit type
-                            datatype = Unit
-                        case _:
-                            error = f"Unexpected arguments to core.load_const: {args}"
-                            raise ModelImportError(error, node)
+                    value = args[-1]
+                    [datatype] = signature.output
                     match datatype:
                         case FunctionType(_inputs, _outputs):
                             # Import as a LoadFunc operation.
-                            # TODO
-                            raise NotImplementedError()
+                            match value:
+                                case model.Apply(str() as fn_id, fn_args):
+                                    pass
+                                case _:
+                                    error = "Unexpected arguments to core.load_const: "
+                                    f"{args}"
+                                    raise ModelImportError(error, node)
+                            loadfunc_node = self.add_node(
+                                node,
+                                LoadFunc(
+                                    PolyFuncType(
+                                        [
+                                            self.import_type_arg(fn_arg)
+                                            for fn_arg in fn_args
+                                        ],
+                                        datatype,
+                                    ),
+                                    datatype,
+                                    [
+                                        self.import_type_arg(fn_arg)
+                                        for fn_arg in fn_args
+                                    ],
+                                ),
+                                parent,
+                            )
+                            self.hugr.add_link(
+                                OutPort(self.fn_nodes[fn_id], 0),
+                                InPort(loadfunc_node, 0),
+                            )
+                            return loadfunc_node
                         case _:
                             # Import as a Const and a LoadConst node.
-                            v = self.import_value(value_arg)
+                            v = self.import_value(value)
                             const_node = self.hugr.add_node(Const(v), parent, 1)
                             loadconst_node = self.add_node(
                                 node, LoadConst(datatype), parent
