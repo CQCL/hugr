@@ -57,6 +57,7 @@ from hugr.tys import (
     TypeArg,
     TypeBound,
     TypeParam,
+    TypeTypeArg,
     TypeTypeParam,
     Unit,
     Variable,
@@ -795,6 +796,8 @@ class ModelImport:
                 return import_list(term)
             case model.Tuple():
                 return import_tuple(term)
+            case model.Apply("prelude.qubit", []):
+                return TypeTypeArg(_QubitDef())
             case _:
                 error = "Failed to import TypeArg."
                 raise ModelImportError(error, term)
