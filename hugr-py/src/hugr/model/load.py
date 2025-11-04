@@ -442,9 +442,6 @@ class ModelImport:
                             "application."
                             raise ModelImportError(error, node)
                 case "core.load_const":
-                    # TODO If the constant refers directly to a function, import this as
-                    # the LoadFunc operation.
-                    # Otherwise, import as a Const and a LoadConst node:
                     match args:
                         case [type_arg, value_arg]:
                             datatype = self.import_type(type_arg)
@@ -454,13 +451,22 @@ class ModelImport:
                         case _:
                             error = f"Unexpected arguments to core.load_const: {args}"
                             raise ModelImportError(error, node)
-                    v = self.import_value(value_arg)
-                    const_node = self.hugr.add_node(Const(v), parent, 1)
-                    loadconst_node = self.add_node(node, LoadConst(datatype), parent)
-                    self.hugr.add_link(
-                        OutPort(const_node, 0), InPort(loadconst_node, 0)
-                    )
-                    return loadconst_node  # TODO What about const_node?
+                    match datatype:
+                        case FunctionType(_inputs, _outputs):
+                            # Import as a LoadFunc operation.
+                            # TODO
+                            raise NotImplementedError()
+                        case _:
+                            # Import as a Const and a LoadConst node.
+                            v = self.import_value(value_arg)
+                            const_node = self.hugr.add_node(Const(v), parent, 1)
+                            loadconst_node = self.add_node(
+                                node, LoadConst(datatype), parent
+                            )
+                            self.hugr.add_link(
+                                OutPort(const_node, 0), InPort(loadconst_node, 0)
+                            )
+                            return loadconst_node  # TODO What about const_node?
                 case "core.make_adt":
                     [variants, types, tag] = args
                     match tag:
