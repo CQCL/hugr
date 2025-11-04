@@ -14,6 +14,7 @@ from hugr.ops import (
     CFG,
     DFG,
     Call,
+    CallIndirect,
     Case,
     Conditional,
     Const,
@@ -443,6 +444,13 @@ class ModelImport:
                             error = "The function of a Call node must be a symbol "
                             "application."
                             raise ModelImportError(error, node)
+                case "core.call_indirect":
+                    [inputs, outputs] = args
+                    sig = FunctionType(
+                        self.import_type_row(inputs), self.import_type_row(outputs)
+                    )
+                    callindirectnode = self.add_node(node, CallIndirect(sig), parent)
+                    return callindirectnode
                 case "core.load_const":
                     value = args[-1]
                     [datatype] = signature.output
