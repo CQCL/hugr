@@ -259,7 +259,9 @@ class ModelImport:
         """Import an entire DFG region from the model into the Hugr."""
         signature = self.import_signature(region.signature)
 
-        input_node = self.hugr.add_node(Input(signature.input), parent=parent)
+        input_node = self.hugr.add_node(
+            Input(signature.input), parent=parent, num_outs=len(signature.input)
+        )
         self.record_out_links(input_node, region.sources)
 
         output_node = self.hugr.add_node(Output(signature.output), parent=parent)
