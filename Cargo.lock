@@ -1267,6 +1267,7 @@ dependencies = [
  "derive_more 2.0.1",
  "hugr-core",
  "hugr-llvm",
+ "hugr-passes",
  "inkwell",
  "insta",
  "itertools 0.14.0",
