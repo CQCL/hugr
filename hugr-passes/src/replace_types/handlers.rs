@@ -451,13 +451,13 @@ pub fn copy_discard_borrow_array(
                 .unwrap();
             {
                 // borrowed - do nothing
-                let borrowed_case = cond2.case_builder(1).unwrap();
+                let borrowed_case = cond2.case_builder(0).unwrap();
                 let [arr] = borrowed_case.input_wires_arr();
                 borrowed_case.finish_with_outputs([arr]).unwrap();
             }
             {
                 // not borrowed - discard element
-                let mut not_borrowed_case = cond2.case_builder(0).unwrap();
+                let mut not_borrowed_case = cond2.case_builder(1).unwrap();
                 let [arr] = not_borrowed_case.input_wires_arr();
                 let (arr, elem) = not_borrowed_case
                     .add_borrow_array_borrow(ty.clone(), *n, arr, idx_u)
