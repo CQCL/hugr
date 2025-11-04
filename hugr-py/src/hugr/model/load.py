@@ -26,6 +26,7 @@ from hugr.ops import (
     LoadConst,
     Op,
     Output,
+    Tag,
     TailLoop,
 )
 from hugr.std.float import FloatVal
@@ -458,6 +459,28 @@ class ModelImport:
                         OutPort(const_node, 0), InPort(loadconst_node, 0)
                     )
                     return loadconst_node  # TODO What about const_node?
+                case "core.make_adt":
+                    [variants, types, tag] = args
+                    match tag:
+                        case model.Literal(int() as tagval):
+                            pass
+                        case _:
+                            error = f"Unexpected tag: {tag}"
+                            raise ModelImportError(error)
+                    return self.add_node(
+                        node,
+                        Tag(
+                            tagval,
+                            Sum(
+                                variant_rows=[
+                                    self.import_type_row(cast(model.Term, variant))
+                                    for variant in variants.to_list_parts()
+                                ]
+                            ),
+                        ),
+                        parent,
+                        1,
+                    )
                 # TODO others
                 case _:
                     signature = self.import_signature(node.signature)
