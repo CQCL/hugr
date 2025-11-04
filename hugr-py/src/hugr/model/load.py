@@ -594,7 +594,7 @@ class ModelImport:
                 1,
             )
             self.exit_symbol()
-            self.fn_nodes[f_name] = node_id
+            self.fn_nodes[symbol.name] = node_id
             return node_id
 
         def import_define_func(symbol: model.Symbol) -> Node:
@@ -622,7 +622,7 @@ class ModelImport:
 
             self.import_dfg_region(body, node_id)
             self.exit_symbol()
-            self.fn_nodes[f_name] = node_id
+            self.fn_nodes[symbol.name] = node_id
             return node_id
 
         match node.operation:
