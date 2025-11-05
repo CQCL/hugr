@@ -196,13 +196,12 @@ impl ReplacementOptions {
         self
     }
 
-    /// Specifies that all operations within the replacement should have their
+    /// Specifies that all nodes within the replacement should have their
     /// output ports linearized.
     ///
     /// * If [Self::with_recursive_replacement] has been set, this applies linearization
-    ///.  even to nodes (within the original replacement) that were not altered by the
-    ///   recursive processing.
-    /// * Otherwise, applies linearization (to all nodes) without changing any ops.
+    ///   after recursive processing.
+    /// * Otherwise, just applies linearization (to all nodes) without changing any ops.
     pub fn with_linearization(mut self, lin: bool) -> Self {
         self.linearize = lin;
         self
