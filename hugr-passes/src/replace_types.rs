@@ -1329,8 +1329,9 @@ mod test {
         let ext = ext();
         let mut lowerer = lowerer(&ext);
         // Replace std Array's with 64 elements with PackedVec's
-        lowerer.replace_parametrized_type_opts(array_type_def(), {
-            let ext2 = ext.clone();
+        let ext2 = ext.clone();
+        lowerer.replace_parametrized_type_opts(
+            array_type_def(),
             move |args| {
                 let [sz, ty] = args else {
                     panic!("Expected two args to array")
@@ -1342,56 +1343,54 @@ mod test {
                         .unwrap()
                         .into(),
                 )
-            }
-        },
-        ReplacementOptions::default().with_recursive_replacement(true));
+            },
+            ReplacementOptions::default().with_recursive_replacement(true),
+        );
 
         // Replacement of `get` is complex because we need to wrap result of read into a Some
+        let ext = ext.clone();
         lowerer.replace_parametrized_op_with(
             array::EXTENSION
                 .get_op(ArrayOpDef::get.opdef_id().as_str())
                 .unwrap()
                 .as_ref(),
-            {
-                let ext2 = ext.clone();
-                move |args| {
-                    let [sz, Term::Runtime(ty)] = args else {
-                        panic!("Expected two args to array-get")
-                    };
-                    if sz != &Term::BoundedNat(64) {
-                        return None;
-                    }
-                    let pv = ext2
-                        .get_type(PACKED_VEC)
-                        .unwrap()
-                        .instantiate([ty.clone().into()])
-                        .unwrap();
-
-                    let mut dfb = DFGBuilder::new(Signature::new(
-                        vec![pv.clone().into(), usize_t()],
-                        vec![option_type(ty.clone()).into(), pv.into()],
-                    ))
-                    .unwrap();
-                    let [pvec, idx] = dfb.input_wires_arr();
-                    let [idx] = dfb
-                        .add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx])
-                        .unwrap()
-                        .outputs_arr();
-                    let [elem] = dfb
-                        .add_dataflow_op(read_op(&ext2, ty.clone()), [pvec, idx])
-                        .unwrap()
-                        .outputs_arr();
-                    let [wrapped_elem] = dfb
-                        .add_dataflow_op(
-                            ops::Tag::new(1, vec![type_row![], ty.clone().into()]),
-                            [elem],
-                        )
-                        .unwrap()
-                        .outputs_arr();
-                    Some(NodeTemplate::CompoundOp(Box::new(
-                        dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
-                    )))
+            move |args| {
+                let [sz, Term::Runtime(ty)] = args else {
+                    panic!("Expected two args to array-get")
+                };
+                if sz != &Term::BoundedNat(64) {
+                    return None;
                 }
+                let pv = ext
+                    .get_type(PACKED_VEC)
+                    .unwrap()
+                    .instantiate([ty.clone().into()])
+                    .unwrap();
+
+                let mut dfb = DFGBuilder::new(Signature::new(
+                    vec![pv.clone().into(), usize_t()],
+                    vec![option_type(ty.clone()).into(), pv.into()],
+                ))
+                .unwrap();
+                let [pvec, idx] = dfb.input_wires_arr();
+                let [idx] = dfb
+                    .add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx])
+                    .unwrap()
+                    .outputs_arr();
+                let [elem] = dfb
+                    .add_dataflow_op(read_op(&ext, ty.clone()), [pvec, idx])
+                    .unwrap()
+                    .outputs_arr();
+                let [wrapped_elem] = dfb
+                    .add_dataflow_op(
+                        ops::Tag::new(1, vec![type_row![], ty.clone().into()]),
+                        [elem],
+                    )
+                    .unwrap()
+                    .outputs_arr();
+                Some(NodeTemplate::CompoundOp(Box::new(
+                    dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
+                )))
             },
             ReplacementOptions::default().with_recursive_replacement(true),
         );
