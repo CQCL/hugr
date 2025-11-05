@@ -431,26 +431,26 @@ class ModelImport:
                     input_types, output_types, func = args
                     match func:
                         case model.Apply(symbol, fn_args):
-                            sig = self.import_signature(node.signature)
-                            callnode = self.add_node(
-                                node,
-                                Call(
-                                    signature=PolyFuncType(fn_args, sig),
-                                    instantiation=sig,
-                                    type_args=[
-                                        self.import_type_arg(fn_arg)
-                                        for fn_arg in fn_args
-                                    ],
-                                ),
-                                parent,
-                                1,
-                            )
-                            self.fn_calls.append((symbol, callnode))
-                            return callnode
+                            pass
                         case _:
                             error = "The function of a Call node must be a symbol "
                             "application."
                             raise ModelImportError(error, node)
+                    sig = self.import_signature(node.signature)
+                    callnode = self.add_node(
+                        node,
+                        Call(
+                            signature=PolyFuncType(fn_args, sig),
+                            instantiation=sig,
+                            type_args=[
+                                self.import_type_arg(fn_arg) for fn_arg in fn_args
+                            ],
+                        ),
+                        parent,
+                        1,
+                    )
+                    self.fn_calls.append((symbol, callnode))
+                    return callnode
                 case "core.call_indirect":
                     [inputs, outputs] = args
                     sig = FunctionType(
