@@ -26,10 +26,12 @@ from hugr.ops import (
     Input,
     LoadConst,
     LoadFunc,
+    MakeTuple,
     Op,
     Output,
     Tag,
     TailLoop,
+    UnpackTuple,
 )
 from hugr.std.float import FloatVal
 from hugr.std.int import IntVal
@@ -519,6 +521,23 @@ class ModelImport:
                         ),
                         parent,
                         1,
+                    )
+                case "prelude.MakeTuple":
+                    [arglist] = args
+                    return self.add_node(
+                        node,
+                        MakeTuple(self.import_type_row(arglist)),
+                        parent,
+                        1,
+                    )
+                case "prelude.UnpackTuple":
+                    [arglist] = args
+                    typerow = self.import_type_row(arglist)
+                    return self.add_node(
+                        node,
+                        UnpackTuple(typerow),
+                        parent,
+                        len(typerow),
                     )
                 # TODO others
                 case _:
