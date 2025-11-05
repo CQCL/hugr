@@ -430,15 +430,16 @@ class ModelImport:
                 case "core.call":
                     input_types, output_types, func = args
                     match func:
-                        case model.Apply(symbol, args):
+                        case model.Apply(symbol, fn_args):
                             sig = self.import_signature(node.signature)
                             callnode = self.add_node(
                                 node,
                                 Call(
-                                    signature=PolyFuncType([], sig),  # TODO params
+                                    signature=PolyFuncType(fn_args, sig),
                                     instantiation=sig,
                                     type_args=[
-                                        self.import_type_arg(arg) for arg in args
+                                        self.import_type_arg(fn_arg)
+                                        for fn_arg in fn_args
                                     ],
                                 ),
                                 parent,
