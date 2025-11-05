@@ -959,7 +959,7 @@ class RegionOrderHints:
             self.key_to_node[key] = node
 
     def get_node_by_key(self, key: int) -> Node:
-        if key in self.key_to_node:
+        if key not in self.key_to_node:
             error = f"Unknown order key `{key}`."
             raise ModelImportError(error)
 
