@@ -266,6 +266,9 @@ class ModelImport:
 
             self.hugr.add_link(out_port, in_port)
 
+    def add_module_metadata(self):
+        self.hugr[self.hugr.module_root].metadata = _collect_meta_json(self.module.root)
+
     def import_dfg_region(self, region: model.Region, parent: Node):
         """Import an entire DFG region from the model into the Hugr."""
         signature = self.import_signature(region.signature)
