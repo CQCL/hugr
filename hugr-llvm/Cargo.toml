@@ -40,6 +40,7 @@ derive_more = { workspace = true, features = ["debug"] }
 
 [dev-dependencies]
 hugr-llvm = { "path" = ".", features = ["test-utils"] }
+hugr-passes = { path = "../hugr-passes" }
 
 [build-dependencies]
 cc = "1.2.41"

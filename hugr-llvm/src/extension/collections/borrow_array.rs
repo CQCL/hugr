@@ -3039,4 +3039,48 @@ mod test {
         });
         assert_eq!(1, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
+
+    #[rstest]
+    fn exec_discard_part_borrowed(mut exec_ctx: TestContext) {
+        use hugr_passes::replace_types::{DelegatingLinearizer, Linearizer};
+        // Builds a HUGR that:
+        // - Creates a borrow array [1,2,3]
+        // - Borrows index 1
+        // - Discards the borrow array using the ReplaceTypes linearizer
+        // And then runs this, i.e. to check that it does not panic.
+        let inn_arr_ty = borrow_array_type(2, usize_t());
+        let arr_ty = borrow_array_type(3, inn_arr_ty.clone());
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_type(6))
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let inner_arrays = [1, 3, 5].map(|i| {
+                    let elems = [i, i + 1].map(|v| builder.add_load_value(ConstUsize::new(v)));
+                    builder.add_new_borrow_array(usize_t(), elems).unwrap()
+                });
+                let outer = builder
+                    .add_new_borrow_array(inn_arr_ty.clone(), inner_arrays)
+                    .unwrap();
+                let idx = builder.add_load_value(ConstUsize::new(0));
+                let (outer, inner) = builder
+                    .add_borrow_array_borrow(inn_arr_ty, 3, outer, idx)
+                    .unwrap();
+                builder
+                    .add_borrow_array_discard(usize_t(), 2, inner)
+                    .unwrap();
+                let dl = DelegatingLinearizer::default();
+                let nt = dl.copy_discard_op(&arr_ty, 0).unwrap();
+                nt.add(&mut builder, [outer]).unwrap();
+                let res = builder.add_load_value(ConstInt::new_u(6, 17).unwrap());
+                builder.finish_hugr_with_outputs([res]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_logic_extensions()
+                .add_conversion_extensions()
+                .add_default_borrow_array_extensions(DefaultPreludeCodegen)
+                .add_default_int_extensions()
+        });
+        assert_eq!(17, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
 }
