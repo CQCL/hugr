@@ -11,6 +11,8 @@ from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
 from hugr.ops import (
+    AliasDecl,
+    AliasDefn,
     CFG,
     DFG,
     Call,
@@ -683,17 +685,49 @@ class ModelImport:
             self.fn_nodes[symbol.name] = node_id
             return node_id
 
+        def import_declare_alias(symbol: model.Symbol) -> Node:
+            match symbol:
+                case model.Symbol(
+                    name=name,
+                    visibility=_visibility,
+                    signature=model.Apply("core.type", []),
+                ):
+                    pass
+                case _:
+                    error = f"Unexpected symbol in alias declaration: {symbol}"
+                    raise ModelImportError(error)
+            return self.add_node(
+                node,
+                AliasDecl(alias=name, bound=TypeBound.Copyable),  # TODO which bound?
+                self.hugr.module_root,
+            )
+
+        def import_define_alias(symbol: model.Symbol, value: model.Term) -> Node:
+            match symbol:
+                case model.Symbol(
+                    name=name,
+                    visibility=_visibility,
+                    signature=model.Apply("core.type", []),
+                ):
+                    pass
+                case _:
+                    error = f"Unexpected symbol in alias definition: {symbol}"
+                    raise ModelImportError(error)
+            return self.add_node(
+                node,
+                AliasDefn(alias=name, definition=self.import_type(value)),
+                self.hugr.module_root,
+            )
+
         match node.operation:
             case model.DeclareFunc(symbol):
                 return import_declare_func(symbol)
             case model.DefineFunc(symbol):
                 return import_define_func(symbol)
-            case model.DeclareAlias():
-                error = "Aliases unsupported for now."
-                raise ModelImportError(error, node)
-            case model.DefineAlias():
-                error = "Aliases unsupported for now."
-                raise ModelImportError(error, node)
+            case model.DeclareAlias(symbol):
+                return import_declare_alias(symbol)
+            case model.DefineAlias(symbol, value):
+                return import_define_alias(symbol, value)
             case model.Import():
                 return None
             case model.DeclareConstructor():
