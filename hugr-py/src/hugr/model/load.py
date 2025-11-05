@@ -182,6 +182,7 @@ class ModelImport:
     module: model.Module
     symbols: dict[str, model.Node]
     fn_nodes: dict[str, Node]
+    fn_calls: list[tuple[str, Node]]
     hugr: Hugr
 
     def __init__(self, module: model.Module):
@@ -193,6 +194,7 @@ class ModelImport:
         self.linked_ports = {}
         self.static_edges = []
         self.fn_nodes = {}
+        self.fn_calls = []
 
         for node in module.root.children:
             symbol_name = node.operation.symbol_name()
@@ -251,6 +253,8 @@ class ModelImport:
                     raise ModelImportError(error)
 
     def link_static_ports(self):
+        for symbol, callnode in self.fn_calls:
+            self.static_edges.append((self.fn_nodes[symbol], callnode))
         for src, dst in self.static_edges:
             out_port_offset = self.hugr.num_out_ports(src) - 1
             out_port = OutPort(node=src, offset=out_port_offset)
@@ -440,7 +444,7 @@ class ModelImport:
                                 parent,
                                 1,
                             )
-                            self.static_edges.append((self.fn_nodes[symbol], callnode))
+                            self.fn_calls.append((symbol, callnode))
                             return callnode
                         case _:
                             error = "The function of a Call node must be a symbol "
@@ -484,10 +488,7 @@ class ModelImport:
                                 ),
                                 parent,
                             )
-                            self.hugr.add_link(
-                                OutPort(self.fn_nodes[fn_id], 0),
-                                InPort(loadfunc_node, 0),
-                            )
+                            self.fn_calls.append((fn_id, loadfunc_node))
                             return loadfunc_node
                         case _:
                             # Import as a Const and a LoadConst node.
