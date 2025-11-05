@@ -317,6 +317,7 @@ class ModelImport:
                                     ],
                                 ),
                                 parent,
+                                1,
                             )
                             self.static_edges.append((self.fn_nodes[symbol], callnode))
                             return callnode
