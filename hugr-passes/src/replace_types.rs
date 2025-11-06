@@ -193,6 +193,7 @@ impl ReplacementOptions {
     /// an instance of the same op.
     pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
         self.process_recursive = rec;
+        self.linearize = rec; // TODO ALAN update docs!
         self
     }
 
