@@ -275,8 +275,9 @@ impl TypeTransformer for ReplaceTypes {
     type Err = ReplaceTypesError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
-        let next = if let Some(res) = self.type_map.get(ct) {
-            Some(res.clone())
+        let mut ty = None;
+        if let Some(res) = self.type_map.get(ct) {
+            ty = Some(res.clone())
         } else if let Some((dest_fn, opts)) = self.param_types.get(&ct.into()) {
             // `ct` has not had args transformed
             let mut nargs = ct.args().to_vec();
@@ -284,11 +285,9 @@ impl TypeTransformer for ReplaceTypes {
             nargs
                 .iter_mut()
                 .try_for_each(|ta| ta.transform(self).map(|_ch| ()))?;
-            dest_fn(&nargs).map(|ty| (ty, opts.clone()))
-        } else {
-            None
+            ty = dest_fn(&nargs).map(|ty| (ty, opts.clone()))
         };
-        let Some((mut ty, opts)) = next else {
+        let Some((mut ty, opts)) = ty else {
             return Ok(None);
         };
         if opts.process_recursive {
