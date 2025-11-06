@@ -848,8 +848,6 @@ class ModelImport:
 
             return TupleConcatArg(tuples).flatten()
 
-        # TODO: TypeTypeArg
-
         match term:
             case model.Literal(str() as value):
                 return StringArg(value)
@@ -863,11 +861,9 @@ class ModelImport:
                 return import_list(term)
             case model.Tuple():
                 return import_tuple(term)
-            case model.Apply("prelude.qubit", []):
-                return TypeTypeArg(_QubitDef())
             case _:
-                error = "Failed to import TypeArg."
-                raise ModelImportError(error, term)
+                # Assume it's a TypeTypeArg
+                return TypeTypeArg(self.import_type(term))
 
     def import_type(self, term: model.Term) -> Type:
         """Import the type from a model Term."""
