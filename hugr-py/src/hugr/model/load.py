@@ -938,14 +938,32 @@ class ModelImport:
             case model.Apply(
                 "compat.const_json", [typ, model.Literal(str() as json_str)]
             ):
+                json_dict = json.loads(json_str)
                 match typ:
                     case model.Apply("prelude.string", []):
-                        json_dict = json.loads(json_str)
                         match json_dict:
                             case {"c": "ConstString", "v": value}:
                                 return StringVal(value)
                             case _:
                                 error = f"Unexpected string constant: {term}"
+                                raise ModelImportError(error)
+                    case model.Apply(
+                        "collections.static_array.static_array", [elem_ty]
+                    ):
+                        match json_dict:
+                            case {"c": "StaticArrayValue", "v": value}:
+                                return val.Extension(
+                                    name="StaticArrayValue",
+                                    typ=Opaque(
+                                        id="static_array",
+                                        bound=TypeBound.Copyable,
+                                        args=[self.import_type_arg(elem_ty)],
+                                        extension="collections.static_array",
+                                    ),
+                                    val=value,
+                                )
+                            case _:
+                                error = f"Unexpected static_array value: {json_str}"
                                 raise ModelImportError(error)
                     case _:
                         # TODO others
