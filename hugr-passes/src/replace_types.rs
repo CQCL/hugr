@@ -182,29 +182,28 @@ fn call<H: HugrView<Node = Node>>(
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
     process_recursive: bool,
-    linearize: bool,
+    linearize_unchanged: bool,
 }
 
 impl ReplacementOptions {
-    /// Specifies that the replacement (op or type) should be processed by the same
-    /// [ReplaceTypes]. This increases compositionality (in that replacements for
-    /// other types/ops do not need to have already been applied to the RHS), but
-    /// would lead to an infinite loop if e.g. changing an op for a DFG containing
-    /// an instance of the same op.
+    /// Specifies whether the replacement (op or type) should be processed by the same
+    /// [ReplaceTypes], including linearization of any changed ops. This increases
+    /// compositionality (in that replacements for other types/ops do not need to have
+    /// already been applied to the RHS), but can lead to infinite looping if e.g. the
+    ///  replacement for an op is a DFG containing an instance of the same op.
     pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
         self.process_recursive = rec;
-        self.linearize = rec; // TODO ALAN update docs!
         self
     }
 
-    /// Specifies that all nodes within the replacement should have their
+    /// Specifies whether *all* nodes within the replacement should have their
     /// output ports linearized.
     ///
-    /// * If [Self::with_recursive_replacement] has been set, this applies linearization
-    ///   after recursive processing.
+    /// * If [Self::with_recursive_replacement] has been set, this causes linearization
+    ///   to apply even to unchanged ops.
     /// * Otherwise, just applies linearization (to all nodes) without changing any ops.
     pub fn with_linearization(mut self, lin: bool) -> Self {
-        self.linearize = lin;
+        self.linearize_unchanged = lin;
         self
     }
 }
@@ -500,10 +499,15 @@ impl ReplaceTypes {
         &self,
         hugr: &mut impl HugrMut<Node = Node>,
         root: Node,
+        linearize_unchanged_ops: bool,
     ) -> Result<bool, ReplaceTypesError> {
         let mut changed = false;
         for n in hugr.descendants(root).collect::<Vec<_>>() {
-            changed |= self.change_node(hugr, n)?;
+            if self.change_node(hugr, n)? {
+                changed = true;
+            } else if !linearize_unchanged_ops {
+                continue;
+            }
             if n != hugr.entrypoint() {
                 self.linearize_outputs(hugr, n)?;
             }
@@ -594,14 +598,8 @@ impl ReplaceTypes {
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                     if opts.process_recursive {
-                        self.change_subtree(hugr, n)?;
-                    }
-                    if opts.linearize {
-                        for d in hugr.descendants(n).collect::<Vec<_>>() {
-                            if d != n {
-                                self.linearize_outputs(hugr, d)?;
-                            }
-                        }
+                        self.change_subtree(hugr, n, opts.linearize_unchanged)?;
+                        // change_subtree does not linearize it's root, but that's done by our caller
                     }
                     true
                 } else {
@@ -689,7 +687,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
         };
         let mut changed = false;
         for region_root in regions {
-            changed |= self.change_subtree(hugr, *region_root)?;
+            changed |= self.change_subtree(hugr, *region_root, false)?;
         }
         Ok(changed)
     }
