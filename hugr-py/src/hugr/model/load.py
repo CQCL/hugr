@@ -919,11 +919,15 @@ class ModelImport:
             case model.Apply(
                 "arithmetic.int.const",
                 [
-                    model.Literal(int() as int_bitwidth),
+                    model.Literal(int() as int_logwidth),
                     model.Literal(int() as int_value),
                 ],
             ):
-                return IntVal(int_value, int_bitwidth)
+                # Ensure value is in signed form for conversion to IntVal:
+                width = 1 << int_logwidth
+                if int_value >= 1 << (width - 1):
+                    int_value -= 1 << width
+                return IntVal(int_value, int_logwidth)
             case model.Apply(
                 "arithmetic.float.const_f64", [model.Literal(float() as float_value)]
             ):
