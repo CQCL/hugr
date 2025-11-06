@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.24.2...hugr-llvm-v0.24.3) - 2025-11-06
+
+### Bug Fixes
+
+- BorrowArray discard handler allows elements to be borrowed ([#2666](https://github.com/CQCL/hugr/pull/2666))
+
 ## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.23.0...hugr-llvm-v0.24.0) - 2025-10-13
 
 ### New Features
