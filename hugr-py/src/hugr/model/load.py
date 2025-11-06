@@ -37,6 +37,7 @@ from hugr.ops import (
 )
 from hugr.std.float import FloatVal
 from hugr.std.int import IntVal
+from hugr.std.prelude import StringVal
 from hugr.tys import (
     BoundedNatArg,
     BoundedNatParam,
@@ -939,14 +940,21 @@ class ModelImport:
                 error = "Import array constants"
                 raise NotImplementedError(error)
             case model.Apply(
-                "compat.const_json",
-                [
-                    model.Literal(str() as _json),
-                ],
+                "compat.const_json", [typ, model.Literal(str() as json_str)]
             ):
-                # TODO
-                error = "Import json encoded constants"
-                raise NotImplementedError(error)
+                match typ:
+                    case model.Apply("prelude.string", []):
+                        json_dict = json.loads(json_str)
+                        match json_dict:
+                            case {"c": "ConstString", "v": value}:
+                                return StringVal(value)
+                            case _:
+                                error = f"Unexpected string constant: {term}"
+                                raise ModelImportError(error)
+                    case _:
+                        # TODO others
+                        error = f"Import json encoded constant: {term}"
+                        raise NotImplementedError(error)
             case model.Apply("core.const.adt", [variants, _types, tag, values]):
                 match tag:
                     case model.Literal(int() as tagval):
