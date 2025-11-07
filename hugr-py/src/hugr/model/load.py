@@ -179,6 +179,7 @@ class ModelImport:
 
     local_vars: dict[str, "LocalVarData"]
     current_symbol: str | None
+    link_prefix: int
     linked_ports: dict[str, tuple[list[InPort], list[OutPort]]]
     static_edges: list[tuple[Node, Node]]
 
@@ -194,6 +195,7 @@ class ModelImport:
         self.module = module
         self.symbols = {}
         self.hugr = Hugr()
+        self.link_prefix = 0
         self.linked_ports = {}
         self.static_edges = []
         self.fn_nodes = {}
@@ -231,13 +233,17 @@ class ModelImport:
         """Record a bunch of links entering the given Hugr Node with the given names."""
         for offset, link in enumerate(links):
             in_port = InPort(node=node, offset=offset)
-            self.linked_ports.setdefault(link, ([], []))[0].append(in_port)
+            self.linked_ports.setdefault(f"{self.link_prefix}_{link}", ([], []))[
+                0
+            ].append(in_port)
 
     def record_out_links(self, node: Node, links: Iterable[str]):
         """Record a bunch of links exiting the given Hugr Node with the given names."""
         for offset, link in enumerate(links):
             out_port = OutPort(node=node, offset=offset)
-            self.linked_ports.setdefault(link, ([], []))[1].append(out_port)
+            self.linked_ports.setdefault(f"{self.link_prefix}_{link}", ([], []))[
+                1
+            ].append(out_port)
 
     def link_ports(self):
         """Add links to the Hugr according to the recorded data."""
@@ -643,8 +649,10 @@ class ModelImport:
                 error = "Unexpected node in DFG region."
                 raise ModelImportError(error, node)
 
-    def import_node_in_module(self, node: model.Node) -> Node | None:
+    def import_node_in_module(self, node: model.Node, link_prefix: int) -> Node | None:
         """Import a model Node at the Hugr Module level."""
+
+        self.link_prefix = link_prefix
 
         def import_declare_func(symbol: model.Symbol) -> Node:
             f_name = _find_meta_title(node) or symbol.name
