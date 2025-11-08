@@ -1,5 +1,6 @@
 //! Supporting Rust library for the hugr Python bindings.
 
+use hugr_cli::{CliCommand, hugr_io::HugrInputArgs, validate::ValArgs};
 use hugr_core::{
     envelope::{EnvelopeConfig, EnvelopeFormat, read_described_envelope, write_envelope},
     std_extensions::STD_REG,
@@ -75,6 +76,15 @@ fn current_model_version() -> (u64, u64, u64) {
     )
 }
 
+#[pyfunction]
+#[pyo3(signature = (args=std::env::args().skip(1).collect()))]
+fn run_cli(args: Vec<String>) -> PyResult<()> {
+    let cli_args = hugr_cli::CliArgs::new_from_args(args);
+
+    cli_args.run();
+    Ok(())
+}
+
 #[pymodule]
 fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(term_to_string, m)?)?;
@@ -95,5 +105,6 @@ fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(string_to_symbol, m)?)?;
     m.add_function(wrap_pyfunction!(current_model_version, m)?)?;
     m.add_function(wrap_pyfunction!(to_json_envelope, m)?)?;
+    m.add_function(wrap_pyfunction!(run_cli, m)?)?;
     Ok(())
 }

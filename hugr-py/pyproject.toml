@@ -36,6 +36,10 @@ dependencies = [
     "pyzstd~=0.18.0",
 ]
 
+
+[project.scripts]
+hugr = "hugr._hugr:run_cli"
+
 [project.optional-dependencies]
 docs = ["sphinx>=8.1.3,<9.0.0", "furo"]
 pytket = ["pytket >= 1.34.0"]
