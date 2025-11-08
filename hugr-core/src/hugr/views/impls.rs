@@ -72,7 +72,6 @@ macro_rules! hugr_view_methods {
         }
     }
 }
-pub(crate) use hugr_view_methods;
 
 macro_rules! hugr_mut_internal_methods {
     // The extra ident here is because invocations of the macro cannot pass `self` as argument
@@ -122,7 +121,6 @@ macro_rules! hugr_mut_methods {
         }
     };
 }
-pub(crate) use hugr_mut_methods;
 
 // -------- Immutable borrow
 impl<T: HugrView> HugrInternals for &T {
