@@ -372,6 +372,7 @@ class ModelImport:
 
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
         """Import a model Node within a DFG region."""
+        signature = self.import_signature(node.signature)
 
         def import_dfg_node() -> Node:
             match node.regions:
@@ -380,8 +381,6 @@ class ModelImport:
                 case _:
                     error = "DFG node expects a dataflow region."
                     raise ModelImportError(error, node)
-
-            signature = self.import_signature(node.signature)
             node_id = self.add_node(
                 node, DFG(signature.input, signature.output), parent
             )
@@ -448,12 +447,11 @@ class ModelImport:
                             error = "The function of a Call node must be a symbol "
                             "application."
                             raise ModelImportError(error, node)
-                    sig = self.import_signature(node.signature)
                     callnode = self.add_node(
                         node,
                         Call(
-                            signature=PolyFuncType(fn_args, sig),
-                            instantiation=sig,
+                            signature=PolyFuncType(fn_args, signature),
+                            instantiation=signature,
                             type_args=[
                                 self.import_type_arg(fn_arg) for fn_arg in fn_args
                             ],
@@ -555,7 +553,6 @@ class ModelImport:
                     )
                 # TODO others
                 case _:
-                    signature = self.import_signature(node.signature)
                     return self.add_node(
                         node,
                         Custom(
@@ -575,8 +572,6 @@ class ModelImport:
                 case _:
                     error = "CFG node expects a control-flow region."
                     raise ModelImportError(error, node)
-
-            signature = self.import_signature(node.signature)
             node_id = self.add_node(
                 node, CFG(signature.input, signature.output), parent
             )
