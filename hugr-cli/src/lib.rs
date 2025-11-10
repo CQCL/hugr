@@ -250,6 +250,18 @@ impl CliArgs {
                 args.run_convert_with_io(Some(input), Some(&mut output))?;
                 Ok(output)
             }
+            CliCommand::Mermaid(ref mut args) => {
+                // Run mermaid with bytes input and capture output
+                let mut output = Vec::new();
+                args.run_print_with_io(Some(input), Some(&mut output))?;
+                Ok(output)
+            }
+            CliCommand::Describe(ref mut args) => {
+                // Run describe with bytes input and capture output
+                let mut output = Vec::new();
+                args.run_describe_with_io(Some(input), Some(&mut output))?;
+                Ok(output)
+            }
             x => Err(anyhow::anyhow!(
                 "This command does not support programmatic byte input/output yet {x:?}"
             )),

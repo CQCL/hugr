@@ -8,7 +8,7 @@ use hugr::envelope::ReadError;
 use hugr::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use hugr::extension::Version;
 use hugr::package::Package;
-use std::io::Write;
+use std::io::{Read, Write};
 use tabled::Tabled;
 use tabled::derive::display;
 
@@ -73,21 +73,46 @@ impl ModuleArgs {
     }
 }
 impl DescribeArgs {
-    /// Load and describe the HUGR package.
-    pub fn run_describe(&mut self) -> Result<()> {
+    /// Load and describe the HUGR package with optional input/output overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of the CLI input argument.
+    /// * `output_override` - Optional writer to use instead of the CLI output argument.
+    pub fn run_describe_with_io<R: Read, W: Write>(
+        &mut self,
+        input_override: Option<R>,
+        mut output_override: Option<W>,
+    ) -> Result<()> {
         if self.json_schema {
             let schema = schemars::schema_for!(PackageDescriptionJson);
             let schema_json = serde_json::to_string_pretty(&schema)?;
-            writeln!(self.output, "{schema_json}")?;
+            if let Some(ref mut writer) = output_override {
+                writeln!(writer, "{schema_json}")?;
+            } else {
+                writeln!(self.output, "{schema_json}")?;
+            }
             return Ok(());
         }
-        let (mut desc, res) = match self.input_args.get_described_package() {
-            Ok((desc, pkg)) => (desc, Ok(pkg)),
-            Err(crate::CliError::ReadEnvelope(ReadError::Payload {
-                source,
-                partial_description,
-            })) => (partial_description, Err(source)), // keep error for later
-            Err(e) => return Err(e.into()),
+
+        let (mut desc, res) = if let Some(reader) = input_override {
+            match self.input_args.get_described_package_from_reader(reader) {
+                Ok((desc, pkg)) => (desc, Ok(pkg)),
+                Err(crate::CliError::ReadEnvelope(ReadError::Payload {
+                    source,
+                    partial_description,
+                })) => (partial_description, Err(source)),
+                Err(e) => return Err(e.into()),
+            }
+        } else {
+            match self.input_args.get_described_package() {
+                Ok((desc, pkg)) => (desc, Ok(pkg)),
+                Err(crate::CliError::ReadEnvelope(ReadError::Payload {
+                    source,
+                    partial_description,
+                })) => (partial_description, Err(source)),
+                Err(e) => return Err(e.into()),
+            }
         };
 
         // clear fields that have not been requested
@@ -96,91 +121,116 @@ impl DescribeArgs {
         }
 
         let res = res.map_err(anyhow::Error::from);
+
+        let writer: &mut dyn Write = if let Some(ref mut w) = output_override {
+            w
+        } else {
+            &mut self.output
+        };
+
         if self.json {
             if !self.packaged_extensions {
                 desc.packaged_extensions.clear();
             }
-            self.output_json(desc, &res)?;
+            output_json(desc, &res, writer)?;
         } else {
-            self.print_description(desc)?;
+            print_description(desc, self.packaged_extensions, writer)?;
         }
 
         // bubble up any errors
         res.map(|_| ())
     }
 
-    fn print_description(&mut self, desc: PackageDesc) -> Result<()> {
-        let header = desc.header();
-        let n_modules = desc.n_modules();
-        let n_extensions = desc.n_packaged_extensions();
-        let module_str = if n_modules == 1 { "module" } else { "modules" };
-        let extension_str = if n_extensions == 1 {
-            "extension"
-        } else {
-            "extensions"
-        };
-        writeln!(
-            self.output,
-            "{header}\nPackage contains {n_modules} {module_str} and {n_extensions} {extension_str}",
-        )?;
-        let summaries: Vec<ModuleSummary> = desc
-            .modules
-            .iter()
-            .map(|m| m.as_ref().map(Into::into).unwrap_or_default())
+    /// Load and describe the HUGR package.
+    pub fn run_describe(&mut self) -> Result<()> {
+        self.run_describe_with_io(None::<&[u8]>, None::<Vec<u8>>)
+    }
+}
+
+/// Print a human-readable description of a package.
+fn print_description<W: Write + ?Sized>(
+    desc: PackageDesc,
+    show_packaged_extensions: bool,
+    writer: &mut W,
+) -> Result<()> {
+    let header = desc.header();
+    let n_modules = desc.n_modules();
+    let n_extensions = desc.n_packaged_extensions();
+    let module_str = if n_modules == 1 { "module" } else { "modules" };
+    let extension_str = if n_extensions == 1 {
+        "extension"
+    } else {
+        "extensions"
+    };
+
+    writeln!(
+        writer,
+        "{header}\nPackage contains {n_modules} {module_str} and {n_extensions} {extension_str}",
+    )?;
+
+    let summaries: Vec<ModuleSummary> = desc
+        .modules
+        .iter()
+        .map(|m| m.as_ref().map(Into::into).unwrap_or_default())
+        .collect();
+    let summary_table = tabled::Table::builder(summaries).index().build();
+    writeln!(writer, "{summary_table}")?;
+
+    for (i, module) in desc.modules.into_iter().enumerate() {
+        writeln!(writer, "\nModule {i}:")?;
+        if let Some(module) = module {
+            display_module(module, writer)?;
+        }
+    }
+    if show_packaged_extensions {
+        writeln!(writer, "Packaged extensions:")?;
+        let ext_rows: Vec<ExtensionRow> = desc
+            .packaged_extensions
+            .into_iter()
+            .flatten()
+            .map(Into::into)
             .collect();
-        let summary_table = tabled::Table::builder(summaries).index().build();
-        writeln!(self.output, "{summary_table}")?;
+        let ext_table = tabled::Table::new(ext_rows);
+        writeln!(writer, "{ext_table}")?;
+    }
+    Ok(())
+}
 
-        for (i, module) in desc.modules.into_iter().enumerate() {
-            writeln!(self.output, "\nModule {i}:")?;
-            if let Some(module) = module {
-                self.display_module(module)?;
-            }
-        }
-        if self.packaged_extensions {
-            writeln!(self.output, "Packaged extensions:")?;
-            let ext_rows: Vec<ExtensionRow> = desc
-                .packaged_extensions
-                .into_iter()
-                .flatten()
-                .map(Into::into)
-                .collect();
-            let ext_table = tabled::Table::new(ext_rows);
-            writeln!(self.output, "{ext_table}")?;
-        }
-        Ok(())
+/// Output a package description as JSON.
+fn output_json<W: Write + ?Sized>(
+    package_desc: PackageDesc,
+    res: &Result<Package>,
+    writer: &mut W,
+) -> Result<()> {
+    let err_str = res.as_ref().err().map(|e| format!("{e:?}"));
+    let json_desc = PackageDescriptionJson {
+        package_desc,
+        error: err_str,
+    };
+    serde_json::to_writer_pretty(writer, &json_desc)?;
+    Ok(())
+}
+
+/// Display information about a single module.
+fn display_module<W: Write + ?Sized>(desc: ModuleDesc, writer: &mut W) -> Result<()> {
+    if let Some(exts) = desc.used_extensions_resolved {
+        let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
+        let ext_table = tabled::Table::new(ext_rows);
+        writeln!(writer, "Resolved extensions:\n{ext_table}")?;
     }
 
-    fn output_json(&mut self, package_desc: PackageDesc, res: &Result<Package>) -> Result<()> {
-        let err_str = res.as_ref().err().map(|e| format!("{e:?}"));
-        let json_desc = PackageDescriptionJson {
-            package_desc,
-            error: err_str,
-        };
-        serde_json::to_writer_pretty(&mut self.output, &json_desc)?;
-        Ok(())
+    if let Some(syms) = desc.public_symbols {
+        let sym_table = tabled::Table::new(syms.into_iter().map(|s| SymbolRow { symbol: s }));
+        writeln!(writer, "Public symbols:\n{sym_table}")?;
     }
 
-    fn display_module(&mut self, desc: ModuleDesc) -> Result<()> {
-        if let Some(exts) = desc.used_extensions_resolved {
-            let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
-            let ext_table = tabled::Table::new(ext_rows);
-            writeln!(self.output, "Resolved extensions:\n{ext_table}")?;
-        }
-
-        if let Some(syms) = desc.public_symbols {
-            let sym_table = tabled::Table::new(syms.into_iter().map(|s| SymbolRow { symbol: s }));
-            writeln!(self.output, "Public symbols:\n{sym_table}")?;
-        }
-
-        if let Some(exts) = desc.used_extensions_generator {
-            let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
-            let ext_table = tabled::Table::new(ext_rows);
-            writeln!(self.output, "Generator claimed extensions:\n{ext_table}")?;
-        }
-
-        Ok(())
+    if let Some(exts) = desc.used_extensions_generator {
+        let ext_rows: Vec<ExtensionRow> = exts.into_iter().map(Into::into).collect();
+        let ext_table = tabled::Table::new(ext_rows);
+        writeln!(writer, "Generator claimed extensions:\n{ext_table}")?;
     }
+
+    Ok(())
 }
 
 #[derive(serde::Serialize, schemars::JsonSchema)]
