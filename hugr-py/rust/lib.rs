@@ -81,7 +81,7 @@ fn run_cli() -> PyResult<()> {
     // python is the first arg so skip it
     let cli_args = hugr_cli::CliArgs::new_from_args(std::env::args().skip(1));
 
-    cli_args.run();
+    cli_args.run_cli();
     Ok(())
 }
 
@@ -117,7 +117,7 @@ fn cli_with_input(mut args: Vec<String>, input_bytes: Option<&[u8]>) -> PyResult
     let cli_args = CliArgs::new_from_args(args);
     let input = input_bytes.unwrap_or(&[]);
     cli_args
-        .run_with_bytes(input)
+        .run_programmatic(input)
         .map_err(|e| PyValueError::new_err(format!("{:?}", e)))
 }
 

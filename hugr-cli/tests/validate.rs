@@ -255,7 +255,7 @@ fn test_validate_programmatic_api(test_package: Package) {
     let cli_args = CliArgs::new_from_args(vec!["hugr", "validate"]);
 
     // Run validation with bytes input
-    let result = cli_args.run_with_bytes(&package_bytes);
+    let result = cli_args.run_programmatic(package_bytes.as_slice());
 
     // Should succeed and return empty vec
     assert!(result.is_ok());
@@ -271,7 +271,7 @@ fn test_validate_programmatic_api_invalid(invalid_hugr_with_generator: Vec<u8>) 
     let cli_args = CliArgs::new_from_args(vec!["hugr", "validate"]);
 
     // Run validation with invalid bytes input
-    let result = cli_args.run_with_bytes(&invalid_hugr_with_generator);
+    let result = cli_args.run_programmatic(invalid_hugr_with_generator.as_slice());
 
     // Should fail
     assert!(result.is_err());

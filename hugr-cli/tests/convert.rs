@@ -285,7 +285,7 @@ fn test_convert_programmatic_api(test_package: Package) {
     let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "json"]);
 
     // Run with bytes
-    let output = cli_args.run_with_bytes(&input_data).unwrap();
+    let output = cli_args.run_programmatic(input_data.as_slice()).unwrap();
 
     // Verify the output is valid and in JSON format
     let reader = BufReader::new(output.as_slice());
@@ -312,7 +312,7 @@ fn test_convert_programmatic_model_text(test_package: Package) {
 
     let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "model-text"]);
 
-    let output = cli_args.run_with_bytes(&input_data).unwrap();
+    let output = cli_args.run_programmatic(input_data.as_slice()).unwrap();
 
     // Verify the output is valid model-text format
     let reader = BufReader::new(output.as_slice());

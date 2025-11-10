@@ -2,5 +2,5 @@
 use hugr_cli::CliArgs;
 
 fn main() {
-    CliArgs::new().run();
+    CliArgs::new().run_cli();
 }

@@ -151,7 +151,7 @@ impl CliArgs {
     }
 
     /// Entrypoint for cli - process arguments and run commands.
-    pub fn run(self) {
+    pub fn run_cli(self) {
         let level = match self.verbose.filter() {
             VerbosityFilter::Off => LevelFilter::OFF,
             VerbosityFilter::Error => LevelFilter::ERROR,
@@ -166,19 +166,92 @@ impl CliArgs {
             .pretty()
             .init();
 
-        let result = match self.command {
-            CliCommand::Validate(mut args) => args.run(),
-            CliCommand::GenExtensions(args) => args.run_dump(&hugr::std_extensions::STD_REG),
-            CliCommand::Mermaid(mut args) => args.run_print(),
-            CliCommand::Convert(mut args) => args.run_convert(),
-            CliCommand::Describe(mut args) => args.run_describe(),
-            CliCommand::External(args) => run_external(args),
-        };
+        let result = self.run_with_io(None::<std::io::Stdin>, None::<std::io::Stdout>);
 
         if let Err(err) = result {
             error!("{:?}", err);
             std::process::exit(1);
         }
+    }
+
+    /// Run a CLI command with optional input/output overrides.
+    ///
+    /// This provides a unified interface for running commands with optional
+    /// programmatic I/O, useful for language bindings (e.g., Python via PyO3).
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of stdin/files
+    /// * `output_override` - Optional writer to use instead of stdout/files
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` on success, or `Err` on failure.
+    ///
+    /// # Note
+    ///
+    /// When called with `None` arguments, behaves like the normal CLI.
+    /// The `gen-extensions` and `external` commands don't support overrides.
+    fn run_with_io<R: std::io::Read, W: std::io::Write>(
+        mut self,
+        input_override: Option<R>,
+        output_override: Option<W>,
+    ) -> Result<()> {
+        match self.command {
+            CliCommand::Validate(ref mut args) => args.run_with_input(input_override),
+            CliCommand::GenExtensions(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "GenExtensions command does not support programmatic I/O overrides"
+                    ));
+                }
+                args.run_dump(&hugr::std_extensions::STD_REG)
+            }
+            CliCommand::Mermaid(ref mut args) => {
+                args.run_print_with_io(input_override, output_override)
+            }
+            CliCommand::Convert(ref mut args) => {
+                args.run_convert_with_io(input_override, output_override)
+            }
+            CliCommand::Describe(ref mut args) => {
+                args.run_describe_with_io(input_override, output_override)
+            }
+            CliCommand::External(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "External commands do not support programmatic I/O overrides"
+                    ));
+                }
+                run_external(args)
+            }
+        }
+    }
+
+    /// Run a CLI command with bytes input and capture bytes output.
+    ///
+    /// This provides a programmatic interface to the CLI, useful for
+    /// language bindings (e.g., Python via PyO3). Unlike `run()`, this
+    /// method:
+    /// - Accepts input as a byte slice instead of reading from stdin/files
+    /// - Returns output as a byte vector instead of writing to stdout/files
+    /// - Still writes logs and errors to stderr as normal
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input data as bytes (e.g., a HUGR package)
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Vec<u8>)` with the command output, or an error on failure.
+    ///
+    /// # Note
+    ///
+    /// The `gen-extensions` and `external` commands don't support byte I/O
+    /// and should use the normal `run()` method instead.
+    pub fn run_programmatic(self, input: impl std::io::Read) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
+        self.run_with_io(Some(input), Some(&mut output))?;
+        Ok(output)
     }
 }
 
@@ -211,60 +284,4 @@ fn run_external(args: Vec<OsString>) -> Result<()> {
     }
 
     Ok(())
-}
-
-impl CliArgs {
-    /// Run a CLI command with bytes input and capture bytes output.
-    ///
-    /// This provides a programmatic interface to the CLI, useful for
-    /// language bindings (e.g., Python via PyO3). Unlike `run()`, this
-    /// method:
-    /// - Accepts input as a byte slice instead of reading from stdin/files
-    /// - Returns output as a byte vector instead of writing to stdout/files
-    /// - Still writes logs and errors to stderr as normal
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - The input data as bytes (e.g., a HUGR package)
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(Vec<u8>)` with the command output, or `Err(CliError)` on failure.
-    ///
-    /// # Note
-    ///
-    /// Currently only the `validate` command is supported. Other commands will
-    /// return an error. The `gen-extensions` command doesn't require input and
-    /// should use the normal `run()` method instead.
-    pub fn run_with_bytes(mut self, input: &[u8]) -> Result<Vec<u8>> {
-        match self.command {
-            CliCommand::Validate(ref mut args) => {
-                // Run validation with the bytes input
-                args.run_with_input(Some(input))?;
-                // Validate has no output, return empty vec
-                Ok(Vec::new())
-            }
-            CliCommand::Convert(ref mut args) => {
-                // Run conversion with bytes input and capture output
-                let mut output = Vec::new();
-                args.run_convert_with_io(Some(input), Some(&mut output))?;
-                Ok(output)
-            }
-            CliCommand::Mermaid(ref mut args) => {
-                // Run mermaid with bytes input and capture output
-                let mut output = Vec::new();
-                args.run_print_with_io(Some(input), Some(&mut output))?;
-                Ok(output)
-            }
-            CliCommand::Describe(ref mut args) => {
-                // Run describe with bytes input and capture output
-                let mut output = Vec::new();
-                args.run_describe_with_io(Some(input), Some(&mut output))?;
-                Ok(output)
-            }
-            x => Err(anyhow::anyhow!(
-                "This command does not support programmatic byte input/output yet {x:?}"
-            )),
-        }
-    }
 }
