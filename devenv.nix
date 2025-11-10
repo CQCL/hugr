@@ -27,6 +27,8 @@ in
       pkgs.libffi
       pkgs.libxml2
       pkgs.ncurses
+    ] ++ lib.optionals pkgs.stdenv.isDarwin [
+      pkgs.xz
     ];
 
     env = {
