@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pyzstd
 
-import hugr._hugr as rust
+from hugr import cli
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
@@ -117,7 +117,7 @@ def read_envelope(envelope: bytes) -> Package:
             # TODO Going via JSON is a temporary solution, until we get model import to
             # python properly implemented.
             # https://github.com/CQCL/hugr/issues/2287
-            json_data = rust.to_json_envelope(envelope)
+            json_data = cli.convert(envelope, format="json")
             return read_envelope(json_data)
 
 
