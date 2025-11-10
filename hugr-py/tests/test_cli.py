@@ -2,106 +2,152 @@
 
 import pytest
 
-from hugr._hugr import cli_with_io
+from hugr import cli
+from hugr.build import Module
 from hugr.package import Package
 
 
-def test_validate_with_bytes():
-    """Test validating a HUGR package using the programmatic bytes API."""
+@pytest.fixture
+def simple_hugr_bytes() -> bytes:
+    """Create a simple HUGR package as bytes for testing."""
+    return Package([Module().hugr]).to_bytes()
 
+
+def test_validate_with_bytes(simple_hugr_bytes):
+    """Test validating a HUGR package using the programmatic API."""
     # Validate using the programmatic API
-    result = cli_with_io(["validate"], Package([]).to_bytes())
-
-    # Should return empty bytes for successful validation
-    assert result == b""
+    cli.validate(simple_hugr_bytes)  # Should not raise
 
 
 def test_validate_with_bytes_invalid():
     """Test that invalid packages raise errors through the programmatic API."""
-    # Create some invalid bytes
+    # We need to pass invalid bytes through cli_with_io directly
+    # since Package construction would fail first
+
     invalid_bytes = b"not a valid hugr package"
 
-    # Should raise an error
-    with pytest.raises(ValueError, match=r"(?i)(error|invalid|magic)"):
-        cli_with_io(["validate"], invalid_bytes)
+    # Should raise an error when trying to validate
+    with pytest.raises(ValueError, match="Bad magic number"):
+        cli.cli_with_io(["validate"], invalid_bytes)
 
 
-def test_convert_format():
+def test_validate_quiet(simple_hugr_bytes):
+    """Test validate with quiet flag."""
+    # Validate with quiet mode
+    cli.validate(simple_hugr_bytes, quiet=True)  # Should not raise
+
+
+def test_validate_no_std(simple_hugr_bytes):
+    """Test validate with no_std flag."""
+    # Validate without standard extensions
+    cli.validate(simple_hugr_bytes, no_std=True)  # Should not raise
+
+
+def test_convert_format(simple_hugr_bytes):
     """Test converting a HUGR package between formats."""
-    # Create a simple package
-    package = Package([])
-    input_bytes = package.to_bytes()
-
     # Convert to JSON format
-    output_bytes = cli_with_io(["convert", "--format", "json"], input_bytes)
+    output_bytes = cli.convert(simple_hugr_bytes, format="json")
 
-    # Output should not be empty
-    assert len(output_bytes) > 0
-
-    # Output should be a valid HUGR package
-    output_package = Package.from_bytes(output_bytes)
-    assert len(output_package.modules) == len(package.modules)
-
-
-def test_convert_binary_to_text():
-    """Test converting a HUGR package from binary to text format."""
-    package = Package([])
-    input_bytes = package.to_bytes()
-
-    # Convert to text format using --text flag
-    output_bytes = cli_with_io(["convert", "--text"], input_bytes)
-
-    # Output should not be empty
-    assert len(output_bytes) > 0
-
-    # Should be able to parse back as a package
-    output_package = Package.from_bytes(output_bytes)
-    assert len(output_package.modules) == len(package.modules)
-
-
-def test_mermaid_output():
-    """Test generating mermaid diagrams from a HUGR package."""
-    package = Package([])
-    input_bytes = package.to_bytes()
-
-    # Generate mermaid diagram
-    output_bytes = cli_with_io(["mermaid"], input_bytes)
-
-    # Empty package produces no output (no modules)
-    # This is expected behavior - should succeed with empty output
+    # Output should be valid bytes
     assert isinstance(output_bytes, bytes)
+    assert len(output_bytes) > 0
+
+    # Should be parseable as a package
+    output_package = Package.from_bytes(output_bytes)
+    input_package = Package.from_bytes(simple_hugr_bytes)
+    assert len(output_package.modules) == len(input_package.modules)
 
 
-def test_describe_output():
+def test_convert_binary_to_text(simple_hugr_bytes):
+    """Test converting a HUGR package from binary to text format."""
+    # Convert to text format using --text flag
+    output_bytes = cli.convert(simple_hugr_bytes, text=True)
+
+    # Should be valid bytes
+    assert isinstance(output_bytes, bytes)
+    assert len(output_bytes) > 0
+
+    # Should be parseable as a package
+    output_package = Package.from_bytes(output_bytes)
+    input_package = Package.from_bytes(simple_hugr_bytes)
+    assert len(output_package.modules) == len(input_package.modules)
+
+
+def test_convert_with_compression(simple_hugr_bytes):
+    """Test converting with compression enabled."""
+    # Convert with compression
+    output_bytes = cli.convert(simple_hugr_bytes, compress=True, compression_level=9)
+
+    # Should be valid bytes
+    assert isinstance(output_bytes, bytes)
+    assert len(output_bytes) > 0
+
+    # Should be parseable as a package
+    output_package = Package.from_bytes(output_bytes)
+    input_package = Package.from_bytes(simple_hugr_bytes)
+    assert len(output_package.modules) == len(input_package.modules)
+
+
+def test_mermaid_output(simple_hugr_bytes):
+    """Test generating mermaid diagrams from a HUGR package."""
+    # Generate mermaid diagram
+    output = cli.mermaid(simple_hugr_bytes)
+
+    # Should produce mermaid output
+    assert isinstance(output, str)
+    assert "graph LR" in output
+
+
+def test_mermaid_with_validation(simple_hugr_bytes):
+    """Test generating mermaid diagrams with validation."""
+    # Generate mermaid diagram with validation
+    output = cli.mermaid(simple_hugr_bytes, validate=True)
+    assert "graph LR" in output
+
+
+def test_describe_output(simple_hugr_bytes):
     """Test describing a HUGR package."""
-    package = Package([])
-    input_bytes = package.to_bytes()
-
     # Describe the package
-    output_bytes = cli_with_io(["describe"], input_bytes)
+    output_text = cli.describe(simple_hugr_bytes)
 
     # Output should not be empty
-    assert len(output_bytes) > 0
-    output_text = output_bytes.decode("utf-8")
+    assert len(output_text) > 0
+    assert isinstance(output_text, str)
 
     # Should contain package information
     assert "Package contains" in output_text or "module" in output_text.lower()
 
 
-def test_describe_json_output():
+def test_describe_json_output(simple_hugr_bytes):
     """Test describing a HUGR package in JSON format."""
     import json
 
-    package = Package([])
-    input_bytes = package.to_bytes()
-
     # Describe the package in JSON format
-    output_bytes = cli_with_io(["describe", "--json"], input_bytes)
+    output_text = cli.describe(simple_hugr_bytes, json=True)
 
     # Output should be valid JSON
-    assert len(output_bytes) > 0
-    description = json.loads(output_bytes.decode("utf-8"))
+    assert len(output_text) > 0
+    description = json.loads(output_text)
 
     # Should have expected fields
     assert "header" in description
     assert "modules" in description
+
+
+def test_describe_with_options(simple_hugr_bytes):
+    """Test describe with various options."""
+    # Test with packaged_extensions flag
+    output_text = cli.describe(simple_hugr_bytes, packaged_extensions=True)
+    assert "Packaged extensions:" in output_text
+
+    # Test with no_resolved_extensions flag
+    output_text = cli.describe(simple_hugr_bytes, no_resolved_extensions=True)
+    assert "resolved" not in output_text
+
+    # Test with public_symbols flag
+    output_text = cli.describe(simple_hugr_bytes, public_symbols=True)
+    assert len(output_text) > 0
+
+    # Test with generator_claimed_extensions flag
+    output_text = cli.describe(simple_hugr_bytes, generator_claimed_extensions=True)
+    assert len(output_text) > 0
