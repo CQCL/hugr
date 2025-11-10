@@ -77,12 +77,9 @@ fn current_model_version() -> (u64, u64, u64) {
 }
 
 #[pyfunction]
-fn run_cli() -> PyResult<()> {
+fn run_cli() {
     // python is the first arg so skip it
-    let cli_args = hugr_cli::CliArgs::new_from_args(std::env::args().skip(1));
-
-    cli_args.run_cli();
-    Ok(())
+    CliArgs::new_from_args(std::env::args().skip(1)).run_cli();
 }
 
 /// Run a CLI command with bytes input and return bytes output.
@@ -100,18 +97,10 @@ fn run_cli() -> PyResult<()> {
 ///
 /// Returns the command output as bytes if successful, or None if no output
 /// is produced. Raises an exception on error.
-///
-/// # Example
-///
-/// ```python
-/// # Validate a HUGR package from bytes
-/// hugr_data = read_hugr_file()
-/// result = cli_with_input(['validate'], hugr_data)
-/// # result is an empty bytes object b'' for validate (which has no output)
 /// ```
 #[pyfunction]
 #[pyo3(signature = (args, input_bytes=None))]
-fn cli_with_input(mut args: Vec<String>, input_bytes: Option<&[u8]>) -> PyResult<Vec<u8>> {
+fn cli_with_io(mut args: Vec<String>, input_bytes: Option<&[u8]>) -> PyResult<Vec<u8>> {
     // placeholder for executable
     args.insert(0, String::new());
     let cli_args = CliArgs::new_from_args(args);
@@ -142,6 +131,6 @@ fn _hugr(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(current_model_version, m)?)?;
     m.add_function(wrap_pyfunction!(to_json_envelope, m)?)?;
     m.add_function(wrap_pyfunction!(run_cli, m)?)?;
-    m.add_function(wrap_pyfunction!(cli_with_input, m)?)?;
+    m.add_function(wrap_pyfunction!(cli_with_io, m)?)?;
     Ok(())
 }

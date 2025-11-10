@@ -2,7 +2,7 @@
 
 import pytest
 
-from hugr._hugr import cli_with_input
+from hugr._hugr import cli_with_io
 from hugr.package import Package
 
 
@@ -10,7 +10,7 @@ def test_validate_with_bytes():
     """Test validating a HUGR package using the programmatic bytes API."""
 
     # Validate using the programmatic API
-    result = cli_with_input(["validate"], Package([]).to_bytes())
+    result = cli_with_io(["validate"], Package([]).to_bytes())
 
     # Should return empty bytes for successful validation
     assert result == b""
@@ -23,7 +23,7 @@ def test_validate_with_bytes_invalid():
 
     # Should raise an error
     with pytest.raises(ValueError, match=r"(?i)(error|invalid|magic)"):
-        cli_with_input(["validate"], invalid_bytes)
+        cli_with_io(["validate"], invalid_bytes)
 
 
 def test_convert_format():
@@ -33,7 +33,7 @@ def test_convert_format():
     input_bytes = package.to_bytes()
 
     # Convert to JSON format
-    output_bytes = cli_with_input(["convert", "--format", "json"], input_bytes)
+    output_bytes = cli_with_io(["convert", "--format", "json"], input_bytes)
 
     # Output should not be empty
     assert len(output_bytes) > 0
@@ -49,7 +49,7 @@ def test_convert_binary_to_text():
     input_bytes = package.to_bytes()
 
     # Convert to text format using --text flag
-    output_bytes = cli_with_input(["convert", "--text"], input_bytes)
+    output_bytes = cli_with_io(["convert", "--text"], input_bytes)
 
     # Output should not be empty
     assert len(output_bytes) > 0
@@ -65,7 +65,7 @@ def test_mermaid_output():
     input_bytes = package.to_bytes()
 
     # Generate mermaid diagram
-    output_bytes = cli_with_input(["mermaid"], input_bytes)
+    output_bytes = cli_with_io(["mermaid"], input_bytes)
 
     # Empty package produces no output (no modules)
     # This is expected behavior - should succeed with empty output
@@ -78,7 +78,7 @@ def test_describe_output():
     input_bytes = package.to_bytes()
 
     # Describe the package
-    output_bytes = cli_with_input(["describe"], input_bytes)
+    output_bytes = cli_with_io(["describe"], input_bytes)
 
     # Output should not be empty
     assert len(output_bytes) > 0
@@ -96,7 +96,7 @@ def test_describe_json_output():
     input_bytes = package.to_bytes()
 
     # Describe the package in JSON format
-    output_bytes = cli_with_input(["describe", "--json"], input_bytes)
+    output_bytes = cli_with_io(["describe", "--json"], input_bytes)
 
     # Output should be valid JSON
     assert len(output_bytes) > 0
