@@ -151,6 +151,8 @@ impl CliArgs {
     }
 
     /// Entrypoint for cli - process arguments and run commands.
+    ///
+    /// Process exits on error.
     pub fn run_cli(self) {
         let level = match self.verbose.filter() {
             VerbosityFilter::Off => LevelFilter::OFF,
@@ -175,30 +177,22 @@ impl CliArgs {
     }
 
     /// Run a CLI command with optional input/output overrides.
-    ///
-    /// This provides a unified interface for running commands with optional
-    /// programmatic I/O, useful for language bindings (e.g., Python via PyO3).
+    /// If overrides are `None`, behaves like the normal CLI.
+    /// If overrides are provided, stdin/stdout/files are ignored.
+    /// The `gen-extensions` and `external` commands don't support overrides.
     ///
     /// # Arguments
     ///
     /// * `input_override` - Optional reader to use instead of stdin/files
     /// * `output_override` - Optional writer to use instead of stdout/files
     ///
-    /// # Returns
-    ///
-    /// Returns `Ok(())` on success, or `Err` on failure.
-    ///
-    /// # Note
-    ///
-    /// When called with `None` arguments, behaves like the normal CLI.
-    /// The `gen-extensions` and `external` commands don't support overrides.
     fn run_with_io<R: std::io::Read, W: std::io::Write>(
-        mut self,
+        self,
         input_override: Option<R>,
         output_override: Option<W>,
     ) -> Result<()> {
         match self.command {
-            CliCommand::Validate(ref mut args) => args.run_with_input(input_override),
+            CliCommand::Validate(mut args) => args.run_with_input(input_override),
             CliCommand::GenExtensions(args) => {
                 if input_override.is_some() || output_override.is_some() {
                     return Err(anyhow::anyhow!(
@@ -207,13 +201,13 @@ impl CliArgs {
                 }
                 args.run_dump(&hugr::std_extensions::STD_REG)
             }
-            CliCommand::Mermaid(ref mut args) => {
+            CliCommand::Mermaid(mut args) => {
                 args.run_print_with_io(input_override, output_override)
             }
-            CliCommand::Convert(ref mut args) => {
+            CliCommand::Convert(mut args) => {
                 args.run_convert_with_io(input_override, output_override)
             }
-            CliCommand::Describe(ref mut args) => {
+            CliCommand::Describe(mut args) => {
                 args.run_describe_with_io(input_override, output_override)
             }
             CliCommand::External(args) => {
@@ -232,7 +226,7 @@ impl CliArgs {
     /// This provides a programmatic interface to the CLI, useful for
     /// language bindings (e.g., Python via PyO3). Unlike `run()`, this
     /// method:
-    /// - Accepts input as a byte slice instead of reading from stdin/files
+    /// - Accepts input instead of reading from stdin/files
     /// - Returns output as a byte vector instead of writing to stdout/files
     /// - Still writes logs and errors to stderr as normal
     ///
