@@ -212,3 +212,43 @@ fn run_external(args: Vec<OsString>) -> Result<()> {
 
     Ok(())
 }
+
+impl CliArgs {
+    /// Run a CLI command with bytes input and capture bytes output.
+    ///
+    /// This provides a programmatic interface to the CLI, useful for
+    /// language bindings (e.g., Python via PyO3). Unlike `run()`, this
+    /// method:
+    /// - Accepts input as a byte slice instead of reading from stdin/files
+    /// - Returns output as a byte vector instead of writing to stdout/files
+    /// - Still writes logs and errors to stderr as normal
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input data as bytes (e.g., a HUGR package)
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Vec<u8>)` with the command output, or `Err(CliError)` on failure.
+    ///
+    /// # Note
+    ///
+    /// Currently only the `validate` command is supported. Other commands will
+    /// return an error. The `gen-extensions` command doesn't require input and
+    /// should use the normal `run()` method instead.
+    pub fn run_with_bytes(mut self, input: &[u8]) -> Result<Vec<u8>> {
+        use std::io::Cursor;
+
+        match self.command {
+            CliCommand::Validate(ref mut args) => {
+                // Run validation with the bytes input
+                args.run_with_input(Some(Cursor::new(input)))?;
+                // Validate has no output, return empty vec
+                Ok(Vec::new())
+            }
+            x => Err(anyhow::anyhow!(
+                "This command does not support programmatic byte input/output yet {x:?}"
+            )),
+        }
+    }
+}

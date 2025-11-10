@@ -4,6 +4,7 @@ use anyhow::Result;
 use clap::Parser;
 use hugr::HugrView;
 use hugr::package::PackageValidationError;
+use std::io::Read;
 use tracing::info;
 
 use crate::CliError;
@@ -26,10 +27,20 @@ pub const VALID_PRINT: &str = "HUGR valid!";
 
 impl ValArgs {
     /// Run the HUGR cli and validate against an extension registry.
-    pub fn run(&mut self) -> Result<()> {
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of the CLI input argument.
+    ///   If provided, this reader will be used for input instead of
+    ///   `self.input_args.input`.
+    pub fn run_with_input<R: Read>(&mut self, input_override: Option<R>) -> Result<()> {
         if self.input_args.hugr_json {
             #[allow(deprecated)]
-            let hugr = self.input_args.get_hugr()?;
+            let hugr = if let Some(reader) = input_override {
+                self.input_args.get_hugr_from_reader(reader)?
+            } else {
+                self.input_args.get_hugr()?
+            };
             #[allow(deprecated)]
             let generator = hugr::envelope::get_generator(&[&hugr]);
 
@@ -37,7 +48,11 @@ impl ValArgs {
                 .map_err(PackageValidationError::Validation)
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
-            let (desc, package) = self.input_args.get_described_package()?;
+            let (desc, package) = if let Some(reader) = input_override {
+                self.input_args.get_described_package_from_reader(reader)?
+            } else {
+                self.input_args.get_described_package()?
+            };
             let generator = desc.generator();
             package
                 .validate()
@@ -47,5 +62,10 @@ impl ValArgs {
         info!("{VALID_PRINT}");
 
         Ok(())
+    }
+
+    /// Run the HUGR cli and validate against an extension registry.
+    pub fn run(&mut self) -> Result<()> {
+        self.run_with_input(None::<&[u8]>)
     }
 }

@@ -52,6 +52,21 @@ impl HugrInputArgs {
         self.get_described_package().map(|(_, package)| package)
     }
 
+    /// Read a hugr envelope from a generic reader and return the package encoded
+    /// within.
+    ///
+    /// This method allows reading from any source implementing `Read`, such as
+    /// in-memory buffers or byte slices.
+    ///
+    /// # Errors
+    ///
+    /// If [`HugrInputArgs::hugr_json`] is `true`, this will fail as the hugr_json
+    /// format requires special handling.
+    pub fn get_package_from_reader<R: Read>(&self, reader: R) -> Result<Package, CliError> {
+        self.get_described_package_from_reader(reader)
+            .map(|(_, package)| package)
+    }
+
     /// Read a hugr envelope from the input and return the envelope
     /// configuration and the package encoded within.
     ///
@@ -78,6 +93,23 @@ impl HugrInputArgs {
 
         Ok(read_described_envelope(buffer, &extensions)?)
     }
+
+    /// Read a hugr envelope from a generic reader and return the envelope
+    /// description and the decoded package.
+    ///
+    /// # Errors
+    ///
+    /// If [`HugrInputArgs::hugr_json`] is `true`, this will fail as the hugr_json
+    /// format requires special handling.
+    pub fn get_described_package_from_reader<R: Read>(
+        &self,
+        reader: R,
+    ) -> Result<(PackageDesc, Package), CliError> {
+        let extensions = self.load_extensions()?;
+        let buffer = BufReader::new(reader);
+
+        Ok(read_described_envelope(buffer, &extensions)?)
+    }
     /// Read a hugr JSON file from the input.
     ///
     /// This is a legacy option for reading old HUGR JSON files when the
@@ -88,6 +120,29 @@ impl HugrInputArgs {
     pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
         let extensions = self.load_extensions()?;
         let mut buffer = BufReader::new(&mut self.input);
+
+        /// Wraps the hugr JSON so that it defines a valid envelope.
+        const PREPEND: &str = r#"HUGRiHJv?@{"modules": ["#;
+        const APPEND: &str = r#"],"extensions": []}"#;
+
+        let mut envelope = PREPEND.to_string();
+        buffer.read_to_string(&mut envelope)?;
+        envelope.push_str(APPEND);
+
+        let hugr = Hugr::load_str(envelope, Some(&extensions))?;
+        Ok(hugr)
+    }
+
+    /// Read a hugr JSON file from a generic reader.
+    ///
+    /// This is a legacy option for reading old HUGR JSON files.
+    #[deprecated(
+        note = "Use `HugrInputArgs::get_package_from_reader` instead.",
+        since = "0.22.2"
+    )]
+    pub fn get_hugr_from_reader<R: Read>(&self, reader: R) -> Result<Hugr, CliError> {
+        let extensions = self.load_extensions()?;
+        let mut buffer = BufReader::new(reader);
 
         /// Wraps the hugr JSON so that it defines a valid envelope.
         const PREPEND: &str = r#"HUGRiHJv?@{"modules": ["#;
