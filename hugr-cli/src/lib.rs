@@ -237,14 +237,18 @@ impl CliArgs {
     /// return an error. The `gen-extensions` command doesn't require input and
     /// should use the normal `run()` method instead.
     pub fn run_with_bytes(mut self, input: &[u8]) -> Result<Vec<u8>> {
-        use std::io::Cursor;
-
         match self.command {
             CliCommand::Validate(ref mut args) => {
                 // Run validation with the bytes input
-                args.run_with_input(Some(Cursor::new(input)))?;
+                args.run_with_input(Some(input))?;
                 // Validate has no output, return empty vec
                 Ok(Vec::new())
+            }
+            CliCommand::Convert(ref mut args) => {
+                // Run conversion with bytes input and capture output
+                let mut output = Vec::new();
+                args.run_convert_with_io(Some(input), Some(&mut output))?;
+                Ok(output)
             }
             x => Err(anyhow::anyhow!(
                 "This command does not support programmatic byte input/output yet {x:?}"
