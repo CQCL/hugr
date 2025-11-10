@@ -439,9 +439,9 @@ class ModelImport:
 
             match symbol:
                 case "core.call":
-                    input_types, output_types, func = args
+                    _input_types, _output_types, func = args
                     match func:
-                        case model.Apply(symbol, fn_args):
+                        case model.Apply(fn_symbol, fn_args):
                             pass
                         case _:
                             error = "The function of a Call node must be a symbol "
@@ -459,7 +459,7 @@ class ModelImport:
                         parent,
                         len(signature.output),
                     )
-                    self.fn_calls.append((symbol, callnode))
+                    self.fn_calls.append((fn_symbol, callnode))
                     return callnode
                 case "core.call_indirect":
                     [inputs, outputs] = args
