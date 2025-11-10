@@ -513,27 +513,21 @@ class ModelImport:
                             )
                             return loadconst_node  # TODO What about const_node?
                 case "core.make_adt":
-                    [variants, types, tag] = args
+                    tag = args[-1]
                     match tag:
                         case model.Literal(int() as tagval):
                             pass
                         case _:
                             error = f"Unexpected tag: {tag}"
                             raise ModelImportError(error)
-                    return self.add_node(
-                        node,
-                        Tag(
-                            tagval,
-                            Sum(
-                                variant_rows=[
-                                    self.import_type_row(cast(model.Term, variant))
-                                    for variant in variants.to_list_parts()
-                                ]
-                            ),
-                        ),
-                        parent,
-                        1,
-                    )
+                    [sigout] = signature.output
+                    match sigout:
+                        case Sum(_variant_rows) as output_sum:
+                            pass
+                        case _:
+                            error = f"Invalid signature from core.make_adt: {node.signature}"
+                            raise ModelImportError(error)
+                    return self.add_node(node, Tag(tagval, output_sum), parent, 1)
                 case "prelude.MakeTuple":
                     [arglist] = args
                     return self.add_node(
