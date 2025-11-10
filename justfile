@@ -33,7 +33,7 @@ test-rust *TEST_ARGS: _check_nextest_installed
 test-python *TEST_ARGS:
     uv run maturin develop --uv
     cargo build -p hugr-cli
-    HUGR_RENDER_DOT=1 uv run pytest -n auto {{TEST_ARGS}}
+    HUGR_RENDER_DOT=1 uv run pytest {{TEST_ARGS}}
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \
