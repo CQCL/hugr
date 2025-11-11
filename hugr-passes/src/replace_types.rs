@@ -600,6 +600,12 @@ impl ReplaceTypes {
                     if opts.process_recursive {
                         self.change_subtree(hugr, n, opts.linearize_unchanged)?;
                         // change_subtree does not linearize it's root, but that's done by our caller
+                    } else if opts.linearize_unchanged {
+                        let mut descs = hugr.descendants(n);
+                        assert_eq!(descs.next(), Some(n));
+                        for n in descs.collect::<Vec<_>>() {
+                            self.linearize_outputs(hugr, n)?;
+                        }
                     }
                     true
                 } else {
