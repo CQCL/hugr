@@ -508,7 +508,7 @@ impl ReplaceTypes {
             } else if !linearize_unchanged_ops {
                 continue;
             }
-            if n != hugr.entrypoint() {
+            if n != root {
                 self.linearize_outputs(hugr, n)?;
             }
         }
