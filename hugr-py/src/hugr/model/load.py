@@ -447,14 +447,15 @@ class ModelImport:
                             error = "The function of a Call node must be a symbol "
                             "application."
                             raise ModelImportError(error, node)
+                    type_args = [self.import_type_arg(fn_arg) for fn_arg in fn_args]
                     callnode = self.add_node(
                         node,
                         Call(
-                            signature=PolyFuncType(fn_args, signature),
+                            # FIXME PolyFuncType needs list[TypeParam], not
+                            # list[TypeArg]. How to get this?
+                            signature=PolyFuncType(type_args, signature),  # type: ignore
                             instantiation=signature,
-                            type_args=[
-                                self.import_type_arg(fn_arg) for fn_arg in fn_args
-                            ],
+                            type_args=type_args,
                         ),
                         parent,
                         len(signature.output),
@@ -481,21 +482,17 @@ class ModelImport:
                                     error = "Unexpected arguments to core.load_const: "
                                     f"{args}"
                                     raise ModelImportError(error, node)
+                            type_args = [
+                                self.import_type_arg(fn_arg) for fn_arg in fn_args
+                            ]
                             loadfunc_node = self.add_node(
                                 node,
                                 LoadFunc(
-                                    PolyFuncType(
-                                        [
-                                            self.import_type_arg(fn_arg)
-                                            for fn_arg in fn_args
-                                        ],
-                                        datatype,
-                                    ),
+                                    # FIXME PolyFuncType needs list[TypeParam], not
+                                    # list[TypeArg]. How to get this?
+                                    PolyFuncType(type_args, datatype),  # type: ignore
                                     datatype,
-                                    [
-                                        self.import_type_arg(fn_arg)
-                                        for fn_arg in fn_args
-                                    ],
+                                    type_args,
                                 ),
                                 parent,
                             )
