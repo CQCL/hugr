@@ -447,7 +447,7 @@ class ModelImport:
                             ],
                         ),
                         parent,
-                        1,
+                        len(signature.output),
                     )
                     self.fn_calls.append((symbol, callnode))
                     return callnode
