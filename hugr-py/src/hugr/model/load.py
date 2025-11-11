@@ -941,58 +941,29 @@ class ModelImport:
                             case _:
                                 error = f"Unexpected string constant: {term}"
                                 raise ModelImportError(error)
-                    case model.Apply(
-                        "collections.static_array.static_array", [elem_ty]
-                    ):
+                    case model.Apply(typename, args):
+                        extension, type_id = _split_extension_name(typename)
                         match json_dict:
-                            case {"c": "StaticArrayValue", "v": value}:
+                            case {"c": name, "v": value}:
                                 return val.Extension(
-                                    name="StaticArrayValue",
+                                    name=name,
                                     typ=Opaque(
-                                        id="static_array",
+                                        id=type_id,
                                         bound=TypeBound.Copyable,
-                                        args=[self.import_type_arg(elem_ty)],
-                                        extension="collections.static_array",
+                                        args=[
+                                            self.import_type_arg(arg) for arg in args
+                                        ],
+                                        extension=extension,
                                     ),
                                     val=value,
                                 )
                             case _:
-                                error = f"Unexpected static_array value: {json_str}"
-                                raise ModelImportError(error)
-                    case model.Apply("collections.list.List", [elem_ty]):
-                        match json_dict:
-                            case {"c": "ListValue", "v": value}:
-                                return val.Extension(
-                                    name="ListValue",
-                                    typ=Opaque(
-                                        id="List",
-                                        bound=TypeBound.Copyable,
-                                        args=[self.import_type_arg(elem_ty)],
-                                        extension="collections.list",
-                                    ),
-                                    val=value,
+                                error = (
+                                    f"Unexpected compat.const_json value: {json_str}"
                                 )
-                            case _:
-                                error = f"Undexpected list value: {json_str}"
-                                raise ModelImportError(error)
-                    case model.Apply("arithmetic.int.types.int", [log_width]):
-                        match json_dict:
-                            case {"c": "ConstInt", "v": value}:
-                                return val.Extension(
-                                    name="ConstInt",
-                                    typ=Opaque(
-                                        id="int",
-                                        bound=TypeBound.Copyable,
-                                        args=[self.import_type_arg(log_width)],
-                                        extension="arithmetic.int.types",
-                                    ),
-                                    val=value,
-                                )
-                            case _:
-                                error = f"Unexpected int value: {json_str}"
                                 raise ModelImportError(error)
                     case _:
-                        # TODO others
+                        # TODO others?
                         error = f"Import json encoded constant: {term}"
                         raise NotImplementedError(error)
             case model.Apply("core.const.adt", [variants, _types, tag, values]):
