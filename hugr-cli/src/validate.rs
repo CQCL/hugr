@@ -36,11 +36,7 @@ impl ValArgs {
     pub fn run_with_input<R: Read>(&mut self, input_override: Option<R>) -> Result<()> {
         if self.input_args.hugr_json {
             #[allow(deprecated)]
-            let hugr = if let Some(reader) = input_override {
-                self.input_args.get_hugr_from_reader(reader)?
-            } else {
-                self.input_args.get_hugr()?
-            };
+            let hugr = self.input_args.get_hugr_with_reader(input_override)?;
             #[allow(deprecated)]
             let generator = hugr::envelope::get_generator(&[&hugr]);
 
@@ -48,11 +44,9 @@ impl ValArgs {
                 .map_err(PackageValidationError::Validation)
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
-            let (desc, package) = if let Some(reader) = input_override {
-                self.input_args.get_described_package_from_reader(reader)?
-            } else {
-                self.input_args.get_described_package()?
-            };
+            let (desc, package) = self
+                .input_args
+                .get_described_package_with_reader(input_override)?;
             let generator = desc.generator();
             package
                 .validate()

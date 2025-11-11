@@ -95,24 +95,16 @@ impl DescribeArgs {
             return Ok(());
         }
 
-        let (mut desc, res) = if let Some(reader) = input_override {
-            match self.input_args.get_described_package_from_reader(reader) {
-                Ok((desc, pkg)) => (desc, Ok(pkg)),
-                Err(crate::CliError::ReadEnvelope(ReadError::Payload {
-                    source,
-                    partial_description,
-                })) => (partial_description, Err(source)),
-                Err(e) => return Err(e.into()),
-            }
-        } else {
-            match self.input_args.get_described_package() {
-                Ok((desc, pkg)) => (desc, Ok(pkg)),
-                Err(crate::CliError::ReadEnvelope(ReadError::Payload {
-                    source,
-                    partial_description,
-                })) => (partial_description, Err(source)),
-                Err(e) => return Err(e.into()),
-            }
+        let (mut desc, res) = match self
+            .input_args
+            .get_described_package_with_reader(input_override)
+        {
+            Ok((desc, pkg)) => (desc, Ok(pkg)),
+            Err(crate::CliError::ReadEnvelope(ReadError::Payload {
+                source,
+                partial_description,
+            })) => (partial_description, Err(source)),
+            Err(e) => return Err(e.into()),
         };
 
         // clear fields that have not been requested

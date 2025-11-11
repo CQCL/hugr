@@ -56,11 +56,9 @@ impl MermaidArgs {
         input_override: Option<R>,
         mut output_override: Option<W>,
     ) -> Result<()> {
-        let (desc, package) = if let Some(reader) = input_override {
-            self.input_args.get_described_package_from_reader(reader)?
-        } else {
-            self.input_args.get_described_package()?
-        };
+        let (desc, package) = self
+            .input_args
+            .get_described_package_with_reader(input_override)?;
 
         let generator = desc.generator();
         if self.validate {
@@ -86,11 +84,7 @@ impl MermaidArgs {
         mut output_override: Option<W>,
     ) -> Result<()> {
         #[allow(deprecated)]
-        let hugr = if let Some(reader) = input_override {
-            self.input_args.get_hugr_from_reader(reader)?
-        } else {
-            self.input_args.get_hugr()?
-        };
+        let hugr = self.input_args.get_hugr_with_reader(input_override)?;
 
         if self.validate {
             hugr.validate()

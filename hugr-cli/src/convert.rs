@@ -59,11 +59,9 @@ impl ConvertArgs {
         input_override: Option<R>,
         mut output_override: Option<W>,
     ) -> Result<()> {
-        let (env_config, package) = if let Some(reader) = input_override {
-            self.input_args.get_described_package_from_reader(reader)?
-        } else {
-            self.input_args.get_described_package()?
-        };
+        let (env_config, package) = self
+            .input_args
+            .get_described_package_with_reader(input_override)?;
 
         // Handle text and binary format flags, which override the format option
         let mut config = if self.text {
