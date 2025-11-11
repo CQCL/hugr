@@ -4,13 +4,24 @@ import pytest
 
 from hugr import cli
 from hugr.build import Module
+from hugr.ext import Extension
 from hugr.package import Package
+
+from .serialization.test_extension import EXAMPLE
 
 
 @pytest.fixture
 def simple_hugr_bytes() -> bytes:
     """Create a simple HUGR package as bytes for testing."""
     return Package([Module().hugr]).to_bytes()
+
+
+@pytest.fixture
+def hugr_with_extension_bytes() -> bytes:
+    """Create a HUGR package with an extension as bytes for testing."""
+    ext = Extension.from_json(EXAMPLE)
+    module = Module()
+    return Package([module.hugr], [ext]).to_bytes()
 
 
 def test_validate_with_bytes(simple_hugr_bytes):
@@ -58,10 +69,10 @@ def test_convert_format(simple_hugr_bytes):
     assert len(output_package.modules) == len(input_package.modules)
 
 
-def test_convert_binary_to_text(simple_hugr_bytes):
+def test_convert_binary_to_text(hugr_with_extension_bytes):
     """Test converting a HUGR package from binary to text format."""
     # Convert to text format using --text flag
-    output_bytes = cli.convert(simple_hugr_bytes, text=True)
+    output_bytes = cli.convert(hugr_with_extension_bytes, text=True)
 
     # Should be valid bytes
     assert isinstance(output_bytes, bytes)
@@ -69,14 +80,16 @@ def test_convert_binary_to_text(simple_hugr_bytes):
 
     # Should be parseable as a package
     output_package = Package.from_bytes(output_bytes)
-    input_package = Package.from_bytes(simple_hugr_bytes)
+    input_package = Package.from_bytes(hugr_with_extension_bytes)
     assert len(output_package.modules) == len(input_package.modules)
 
 
-def test_convert_with_compression(simple_hugr_bytes):
+def test_convert_with_compression(hugr_with_extension_bytes):
     """Test converting with compression enabled."""
     # Convert with compression
-    output_bytes = cli.convert(simple_hugr_bytes, compress=True, compression_level=9)
+    output_bytes = cli.convert(
+        hugr_with_extension_bytes, compress=True, compression_level=9
+    )
 
     # Should be valid bytes
     assert isinstance(output_bytes, bytes)
@@ -84,7 +97,7 @@ def test_convert_with_compression(simple_hugr_bytes):
 
     # Should be parseable as a package
     output_package = Package.from_bytes(output_bytes)
-    input_package = Package.from_bytes(simple_hugr_bytes)
+    input_package = Package.from_bytes(hugr_with_extension_bytes)
     assert len(output_package.modules) == len(input_package.modules)
 
 
@@ -108,7 +121,7 @@ def test_mermaid_with_validation(simple_hugr_bytes):
 def test_describe_output(simple_hugr_bytes):
     """Test describing a HUGR package."""
     # Describe the package
-    output_text = cli.describe(simple_hugr_bytes)
+    output_text = cli.describe_str(simple_hugr_bytes)
 
     # Output should not be empty
     assert len(output_text) > 0
@@ -118,36 +131,55 @@ def test_describe_output(simple_hugr_bytes):
     assert "Package contains" in output_text or "module" in output_text.lower()
 
 
-def test_describe_json_output(simple_hugr_bytes):
-    """Test describing a HUGR package in JSON format."""
-    import json
-
-    # Describe the package in JSON format
-    output_text = cli.describe(simple_hugr_bytes, json=True)
-
-    # Output should be valid JSON
-    assert len(output_text) > 0
-    description = json.loads(output_text)
-
-    # Should have expected fields
-    assert "header" in description
-    assert "modules" in description
-
-
-def test_describe_with_options(simple_hugr_bytes):
+def test_describe_with_options(hugr_with_extension_bytes):
     """Test describe with various options."""
     # Test with packaged_extensions flag
-    output_text = cli.describe(simple_hugr_bytes, packaged_extensions=True)
+    output_text = cli.describe_str(hugr_with_extension_bytes, packaged_extensions=True)
     assert "Packaged extensions:" in output_text
 
     # Test with no_resolved_extensions flag
-    output_text = cli.describe(simple_hugr_bytes, no_resolved_extensions=True)
+    output_text = cli.describe_str(
+        hugr_with_extension_bytes, no_resolved_extensions=True
+    )
     assert "resolved" not in output_text
 
     # Test with public_symbols flag
-    output_text = cli.describe(simple_hugr_bytes, public_symbols=True)
+    output_text = cli.describe_str(hugr_with_extension_bytes, public_symbols=True)
     assert len(output_text) > 0
 
     # Test with generator_claimed_extensions flag
-    output_text = cli.describe(simple_hugr_bytes, generator_claimed_extensions=True)
+    output_text = cli.describe_str(
+        hugr_with_extension_bytes, generator_claimed_extensions=True
+    )
     assert len(output_text) > 0
+
+
+def test_describe_json_basic(simple_hugr_bytes):
+    """Test describe_json returns structured PackageDesc."""
+    # Get structured description
+    desc = cli.describe(simple_hugr_bytes)
+
+    # Should be a PackageDesc instance
+    assert isinstance(desc, cli.PackageDesc)
+
+    # Should have expected fields
+    assert desc.header is not None
+    assert isinstance(desc.modules, list)
+    assert len(desc.modules) == 1
+
+    # Module should have properties
+    module = desc.modules[0]
+    assert module is not None
+    assert isinstance(module, cli.ModuleDesc)
+    assert module.num_nodes is not None
+    assert module.num_nodes > 0
+
+
+def test_describe_json_with_packaged_extensions(hugr_with_extension_bytes):
+    """Test describe_json with packaged_extensions flag."""
+    # Get description with packaged extensions
+    desc = cli.describe(hugr_with_extension_bytes, packaged_extensions=True)
+
+    # Should have packaged_extensions field populated
+    assert isinstance(desc, cli.PackageDesc)
+    assert desc.packaged_extensions is not None
