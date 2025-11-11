@@ -18,6 +18,7 @@ use hugr::{
     std_extensions::arithmetic::float_types::float64_type,
     types::Signature,
 };
+use hugr_cli::CliArgs;
 use hugr_cli::validate::VALID_PRINT;
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
@@ -244,8 +245,6 @@ fn test_validate_known_generator(invalid_hugr_with_generator: Vec<u8>, mut val_c
 
 #[rstest]
 fn test_validate_programmatic_api(test_package: Package) {
-    use hugr_cli::CliArgs;
-
     // Serialize the test package to bytes
     let mut package_bytes = Vec::new();
     test_package
@@ -255,19 +254,14 @@ fn test_validate_programmatic_api(test_package: Package) {
     // Create CLI args for validate command
     let cli_args = CliArgs::new_from_args(vec!["hugr", "validate"]);
 
-    // Run validation with bytes input
     let result = cli_args.run_programmatic(package_bytes.as_slice());
 
-    // Should succeed and return empty vec
-    assert!(result.is_ok());
     let output = result.unwrap();
-    assert_eq!(output, Vec::<u8>::new());
+    assert!(output.is_empty());
 }
 
 #[rstest]
 fn test_validate_programmatic_api_invalid(invalid_hugr_with_generator: Vec<u8>) {
-    use hugr_cli::CliArgs;
-
     // Create CLI args for validate command
     let cli_args = CliArgs::new_from_args(vec!["hugr", "validate"]);
 
@@ -278,5 +272,5 @@ fn test_validate_programmatic_api_invalid(invalid_hugr_with_generator: Vec<u8>) 
     assert!(result.is_err());
     let err = result.unwrap_err();
     let err_string = format!("{:?}", err);
-    assert!(err_string.contains("unconnected port") || err_string.contains("Validate"));
+    assert!(err_string.contains("unconnected port"));
 }

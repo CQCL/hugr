@@ -16,6 +16,7 @@ use hugr::{
     extension::prelude::bool_t,
     types::Signature,
 };
+use hugr_cli::CliArgs;
 use predicates::str::contains;
 use rstest::{fixture, rstest};
 use std::io::BufReader;
@@ -273,7 +274,6 @@ fn test_format_conflicts(mut convert_cmd: Command) {
 #[rstest]
 fn test_convert_programmatic_api(test_package: Package) {
     // Test the programmatic API (no CLI process spawning)
-    use hugr_cli::CliArgs;
 
     // Serialize the test package as binary
     let mut input_data = Vec::new();
@@ -284,10 +284,8 @@ fn test_convert_programmatic_api(test_package: Package) {
     // Parse CLI args for conversion to JSON
     let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "json"]);
 
-    // Run with bytes
     let output = cli_args.run_programmatic(input_data.as_slice()).unwrap();
 
-    // Verify the output is valid and in JSON format
     let reader = BufReader::new(output.as_slice());
     let registry = ExtensionRegistry::default();
     let (desc, package_out) =
@@ -297,13 +295,12 @@ fn test_convert_programmatic_api(test_package: Package) {
     assert_eq!(desc.header.config().format, EnvelopeFormat::PackageJson);
 
     // Verify the package content is preserved
-    assert_eq!(package_out.modules.len(), test_package.modules.len());
+    assert_eq!(package_out, test_package);
 }
 
 #[rstest]
 fn test_convert_programmatic_model_text(test_package: Package) {
     // Test converting to model-text format programmatically
-    use hugr_cli::CliArgs;
 
     let mut input_data = Vec::new();
     test_package
