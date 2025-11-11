@@ -975,6 +975,22 @@ class ModelImport:
                             case _:
                                 error = f"Undexpected list value: {json_str}"
                                 raise ModelImportError(error)
+                    case model.Apply("arithmetic.int.types.int", [log_width]):
+                        match json_dict:
+                            case {"c": "ConstInt", "v": value}:
+                                return val.Extension(
+                                    name="ConstInt",
+                                    typ=Opaque(
+                                        id="int",
+                                        bound=TypeBound.Copyable,
+                                        args=[self.import_type_arg(log_width)],
+                                        extension="arithmetic.int.types",
+                                    ),
+                                    val=value,
+                                )
+                            case _:
+                                error = f"Unexpected int value: {json_str}"
+                                raise ModelImportError(error)
                     case _:
                         # TODO others
                         error = f"Import json encoded constant: {term}"
