@@ -959,6 +959,22 @@ class ModelImport:
                             case _:
                                 error = f"Unexpected static_array value: {json_str}"
                                 raise ModelImportError(error)
+                    case model.Apply("collections.list.List", [elem_ty]):
+                        match json_dict:
+                            case {"c": "ListValue", "v": value}:
+                                return val.Extension(
+                                    name="ListValue",
+                                    typ=Opaque(
+                                        id="List",
+                                        bound=TypeBound.Copyable,
+                                        args=[self.import_type_arg(elem_ty)],
+                                        extension="collections.list",
+                                    ),
+                                    val=value,
+                                )
+                            case _:
+                                error = f"Undexpected list value: {json_str}"
+                                raise ModelImportError(error)
                     case _:
                         # TODO others
                         error = f"Import json encoded constant: {term}"
