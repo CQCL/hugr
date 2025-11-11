@@ -136,3 +136,11 @@ def test_describe_json_with_packaged_extensions(hugr_with_extension_bytes: bytes
     # Should have packaged_extensions field populated
     assert isinstance(desc, cli.PackageDesc)
     assert desc.packaged_extensions is not None
+
+    mod = desc.modules[0]
+    assert mod is not None
+    # mock use of extension in module
+    mod.used_extensions_resolved = desc.packaged_extensions  # type: ignore[assignment]
+
+    assert desc.uses_extension("ext")
+    assert not desc.uses_extension("nonexistent_extension")
