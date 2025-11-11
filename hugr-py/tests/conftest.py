@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import pathlib
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, TypeVar
@@ -145,13 +144,6 @@ class RzDef(RegisteredOp):
 
 
 Rz = RzDef()
-
-
-def _base_command() -> list[str]:
-    workspace_dir = pathlib.Path(__file__).parent.parent.parent
-    # use the HUGR_BIN environment variable if set, otherwise use the debug build
-    bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
-    return [bin_loc]
 
 
 def validate(
