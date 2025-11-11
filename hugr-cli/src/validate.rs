@@ -5,6 +5,7 @@ use clap::Parser;
 use hugr::HugrView;
 use hugr::package::PackageValidationError;
 use std::io::Read;
+#[cfg(feature = "tracing")]
 use tracing::info;
 
 use crate::CliError;
@@ -53,7 +54,10 @@ impl ValArgs {
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         };
 
+        #[cfg(feature = "tracing")]
         info!("{VALID_PRINT}");
+        #[cfg(not(feature = "tracing"))]
+        eprintln!("{VALID_PRINT}");
 
         Ok(())
     }

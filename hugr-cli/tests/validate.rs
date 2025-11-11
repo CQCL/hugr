@@ -93,6 +93,7 @@ fn test_stdin(test_envelope_str: String, mut val_cmd: Command) {
 }
 
 #[rstest]
+#[cfg(feature = "tracing")]
 fn test_stdin_silent(test_envelope_str: String, mut val_cmd: Command) {
     val_cmd.args(["-", "-q"]);
     val_cmd.write_stdin(test_envelope_str);

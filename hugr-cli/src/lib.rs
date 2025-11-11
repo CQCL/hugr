@@ -23,11 +23,13 @@ use std::ffi::OsString;
 
 use anyhow::Result;
 use clap::{Parser, crate_version};
+#[cfg(feature = "tracing")]
 use clap_verbosity_flag::VerbosityFilter;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;
 use hugr::package::PackageValidationError;
 use thiserror::Error;
+#[cfg(feature = "tracing")]
 use tracing::{error, metadata::LevelFilter};
 
 pub mod convert;
@@ -154,24 +156,30 @@ impl CliArgs {
     ///
     /// Process exits on error.
     pub fn run_cli(self) {
-        let level = match self.verbose.filter() {
-            VerbosityFilter::Off => LevelFilter::OFF,
-            VerbosityFilter::Error => LevelFilter::ERROR,
-            VerbosityFilter::Warn => LevelFilter::WARN,
-            VerbosityFilter::Info => LevelFilter::INFO,
-            VerbosityFilter::Debug => LevelFilter::DEBUG,
-            VerbosityFilter::Trace => LevelFilter::TRACE,
-        };
-        tracing_subscriber::fmt()
-            .with_writer(std::io::stderr)
-            .with_max_level(level)
-            .pretty()
-            .init();
+        #[cfg(feature = "tracing")]
+        {
+            let level = match self.verbose.filter() {
+                VerbosityFilter::Off => LevelFilter::OFF,
+                VerbosityFilter::Error => LevelFilter::ERROR,
+                VerbosityFilter::Warn => LevelFilter::WARN,
+                VerbosityFilter::Info => LevelFilter::INFO,
+                VerbosityFilter::Debug => LevelFilter::DEBUG,
+                VerbosityFilter::Trace => LevelFilter::TRACE,
+            };
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_max_level(level)
+                .pretty()
+                .init();
+        }
 
         let result = self.run_with_io(None::<std::io::Stdin>, None::<std::io::Stdout>);
 
         if let Err(err) = result {
+            #[cfg(feature = "tracing")]
             error!("{:?}", err);
+            #[cfg(not(feature = "tracing"))]
+            eprintln!("{:?}", err);
             std::process::exit(1);
         }
     }
