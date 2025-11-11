@@ -934,13 +934,6 @@ class ModelImport:
             ):
                 json_dict = json.loads(json_str)
                 match typ:
-                    case model.Apply("prelude.string", []):
-                        match json_dict:
-                            case {"c": "ConstString", "v": value}:
-                                return StringVal(value)
-                            case _:
-                                error = f"Unexpected string constant: {term}"
-                                raise ModelImportError(error)
                     case model.Apply(typename, args):
                         extension, type_id = _split_extension_name(typename)
                         match json_dict:
@@ -963,9 +956,8 @@ class ModelImport:
                                 )
                                 raise ModelImportError(error)
                     case _:
-                        # TODO others?
-                        error = f"Import json encoded constant: {term}"
-                        raise NotImplementedError(error)
+                        error = f"Unexpected compat.const_json type: {typ}"
+                        raise ModelImportError(error)
             case model.Apply("core.const.adt", [variants, _types, tag, values]):
                 match tag:
                     case model.Literal(int() as tagval):
