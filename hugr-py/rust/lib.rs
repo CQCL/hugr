@@ -94,7 +94,7 @@ fn cli_with_io(mut args: Vec<String>, input_bytes: Option<&[u8]>) -> PyResult<Ve
     let cli_args = CliArgs::new_from_args(args);
     let input = input_bytes.unwrap_or(&[]);
     cli_args
-        .run_programmatic(input)
+        .run_with_io(input)
         .map_err(|e| PyValueError::new_err(format!("{:?}", e)))
 }
 

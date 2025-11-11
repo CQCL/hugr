@@ -131,6 +131,47 @@ impl CliError {
     }
 }
 
+impl CliCommand {
+    /// Run a CLI command with optional input/output overrides.
+    /// If overrides are `None`, behaves like the normal CLI.
+    /// If overrides are provided, stdin/stdout/files are ignored.
+    /// The `gen-extensions` and `external` commands don't support overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of stdin/files
+    /// * `output_override` - Optional writer to use instead of stdout/files
+    ///
+    fn run_with_io<R: std::io::Read, W: std::io::Write>(
+        self,
+        input_override: Option<R>,
+        output_override: Option<W>,
+    ) -> Result<()> {
+        match self {
+            Self::Validate(mut args) => args.run_with_input(input_override),
+            Self::GenExtensions(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "GenExtensions command does not support programmatic I/O overrides"
+                    ));
+                }
+                args.run_dump(&hugr::std_extensions::STD_REG)
+            }
+            Self::Mermaid(mut args) => args.run_print_with_io(input_override, output_override),
+            Self::Convert(mut args) => args.run_convert_with_io(input_override, output_override),
+            Self::Describe(mut args) => args.run_describe_with_io(input_override, output_override),
+            Self::External(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "External commands do not support programmatic I/O overrides"
+                    ));
+                }
+                run_external(args)
+            }
+        }
+    }
+}
+
 impl Default for CliArgs {
     fn default() -> Self {
         Self::new()
@@ -173,7 +214,9 @@ impl CliArgs {
                 .init();
         }
 
-        let result = self.run_with_io(None::<std::io::Stdin>, None::<std::io::Stdout>);
+        let result = self
+            .command
+            .run_with_io(None::<std::io::Stdin>, None::<std::io::Stdout>);
 
         if let Err(err) = result {
             #[cfg(feature = "tracing")]
@@ -184,59 +227,13 @@ impl CliArgs {
         }
     }
 
-    /// Run a CLI command with optional input/output overrides.
-    /// If overrides are `None`, behaves like the normal CLI.
-    /// If overrides are provided, stdin/stdout/files are ignored.
-    /// The `gen-extensions` and `external` commands don't support overrides.
-    ///
-    /// # Arguments
-    ///
-    /// * `input_override` - Optional reader to use instead of stdin/files
-    /// * `output_override` - Optional writer to use instead of stdout/files
-    ///
-    fn run_with_io<R: std::io::Read, W: std::io::Write>(
-        self,
-        input_override: Option<R>,
-        output_override: Option<W>,
-    ) -> Result<()> {
-        match self.command {
-            CliCommand::Validate(mut args) => args.run_with_input(input_override),
-            CliCommand::GenExtensions(args) => {
-                if input_override.is_some() || output_override.is_some() {
-                    return Err(anyhow::anyhow!(
-                        "GenExtensions command does not support programmatic I/O overrides"
-                    ));
-                }
-                args.run_dump(&hugr::std_extensions::STD_REG)
-            }
-            CliCommand::Mermaid(mut args) => {
-                args.run_print_with_io(input_override, output_override)
-            }
-            CliCommand::Convert(mut args) => {
-                args.run_convert_with_io(input_override, output_override)
-            }
-            CliCommand::Describe(mut args) => {
-                args.run_describe_with_io(input_override, output_override)
-            }
-            CliCommand::External(args) => {
-                if input_override.is_some() || output_override.is_some() {
-                    return Err(anyhow::anyhow!(
-                        "External commands do not support programmatic I/O overrides"
-                    ));
-                }
-                run_external(args)
-            }
-        }
-    }
-
     /// Run a CLI command with bytes input and capture bytes output.
     ///
-    /// This provides a programmatic interface to the CLI, useful for
-    /// language bindings (e.g., Python via PyO3). Unlike `run()`, this
+    /// This provides a programmatic interface to the CLI.
+    /// Unlike `run_cli()`, this
     /// method:
     /// - Accepts input instead of reading from stdin/files
     /// - Returns output as a byte vector instead of writing to stdout/files
-    /// - Still writes logs and errors to stderr as normal
     ///
     /// # Arguments
     ///
@@ -246,13 +243,14 @@ impl CliArgs {
     ///
     /// Returns `Ok(Vec<u8>)` with the command output, or an error on failure.
     ///
+    ///
     /// # Note
     ///
     /// The `gen-extensions` and `external` commands don't support byte I/O
-    /// and should use the normal `run()` method instead.
-    pub fn run_programmatic(self, input: impl std::io::Read) -> Result<Vec<u8>> {
+    /// and should use the normal `run_cli()` method instead.
+    pub fn run_with_io(self, input: impl std::io::Read) -> Result<Vec<u8>> {
         let mut output = Vec::new();
-        self.run_with_io(Some(input), Some(&mut output))?;
+        self.command.run_with_io(Some(input), Some(&mut output))?;
         Ok(output)
     }
 }

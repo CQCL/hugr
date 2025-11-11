@@ -284,7 +284,7 @@ fn test_convert_programmatic_api(test_package: Package) {
     // Parse CLI args for conversion to JSON
     let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "json"]);
 
-    let output = cli_args.run_programmatic(input_data.as_slice()).unwrap();
+    let output = cli_args.run_with_io(input_data.as_slice()).unwrap();
 
     let reader = BufReader::new(output.as_slice());
     let registry = ExtensionRegistry::default();
@@ -309,7 +309,7 @@ fn test_convert_programmatic_model_text(test_package: Package) {
 
     let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "model-text"]);
 
-    let output = cli_args.run_programmatic(input_data.as_slice()).unwrap();
+    let output = cli_args.run_with_io(input_data.as_slice()).unwrap();
 
     // Verify the output is valid model-text format
     let reader = BufReader::new(output.as_slice());
