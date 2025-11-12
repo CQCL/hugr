@@ -468,7 +468,9 @@ class ModelImport:
                     sig = FunctionType(
                         self.import_type_row(inputs), self.import_type_row(outputs)
                     )
-                    callindirectnode = self.add_node(node, CallIndirect(sig), parent)
+                    callindirectnode = self.add_node(
+                        node, CallIndirect(sig), parent, len(signature.output)
+                    )
                     return callindirectnode
                 case "core.load_const":
                     value = args[-1]
