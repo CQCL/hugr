@@ -946,7 +946,7 @@ class ModelImport:
                                     name=name,
                                     typ=Opaque(
                                         id=type_id,
-                                        bound=TypeBound.Copyable,
+                                        bound=TypeBound.Copyable,  # FIXME How to know?
                                         args=[
                                             self.import_type_arg(arg) for arg in args
                                         ],
