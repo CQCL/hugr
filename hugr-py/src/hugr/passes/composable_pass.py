@@ -1,4 +1,5 @@
 """A Protocol for a composable pass."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol
@@ -15,7 +16,7 @@ class ComposablePass(Protocol):
         """Call the pass to transform a HUGR."""
         ...
 
-    def then(self, other: Self) -> ComposedPass:
+    def then(self, other: Self) -> ComposablePass:
         """Perform another composable pass after this pass."""
         # Provide a default implementation for composing passes.
         pass_list = []
@@ -23,14 +24,13 @@ class ComposablePass(Protocol):
             pass_list.extend(self.passes)
         else:
             pass_list.append(self)
-        
+
         if isinstance(other, ComposedPass):
             pass_list.extend(other.passes)
         else:
             pass_list.append(other)
-        
-        return ComposedPass(pass_list)
 
+        return ComposedPass([self, other])
 
 
 @dataclass
