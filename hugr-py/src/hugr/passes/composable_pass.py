@@ -31,7 +31,9 @@ class ComposablePass(Protocol):
             pass_list.append(other)
 
         return ComposedPass(pass_list)
-
+    def name(self) -> str:
+        """Returns the name of the Pass"""
+        return self.__class__.__name__
 
 @dataclass
 class ComposedPass(ComposablePass):
