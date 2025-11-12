@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-v0.24.2...hugr-v0.24.3) - 2025-11-06
+
+### Bug Fixes
+
+- BorrowArray discard handler allows elements to be borrowed ([#2666](https://github.com/CQCL/hugr/pull/2666))
+
+## [0.24.2](https://github.com/CQCL/hugr/compare/hugr-v0.24.1...hugr-v0.24.2) - 2025-11-03
+
+### Bug Fixes
+
+- ReplaceTypes: operate on whole Hugr, with set_regions ([#2662](https://github.com/CQCL/hugr/pull/2662))
+
 ## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-v0.24.0...hugr-v0.24.1) - 2025-11-03
 
 ### Bug Fixes
