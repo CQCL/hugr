@@ -63,6 +63,7 @@ fn current_model_version() -> (u64, u64, u64) {
 
 #[pyfunction]
 /// Directly invoke the HUGR CLI entrypoint.
+/// Arguments are extracted from std::env::args().
 fn run_cli() {
     // python is the first arg so skip it
     CliArgs::new_from_args(std::env::args().skip(1)).run_cli();
@@ -85,7 +86,6 @@ fn run_cli() {
 /// Raises an exception on error.
 ///
 /// Errors or tracing may still be printed to stderr as normal.
-/// ```
 #[pyfunction]
 #[pyo3(signature = (args, input_bytes=None))]
 fn cli_with_io(mut args: Vec<String>, input_bytes: Option<&[u8]>) -> PyResult<Vec<u8>> {
