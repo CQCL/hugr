@@ -17,12 +17,12 @@ class ComposablePass(Protocol):
 
     def then(self, other: Self) -> Self:
         """Perform another composable pass after this pass."""
-        pass_list = [] 
+        # Provide a default implementation for composing passes.
         if isinstance(self, ComposedPass) or isinstance(other, ComposedPass):
-            if isinstance(self, ComposedPass):
-                pass_list.append(self.passes)
-            elif isinstance(other, ComposedPass):
-                pass_list.append(other.passes)
+            if isinstance(self, ComposedPass) and not isinstance(other, ComposedPass):
+                return ComposedPass([self.passes, other])
+            elif isinstance(other, ComposedPass) and not isinstance(self, ComposedPass):
+                return ComposedPass([self, other.passes])
         else:
             return ComposedPass([self, other])
 
