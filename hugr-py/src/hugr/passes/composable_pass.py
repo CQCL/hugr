@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
 
 
+@runtime_checkable
 class ComposablePass(Protocol):
     """A Protocol which represents a composable Hugr transformation."""
 
@@ -16,6 +17,7 @@ class ComposablePass(Protocol):
         """Call the pass to transform a HUGR."""
         ...
 
+    @property
     def name(self) -> str:
         """Returns the name of the pass."""
         return self.__class__.__name__
