@@ -641,7 +641,9 @@ class ModelImport:
         self.link_prefix = link_prefix
 
         def import_declare_func(symbol: model.Symbol) -> Node:
-            f_name = _find_meta_title(node) or symbol.name
+            f_name = _find_meta_title(node)
+            if f_name is None:
+                f_name = symbol.name
             signature = self.enter_symbol(symbol)
             node_id = self.add_node(
                 node,
@@ -656,7 +658,9 @@ class ModelImport:
             return node_id
 
         def import_define_func(symbol: model.Symbol) -> Node:
-            f_name = _find_meta_title(node) or symbol.name
+            f_name = _find_meta_title(node)
+            if f_name is None:
+                f_name = symbol.name
             signature = self.enter_symbol(symbol)
             node_id = self.add_node(
                 node,
