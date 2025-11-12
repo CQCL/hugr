@@ -23,31 +23,36 @@ __all__ = [
 ]
 
 
+def _add_input_args(
+    args: list[str], no_std: bool, extensions: list[str] | None
+) -> list[str]:
+    """Add common HugrInputArgs parameters to the argument list."""
+    if no_std:
+        args.append("--no-std")
+    if extensions is not None:
+        for ext in extensions:
+            args.extend(["--extensions", ext])
+    return args
+
+
 def validate(
     hugr_bytes: bytes,
     *,
-    quiet: bool = False,
     no_std: bool = False,
-    extensions: str | None = None,
+    extensions: list[str] | None = None,
 ) -> None:
     """Validate a HUGR package.
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        quiet: Suppress success messages (default: False).
-        no_std: Don't include the standard extension (default: False).
-        extensions: Path to additional extensions registry file.
+        no_std: Don't use standard extensions when validating hugrs.
+            Prelude is still used (default: False).
+        extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Raises:
         ValueError: On validation failure.
     """
-    args = ["validate"]
-    if quiet:
-        args.extend(["-q"])
-    if no_std:
-        args.append("--no-std")
-    if extensions:
-        args.extend(["--extensions", extensions])
+    args = _add_input_args(["validate"], no_std, extensions)
     cli_with_io(args, hugr_bytes)
 
 
@@ -146,17 +151,27 @@ def describe_str(
     no_resolved_extensions: bool = False,
     public_symbols: bool = False,
     generator_claimed_extensions: bool = False,
+    no_std: bool = False,
+    extensions: list[str] | None = None,
     _json: bool = False,  # only used by describe()
 ) -> str:
-    """Describe a HUGR package with a string.
+    """Describe the contents of a HUGR package as text.
+
+    If an error occurs during loading, partial descriptions are printed.
+    For example, if the first module is loaded and the second fails,
+    then only the first module will be described.
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        packaged_extensions: Show packaged extensions (default: False).
-        no_resolved_extensions: Hide resolved extensions (default: False).
-        public_symbols: Show public symbols (default: False).
-        generator_claimed_extensions: Show generator claimed extensions
+        packaged_extensions: Enumerate packaged extensions (default: False).
+        no_resolved_extensions: Don't display resolved extensions used by the module
             (default: False).
+        public_symbols: Display public symbols in the module (default: False).
+        generator_claimed_extensions: Display claimed extensions set by generator
+            in module metadata (default: False).
+        no_std: Don't use standard extensions when validating hugrs.
+            Prelude is still used (default: False).
+        extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Returns:
         Text description of the package.
@@ -172,6 +187,7 @@ def describe_str(
         args.append("--public-symbols")
     if generator_claimed_extensions:
         args.append("--generator-claimed-extensions")
+    args = _add_input_args(args, no_std, extensions)
     return cli_with_io(args, hugr_bytes).decode("utf-8")
 
 
@@ -182,16 +198,26 @@ def describe(
     no_resolved_extensions: bool = False,
     public_symbols: bool = False,
     generator_claimed_extensions: bool = False,
+    no_std: bool = False,
+    extensions: list[str] | None = None,
 ) -> PackageDesc:
-    """Describe a HUGR package.
+    """Describe the contents of a HUGR package.
+
+    If an error occurs during loading, partial descriptions are returned.
+    For example, if the first module is loaded and the second fails,
+    then only the first module will be described.
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        packaged_extensions: Show packaged extensions (default: False).
-        no_resolved_extensions: Hide resolved extensions (default: False).
-        public_symbols: Show public symbols (default: False).
-        generator_claimed_extensions: Show generator claimed extensions
+        packaged_extensions: Enumerate packaged extensions (default: False).
+        no_resolved_extensions: Don't display resolved extensions used by the module
             (default: False).
+        public_symbols: Display public symbols in the module (default: False).
+        generator_claimed_extensions: Display claimed extensions set by generator
+            in module metadata (default: False).
+        no_std: Don't use standard extensions when validating hugrs.
+            Prelude is still used (default: False).
+        extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Returns:
         Structured package description as a PackageDesc object.
@@ -203,6 +229,8 @@ def describe(
         no_resolved_extensions=no_resolved_extensions,
         public_symbols=public_symbols,
         generator_claimed_extensions=generator_claimed_extensions,
+        no_std=no_std,
+        extensions=extensions,
     )
     return PackageDesc.model_validate_json(output)
 
@@ -215,22 +243,31 @@ def convert(
     binary: bool = False,
     compress: bool = False,
     compression_level: int | None = None,
+    no_std: bool = False,
+    extensions: list[str] | None = None,
 ) -> bytes:
-    """Convert a HUGR package between formats.
+    """Convert between different HUGR envelope formats.
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        format: Target format ("json" or "model", default: auto-detect).
-        text: Output as text (default: auto-detect).
-        binary: Output as binary (default: auto-detect).
-        compress: Compress the output (default: False).
-        compression_level: Compression level 0-9 (default: 6).
+        format: Output format. One of: json, model, model-exts, model-text,
+            model-text-exts (default: None, meaning same format as input).
+        text: Use default text-based envelope configuration. Cannot be combined
+            with format or binary (default: False).
+        binary: Use default binary envelope configuration. Cannot be combined
+            with format or text (default: False).
+        compress: Enable zstd compression for the output (default: False).
+        compression_level: Zstd compression level (1-22, where 1 is fastest and
+            22 is best compression). (default None, uses the zstd default).
+        no_std: Don't use standard extensions when validating hugrs.
+            Prelude is still used (default: False).
+        extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Returns:
         Converted package as bytes.
     """
     args = ["convert"]
-    if format:
+    if format is not None:
         args.extend(["--format", format])
     if text:
         args.append("--text")
@@ -240,15 +277,26 @@ def convert(
         args.append("--compress")
     if compression_level is not None:
         args.extend(["--compression-level", str(compression_level)])
+    args = _add_input_args(args, no_std, extensions)
     return cli_with_io(args, hugr_bytes)
 
 
-def mermaid(hugr_bytes: bytes, *, validate: bool = False) -> str:
+def mermaid(
+    hugr_bytes: bytes,
+    *,
+    validate: bool = False,
+    no_std: bool = False,
+    extensions: list[str] | None = None,
+) -> str:
     """Generate mermaid diagrams from a HUGR package.
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        validate: Validate the HUGR before generating diagram (default: False).
+        validate: Validate before rendering, includes extension inference
+            (default: False).
+        no_std: Don't use standard extensions when validating hugrs.
+            Prelude is still used (default: False).
+        extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Returns:
         Mermaid diagram output as a string.
@@ -256,4 +304,5 @@ def mermaid(hugr_bytes: bytes, *, validate: bool = False) -> str:
     args = ["mermaid"]
     if validate:
         args.append("--validate")
+    args = _add_input_args(args, no_std, extensions)
     return cli_with_io(args, hugr_bytes).decode("utf-8")

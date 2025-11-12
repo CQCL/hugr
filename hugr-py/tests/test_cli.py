@@ -42,11 +42,6 @@ def test_validate_with_bytes_invalid():
         cli.cli_with_io(["validate"], invalid_bytes)
 
 
-def test_validate_quiet(simple_hugr_bytes: bytes):
-    """Test validate with quiet flag."""
-    cli.validate(simple_hugr_bytes, quiet=True)
-
-
 def test_validate_no_std(simple_hugr_bytes: bytes):
     """Test validate with no_std flag."""
     cli.validate(simple_hugr_bytes, no_std=True)
