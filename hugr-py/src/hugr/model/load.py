@@ -942,11 +942,18 @@ class ModelImport:
                         extension, type_id = _split_extension_name(typename)
                         match json_dict:
                             case {"c": name, "v": value}:
+                                # Determine appropriate TypeBound
+                                bound = TypeBound.Copyable
+                                if typename == "collections.list.List":
+                                    [arg] = args
+                                    datatype = self.import_type(arg)
+                                    bound = datatype.type_bound()
+                                # TODO Determine type bound in other cases
                                 return val.Extension(
                                     name=name,
                                     typ=Opaque(
                                         id=type_id,
-                                        bound=TypeBound.Copyable,  # FIXME How to know?
+                                        bound=bound,
                                         args=[
                                             self.import_type_arg(arg) for arg in args
                                         ],
