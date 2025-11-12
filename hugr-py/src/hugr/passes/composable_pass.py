@@ -15,16 +15,21 @@ class ComposablePass(Protocol):
         """Call the pass to transform a HUGR."""
         ...
 
-    def then(self, other: Self) -> Self:
+    def then(self, other: Self) -> ComposedPass:
         """Perform another composable pass after this pass."""
         # Provide a default implementation for composing passes.
-        if isinstance(self, ComposedPass) or isinstance(other, ComposedPass):
-            if isinstance(self, ComposedPass) and not isinstance(other, ComposedPass):
-                return ComposedPass([self.passes, other])
-            elif isinstance(other, ComposedPass) and not isinstance(self, ComposedPass):
-                return ComposedPass([self, other.passes])
+        pass_list = []
+        if isinstance(self, ComposedPass):
+            pass_list.extend(self.passes)
         else:
-            return ComposedPass([self, other])
+            pass_list.append(self)
+        
+        if isinstance(other, ComposedPass):
+            pass_list.extend(other.passes)
+        else:
+            pass_list.append(other)
+        
+        return ComposedPass(pass_list)
 
 
 
