@@ -424,6 +424,7 @@ class ModelImport:
                     _just_outputs=self.import_type_row(just_outputs),
                 ),
                 parent,
+                len(signature.output),
             )
             self.import_dfg_region(body, node_id)
             return node_id
