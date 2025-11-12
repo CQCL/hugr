@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from typing_extensions import Self
-
 from hugr.hugr.base import Hugr
 
 
@@ -17,7 +15,7 @@ class ComposablePass(Protocol):
         """Call the pass to transform a HUGR."""
         ...
 
-    def then(self, other: Self) -> ComposablePass:
+    def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
         # Provide a default implementation for composing passes.
         pass_list = []
