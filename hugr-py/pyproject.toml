@@ -36,6 +36,10 @@ dependencies = [
     "pyzstd~=0.18.0",
 ]
 
+
+[project.scripts]
+hugr = "hugr._hugr:run_cli"
+
 [project.optional-dependencies]
 docs = ["sphinx>=8.1.3,<9.0.0", "furo"]
 pytket = ["pytket >= 1.34.0"]
@@ -55,6 +59,8 @@ python-source = "src/"
 manifest-path = "Cargo.toml"
 # "extension-module" tells pyo3 we want to build an extension module (skips linking against libpython.so)
 features = ["pyo3/extension-module"]
+# custom profile with extra optimisations
+profile = "release-py"
 
 [tool.pyright]
 # Rust bindings have typing stubs but no python source code.

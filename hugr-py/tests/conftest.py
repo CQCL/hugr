@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import os
-import pathlib
-import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-from hugr import ext, tys
+from hugr import cli, ext, tys
 from hugr.envelope import EnvelopeConfig
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
@@ -148,19 +146,6 @@ class RzDef(RegisteredOp):
 Rz = RzDef()
 
 
-def _base_command() -> list[str]:
-    workspace_dir = pathlib.Path(__file__).parent.parent.parent
-    # use the HUGR_BIN environment variable if set, otherwise use the debug build
-    bin_loc = os.environ.get("HUGR_BIN", str(workspace_dir / "target/debug/hugr"))
-    return [bin_loc]
-
-
-def mermaid(h: Hugr):
-    """Render the Hugr as a mermaid diagram for debugging."""
-    cmd = [*_base_command(), "mermaid", "-"]
-    _run_hugr_cmd(h.to_str().encode(), cmd)
-
-
 def validate(
     h: Hugr | Package,
     *,
@@ -193,12 +178,10 @@ def validate(
     # test hugrs.
     LOAD_FORMATS = ["json", "model-exts"]
 
-    cmd = [*_base_command(), "validate", "-"]
-
     # validate text and binary formats
     for write_fmt in WRITE_FORMATS:
         serial = h.to_bytes(FORMATS[write_fmt])
-        _run_hugr_cmd(serial, cmd)
+        cli.validate(serial)
 
         if roundtrip:
             # Roundtrip tests:
@@ -209,9 +192,7 @@ def validate(
             # Run `pytest` with `-vv` to see the hash diff.
             for load_fmt in LOAD_FORMATS:
                 if load_fmt != write_fmt:
-                    cmd = [*_base_command(), "convert", "--format", load_fmt, "-"]
-                    out = _run_hugr_cmd(serial, cmd)
-                    converted_serial = out.stdout
+                    converted_serial = cli.convert(serial, format=load_fmt)
                 else:
                     converted_serial = serial
                 loaded = Package.from_bytes(converted_serial)
@@ -225,12 +206,6 @@ def validate(
                     assert (
                         h1_hash == h2_hash
                     ), f"HUGRs are not the same for {write_fmt} -> {load_fmt}"
-
-                # Lowering functions are currently ignored in Python,
-                # because we don't support loading -model envelopes yet.
-                for ext in loaded.extensions:
-                    for op in ext.operations.values():
-                        assert op.lower_funcs == []
 
 
 @dataclass(frozen=True, order=True)
@@ -308,20 +283,3 @@ class _OpHash:
     def __lt__(self, other: _OpHash) -> bool:
         """Compare two op hashes by name and payload."""
         return (self.name, repr(self.payload)) < (other.name, repr(other.payload))
-
-
-def _get_mermaid(serial: bytes) -> str:  #
-    """Render a HUGR as a mermaid diagram using the CLI."""
-    return _run_hugr_cmd(serial, [*_base_command(), "mermaid", "-"]).stdout.decode()
-
-
-def _run_hugr_cmd(serial: bytes, cmd: list[str]) -> subprocess.CompletedProcess[bytes]:
-    """Run a HUGR command.
-
-    The `serial` argument is the serialized HUGR to pass to the command via stdin.
-    """
-    try:
-        return subprocess.run(cmd, check=True, input=serial, capture_output=True)  # noqa: S603
-    except subprocess.CalledProcessError as e:
-        error = e.stderr.decode()
-        raise RuntimeError(error) from e

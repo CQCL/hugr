@@ -19,12 +19,18 @@
 //! hugr validate --help
 //! ```
 
+use std::ffi::OsString;
+
+use anyhow::Result;
 use clap::{Parser, crate_version};
+#[cfg(feature = "tracing")]
+use clap_verbosity_flag::VerbosityFilter;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use hugr::envelope::EnvelopeError;
 use hugr::package::PackageValidationError;
-use std::ffi::OsString;
 use thiserror::Error;
+#[cfg(feature = "tracing")]
+use tracing::{error, metadata::LevelFilter};
 
 pub mod convert;
 pub mod describe;
@@ -32,6 +38,7 @@ pub mod extensions;
 pub mod hugr_io;
 pub mod mermaid;
 pub mod validate;
+
 /// CLI arguments.
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), long_about = None)]
@@ -122,4 +129,158 @@ impl CliError {
             Self::Validate(val_err)
         }
     }
+}
+
+impl CliCommand {
+    /// Run a CLI command with optional input/output overrides.
+    /// If overrides are `None`, behaves like the normal CLI.
+    /// If overrides are provided, stdin/stdout/files are ignored.
+    /// The `gen-extensions` and `external` commands don't support overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of stdin/files
+    /// * `output_override` - Optional writer to use instead of stdout/files
+    ///
+    fn run_with_io<R: std::io::Read, W: std::io::Write>(
+        self,
+        input_override: Option<R>,
+        output_override: Option<W>,
+    ) -> Result<()> {
+        match self {
+            Self::Validate(mut args) => args.run_with_input(input_override),
+            Self::GenExtensions(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "GenExtensions command does not support programmatic I/O overrides"
+                    ));
+                }
+                args.run_dump(&hugr::std_extensions::STD_REG)
+            }
+            Self::Mermaid(mut args) => args.run_print_with_io(input_override, output_override),
+            Self::Convert(mut args) => args.run_convert_with_io(input_override, output_override),
+            Self::Describe(mut args) => args.run_describe_with_io(input_override, output_override),
+            Self::External(args) => {
+                if input_override.is_some() || output_override.is_some() {
+                    return Err(anyhow::anyhow!(
+                        "External commands do not support programmatic I/O overrides"
+                    ));
+                }
+                run_external(args)
+            }
+        }
+    }
+}
+
+impl Default for CliArgs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl CliArgs {
+    /// Parse CLI arguments from the environment.
+    pub fn new() -> Self {
+        CliArgs::parse()
+    }
+
+    /// Parse CLI arguments from an iterator.
+    pub fn new_from_args<I, T>(args: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::ffi::OsString> + Clone,
+    {
+        CliArgs::parse_from(args)
+    }
+
+    /// Entrypoint for cli - process arguments and run commands.
+    ///
+    /// Process exits on error.
+    pub fn run_cli(self) {
+        #[cfg(feature = "tracing")]
+        {
+            let level = match self.verbose.filter() {
+                VerbosityFilter::Off => LevelFilter::OFF,
+                VerbosityFilter::Error => LevelFilter::ERROR,
+                VerbosityFilter::Warn => LevelFilter::WARN,
+                VerbosityFilter::Info => LevelFilter::INFO,
+                VerbosityFilter::Debug => LevelFilter::DEBUG,
+                VerbosityFilter::Trace => LevelFilter::TRACE,
+            };
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .with_max_level(level)
+                .pretty()
+                .init();
+        }
+
+        let result = self
+            .command
+            .run_with_io(None::<std::io::Stdin>, None::<std::io::Stdout>);
+
+        if let Err(err) = result {
+            #[cfg(feature = "tracing")]
+            error!("{:?}", err);
+            #[cfg(not(feature = "tracing"))]
+            eprintln!("{:?}", err);
+            std::process::exit(1);
+        }
+    }
+
+    /// Run a CLI command with bytes input and capture bytes output.
+    ///
+    /// This provides a programmatic interface to the CLI.
+    /// Unlike `run_cli()`, this method:
+    /// - Accepts input instead of reading from stdin/files
+    /// - Returns output as a byte vector instead of writing to stdout/files
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input data as bytes (e.g., a HUGR package)
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(Vec<u8>)` with the command output, or an error on failure.
+    ///
+    ///
+    /// # Note
+    ///
+    /// The `gen-extensions` and `external` commands don't support byte I/O
+    /// and should use the normal `run_cli()` method instead.
+    pub fn run_with_io(self, input: impl std::io::Read) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
+        self.command.run_with_io(Some(input), Some(&mut output))?;
+        Ok(output)
+    }
+}
+
+fn run_external(args: Vec<OsString>) -> Result<()> {
+    // External subcommand support: invoke `hugr-<subcommand>`
+    if args.is_empty() {
+        eprintln!("No external subcommand specified.");
+        std::process::exit(1);
+    }
+    let subcmd = args[0].to_string_lossy();
+    let exe = format!("hugr-{subcmd}");
+    let rest: Vec<_> = args[1..]
+        .iter()
+        .map(|s| s.to_string_lossy().to_string())
+        .collect();
+    match std::process::Command::new(&exe).args(&rest).status() {
+        Ok(status) => {
+            if !status.success() {
+                std::process::exit(status.code().unwrap_or(1));
+            }
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("error: no such subcommand: '{subcmd}'.\nCould not find '{exe}' in PATH.");
+            std::process::exit(1);
+        }
+        Err(e) => {
+            eprintln!("error: failed to invoke '{exe}': {e}");
+            std::process::exit(1);
+        }
+    }
+
+    Ok(())
 }

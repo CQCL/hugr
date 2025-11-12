@@ -129,3 +129,10 @@ jsonschema.debug = 1
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# The profile that 'hugr-py' will build with
+[profile.release-py]
+inherits = "release"
+lto = "fat"
+strip = "symbols"
+panic = "abort"

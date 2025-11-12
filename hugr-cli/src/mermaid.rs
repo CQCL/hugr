@@ -1,5 +1,5 @@
 //! Render mermaid diagrams.
-use std::io::Write;
+use std::io::{Read, Write};
 
 use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
@@ -32,18 +32,34 @@ pub struct MermaidArgs {
 }
 
 impl MermaidArgs {
-    /// Write the mermaid diagram to the output.
-    pub fn run_print(&mut self) -> Result<()> {
+    /// Write the mermaid diagram to the output with optional input/output overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of the CLI input argument.
+    /// * `output_override` - Optional writer to use instead of the CLI output argument.
+    pub fn run_print_with_io<R: Read, W: Write>(
+        &mut self,
+        input_override: Option<R>,
+        output_override: Option<W>,
+    ) -> Result<()> {
         if self.input_args.hugr_json {
-            self.run_print_hugr()
+            self.run_print_hugr_with_io(input_override, output_override)
         } else {
-            self.run_print_envelope()
+            self.run_print_envelope_with_io(input_override, output_override)
         }
     }
 
-    /// Write the mermaid diagram for a HUGR envelope.
-    pub fn run_print_envelope(&mut self) -> Result<()> {
-        let (desc, package) = self.input_args.get_described_package()?;
+    /// Write the mermaid diagram for a HUGR envelope with optional I/O overrides.
+    fn run_print_envelope_with_io<R: Read, W: Write>(
+        &mut self,
+        input_override: Option<R>,
+        mut output_override: Option<W>,
+    ) -> Result<()> {
+        let (desc, package) = self
+            .input_args
+            .get_described_package_with_reader(input_override)?;
+
         let generator = desc.generator();
         if self.validate {
             package
@@ -52,22 +68,49 @@ impl MermaidArgs {
         }
 
         for hugr in package.modules {
-            writeln!(self.output, "{}", hugr.mermaid_string())?;
+            if let Some(ref mut writer) = output_override {
+                writeln!(writer, "{}", hugr.mermaid_string())?;
+            } else {
+                writeln!(self.output, "{}", hugr.mermaid_string())?;
+            }
         }
         Ok(())
     }
 
-    /// Write the mermaid diagram for a legacy HUGR json.
-    pub fn run_print_hugr(&mut self) -> Result<()> {
+    /// Write the mermaid diagram for a legacy HUGR json with optional I/O overrides.
+    fn run_print_hugr_with_io<R: Read, W: Write>(
+        &mut self,
+        input_override: Option<R>,
+        mut output_override: Option<W>,
+    ) -> Result<()> {
         #[allow(deprecated)]
-        let hugr = self.input_args.get_hugr()?;
+        let hugr = self.input_args.get_hugr_with_reader(input_override)?;
 
         if self.validate {
             hugr.validate()
                 .map_err(PackageValidationError::Validation)?;
         }
 
-        writeln!(self.output, "{}", hugr.mermaid_string())?;
+        if let Some(ref mut writer) = output_override {
+            writeln!(writer, "{}", hugr.mermaid_string())?;
+        } else {
+            writeln!(self.output, "{}", hugr.mermaid_string())?;
+        }
         Ok(())
+    }
+
+    /// Write the mermaid diagram to the output.
+    pub fn run_print(&mut self) -> Result<()> {
+        self.run_print_with_io(None::<&[u8]>, None::<Vec<u8>>)
+    }
+
+    /// Write the mermaid diagram for a HUGR envelope.
+    pub fn run_print_envelope(&mut self) -> Result<()> {
+        self.run_print_envelope_with_io(None::<&[u8]>, None::<Vec<u8>>)
+    }
+
+    /// Write the mermaid diagram for a legacy HUGR json.
+    pub fn run_print_hugr(&mut self) -> Result<()> {
+        self.run_print_hugr_with_io(None::<&[u8]>, None::<Vec<u8>>)
     }
 }

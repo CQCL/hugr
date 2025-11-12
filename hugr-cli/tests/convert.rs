@@ -16,6 +16,7 @@ use hugr::{
     extension::prelude::bool_t,
     types::Signature,
 };
+use hugr_cli::CliArgs;
 use predicates::str::contains;
 use rstest::{fixture, rstest};
 use std::io::BufReader;
@@ -268,4 +269,53 @@ fn test_format_conflicts(mut convert_cmd: Command) {
         .assert()
         .failure()
         .stderr(contains("cannot be used with"));
+}
+
+#[rstest]
+fn test_convert_programmatic_api(test_package: Package) {
+    // Test the programmatic API (no CLI process spawning)
+
+    // Serialize the test package as binary
+    let mut input_data = Vec::new();
+    test_package
+        .store(&mut input_data, EnvelopeConfig::binary())
+        .unwrap();
+
+    // Parse CLI args for conversion to JSON
+    let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "json"]);
+
+    let output = cli_args.run_with_io(input_data.as_slice()).unwrap();
+
+    let reader = BufReader::new(output.as_slice());
+    let registry = ExtensionRegistry::default();
+    let (desc, package_out) =
+        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+
+    // Verify format is JSON
+    assert_eq!(desc.header.config().format, EnvelopeFormat::PackageJson);
+
+    // Verify the package content is preserved
+    assert_eq!(package_out, test_package);
+}
+
+#[rstest]
+fn test_convert_programmatic_model_text(test_package: Package) {
+    // Test converting to model-text format programmatically
+
+    let mut input_data = Vec::new();
+    test_package
+        .store(&mut input_data, EnvelopeConfig::binary())
+        .unwrap();
+
+    let cli_args = CliArgs::new_from_args(["hugr", "convert", "--format", "model-text"]);
+
+    let output = cli_args.run_with_io(input_data.as_slice()).unwrap();
+
+    // Verify the output is valid model-text format
+    let reader = BufReader::new(output.as_slice());
+    let registry = ExtensionRegistry::default();
+    let (desc, _) =
+        read_described_envelope(reader, &registry).expect("Failed to read output envelope");
+
+    assert_eq!(desc.header.config().format, EnvelopeFormat::ModelText);
 }
