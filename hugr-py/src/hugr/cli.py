@@ -159,7 +159,7 @@ def describe_str(
             (default: False).
 
     Returns:
-        Text description of the package..
+        Text description of the package.
     """
     args = ["describe"]
     if _json:

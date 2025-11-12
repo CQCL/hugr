@@ -230,8 +230,7 @@ impl CliArgs {
     /// Run a CLI command with bytes input and capture bytes output.
     ///
     /// This provides a programmatic interface to the CLI.
-    /// Unlike `run_cli()`, this
-    /// method:
+    /// Unlike `run_cli()`, this method:
     /// - Accepts input instead of reading from stdin/files
     /// - Returns output as a byte vector instead of writing to stdout/files
     ///
