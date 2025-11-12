@@ -16,17 +16,17 @@ class ComposablePass(Protocol):
         ...
 
     def then(self, other: Self) -> Self:
-       """Perform another composable pass after this pass."""
-       ...
+        """Perform another composable pass after this pass."""
+        ...
 
 
 @dataclass
 class ComposedPass(ComposablePass):
-   """A sequence of composable passes."""
-   passes: list[ComposablePass]
+    """A sequence of composable passes."""
 
-   def __call__(self, hugr: Hugr):
-       """Call all of the passes in sequence."""
-       for comp_pass in self.passes:
-           comp_pass(hugr)
-       
+    passes: list[ComposablePass]
+
+    def __call__(self, hugr: Hugr):
+        """Call all of the passes in sequence."""
+        for comp_pass in self.passes:
+            comp_pass(hugr)
