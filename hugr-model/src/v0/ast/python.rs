@@ -13,7 +13,7 @@ impl<'py> pyo3::FromPyObject<'py> for Term {
     fn extract_bound(term: &Bound<'py, PyAny>) -> PyResult<Self> {
         let name = term.get_type().name()?;
 
-        Ok(match name.to_str()? {
+        Ok(match name.to_cow()?.as_ref() {
             "Wildcard" => Self::Wildcard,
             "Var" => {
                 let name = term.getattr("name")?.extract()?;
@@ -43,7 +43,7 @@ impl<'py> pyo3::FromPyObject<'py> for Term {
             _ => {
                 return Err(PyTypeError::new_err(format!(
                     "Unknown Term type: {}.",
-                    name.to_str()?
+                    name.to_cow()?
                 )));
             }
         })
@@ -94,7 +94,7 @@ impl<'py> pyo3::FromPyObject<'py> for SeqPart {
     fn extract_bound(part: &Bound<'py, PyAny>) -> PyResult<Self> {
         let name = part.get_type().name()?;
 
-        if name.to_str()? == "Splice" {
+        if name.to_cow()?.as_ref() == "Splice" {
             let term = part.getattr("seq")?.extract()?;
             Ok(Self::Splice(term))
         } else {
@@ -143,7 +143,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &Param {
 
 impl<'py> pyo3::FromPyObject<'py> for Visibility {
     fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
-        match ob.str()?.to_str()? {
+        match ob.str()?.to_cow()?.as_ref() {
             "Public" => Ok(Visibility::Public),
             "Private" => Ok(Visibility::Private),
             s => Err(PyTypeError::new_err(format!(
@@ -245,7 +245,7 @@ impl<'py> pyo3::FromPyObject<'py> for Operation {
     fn extract_bound(op: &Bound<'py, PyAny>) -> PyResult<Self> {
         let name = op.get_type().name()?;
 
-        Ok(match name.to_str()? {
+        Ok(match name.to_cow()?.as_ref() {
             "InvalidOp" => Self::Invalid,
             "Dfg" => Self::Dfg,
             "Cfg" => Self::Cfg,
