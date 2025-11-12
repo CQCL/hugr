@@ -16,6 +16,10 @@ class ComposablePass(Protocol):
         """Call the pass to transform a HUGR."""
         ...
 
+    def name(self) -> str:
+        """Returns the name of the pass."""
+        return self.__class__.__name__
+
     def then(self, other: ComposablePass) -> ComposablePass:
         """Perform another composable pass after this pass."""
         # Provide a default implementation for composing passes.
@@ -31,9 +35,7 @@ class ComposablePass(Protocol):
             pass_list.append(other)
 
         return ComposedPass(pass_list)
-    def name(self) -> str:
-        """Returns the name of the Pass"""
-        return self.__class__.__name__
+
 
 @dataclass
 class ComposedPass(ComposablePass):
