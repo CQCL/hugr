@@ -496,6 +496,7 @@ class ModelImport:
                                     type_args,
                                 ),
                                 parent,
+                                1,
                             )
                             self.fn_calls.append((fn_id, loadfunc_node))
                             return loadfunc_node
