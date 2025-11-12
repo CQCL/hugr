@@ -23,5 +23,5 @@ class ComposedPass(ComposablePass):
 
    def __call__(self, hugr: Hugr):
        for comp_pass in self.passes:
-           self.comp_pass(hugr)
+           comp_pass(hugr)
        
