@@ -503,7 +503,7 @@ class ModelImport:
                             v = self.import_value(value)
                             const_node = self.hugr.add_node(Const(v), parent, 1)
                             loadconst_node = self.add_node(
-                                node, LoadConst(datatype), parent
+                                node, LoadConst(datatype), parent, 1
                             )
                             self.hugr.add_link(
                                 OutPort(const_node, 0), InPort(loadconst_node, 0)
