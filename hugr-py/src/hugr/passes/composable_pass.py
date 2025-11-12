@@ -30,7 +30,7 @@ class ComposablePass(Protocol):
         else:
             pass_list.append(other)
 
-        return ComposedPass([self, other])
+        return ComposedPass(pass_list)
 
 
 @dataclass
