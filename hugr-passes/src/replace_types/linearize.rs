@@ -934,14 +934,14 @@ mod test {
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
-        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard_all_borrowed"));
 
         // We can drop a borrow array of usize
         let mut h = build_hugr(borrow_array_type(4, usize_t()));
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());
-        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard"));
+        assert!(exts.any(|eo| eo.qualified_id() == "collections.borrow_arr.discard_all_borrowed"));
 
         // We cannot drop a qubit
         let mut h = build_hugr(qb_t());

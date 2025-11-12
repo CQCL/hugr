@@ -25,7 +25,7 @@ use serde_json::json;
 
 #[fixture]
 fn cmd() -> Command {
-    Command::cargo_bin("hugr").unwrap()
+    assert_cmd::cargo::cargo_bin_cmd!("hugr")
 }
 
 #[fixture]
@@ -151,7 +151,7 @@ fn test_bad_json(mut val_cmd: Command) {
     val_cmd
         .assert()
         .failure()
-        .stderr(contains("Error decoding HUGR envelope"))
+        .stderr(contains("Error reading package payload in envelope"))
         .stderr(contains("missing field"));
 }
 

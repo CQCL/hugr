@@ -21,6 +21,9 @@ updates:
       minor:
         update-types: ["minor"]
       # Major updates still generate individual PRs
+    ignore:
+      - dependency-name: "smol_str:*"
+        versions: [">=0.3.4"] # Requires rustc 1.89
 
   - package-ecosystem: "uv"
     directories: # Location of package manifests

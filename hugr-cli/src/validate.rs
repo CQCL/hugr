@@ -30,14 +30,15 @@ impl ValArgs {
         if self.input_args.hugr_json {
             #[allow(deprecated)]
             let hugr = self.input_args.get_hugr()?;
+            #[allow(deprecated)]
             let generator = hugr::envelope::get_generator(&[&hugr]);
 
             hugr.validate()
                 .map_err(PackageValidationError::Validation)
                 .map_err(|val_err| CliError::validation(generator, val_err))?;
         } else {
-            let package = self.input_args.get_package()?;
-            let generator = hugr::envelope::get_generator(&package.modules);
+            let (desc, package) = self.input_args.get_described_package()?;
+            let generator = desc.generator();
             package
                 .validate()
                 .map_err(|val_err| CliError::validation(generator, val_err))?;

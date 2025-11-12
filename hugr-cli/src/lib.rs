@@ -27,11 +27,11 @@ use std::ffi::OsString;
 use thiserror::Error;
 
 pub mod convert;
+pub mod describe;
 pub mod extensions;
 pub mod hugr_io;
 pub mod mermaid;
 pub mod validate;
-
 /// CLI arguments.
 #[derive(Parser, Debug)]
 #[clap(version = crate_version!(), long_about = None)]
@@ -61,6 +61,13 @@ pub enum CliCommand {
     /// External commands
     #[command(external_subcommand)]
     External(Vec<OsString>),
+
+    /// Describe the contents of a HUGR package.
+    ///
+    /// If an error occurs during loading partial descriptions are printed.
+    /// For example if the first module is loaded and the second fails then
+    /// only the first module will be described.
+    Describe(describe::DescribeArgs),
 }
 
 /// Error type for the CLI.
@@ -98,6 +105,9 @@ pub enum CliError {
         /// The generator of the HUGR.
         generator: Box<String>,
     },
+    #[error("Error reading envelope.")]
+    /// Errors produced when reading an envelope.
+    ReadEnvelope(#[from] hugr::envelope::ReadError),
 }
 
 impl CliError {

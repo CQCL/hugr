@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.24.0...hugr-model-v0.24.1) - 2025-11-03
+
+### Bug Fixes
+
+- Correct conversion of `table::Term::Tuple` to `ast::Term` ([#2653](https://github.com/CQCL/hugr/pull/2653))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-model-v0.22.4...hugr-model-v0.23.0) - 2025-09-30
 
 ### Bug Fixes
