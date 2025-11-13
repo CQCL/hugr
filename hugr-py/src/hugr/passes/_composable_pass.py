@@ -1,4 +1,7 @@
-"""A Protocol for a composable pass."""
+"""A Protocol for a composable pass.
+
+Currently unstable.
+"""
 
 from __future__ import annotations
 
