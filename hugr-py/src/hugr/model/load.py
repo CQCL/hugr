@@ -56,6 +56,7 @@ from hugr.tys import (
     StringArg,
     StringParam,
     Sum,
+    Tuple,
     TupleArg,
     TupleConcatArg,
     TupleParam,
@@ -943,33 +944,59 @@ class ModelImport:
                 json_dict = json.loads(json_str)
                 match typ:
                     case model.Apply(typename, args):
-                        extension, type_id = _split_extension_name(typename)
-                        match json_dict:
-                            case {"c": name, "v": value}:
-                                # Determine appropriate TypeBound
-                                bound = TypeBound.Copyable
-                                if typename == "collections.list.List":
-                                    [arg] = args
-                                    datatype = self.import_type(arg)
-                                    bound = datatype.type_bound()
-                                # TODO Determine type bound in other cases
-                                return val.Extension(
-                                    name=name,
-                                    typ=Opaque(
-                                        id=type_id,
-                                        bound=bound,
-                                        args=[
-                                            self.import_type_arg(arg) for arg in args
-                                        ],
-                                        extension=extension,
-                                    ),
-                                    val=value,
-                                )
+                        match typename:
+                            case "core.adt":
+                                [arg] = args
+                                match list(arg.to_list_parts()):
+                                    case [model.List() as ts]:
+                                        pass
+                                    case _:
+                                        error = f"Unexpected term: {term}"
+                                        raise ModelImportError(error)
+                                match json_dict:
+                                    case {"c": "ConstExternalSymbol", "v": value}:
+                                        return val.Extension(
+                                            name="ConstExternalSymbol",
+                                            typ=Tuple(
+                                                *[
+                                                    self.import_type(
+                                                        cast(model.Term, t)
+                                                    )
+                                                    for t in ts.to_list_parts()
+                                                ]
+                                            ),
+                                            val=value,
+                                        )
+                                    case _:
+                                        error = f"Unexpected term: {term}"
+                                        raise ModelImportError(error)
                             case _:
-                                error = (
-                                    f"Unexpected compat.const_json value: {json_str}"
-                                )
-                                raise ModelImportError(error)
+                                extension, type_id = _split_extension_name(typename)
+                                match json_dict:
+                                    case {"c": name, "v": value}:
+                                        # Determine appropriate TypeBound
+                                        bound = TypeBound.Copyable
+                                        if typename == "collections.list.List":
+                                            [arg] = args
+                                            datatype = self.import_type(arg)
+                                            bound = datatype.type_bound()
+                                        # TODO Determine type bound in other cases
+                                        return val.Extension(
+                                            name=name,
+                                            typ=Opaque(
+                                                id=type_id,
+                                                bound=bound,
+                                                args=[
+                                                    self.import_type_arg(arg)
+                                                    for arg in args
+                                                ],
+                                                extension=extension,
+                                            ),
+                                            val=value,
+                                        )
+                                    case _:
+                                        error = f"Unexpected compat.const_json value: {json_str}"
+                                        raise ModelImportError(error)
                     case _:
                         error = f"Unexpected compat.const_json type: {typ}"
                         raise ModelImportError(error)
