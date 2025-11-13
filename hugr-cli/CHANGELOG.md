@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.24.4](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.3...hugr-cli-v0.24.4) - 2025-11-13
+
+### New Features
+
+- *(cli, python)* programmatic interface to cli with python bindings ([#2677](https://github.com/CQCL/hugr/pull/2677))
+- return description output to python on error ([#2681](https://github.com/CQCL/hugr/pull/2681))
+
 ## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.0...hugr-cli-v0.24.1) - 2025-11-03
 
 ### New Features

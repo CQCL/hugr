@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.24.4](https://github.com/CQCL/hugr/compare/hugr-v0.24.3...hugr-v0.24.4) - 2025-11-13
+
+### New Features
+
+- return description output to python on error ([#2681](https://github.com/CQCL/hugr/pull/2681))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-v0.24.2...hugr-v0.24.3) - 2025-11-06
 
 ### Bug Fixes
