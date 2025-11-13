@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.24.4](https://github.com/CQCL/hugr/compare/hugr-model-v0.24.3...hugr-model-v0.24.4) - 2025-11-13
+
+### Bug Fixes
+
+- *(model)* avoid non abi-compatible pyo3 calls ([#2679](https://github.com/CQCL/hugr/pull/2679))
+
 ## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-model-v0.24.0...hugr-model-v0.24.1) - 2025-11-03
 
 ### Bug Fixes
