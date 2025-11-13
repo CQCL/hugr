@@ -7,7 +7,7 @@ validate, describe, convert, and mermaid.
 
 from pydantic import BaseModel
 
-from hugr._hugr import cli_with_io
+from hugr._hugr import HugrCliDescribeError, HugrCliError, cli_with_io
 
 __all__ = [
     "cli_with_io",
@@ -20,6 +20,8 @@ __all__ = [
     "ModuleDesc",
     "ExtensionDesc",
     "EntrypointDesc",
+    "HugrCliError",
+    "HugrCliDescribeError",
 ]
 
 
@@ -50,7 +52,7 @@ def validate(
         extensions: Paths to additional serialised extensions needed to load the HUGR.
 
     Raises:
-        ValueError: On validation failure.
+        HugrCliError: On validation failure or other CLI errors.
     """
     args = _add_input_args(["validate"], no_std, extensions)
     cli_with_io(args, hugr_bytes)
@@ -175,6 +177,10 @@ def describe_str(
 
     Returns:
         Text description of the package.
+
+    Raises:
+        HugrCliDescribeError: On error during package description. The exception
+            contains partial output if available.
     """
     args = ["describe"]
     if _json:
@@ -222,16 +228,19 @@ def describe(
     Returns:
         Structured package description as a PackageDesc object.
     """
-    output = describe_str(
-        hugr_bytes,
-        _json=True,
-        packaged_extensions=packaged_extensions,
-        no_resolved_extensions=no_resolved_extensions,
-        public_symbols=public_symbols,
-        generator_claimed_extensions=generator_claimed_extensions,
-        no_std=no_std,
-        extensions=extensions,
-    )
+    try:
+        output = describe_str(
+            hugr_bytes,
+            _json=True,
+            packaged_extensions=packaged_extensions,
+            no_resolved_extensions=no_resolved_extensions,
+            public_symbols=public_symbols,
+            generator_claimed_extensions=generator_claimed_extensions,
+            no_std=no_std,
+            extensions=extensions,
+        )
+    except HugrCliDescribeError as e:
+        output = e.args[1]
     return PackageDesc.model_validate_json(output)
 
 
@@ -265,6 +274,9 @@ def convert(
 
     Returns:
         Converted package as bytes.
+
+    Raises:
+        HugrCliError: On conversion failure or other CLI errors.
     """
     args = ["convert"]
     if format is not None:
@@ -300,6 +312,9 @@ def mermaid(
 
     Returns:
         Mermaid diagram output as a string.
+
+    Raises:
+        HugrCliError: On mermaid generation failure or other CLI errors.
     """
     args = ["mermaid"]
     if validate:

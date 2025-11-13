@@ -247,11 +247,33 @@ impl CliArgs {
     ///
     /// The `gen-extensions` and `external` commands don't support byte I/O
     /// and should use the normal `run_cli()` method instead.
-    pub fn run_with_io(self, input: impl std::io::Read) -> Result<Vec<u8>> {
+    pub fn run_with_io(self, input: impl std::io::Read) -> Result<Vec<u8>, RunWithIoError> {
         let mut output = Vec::new();
-        self.command.run_with_io(Some(input), Some(&mut output))?;
-        Ok(output)
+        let is_describe = matches!(self.command, CliCommand::Describe(_));
+        let res = self.command.run_with_io(Some(input), Some(&mut output));
+        match (res, is_describe) {
+            (Ok(()), _) => Ok(output),
+            (Err(e), true) => Err(RunWithIoError::Describe { source: e, output }),
+            (Err(e), false) => Err(RunWithIoError::Other(e)),
+        }
     }
+}
+
+#[derive(Debug, Error)]
+#[non_exhaustive]
+#[error("Error running CLI command with IO.")]
+/// Error type for `run_with_io` method.
+pub enum RunWithIoError {
+    /// Error describing HUGR package.
+    Describe {
+        #[source]
+        /// Error returned from describe command.
+        source: anyhow::Error,
+        /// Describe command output.
+        output: Vec<u8>,
+    },
+    /// Non-describe command error.
+    Other(anyhow::Error),
 }
 
 fn run_external(args: Vec<OsString>) -> Result<()> {

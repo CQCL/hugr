@@ -5,7 +5,7 @@ use hugr_model::v0::table;
 use itertools::{Either, Itertools as _};
 
 use crate::HugrView as _;
-use crate::envelope::description::PackageDesc;
+use crate::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
 use crate::envelope::{
     EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
@@ -103,6 +103,32 @@ impl<R: BufRead> EnvelopeReader<R> {
         self.registry.extend(extensions);
     }
 
+    /// Handle extension resolution errors by recording missing extensions in the description.
+    ///
+    /// This function inspects the error and adds any missing extensions to the module description
+    /// with a default version of 0.0.0.
+    fn handle_resolution_error(desc: &mut ModuleDesc, err: &ExtensionResolutionError) {
+        match err {
+            ExtensionResolutionError::MissingOpExtension {
+                missing_extension, ..
+            }
+            | ExtensionResolutionError::MissingTypeExtension {
+                missing_extension, ..
+            } => desc.extend_used_extensions_resolved([ExtensionDesc::new(
+                missing_extension,
+                crate::extension::Version::new(0, 0, 0),
+            )]),
+            ExtensionResolutionError::InvalidConstTypes {
+                missing_extensions, ..
+            } => desc.extend_used_extensions_resolved(
+                missing_extensions
+                    .iter()
+                    .map(|ext| ExtensionDesc::new(ext, crate::extension::Version::new(0, 0, 0))),
+            ),
+            _ => {}
+        }
+    }
+
     fn read_impl(&mut self) -> Result<Package, PayloadError> {
         let mut package = match self.header().format {
             EnvelopeFormat::PackageJson => self.decode_json()?,
@@ -121,7 +147,10 @@ impl<R: BufRead> EnvelopeReader<R> {
                 check_breaking_extensions(module.extensions(), used_exts.drain(..))?;
             }
 
-            module.resolve_extension_defs(&self.registry)?;
+            module
+                .resolve_extension_defs(&self.registry)
+                .inspect_err(|err| Self::handle_resolution_error(desc, err))?;
+
             // overwrite the description with the actual module read,
             // cheap so ok to repeat.
             desc.load_from_hugr(&module);
@@ -414,5 +443,78 @@ mod test {
         assert_matches!(result, Err(PayloadError(PayloadErrorInner::JsonRead(_))));
         assert_eq!(description.header, header);
         assert_eq!(description.n_modules(), 0); // No valid modules should be set
+    }
+
+    #[test]
+    fn test_handle_resolution_error() {
+        use crate::extension::ExtensionId;
+        use crate::ops::{OpName, constant::ValueName};
+        use crate::types::TypeName;
+
+        let mut desc = ModuleDesc::default();
+        let handle_error = |d: &mut ModuleDesc, err: &ExtensionResolutionError| {
+            EnvelopeReader::<Cursor<Vec<u8>>>::handle_resolution_error(d, err)
+        };
+        let assert_extensions = |d: &ModuleDesc, expected_ids: &[&ExtensionId]| {
+            let resolved = d.used_extensions_resolved.as_ref().unwrap();
+            assert_eq!(resolved.len(), expected_ids.len());
+            let names: Vec<_> = resolved.iter().map(|e| &e.name).collect();
+            for ext_id in expected_ids {
+                assert!(names.contains(&&ext_id.to_string()));
+            }
+            assert!(
+                resolved
+                    .iter()
+                    .all(|e| e.version == crate::extension::Version::new(0, 0, 0))
+            );
+        };
+
+        // Test MissingOpExtension
+        let ext_id = ExtensionId::new("test.extension").unwrap();
+        let error = ExtensionResolutionError::MissingOpExtension {
+            node: None,
+            op: OpName::new("test.op"),
+            missing_extension: ext_id.clone(),
+            available_extensions: vec![],
+        };
+        handle_error(&mut desc, &error);
+        assert_extensions(&desc, &[&ext_id]);
+
+        // Test MissingTypeExtension
+        desc.used_extensions_resolved = None;
+        let ext_id2 = ExtensionId::new("test.extension2").unwrap();
+        let error = ExtensionResolutionError::MissingTypeExtension {
+            node: None,
+            ty: TypeName::new("test.type"),
+            missing_extension: ext_id2.clone(),
+            available_extensions: vec![],
+        };
+        handle_error(&mut desc, &error);
+        assert_extensions(&desc, &[&ext_id2]);
+
+        // Test InvalidConstTypes with multiple extensions
+        desc.used_extensions_resolved = None;
+        let ext_id3 = ExtensionId::new("test.extension3").unwrap();
+        let ext_id4 = ExtensionId::new("test.extension4").unwrap();
+        let mut missing_exts = crate::extension::ExtensionSet::new();
+        missing_exts.insert(ext_id3.clone());
+        missing_exts.insert(ext_id4.clone());
+
+        let error = ExtensionResolutionError::InvalidConstTypes {
+            value: ValueName::new("test.value"),
+            missing_extensions: missing_exts,
+        };
+        handle_error(&mut desc, &error);
+        assert_extensions(&desc, &[&ext_id3, &ext_id4]);
+
+        // Test other error variant (should not add anything)
+        desc.used_extensions_resolved = None;
+        let error = ExtensionResolutionError::WrongTypeDefExtension {
+            extension: ExtensionId::new("ext1").unwrap(),
+            def: TypeName::new("def"),
+            wrong_extension: ExtensionId::new("ext2").unwrap(),
+        };
+        handle_error(&mut desc, &error);
+        assert!(desc.used_extensions_resolved.is_none());
     }
 }
