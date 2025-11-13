@@ -83,9 +83,10 @@ class Package:
         return read_envelope_str(envelope)
 
     @staticmethod
-    def from_model(package: model.Package):
-        return Package([Hugr.from_model(hugr) for hugr in package.modules])
-        # FIXME extensions?
+    def from_model(package: model.Package, extensions: list[Extension] | None = None):
+        if extensions is None:
+            extensions = []
+        return Package([Hugr.from_model(hugr) for hugr in package.modules], extensions)
 
     def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the package to a HUGR envelope byte string.
