@@ -1,5 +1,5 @@
 from hugr.hugr.base import Hugr
-from hugr.passes.composable_pass import ComposablePass, ComposedPass
+from hugr.passes._composable_pass import ComposablePass, ComposedPass
 
 
 def test_composable_pass() -> None:
