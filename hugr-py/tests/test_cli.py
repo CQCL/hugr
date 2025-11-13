@@ -167,3 +167,5 @@ def test_failed_describe(hugr_using_ext):
     assert mod.num_nodes == 8  # computed before error
     assert isinstance(desc.error, str)
     assert "requires extension ext" in desc.error
+
+    assert desc.uses_extension("ext")
