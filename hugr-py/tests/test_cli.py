@@ -4,8 +4,8 @@ from typing import Any
 
 import pytest
 
-from hugr import cli
-from hugr.build import Module
+from hugr import cli, tys
+from hugr.build import Dfg, Module
 from hugr.ext import Extension
 from hugr.package import Package
 
@@ -38,7 +38,7 @@ def test_validate_with_bytes_invalid():
 
     invalid_bytes = b"not a valid hugr package"
 
-    with pytest.raises(ValueError, match="Bad magic number"):
+    with pytest.raises(cli.HugrCliError, match="Bad magic number"):
         cli.cli_with_io(["validate"], invalid_bytes)
 
 
@@ -139,3 +139,31 @@ def test_describe_json_with_packaged_extensions(hugr_with_extension_bytes: bytes
 
     assert desc.uses_extension("ext")
     assert not desc.uses_extension("nonexistent_extension")
+
+
+@pytest.fixture
+def hugr_using_ext() -> bytes:
+    """A simple HUGR package that uses an extension, but doesn't package it."""
+    ext = Extension.from_json(EXAMPLE)
+    u_t = tys.USize()
+    op = ext.get_op("New").instantiate(
+        [u_t.type_arg()], concrete_signature=tys.FunctionType([u_t], [])
+    )
+    h = Dfg(u_t)
+    a = h.inputs()[0]
+    h.add_op(op, a)
+    h.set_outputs()
+
+    package = Package([h.hugr], [])
+
+    return package.to_bytes()
+
+
+def test_failed_describe(hugr_using_ext):
+    """Json description still succeeds, with error field populated"""
+    desc = cli.describe(hugr_using_ext)
+    mod = desc.modules[0]
+    assert mod is not None
+    assert mod.num_nodes == 8  # computed before error
+    assert isinstance(desc.error, str)
+    assert "requires extension ext" in desc.error
