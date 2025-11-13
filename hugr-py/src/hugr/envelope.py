@@ -114,6 +114,7 @@ def read_envelope(envelope: bytes) -> Package:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
         case EnvelopeFormat.MODEL | EnvelopeFormat.MODEL_WITH_EXTS:
+            # FIXME Include extensions
             return Package.from_model(rust.bytes_to_package(payload))
 
 
