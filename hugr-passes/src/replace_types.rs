@@ -955,12 +955,12 @@ mod test {
     fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
-        lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.replace_parametrized_type(
+        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_parametrized_type(
             pv,
             Box::new(|args: &[TypeArg]| Some(value_array_type(64, just_elem_type(args).clone()))),
         );
-        lw.replace_op(
+        lw.set_replace_op(
             &read_op(ext, bool_t()),
             NodeTemplate::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
@@ -968,12 +968,12 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
-            Some(NodeTemplate::CompoundOp(Box::new(
+        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
+            Ok(Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
                     .unwrap(),
-            )))
+            ))))
         });
         lw
     }
@@ -1123,7 +1123,7 @@ mod test {
         let mut lowerer = ReplaceTypes::default();
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
-        lowerer.replace_parametrized_type(list_type_def(), |args| {
+        lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (![usize_t(), i64_t()].contains(ty)).then_some(value_array_type(10, ty.clone()))
         });
@@ -1140,7 +1140,7 @@ mod test {
 
         // 2. Now we'll also change usize's to i64_t's
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        lowerer.replace_type(usize_custom_t.clone(), i64_t());
+        lowerer.set_replace_type(usize_custom_t.clone(), i64_t());
         lowerer.replace_consts(usize_custom_t, |opaq, _| {
             Ok(ConstInt::new_u(
                 6,
@@ -1170,7 +1170,7 @@ mod test {
 
         // 3. Lower all List<T> to Array<4,T>
         let mut h = backup;
-        lowerer.replace_parametrized_type(
+        lowerer.set_replace_parametrized_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(value_array_type(4, just_elem_type(args).clone()))),
         );
@@ -1242,26 +1242,23 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
 
         let mut lowerer = ReplaceTypes::default();
-        lowerer.replace_type(i32_custom_t, qb_t());
+        lowerer.set_replace_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
-        lowerer.replace_parametrized_type(list_type_def(), |args| {
+        lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.replace_parametrized_op(
-            e.get_op(READ).unwrap().as_ref(),
-            Box::new(|args: &[TypeArg]| {
-                option_contents(just_elem_type(args)).map(|elem| {
-                    NodeTemplate::SingleOp(
-                        ListOp::get
-                            .with_type(elem)
-                            .to_extension_op()
-                            .unwrap()
-                            .into(),
-                    )
-                })
-            }),
-        );
+        lowerer.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), |args, _| {
+            Ok(option_contents(just_elem_type(args)).map(|elem| {
+                NodeTemplate::SingleOp(
+                    ListOp::get
+                        .with_type(elem)
+                        .to_extension_op()
+                        .unwrap()
+                        .into(),
+                )
+            }))
+        });
         assert!(lowerer.run(&mut h).unwrap());
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
@@ -1303,7 +1300,7 @@ mod test {
 
         let mut repl = ReplaceTypes::new_empty();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        repl.replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
+        repl.set_replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
         repl.replace_consts(usize_custom_t, |cst: &OpaqueValue, _| {
             let cu = cst.value().downcast_ref::<ConstUsize>().unwrap();
             Ok(ConstInt::new_u(6, cu.value())?.into())
@@ -1354,8 +1351,8 @@ mod test {
             .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
-            Some(NodeTemplate::Call(read_func, args.to_owned()))
+        lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
+            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
         });
         lw.run(&mut h).unwrap();
 
