@@ -889,9 +889,9 @@ class ModelImport:
             case model.Apply("prelude.qubit", []):
                 return _QubitDef()
             case model.Apply(symbol, args):
-                extension, id = _split_extension_name(symbol)
+                extension, type_id = _split_extension_name(symbol)
                 return Opaque(
-                    id=id,
+                    id=type_id,
                     extension=extension,
                     # TODO How to determine the type bound (Copyable or Linear)?
                     bound=TypeBound.Copyable,
