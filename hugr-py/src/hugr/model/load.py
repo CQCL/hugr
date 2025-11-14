@@ -436,7 +436,7 @@ class ModelImport:
         def import_custom_node(op: model.Term) -> Node:
             match op:
                 case model.Apply(symbol, args):
-                    extension, op_name = _split_extension_name(symbol)
+                    pass
                 case _:
                     error = "The operation of a custom node must be a symbol "
                     "application."
@@ -550,8 +550,9 @@ class ModelImport:
                         parent,
                         len(typerow),
                     )
-                # TODO others
+                # Others are imported as Custom nodes.
                 case _:
+                    extension, op_name = _split_extension_name(symbol)
                     return self.add_node(
                         node,
                         Custom(
