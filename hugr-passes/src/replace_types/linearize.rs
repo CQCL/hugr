@@ -374,8 +374,8 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, inout_sig,
+        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        inout_sig,
     };
 
     use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
@@ -400,9 +400,7 @@ mod test {
     use rstest::rstest;
 
     use crate::replace_types::handlers::linearize_value_array;
-    use crate::replace_types::{
-        LinearizeError, NodeTemplate, ReplaceTypesError, ReplacementOptions,
-    };
+    use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
     const LIN_T: &str = "Lin";
@@ -897,19 +895,12 @@ mod test {
             },
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
-        lowerer.replace_parametrized_op_with(
-            drop_op,
-            |args| {
-                let [TypeArg::Runtime(ty)] = args else {
-                    panic!("Expected just one type")
-                };
-                // The Hugr here is invalid, so we have to pull it out manually
-                let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();
-                let h = std::mem::take(dfb.hugr_mut());
-                Some(NodeTemplate::CompoundOp(Box::new(h)))
-            },
-            ReplacementOptions::default().with_linearization(true),
-        );
+        lowerer.set_replace_parametrized_op(drop_op, |args, rt| {
+            let [TypeArg::Runtime(ty)] = args else {
+                panic!("Expected just one type")
+            };
+            Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
+        });
 
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new(ty.clone(), vec![])).unwrap();

@@ -238,7 +238,12 @@ pub struct ReplaceTypes {
     param_ops: HashMap<
         ParametricOp,
         (
-            Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate>>,
+            Arc<
+                dyn Fn(
+                    &[TypeArg],
+                    &ReplaceTypes,
+                ) -> Result<Option<NodeTemplate>, ReplaceTypesError>,
+            >,
             ReplacementOptions,
         ),
     >,
@@ -425,6 +430,13 @@ impl ReplaceTypes {
             .insert(src.into(), (Arc::new(dest_fn), opts));
     }
 
+    /// Allows to configure how to deal with types/wires that were `Copyable`
+    /// but have become linear as a result of type-changing.
+    #[deprecated(note = "Use get_linearizer or linearizer_mut")]
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+        &mut self.linearize
+    }
+
     /// Allows to configure how to deal with types/wires that were [Copyable]
     /// but have become linear as a result of type-changing. Specifically,
     /// the [Linearizer] is used whenever lowering produces an outport which both
@@ -434,8 +446,14 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+    pub fn linearizer_mut(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
+    }
+
+    /// Allows use of the linearizer (e.g. in a callback passed to
+    /// [Self::set_replace_parametrized_op])
+    pub fn get_linearizer(&self) -> &impl Linearizer {
+        &self.linearize
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
@@ -499,7 +517,8 @@ impl ReplaceTypes {
     pub fn set_replace_parametrized_op(
         &mut self,
         src: &OpDef,
-        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate> + 'static,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + 'static,
     ) {
         self.param_ops.insert(
             src.into(),
@@ -516,8 +535,10 @@ impl ReplaceTypes {
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
         opts: ReplacementOptions,
     ) {
-        self.param_ops
-            .insert(src.into(), (Arc::new(move |args, _| dest_fn(args)), opts));
+        self.param_ops.insert(
+            src.into(),
+            (Arc::new(move |args, _| Ok(dest_fn(args))), opts),
+        );
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -638,21 +659,23 @@ impl ReplaceTypes {
             OpType::ExtensionOp(ext_op) => Ok({
                 let def = ext_op.def_arc();
                 let mut changed = false;
-                let replacement =
-                    match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                        r @ Some(_) => r.cloned(),
-                        None => {
-                            let mut args = ext_op.args().to_vec();
-                            changed = args.transform(self)?;
-                            let r2 = self.param_ops.get(&def.as_ref().into()).and_then(
-                                |(rep_fn, opts)| rep_fn(&args, self).map(|nt| (nt, opts.clone())),
-                            );
-                            if r2.is_none() && changed {
-                                *ext_op = ExtensionOp::new(def.clone(), args)?;
+                let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                    r @ Some(_) => r.cloned(),
+                    None => {
+                        let mut args = ext_op.args().to_vec();
+                        changed = args.transform(self)?;
+                        let r2 = match self.param_ops.get(&def.as_ref().into()) {
+                            None => None,
+                            Some((rep_fn, opts)) => {
+                                rep_fn(&args, self)?.map(|nt| (nt, opts.clone()))
                             }
-                            r2
+                        };
+                        if r2.is_none() && changed {
+                            *ext_op = ExtensionOp::new(def.clone(), args)?;
                         }
-                    };
+                        r2
+                    }
+                };
                 if let Some((replacement, opts)) = replacement {
                     replacement
                         .replace(hugr, n)
@@ -1417,7 +1440,7 @@ mod test {
                     panic!("Expected two args to array-get")
                 };
                 if sz != &Term::BoundedNat(64) {
-                    return None;
+                    return Ok(None);
                 }
                 let pv = ext
                     .get_type(PACKED_VEC)
@@ -1446,9 +1469,9 @@ mod test {
                     )
                     .unwrap()
                     .outputs_arr();
-                Some(NodeTemplate::CompoundOp(Box::new(
+                Ok(Some(NodeTemplate::CompoundOp(Box::new(
                     dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
-                )))
+                ))))
             },
         );
 
