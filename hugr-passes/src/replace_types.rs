@@ -186,22 +186,15 @@ pub struct ReplacementOptions {
 }
 
 impl ReplacementOptions {
-    /// Specifies whether the replacement (op or type) should be processed by the same
-    /// [ReplaceTypes], including linearization of any changed ops. This increases
-    /// compositionality (in that replacements for other types/ops do not need to have
-    /// already been applied to the RHS), but can lead to infinite looping if e.g. the
-    ///  replacement for an op is a DFG containing an instance of the same op.
-    pub fn with_recursive_replacement(mut self, rec: bool) -> Self {
-        self.process_recursive = rec;
-        self
+    fn recursive() -> Self {
+        Self {
+            process_recursive: true,
+            linearize_unchanged: false,
+        }
     }
 
-    /// Specifies whether *all* nodes within the replacement should have their
+    /// Specifies whether all nodes within the replacement should have their
     /// output ports linearized.
-    ///
-    /// * If [Self::with_recursive_replacement] has been set, this causes linearization
-    ///   to apply even to unchanged ops.
-    /// * Otherwise, just applies linearization (to all nodes) without changing any ops.
     pub fn with_linearization(mut self, lin: bool) -> Self {
         self.linearize_unchanged = lin;
         self
@@ -245,7 +238,7 @@ pub struct ReplaceTypes {
     param_ops: HashMap<
         ParametricOp,
         (
-            Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>,
+            Arc<dyn Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate>>,
             ReplacementOptions,
         ),
     >,
@@ -330,13 +323,18 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
-    /// Equivalent to [Self::replace_type_opts] with [ReplacementOptions::default()]
+    #[deprecated(note = "Use set_replace_type")]
     pub fn replace_type(&mut self, src: CustomType, dest: Type) {
+        #[expect(deprecated)] // remove together
         self.replace_type_opts(src, dest, ReplacementOptions::default())
     }
 
-    /// Configures this instance to replace occurrences of type `src` with `dest`,
-    /// according to the given `ReplacementOptions`.
+    /// Configures this instance to replace occurrences of type `src` with `dest`.
+    ///
+    /// `dest` will be recursively transformed by this [ReplaceTypes] before replacement.
+    /// (Cases where a type should be replaced by a type containing an instance of
+    /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
+    /// type. )
     ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
     /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
@@ -350,41 +348,53 @@ impl ReplaceTypes {
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [`SignatureError`] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
     /// (This can be overridden by an additional [`Self::replace_type`].)
-    pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
+    pub fn set_replace_type(&mut self, src: CustomType, dest: Type) {
         // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
         // discard functions are registered with the linearizer; but since we can't check
         // that for parametrized types, we'll be consistent and not check here either.
+        self.type_map
+            .insert(src, (dest, ReplacementOptions::recursive()));
+    }
+
+    /// Configures this instance to replace occurrences of type `src` with `dest`,
+    /// according to the given `ReplacementOptions`.
+    #[deprecated(note = "Use set_replace_type")]
+    pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
         self.type_map.insert(src, (dest, opts));
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    /// Equivalent to [Self::replace_parametrized_type_opts] with [ReplacementOptions::default].
+    #[deprecated(note = "Use set_replace_parametrized_type")]
     pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
     ) {
+        #[expect(deprecated)] // remove together
         self.replace_parametrized_type_opts(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
-    /// via a callback that builds the replacement type given the [`TypeArg`]s,
-    /// and using the given [ReplacementOptions].
+    /// via a callback that builds the replacement type given the [`TypeArg`]s.
     ///
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
     /// no change (in which case the supplied `TypeArgs` will be given to `src`).
+    /// The returned type will also be subject to recursive processing by this [ReplaceTypes].
+    /// (Cases where a type should be replaced by a type containing an instance of
+    /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
+    /// type. )
     ///
     /// If there are any [`LoadConstant`]s of any of these types, callers should also call
     /// [`Self::replace_consts_parametrized`] (or [`Self::replace_consts`]) as the
     /// [`LoadConstant`]s will be reparametrized (and this will break the edge from [Const] to
     /// [`LoadConstant`]).
-    pub fn replace_parametrized_type_opts(
+    /// See [Self::set_replace_type] for more details (including recursion).
+    pub fn set_replace_parametrized_type(
         &mut self,
         src: &TypeDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
-        opts: ReplacementOptions,
     ) {
         // No way to check that dest_fn never produces a linear type.
         // We could require copy/discard-generators if src is Copyable, or *might be*
@@ -395,6 +405,22 @@ impl ReplaceTypes {
         // dest_fn: impl Fn(&TypeArg) -> (Type,
         //                                Fn(&Linearizer) -> NodeTemplate, // copy
         //                                Fn(&Linearizer) -> NodeTemplate)` // discard
+        self.param_types.insert(
+            src.into(),
+            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s,
+    /// and using the given [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_parametrized_type")]
+    pub fn replace_parametrized_type_opts(
+        &mut self,
+        src: &TypeDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
+        opts: ReplacementOptions,
+    ) {
         self.param_types
             .insert(src.into(), (Arc::new(dest_fn), opts));
     }
@@ -413,18 +439,33 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Equivalent to [Self::replace_op_with] with default [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_op")]
     pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        #[expect(deprecated)] // remove together
         self.replace_op_with(src, dest, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     ///
+    /// The RHS will be recursively processed by this [ReplaceTypes].
+    /// (Cases where an op should be replaced by a container including an
+    /// instance of the same op, must be handled by two separate [ReplaceTypes]'s
+    /// via a temporary op.)
+    ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
-    /// precedence over [`Self::replace_parametrized_op`] where the `src`s overlap. Thus,
-    /// this should only be used on already-*[monomorphize](super::monomorphize())d*
+    /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
+    /// Thus, this method should only be used for already-*[monomorphize](super::monomorphize())d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
+    pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        self.op_map.insert(
+            OpHashWrapper::from(src),
+            (dest, ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of `src` to `dest`.
+    #[deprecated(note = "Use set_replace_op")]
     pub fn replace_op_with(
         &mut self,
         src: &ExtensionOp,
@@ -436,28 +477,47 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    /// Equivalent to [Self::replace_parametrized_op_with] with default [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_parametrized_op")]
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
+        #[expect(deprecated)] // remove together
         self.replace_parametrized_op_with(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
-    /// fit the bounds of the original op).
+    /// fit the bounds of the original op); and the returned [NodeTemplate] will be
+    /// recursively processed by this [ReplaceTypes]. (Cases where an op should be
+    /// replaced by a container including an instance of the same op, must be handled
+    /// by two separate [ReplaceTypes]'s via a temporary op.)
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
+    pub fn set_replace_parametrized_op(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Option<NodeTemplate> + 'static,
+    ) {
+        self.param_ops.insert(
+            src.into(),
+            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    #[deprecated(note = "Use set_replace_parametrized_op")]
     pub fn replace_parametrized_op_with(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
         opts: ReplacementOptions,
     ) {
-        self.param_ops.insert(src.into(), (Arc::new(dest_fn), opts));
+        self.param_ops
+            .insert(src.into(), (Arc::new(move |args, _| dest_fn(args)), opts));
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -578,21 +638,21 @@ impl ReplaceTypes {
             OpType::ExtensionOp(ext_op) => Ok({
                 let def = ext_op.def_arc();
                 let mut changed = false;
-                let replacement = match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
-                    r @ Some(_) => r.cloned(),
-                    None => {
-                        let mut args = ext_op.args().to_vec();
-                        changed = args.transform(self)?;
-                        let r2 = self
-                            .param_ops
-                            .get(&def.as_ref().into())
-                            .and_then(|(rep_fn, opts)| rep_fn(&args).map(|nt| (nt, opts.clone())));
-                        if r2.is_none() && changed {
-                            *ext_op = ExtensionOp::new(def.clone(), args)?;
+                let replacement =
+                    match self.op_map.get(&OpHashWrapper::from(&*ext_op)) {
+                        r @ Some(_) => r.cloned(),
+                        None => {
+                            let mut args = ext_op.args().to_vec();
+                            changed = args.transform(self)?;
+                            let r2 = self.param_ops.get(&def.as_ref().into()).and_then(
+                                |(rep_fn, opts)| rep_fn(&args, self).map(|nt| (nt, opts.clone())),
+                            );
+                            if r2.is_none() && changed {
+                                *ext_op = ExtensionOp::new(def.clone(), args)?;
+                            }
+                            r2
                         }
-                        r2
-                    }
-                };
+                    };
                 if let Some((replacement, opts)) = replacement {
                     replacement
                         .replace(hugr, n)
@@ -745,7 +805,6 @@ impl From<&OpDef> for ParametricOp {
 mod test {
     use std::sync::Arc;
 
-    use crate::replace_types::ReplacementOptions;
     use crate::replace_types::handlers::generic_array_const;
     use hugr_core::builder::{
         BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
@@ -1333,31 +1392,27 @@ mod test {
         let mut lowerer = lowerer(&ext);
         // Replace std Array's with 64 elements with PackedVec's
         let ext2 = ext.clone();
-        lowerer.replace_parametrized_type_opts(
-            array_type_def(),
-            move |args| {
-                let [sz, ty] = args else {
-                    panic!("Expected two args to array")
-                };
-                (sz == &Term::BoundedNat(64)).then_some(
-                    ext2.get_type(PACKED_VEC)
-                        .unwrap()
-                        .instantiate([ty.clone()])
-                        .unwrap()
-                        .into(),
-                )
-            },
-            ReplacementOptions::default().with_recursive_replacement(true),
-        );
+        lowerer.set_replace_parametrized_type(array_type_def(), move |args| {
+            let [sz, ty] = args else {
+                panic!("Expected two args to array")
+            };
+            (sz == &Term::BoundedNat(64)).then_some(
+                ext2.get_type(PACKED_VEC)
+                    .unwrap()
+                    .instantiate([ty.clone()])
+                    .unwrap()
+                    .into(),
+            )
+        });
 
         // Replacement of `get` is complex because we need to wrap result of read into a Some
         let ext = ext.clone();
-        lowerer.replace_parametrized_op_with(
+        lowerer.set_replace_parametrized_op(
             array::EXTENSION
                 .get_op(ArrayOpDef::get.opdef_id().as_str())
                 .unwrap()
                 .as_ref(),
-            move |args| {
+            move |args, _| {
                 let [sz, Term::Runtime(ty)] = args else {
                     panic!("Expected two args to array-get")
                 };
@@ -1395,7 +1450,6 @@ mod test {
                     dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
                 )))
             },
-            ReplacementOptions::default().with_recursive_replacement(true),
         );
 
         // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
