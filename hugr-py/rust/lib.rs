@@ -74,14 +74,14 @@ fn package_to_bytes(package: ast::Package) -> PyResult<Vec<u8>> {
 }
 
 #[pyfunction]
-fn bytes_to_package(bytes: &[u8]) -> PyResult<ast::Package> {
+fn bytes_to_package(bytes: &[u8]) -> PyResult<(ast::Package, Vec<u8>)> {
     let bump = bumpalo::Bump::new();
-    let table = hugr_model::v0::binary::read_from_slice(bytes, &bump)
+    let (table, suffix) = hugr_model::v0::binary::read_from_slice_with_suffix(bytes, &bump)
         .map_err(|err| PyValueError::new_err(err.to_string()))?;
     let package = table
         .as_ast()
         .ok_or_else(|| PyValueError::new_err("Malformed package"))?;
-    Ok(package)
+    Ok((package, suffix))
 }
 
 /// Returns the current version of the HUGR model format as a tuple of (major, minor, patch).
