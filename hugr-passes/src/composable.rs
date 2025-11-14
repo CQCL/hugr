@@ -369,7 +369,7 @@ mod test {
             // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
             let mut repl = ReplaceTypes::default();
             let usize_custom_t = usize_t().as_extension().unwrap().clone();
-            repl.replace_type(usize_custom_t, INT_TYPES[6].clone());
+            repl.set_replace_type(usize_custom_t, INT_TYPES[6].clone());
             let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup.clone());
 
             let mut h = h.clone();
@@ -387,7 +387,7 @@ mod test {
         // Change INT_TYPES[5] to INT_TYPES[6]; that won't do anything, so don't Untuple
         let mut repl = ReplaceTypes::default();
         let i32_custom_t = INT_TYPES[5].as_extension().unwrap().clone();
-        repl.replace_type(i32_custom_t, INT_TYPES[6].clone());
+        repl.set_replace_type(i32_custom_t, INT_TYPES[6].clone());
         let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup);
         let mut h = h;
         let r = validate_if_test(ifthen, &mut h).unwrap();
