@@ -178,7 +178,6 @@ fn call<H: HugrView<Node = Node>>(
 /// [ReplaceTypes::replace_op_with], [ReplaceTypes::replace_parametrized_op_with],
 /// [ReplaceTypes::replace_type_opts] or [ReplaceTypes::replace_parametrized_type_opts].
 /// Otherwise (the default), replacements are inserted as given (without further processing).
-// TODO would be good to migrate to default being process_recursive: true
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
     process_recursive: bool,
