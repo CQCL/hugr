@@ -35,6 +35,7 @@ from hugr.ops import (
     TailLoop,
     UnpackTuple,
 )
+from hugr.std.collections.array import ArrayVal
 from hugr.std.float import FloatVal
 from hugr.std.int import IntVal
 from hugr.tys import (
@@ -935,12 +936,14 @@ class ModelImport:
                 "arithmetic.float.const_f64", [model.Literal(float() as float_value)]
             ):
                 return FloatVal(float_value)
-            case model.Apply(
-                "collections.array.const", [_, _array_item_type, _array_items]
-            ):
-                # TODO
-                error = "Import array constants"
-                raise NotImplementedError(error)
+            case model.Apply("collections.array.const", [_, array_type, array_values]):
+                return ArrayVal(
+                    [
+                        self.import_value(cast(model.Term, v))
+                        for v in array_values.to_list_parts()
+                    ],
+                    self.import_type(array_type),
+                )
             case model.Apply(
                 "compat.const_json", [typ, model.Literal(str() as json_str)]
             ):
