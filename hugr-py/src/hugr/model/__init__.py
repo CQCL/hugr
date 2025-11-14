@@ -6,6 +6,8 @@ from enum import Enum
 
 from semver import Version
 
+import warnings
+
 import hugr._hugr as rust
 from hugr.tys import Visibility
 
@@ -346,7 +348,12 @@ class Package:
     @staticmethod
     def from_bytes(b: bytes) -> "Package":
         """Read a package from its binary representation."""
-        return rust.bytes_to_package(b)
+        package, rest = rust.bytes_to_package(b)
+        if rest:
+            warnings.warn(
+                "Binary encoding of model Package contains extra bytes: ignoring them."
+            )
+        return package
 
     @property
     def version(self) -> Version:

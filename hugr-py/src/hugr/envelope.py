@@ -113,9 +113,24 @@ def read_envelope(envelope: bytes) -> Package:
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODEL | EnvelopeFormat.MODEL_WITH_EXTS:
-            # FIXME Include extensions
-            return Package.from_model(rust.bytes_to_package(payload))
+        case EnvelopeFormat.MODEL:
+            model_package, rest = rust.bytes_to_package(payload)
+            if rest:
+                msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
+                raise ValueError(msg)
+            return Package.from_model(model_package)
+        case EnvelopeFormat.MODEL_WITH_EXTS:
+            from hugr.ext import Extension
+
+            model_package, rest = rust.bytes_to_package(payload)
+            modules = Package.from_model(model_package).modules
+            return Package(
+                modules=modules,
+                extensions=[
+                    Extension.from_json(json.dumps(extension))
+                    for extension in json.loads(rest)
+                ],
+            )
 
 
 def read_envelope_hugr(envelope: bytes) -> Hugr:

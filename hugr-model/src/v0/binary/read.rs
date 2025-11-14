@@ -3,7 +3,7 @@ use crate::v0::table;
 use crate::{CURRENT_VERSION, v0 as model};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use std::io::BufRead;
+use std::io::{BufRead, BufReader, Read};
 
 /// An error encountered while deserialising a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
@@ -27,8 +27,12 @@ pub enum ReadError {
 type ReadResult<T> = Result<T, ReadError>;
 
 /// Read a hugr package from a byte slice.
-pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<table::Package<'a>> {
-    read_from_reader(slice, bump)
+pub fn read_from_slice<'a>(slice: &[u8], bump: &'a Bump) -> ReadResult<(table::Package<'a>, Vec<u8>)> {
+    let mut buffer = BufReader::new(slice);
+    let package = read_from_reader(&mut buffer, bump)?;
+    let mut rest: Vec<u8> = [].into();
+    buffer.read_to_end(&mut rest)?;
+    Ok((package, rest))
 }
 
 /// Read a hugr package from an impl of [`BufRead`].

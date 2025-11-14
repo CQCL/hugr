@@ -14,7 +14,7 @@ pub fn binary_roundtrip(input: &str) {
     let package = ast::Package::from_str(input).unwrap();
     let package = package.resolve(&bump).unwrap();
     let bytes = model::binary::write_to_vec(&package);
-    let deserialized_package = model::binary::read_from_slice(&bytes, &bump).unwrap();
+    let (deserialized_package, _) = model::binary::read_from_slice(&bytes, &bump).unwrap();
     assert_eq!(package, deserialized_package);
 }
 
