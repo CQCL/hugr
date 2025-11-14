@@ -370,7 +370,12 @@ class ModelImport:
                 self.import_block(child, parent)
 
     def import_node_in_dfg(self, node: model.Node, parent: Node) -> Node:
-        """Import a model Node within a DFG region."""
+        """Import a model Node within a DFG region.
+
+        Returns the Hugr Node corresponding to the model Node. The correspondence is
+        almost 1-1, but a LoadConst model Node requires two Hugr Nodes (Const and
+        LoadConst); in this case the LoadConst is returned.
+        """
         signature = self.import_signature(node.signature)
 
         def import_dfg_node() -> Node:
@@ -511,7 +516,7 @@ class ModelImport:
                             self.hugr.add_link(
                                 OutPort(const_node, 0), InPort(loadconst_node, 0)
                             )
-                            return loadconst_node  # TODO What about const_node?
+                            return loadconst_node
                 case "core.make_adt":
                     tag = args[-1]
                     match tag:
