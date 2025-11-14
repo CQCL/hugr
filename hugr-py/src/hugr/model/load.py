@@ -995,7 +995,7 @@ class ModelImport:
                                             val=value,
                                         )
                                     case _:
-                                        error = f"Unexpected compat.const_json value: {json_str}"
+                                        error = f"Unexpected term: {term}"
                                         raise ModelImportError(error)
                     case _:
                         error = f"Unexpected compat.const_json type: {typ}"
