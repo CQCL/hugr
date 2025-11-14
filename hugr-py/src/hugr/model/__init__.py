@@ -1,12 +1,11 @@
 """HUGR model data structures."""
 
+import warnings
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 
 from semver import Version
-
-import warnings
 
 import hugr._hugr as rust
 from hugr.tys import Visibility

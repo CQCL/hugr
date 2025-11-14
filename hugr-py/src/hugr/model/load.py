@@ -11,10 +11,10 @@ from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
 from hugr.ops import (
-    AliasDecl,
-    AliasDefn,
     CFG,
     DFG,
+    AliasDecl,
+    AliasDefn,
     Call,
     CallIndirect,
     Case,
@@ -37,7 +37,6 @@ from hugr.ops import (
 )
 from hugr.std.float import FloatVal
 from hugr.std.int import IntVal
-from hugr.std.prelude import StringVal
 from hugr.tys import (
     BoundedNatArg,
     BoundedNatParam,
@@ -66,7 +65,6 @@ from hugr.tys import (
     TypeParam,
     TypeTypeArg,
     TypeTypeParam,
-    Unit,
     Variable,
     _QubitDef,
 )
@@ -455,7 +453,7 @@ class ModelImport:
                         Call(
                             # FIXME PolyFuncType needs list[TypeParam], not
                             # list[TypeArg]. How to get this?
-                            signature=PolyFuncType(type_args, signature),  # type: ignore
+                            signature=PolyFuncType(type_args, signature),  # type: ignore[arg-type]
                             instantiation=signature,
                             type_args=type_args,
                         ),
@@ -494,7 +492,7 @@ class ModelImport:
                                 LoadFunc(
                                     # FIXME PolyFuncType needs list[TypeParam], not
                                     # list[TypeArg]. How to get this?
-                                    PolyFuncType(type_args, datatype),  # type: ignore
+                                    PolyFuncType(type_args, datatype),  # type: ignore[arg-type]
                                     datatype,
                                     type_args,
                                 ),
@@ -642,7 +640,6 @@ class ModelImport:
 
     def import_node_in_module(self, node: model.Node, link_prefix: int) -> Node | None:
         """Import a model Node at the Hugr Module level."""
-
         self.link_prefix = link_prefix
 
         def import_declare_func(symbol: model.Symbol) -> Node:
