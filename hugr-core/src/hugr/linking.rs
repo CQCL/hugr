@@ -499,9 +499,7 @@ impl NameLinkingPolicy {
         self.to_node_linking_helper(target, source, false)
     }
 
-    /// The result is Ok((action, bool)) where the bool being true
-    /// means the action is ONLY needed if the function is reached.
-    fn process<SN: Display, TN: Copy + Display + std::fmt::Debug>(
+    fn action_for<SN: Display, TN: Copy + Display + std::fmt::Debug>(
         &self,
         existing: &HashMap<&str, PubFuncs<TN>>,
         sn: SN,
@@ -640,7 +638,7 @@ impl NameLinkingPolicy {
                 let (Entry::Vacant(ve), Some(ls)) = (res.entry(sn), link_sig(source, sn)) else {
                     continue;
                 };
-                let act = self.process(&existing, sn, ls)?;
+                let act = self.action_for(&existing, sn, ls)?;
                 let LinkAction::LinkNode(dirv) = &act;
                 let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
                 ve.insert(act);
