@@ -399,7 +399,7 @@ impl NameLinkingPolicy {
                             _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_defn)?,
                             OnNewFunc::RaiseError => {
                                 return Err(NameLinkingError::SignatureConflict {
-                                    name: name.clone(),
+                                    name: name.to_string(),
                                     src_node: n,
                                     src_sig: Box::new(sig.clone()),
                                     tgt_node: target_node(ex_ns),
@@ -463,7 +463,7 @@ fn target_node<N: Copy>(ns: &Either<N, (N, Vec<N>)>) -> N {
 enum LinkSig<'a> {
     Private,
     Public {
-        name: &'a String,
+        name: &'a str,
         is_defn: bool,
         sig: &'a PolyFuncType,
     },
@@ -482,9 +482,7 @@ fn link_sig<H: HugrView + ?Sized>(h: &H, n: H::Node) -> Option<LinkSig<'_>> {
     })
 }
 
-fn gather_existing<'a, H: HugrView + ?Sized>(
-    h: &'a H,
-) -> HashMap<&'a String, PubFuncs<'a, H::Node>> {
+fn gather_existing<'a, H: HugrView + ?Sized>(h: &'a H) -> HashMap<&'a str, PubFuncs<'a, H::Node>> {
     let left_if = |b| if b { Either::Left } else { Either::Right };
     h.children(h.module_root())
         .filter_map(|n| {
@@ -498,7 +496,11 @@ fn gather_existing<'a, H: HugrView + ?Sized>(
             let Some((mut acc, sig1)) = acc else {
                 return Some((new.map_right(|n| (n, vec![])), sig2));
             };
-            assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {}", name);
+            assert_eq!(
+                sig1, sig2,
+                "Invalid Hugr: different signatures for {}",
+                name
+            );
             let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
                 let err = match acc.is_left() && new.is_left() {
                     true => "Multiple FuncDefns",
