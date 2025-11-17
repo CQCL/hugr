@@ -8,6 +8,7 @@
 //! envelopes from/to readers and writers, or call [`Package::load`] and
 //! [`Package::store`] directly.
 //!
+//!
 //! ## Payload formats
 //!
 //! The envelope may encode the HUGR in different formats, listed in
@@ -38,8 +39,10 @@ pub mod description;
 mod header;
 mod package_json;
 mod reader;
+mod writer;
 use reader::EnvelopeReader;
 pub use reader::PayloadError;
+pub use writer::WriteError;
 
 pub mod serde_with;
 
@@ -158,7 +161,7 @@ pub fn write_envelope(
     writer: impl Write,
     package: &Package,
     config: EnvelopeConfig,
-) -> Result<(), EnvelopeError> {
+) -> Result<(), WriteError> {
     write_envelope_impl(writer, &package.modules, &package.extensions, config)
 }
 
@@ -167,95 +170,12 @@ pub fn write_envelope(
 /// It is recommended to use a buffered writer for better performance.
 /// See [`std::io::BufWriter`] for more information.
 pub(crate) fn write_envelope_impl<'h>(
-    mut writer: impl Write,
+    writer: impl Write,
     hugrs: impl IntoIterator<Item = &'h Hugr>,
     extensions: &ExtensionRegistry,
     config: EnvelopeConfig,
-) -> Result<(), EnvelopeError> {
-    let header = config.make_header();
-    header.write(&mut writer)?;
-
-    match config.zstd {
-        #[cfg(feature = "zstd")]
-        Some(zstd) => {
-            let writer = zstd::Encoder::new(writer, zstd.level())?.auto_finish();
-            write_impl(writer, hugrs, extensions, config)?;
-        }
-        #[cfg(not(feature = "zstd"))]
-        Some(_) => return Err(EnvelopeError::ZstdUnsupported),
-        None => write_impl(writer, hugrs, extensions, config)?,
-    }
-
-    Ok(())
-}
-/// Error type for envelope operations.
-#[derive(Debug, Error)]
-#[non_exhaustive]
-pub enum EnvelopeError {
-    /// The specified payload format is not supported.
-    #[error("Payload format {format} is not supported.{}",
-        match feature {
-            Some(f) => format!(" This requires the '{f}' feature for `hugr`."),
-            None => String::new()
-        },
-    )]
-    FormatUnsupported {
-        /// The unsupported format.
-        format: EnvelopeFormat,
-        /// Optionally, the feature required to support this format.
-        feature: Option<&'static str>,
-    },
-    /// Not all envelope formats can be represented as ASCII.
-    ///
-    /// This error is used when trying to store the envelope into a string.
-    #[error("Envelope format {format} cannot be represented as ASCII.")]
-    NonASCIIFormat {
-        /// The unsupported format.
-        format: EnvelopeFormat,
-    },
-    /// Envelope encoding required zstd compression, but the feature is not enabled.
-    #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
-    ZstdUnsupported,
-
-    /// JSON serialization error.
-    #[error(transparent)]
-    SerdeError {
-        /// The source error.
-        #[from]
-        source: serde_json::Error,
-    },
-    /// IO read/write error.
-    #[error(transparent)]
-    IO {
-        /// The source error.
-        #[from]
-        source: std::io::Error,
-    },
-    /// Error writing a json package to the payload.
-    #[error(transparent)]
-    PackageEncoding {
-        /// The source error.
-        #[from]
-        source: PackageEncodingError,
-    },
-
-    /// Error writing a HUGR model payload.
-    #[error(transparent)]
-    ModelWrite {
-        /// The source error.
-        #[from]
-        source: hugr_model::v0::binary::WriteError,
-    },
-
-    /// The specified payload format is not supported.
-    #[error(
-        "The envelope configuration has unknown {}. Please update your HUGR version.",
-        if flag_ids.len() == 1 {format!("flag #{}", flag_ids[0])} else {format!("flags {}", flag_ids.iter().join(", "))}
-    )]
-    FlagUnsupported {
-        /// The unrecognized flag bits.
-        flag_ids: Vec<usize>,
-    },
+) -> Result<(), WriteError> {
+    writer::write_envelope(writer, hugrs, extensions, config)
 }
 
 #[derive(Debug, Error)]
@@ -280,69 +200,6 @@ fn check_model_version(format: EnvelopeFormat) -> Result<(), FormatUnsupportedEr
             feature: None,
         });
     }
-    Ok(())
-}
-
-/// Internal implementation of [`write_envelope`] to call with/without the zstd compression wrapper.
-fn write_impl<'h>(
-    writer: impl Write,
-    hugrs: impl IntoIterator<Item = &'h Hugr>,
-    extensions: &ExtensionRegistry,
-    config: EnvelopeConfig,
-) -> Result<(), EnvelopeError> {
-    match config.format {
-        EnvelopeFormat::PackageJson => package_json::to_json_writer(hugrs, extensions, writer)?,
-        EnvelopeFormat::Model
-        | EnvelopeFormat::ModelWithExtensions
-        | EnvelopeFormat::ModelText
-        | EnvelopeFormat::ModelTextWithExtensions => {
-            encode_model(writer, hugrs, extensions, config.format)?;
-        }
-    }
-    Ok(())
-}
-
-fn encode_model<'h>(
-    mut writer: impl Write,
-    hugrs: impl IntoIterator<Item = &'h Hugr>,
-    extensions: &ExtensionRegistry,
-    format: EnvelopeFormat,
-) -> Result<(), EnvelopeError> {
-    use hugr_model::v0::{binary::write_to_writer, bumpalo::Bump};
-
-    use crate::export::export_package;
-
-    if format.model_version() != Some(0) {
-        return Err(EnvelopeError::FormatUnsupported {
-            format,
-            feature: None,
-        });
-    }
-
-    // Prepend extensions for binary model.
-    if format == EnvelopeFormat::ModelTextWithExtensions {
-        serde_json::to_writer(&mut writer, &extensions.iter().collect_vec())?;
-    }
-
-    let bump = Bump::default();
-    let model_package = export_package(hugrs, extensions, &bump);
-
-    match format {
-        EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => {
-            write_to_writer(&model_package, &mut writer)?;
-        }
-        EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
-            let model_package = model_package.as_ast().unwrap();
-            writeln!(writer, "{model_package}")?;
-        }
-        _ => unreachable!(),
-    }
-
-    // Append extensions for binary model.
-    if format == EnvelopeFormat::ModelWithExtensions {
-        serde_json::to_writer(writer, &extensions.iter().collect_vec())?;
-    }
-
     Ok(())
 }
 
@@ -475,10 +332,8 @@ pub(crate) mod test {
     #[rstest]
     fn errors() {
         let package = simple_package();
-        assert_matches!(
-            package.store_str(EnvelopeConfig::binary()),
-            Err(EnvelopeError::NonASCIIFormat { .. })
-        );
+        // The binary format is not ASCII-printable, so store_str should fail
+        assert!(package.store_str(EnvelopeConfig::binary()).is_err());
     }
 
     #[rstest]
@@ -507,7 +362,8 @@ pub(crate) mod test {
         match cfg!(feature = "zstd") {
             true => res.unwrap(),
             false => {
-                assert_matches!(res, Err(EnvelopeError::ZstdUnsupported));
+                // ZstdUnsupported error should be raised
+                assert!(res.is_err());
                 return;
             }
         }

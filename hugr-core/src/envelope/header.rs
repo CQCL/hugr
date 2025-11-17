@@ -6,8 +6,6 @@ use std::num::NonZeroU8;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::EnvelopeError;
-
 /// Magic number identifying the start of an envelope.
 ///
 /// In ascii, this is "`HUGRiHJv`". The second half is a randomly generated string
@@ -280,7 +278,7 @@ impl EnvelopeHeader {
     /// Write an envelope header to a writer.
     ///
     /// See the [`crate::envelope`] module documentation for the binary format.
-    pub fn write(&self, writer: &mut impl Write) -> Result<(), EnvelopeError> {
+    pub fn write(&self, writer: &mut impl Write) -> Result<(), HeaderError> {
         // The first 8 bytes are the magic number in little-endian.
         writer.write_all(MAGIC_NUMBERS)?;
         // Next is the format descriptor.

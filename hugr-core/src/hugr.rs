@@ -26,7 +26,7 @@ use thiserror::Error;
 
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
-use crate::envelope::{self, EnvelopeConfig, EnvelopeError, ReadError};
+use crate::envelope::{self, EnvelopeConfig, ReadError, WriteError};
 use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
     resolve_op_types_extensions,
@@ -190,11 +190,7 @@ impl Hugr {
     /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load`]).
     /// Use [`Hugr::store_with_exts`] to include additional extensions in the
     /// Envelope.
-    pub fn store(
-        &self,
-        writer: impl io::Write,
-        config: EnvelopeConfig,
-    ) -> Result<(), EnvelopeError> {
+    pub fn store(&self, writer: impl io::Write, config: EnvelopeConfig) -> Result<(), WriteError> {
         self.store_with_exts(writer, config, &EMPTY_REG)
     }
 
@@ -208,7 +204,7 @@ impl Hugr {
         writer: impl io::Write,
         config: EnvelopeConfig,
         extensions: &ExtensionRegistry,
-    ) -> Result<(), EnvelopeError> {
+    ) -> Result<(), WriteError> {
         envelope::write_envelope_impl(writer, [self], extensions, config)
     }
 
@@ -222,7 +218,7 @@ impl Hugr {
     /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load_str`]).
     /// Use [`Hugr::store_str_with_exts`] to include additional extensions in the
     /// Envelope.
-    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, WriteError> {
         self.store_str_with_exts(config, &EMPTY_REG)
     }
 
@@ -239,11 +235,9 @@ impl Hugr {
         &self,
         config: EnvelopeConfig,
         extensions: &ExtensionRegistry,
-    ) -> Result<String, EnvelopeError> {
+    ) -> Result<String, WriteError> {
         if !config.format.ascii_printable() {
-            return Err(EnvelopeError::NonASCIIFormat {
-                format: config.format,
-            });
+            return Err(WriteError::non_ascii_format(config.format));
         }
 
         let mut buf = Vec::new();

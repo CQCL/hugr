@@ -3,7 +3,7 @@
 use std::io;
 
 use crate::envelope::{
-    EnvelopeConfig, EnvelopeError, ReadError, read_described_envelope, write_envelope,
+    EnvelopeConfig, ReadError, WriteError, read_described_envelope, write_envelope,
 };
 use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
@@ -96,11 +96,7 @@ impl Package {
     /// The Envelope will embed the definitions of the extensions in
     /// [`Package::extensions`]. Any other extension used in the definition must
     /// be passed to [`Package::load`] to load back the package.
-    pub fn store(
-        &self,
-        writer: impl io::Write,
-        config: EnvelopeConfig,
-    ) -> Result<(), EnvelopeError> {
+    pub fn store(&self, writer: impl io::Write, config: EnvelopeConfig) -> Result<(), WriteError> {
         write_envelope(writer, self, config)
     }
 
@@ -113,11 +109,9 @@ impl Package {
     /// The Envelope will embed the definitions of the extensions in
     /// [`Package::extensions`]. Any other extension used in the definition must
     /// be passed to [`Package::load_str`] to load back the package.
-    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, WriteError> {
         if !config.format.ascii_printable() {
-            return Err(EnvelopeError::NonASCIIFormat {
-                format: config.format,
-            });
+            return Err(WriteError::non_ascii_format(config.format));
         }
 
         let mut buf = Vec::new();
