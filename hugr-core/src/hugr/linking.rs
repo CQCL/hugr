@@ -340,12 +340,6 @@ pub enum OnNewFunc {
     /// If the new function is reachable, then add it (as per [Self::Add]);
     /// otherwise, skip it.
     AddIfReached,
-    // /// If the new function is reachable, then add it but make it [Private];
-    // /// otherwise, just skip it. (This always avoids making the Hugr invalid.)
-    // ///
-    // /// [Private]: crate::Visibility::Private
-    // ALAN note this really is MakePrivateIfReached, but I don't see much point in the other.
-    // MakePrivate,
 }
 
 /// What to do when both target and inserted Hugr
@@ -466,7 +460,7 @@ impl NameLinkingPolicy {
 
     /// Tells how to behave when the source Hugr adds a ([Visibility::Public])
     /// name not already in the target.
-    pub fn get_new_names(self) -> OnNewFunc {
+    pub fn get_on_new_names(&self) -> OnNewFunc {
         self.new_names
     }
 
@@ -549,7 +543,6 @@ impl NameLinkingPolicy {
             OnNewFunc::ErrorIfReached => (Err(err), true),
             OnNewFunc::Add => (Ok(just_add), false),
             OnNewFunc::AddIfReached => (Ok(just_add), true),
-            //OnNewFunc::MakePrivate if reached => (Ok(LinkAction::MakePrivate), true)
         }
     }
 
