@@ -401,7 +401,7 @@ impl NameLinkingPolicy {
                 None => continue,
                 Some(LinkSig::Private) => NodeLinkingDirective::add(),
                 Some(LinkSig::Public { name, is_defn, sig }) => {
-                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
+                    if let Some(ex@(ex_ns, ex_sig)) = existing.get(name) {
                         match *sig_conflict {
                             _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_impls)?,
                             NewFuncHandling::RaiseError => {
@@ -409,7 +409,7 @@ impl NameLinkingPolicy {
                                     name: name.clone(),
                                     src_node: n,
                                     src_sig: Box::new(sig.clone()),
-                                    tgt_node: *ex_ns.as_ref().left_or_else(|(n, _)| n),
+                                    tgt_node: target_node(ex),
                                     tgt_sig: Box::new((*ex_sig).clone()),
                                 });
                             }
@@ -433,6 +433,7 @@ impl Default for NameLinkingPolicy {
     }
 }
 
+// ALAN TODO make method of PubFuncs?
 fn directive<SN: Display, TN: HugrNode>(
     name: &str,
     new_n: SN,
@@ -462,6 +463,10 @@ fn directive<SN: Display, TN: HugrNode>(
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
+
+fn target_node<N: Copy>(pf: &PubFuncs<N>) -> N {
+    *pf.0.as_ref().left_or_else(|(n, _)| n)
+}
 
 enum LinkSig<'a> {
     Private,
