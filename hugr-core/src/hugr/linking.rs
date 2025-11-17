@@ -251,14 +251,8 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
-    // TODO: consider pub-funcs-to-add? (With others, optionally filtered by callgraph, made private)
-    // copy_private_funcs: bool, // TODO: allow filtering private funcs to only those reachable in callgraph
     sig_conflict: OnNewFunc,
-    // TODO consider Set of names where to prefer new? Or optional map from name?
     multi_defn: OnMultiDefn,
-    // TODO Renames to apply to public functions in the inserted Hugr. These take effect
-    // before [error_on_conflicting_sig] or [take_existing_and_new_impls].
-    // rename_map: HashMap<String, String>
 }
 
 /// Specifies what to do with a function in some situation - used in
