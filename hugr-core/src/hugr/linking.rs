@@ -483,8 +483,12 @@ impl NameLinkingPolicy {
         else {
             return Ok(just_add);
         };
-        let (nfh, err) = match existing.get(name) {
-            None => (
+        let ret = |onf: OnNewFunc, e| match onf {
+            OnNewFunc::RaiseError => Err(e),
+            OnNewFunc::Add => Ok(just_add),
+        };
+        match existing.get(name) {
+            None => ret(
                 self.new_names,
                 NameLinkingError::NoNewNames {
                     name: name.to_string(),
@@ -495,26 +499,26 @@ impl NameLinkingPolicy {
                 if *ex_sig == new_sig {
                     match (existing, new_is_defn, self.multi_defn) {
                         (Either::Left(n), false, _) => {
-                            return Ok(NodeLinkingDirective::UseExisting(*n).into());
+                            Ok(NodeLinkingDirective::UseExisting(*n).into())
                         }
-                        (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
+                        (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => ret(
                             nfh,
                             NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
                         ),
                         (Either::Left(n), true, OnMultiDefn::UseExisting) => {
-                            return Ok(NodeLinkingDirective::UseExisting(*n).into());
+                            Ok(NodeLinkingDirective::UseExisting(*n).into())
                         }
                         (Either::Left(n), true, OnMultiDefn::UseNew) => {
-                            return Ok(NodeLinkingDirective::replace([*n]).into());
+                            Ok(NodeLinkingDirective::replace([*n]).into())
                         }
                         (Either::Right((n, ns)), _, _) => {
                             // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
                             let nodes = once(n).chain(ns).copied();
-                            return Ok(NodeLinkingDirective::replace(nodes).into());
+                            Ok(NodeLinkingDirective::replace(nodes).into())
                         }
                     }
                 } else {
-                    (
+                    ret(
                         self.sig_conflict,
                         NameLinkingError::SignatureConflict {
                             name: name.to_string(),
@@ -526,11 +530,6 @@ impl NameLinkingPolicy {
                     )
                 }
             }
-        };
-
-        match nfh {
-            OnNewFunc::RaiseError => Err(err),
-            OnNewFunc::Add => Ok(just_add),
         }
     }
 
