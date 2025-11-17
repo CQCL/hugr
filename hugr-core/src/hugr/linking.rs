@@ -112,8 +112,8 @@ pub trait HugrLinking: HugrMut {
     ///
     /// All [Visibility::Public] module-children are inserted, or linked, according to the
     /// specified policy; private children will also be inserted, at least including all those
-    /// used by the copied public children.
-    // Yes at present we copy all private children, i.e. a safe over-approximation!
+    /// used by the copied public children. (At present all module-children are inserted,
+    /// but this is expected to change in the future.)
     ///
     /// # Errors
     ///
@@ -142,8 +142,8 @@ pub trait HugrLinking: HugrMut {
     ///
     /// All [Visibility::Public] module-children are copied, or linked, according to the
     /// specified policy; private children will also be copied, at least including all those
-    /// used by the copied public children.
-    // Yes at present we copy all private children, i.e. a safe over-approximation!
+    /// used by the copied public children. (At present all module-children are inserted,
+    /// but this is expected to change in the future.)
     ///
     /// # Errors
     ///
