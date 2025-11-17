@@ -219,13 +219,11 @@ pub trait HugrLinking: HugrMut {
             .map_err(|e| e.to_string())?;
         if matches!(
             pol.get(&entrypoint_func),
-            Some(LinkAction::LinkNode(NodeLinkingDirective::Add { .. }))
+            Some(LinkAction::LinkNode(NodeLinkingDirective::Add { .. })) if entrypoint_func != other.entrypoint()
         ) {
-            if entrypoint_func != other.entrypoint() {
-                return Err(format!(
-                    "Entrypoint is contained in function {entrypoint_func} which would be inserted"
-                ));
-            }
+            return Err(format!(
+                "Entrypoint is contained in function {entrypoint_func} which would be inserted"
+            ));
         }
         let per_node = pol
             .into_iter()
