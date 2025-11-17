@@ -478,7 +478,8 @@ impl NameLinkingPolicy {
         existing: &HashMap<&str, PubFuncs<TN>>,
         sn: SN,
         new: LinkSig,
-    ) -> (Result<LinkAction<TN>, NameLinkingError<SN, TN>>, bool) {
+        reached: bool,
+    ) -> Option<Result<LinkAction<TN>, NameLinkingError<SN, TN>>> {
         let just_add = NodeLinkingDirective::add().into();
         let LinkSig::Public {
             name,
@@ -486,7 +487,7 @@ impl NameLinkingPolicy {
             sig: new_sig,
         } = new
         else {
-            return (Ok(just_add), true);
+            return reached.then_some(Ok(just_add));
         };
         let (nfh, err) = match existing.get(name) {
             None => (
@@ -500,25 +501,22 @@ impl NameLinkingPolicy {
                 if *ex_sig == new_sig {
                     match (existing, new_is_defn, self.multi_defn) {
                         (Either::Left(n), false, _) => {
-                            return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
+                            return Some(Ok(NodeLinkingDirective::UseExisting(*n).into()));
                         }
                         (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
                             nfh,
                             NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
                         ),
                         (Either::Left(n), true, OnMultiDefn::UseExisting) => {
-                            return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
+                            return Some(Ok(NodeLinkingDirective::UseExisting(*n).into()));
                         }
                         (Either::Left(n), true, OnMultiDefn::UseNew) => {
-                            return (Ok(NodeLinkingDirective::replace([*n]).into()), false);
+                            return Some(Ok(NodeLinkingDirective::replace([*n]).into()));
                         }
                         (Either::Right((n, ns)), _, _) => {
                             // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
-                            return (
-                                Ok(NodeLinkingDirective::replace(once(n).chain(ns).copied())
-                                    .into()),
-                                false,
-                            );
+                            let nodes = once(n).chain(ns).copied();
+                            return Some(Ok(NodeLinkingDirective::replace(nodes).into()));
                         }
                     }
                 } else {
@@ -535,11 +533,12 @@ impl NameLinkingPolicy {
                 }
             }
         };
+
         match nfh {
-            OnNewFunc::RaiseError => (Err(err), false),
-            OnNewFunc::ErrorIfReached => (Err(err), true),
-            OnNewFunc::Add => (Ok(just_add), false),
-            OnNewFunc::AddIfReached => (Ok(just_add), true),
+            OnNewFunc::RaiseError => Some(Err(err)),
+            OnNewFunc::ErrorIfReached => reached.then_some(Err(err)),
+            OnNewFunc::Add => Some(Ok(just_add)),
+            OnNewFunc::AddIfReached => reached.then_some(Ok(just_add)),
         }
     }
 
@@ -565,8 +564,7 @@ impl NameLinkingPolicy {
         for sn in source.children(source.module_root()) {
             if let Some(ls) = link_sig(source, sn) {
                 // Note we'll call process() again below, so a bit inefficient
-                let (_, only_if_reached) = self.process(&existing, sn, ls);
-                if !only_if_reached {
+                if self.process(&existing, sn, ls, false).is_some() {
                     to_visit.push_back(sn);
                 }
             }
@@ -577,12 +575,13 @@ impl NameLinkingPolicy {
                     continue;
                 };
                 if let Some(ls) = link_sig(source, sn) {
-                    let act = self.process(&existing, sn, ls).0?;
-                    let LinkAction::LinkNode(dirv) = &act;
-                    let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
-                    ve.insert(act);
-                    if !traverse {
-                        continue;
+                    if let Some(act) = self.process(&existing, sn, ls, true).transpose()? {
+                        let LinkAction::LinkNode(dirv) = &act;
+                        let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
+                        ve.insert(act);
+                        if !traverse {
+                            continue;
+                        }
                     }
                 }
             }
