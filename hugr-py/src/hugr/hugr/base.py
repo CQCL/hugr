@@ -934,6 +934,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             )
         return mapping
 
+    def overwrite_hugr(self, new_hugr: Hugr) -> None:
+        """Modify a Hugr in place by replacing attributes with those from a new Hugr."""
+        self.module_root = new_hugr.module_root
+        self.entrypoint = new_hugr.entrypoint
+        self._nodes = new_hugr._nodes
+        self._links = new_hugr._links
+        self._free_nodes = new_hugr._free_nodes
+
     def _to_serial(self) -> SerialHugr:
         """Serialize the HUGR."""
 
