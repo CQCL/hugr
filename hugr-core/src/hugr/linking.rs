@@ -532,7 +532,7 @@ pub enum LinkAction<TN> {
     LinkNode(#[from] NodeLinkingDirective<TN>),
 }
 
-/// Details the concrete actions to implement a specific source Hugr into a specific target Hugr.
+/// Details the concrete actions to link a specific source Hugr into a specific target Hugr.
 ///
 /// Computed from a [NameLinkingPolicy] and contains all actions required to implement
 /// that policy (for those specific Hugrs).
