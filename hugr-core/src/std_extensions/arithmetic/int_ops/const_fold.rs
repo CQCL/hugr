@@ -1,4 +1,7 @@
-use std::cmp::{max, min};
+use std::{
+    cmp::{max, min},
+    sync::LazyLock,
+};
 
 use crate::{
     IncomingPort,
@@ -16,15 +19,13 @@ use crate::{
 
 use super::IntOpDef;
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    static ref INARROW_ERROR_VALUE: Value = ConstError {
+static INARROW_ERROR_VALUE: LazyLock<Value> = LazyLock::new(|| {
+    ConstError {
         signal: 0,
         message: "Integer too large to narrow".to_string(),
     }
-    .into();
-}
+    .into()
+});
 
 fn bitmask_from_width(width: u64) -> u64 {
     debug_assert!(width <= 64);

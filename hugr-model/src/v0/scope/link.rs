@@ -1,7 +1,7 @@
 use std::hash::{BuildHasherDefault, Hash};
 
-use fxhash::FxHasher;
 use indexmap::IndexSet;
+use rustc_hash::FxHasher;
 
 use crate::v0::table::{LinkIndex, RegionId};
 

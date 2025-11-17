@@ -21,6 +21,17 @@ pr_labels = ["release"]
 # To trigger a release manually, merge a PR from a branch starting with `release-plz-`.
 release_always = false
 
+# Include a list of contributors in the release body
+git_release_body = """
+{{ changelog }}
+{% if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors %}
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}
+"""
+
 [changelog]
 
 header = """# Changelog
@@ -42,6 +53,7 @@ commit_parsers = [
     { message = "^revert", group = "Reverted changes", skip = true },
     { message = "^ci", group = "CI", skip = true },
 ]
+protect_breaking_commits = true
 
 [[package]]
 name = "hugr"
@@ -64,6 +76,7 @@ version_group = "hugr"
 name = "hugr-cli"
 release = true
 version_group = "hugr"
+git_release_draft = true
 
 [[package]]
 name = "hugr-model"

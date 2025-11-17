@@ -67,7 +67,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --profile release-py --strip --out ../dist
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
@@ -75,12 +75,12 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-linux-${{ matrix.platform.target }}
           path: dist
@@ -109,7 +109,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --profile release-py --strip --out ../dist
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -117,12 +117,12 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.13t
           sccache: 'true'
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-musllinux-${{ matrix.platform.target }}
           path: dist
@@ -148,11 +148,11 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist
+          args: --profile release-py --strip --out ../dist
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-windows-${{ matrix.platform.target }}
           path: dist
@@ -177,18 +177,18 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist --find-interpreter
+          args: --profile release-py --strip --out ../dist --find-interpreter
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --release --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.13t
           sccache: 'true'
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-macos-${{ matrix.platform.target }}
           path: dist
@@ -206,7 +206,7 @@ jobs:
           args: --out ../dist
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-sdist
           path: dist
@@ -224,7 +224,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         with:

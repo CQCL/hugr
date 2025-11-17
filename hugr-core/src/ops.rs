@@ -20,9 +20,8 @@ use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::types::{EdgeKind, Signature, Substitution};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
-use derive_more::Display;
 use handle::NodeHandle;
-use paste::paste;
+use pastey::paste;
 
 use enum_dispatch::enum_dispatch;
 
@@ -135,7 +134,7 @@ impl Default for OpType {
     }
 }
 
-impl Display for OpType {
+impl std::fmt::Display for OpType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name())
     }

@@ -13,10 +13,8 @@ on:
 
 env:
   SCCACHE_GHA_ENABLED: "true"
-  HUGR_BIN_DIR: ${{ github.workspace }}/target/debug
-  HUGR_BIN: ${{ github.workspace }}/target/debug/hugr
   # Pinned version for the uv package manager
-  UV_VERSION: "0.7.4"
+  UV_VERSION: "0.9.5"
   UV_FROZEN: 1
 
 jobs:
@@ -44,7 +42,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.13']
+        python-version: ['3.10', '3.14']
 
     steps:
       - uses: actions/checkout@v5
@@ -52,7 +50,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -68,30 +66,8 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check
 
-  build_binary:
-    needs: changes
-    if: ${{ needs.changes.outputs.python == 'true' }}
-
-    name: Build HUGR binary
-    runs-on: ubuntu-latest
-    env:
-      SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
-
-    steps:
-      - uses: actions/checkout@v5
-      - uses: mozilla-actions/sccache-action@v0.0.9
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build HUGR binary
-        run: cargo build -p hugr-cli
-      - name: Upload the binary to the artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: hugr_binary
-          path: target/debug/hugr
   test:
-    needs: [changes, build_binary]
+    needs: [changes]
     if: ${{ needs.changes.outputs.python == 'true' }}
     name: test python ${{ matrix.python-version.py }}
     runs-on: ubuntu-latest
@@ -100,21 +76,15 @@ jobs:
       matrix:
         python-version:
           - { py: '3.10', coverage: false }
-          - { py: '3.13', coverage: true }
+          - { py: '3.14', coverage: true }
     steps:
       - uses: actions/checkout@v5
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
-
-      - name: Download the hugr binary
-        uses: actions/download-artifact@v5
-        with:
-          name: hugr_binary
-          path: ${{env.HUGR_BIN_DIR}}
 
       - name: Setup dependencies
         run: uv sync --python ${{ matrix.python-version.py }}
@@ -125,13 +95,11 @@ jobs:
       - name: Run tests
         if: github.event_name == 'merge_group' || !matrix.python-version.coverage
         run: |
-          chmod +x $HUGR_BIN
           HUGR_RENDER_DOT=1 uv run pytest
 
       - name: Run python tests with coverage instrumentation
         if: github.event_name != 'merge_group' && matrix.python-version.coverage
         run: |
-          chmod +x $HUGR_BIN
           HUGR_RENDER_DOT=1 uv run pytest --cov=./ --cov-report=xml
 
       - name: Upload python coverage to codecov.io
@@ -155,7 +123,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.9
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true

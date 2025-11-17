@@ -2,12 +2,17 @@
 help:
     @just --list --justfile {{justfile()}}
 
+
+_check_nextest_installed:
+    #!/usr/bin/env bash
+    cargo nextest --version >/dev/null 2>&1 || { echo "❌ cargo-nextest not found. Install binary from https://nexte.st/docs/installation/pre-built-binaries/"; exit 1; }
+
 # Prepare the environment for development, installing all the dependencies and
 # setting up the pre-commit hooks.
 setup:
     uv sync
     [[ -n "${HUGR_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
-
+    _check_nextest_installed
 # Run the pre-commit checks.
 check:
     HUGR_TEST_SCHEMA=1 uv run pre-commit run --all-files
@@ -15,19 +20,18 @@ check:
 # Run all the tests.
 test: test-rust test-python
 # Run all rust tests.
-test-rust *TEST_ARGS:
+test-rust *TEST_ARGS: _check_nextest_installed
     @# We cannot use --workspace --all-features as `hugr-model`s pyo3 feature cannot be
     @# built into a binary build (without using `maturin`)
     @#
     @# This feature list should be kept in sync with the `hugr-py/pyproject.toml`
-    HUGR_TEST_SCHEMA=1 cargo test \
+    HUGR_TEST_SCHEMA=1 cargo nextest r \
         --workspace \
         --exclude 'hugr-py' \
         --features 'hugr/declarative hugr/llvm hugr/llvm-test hugr/zstd' {{TEST_ARGS}}
 # Run all python tests.
 test-python *TEST_ARGS:
     uv run maturin develop --uv
-    cargo build -p hugr-cli
     HUGR_RENDER_DOT=1 uv run pytest {{TEST_ARGS}}
 
 # Run all the benchmarks.
@@ -51,7 +55,7 @@ format language="[rust|python]": (_run_lang language \
 # Generate a test coverage report.
 coverage language="[rust|python]": (_run_lang language \
         "cargo llvm-cov --lcov > lcov.info" \
-        "uv run pytest --cov=./ --cov-report=html"
+        "uv run pytest -n auto --cov=./ --cov-report=html"
     )
 
 # Run unsoundness checks using miri
@@ -69,9 +73,9 @@ update-model-capnp:
     @# When modifying the schema version, update the `ci-rs.yml` file too.
     capnp compile -orust:hugr-model/src --src-prefix=hugr-model hugr-model/capnp/hugr-v0.capnp
 
-# Update snapshots used in the pytest tests.
+# Update snapshots used in the pytest -n auto tests.
 update-pytest-snapshots:
-    uv run pytest --snapshot-update
+    uv run pytest -n auto --snapshot-update
 
 # Generate serialized declarations for the standard extensions and prelude.
 gen-extensions:

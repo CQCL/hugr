@@ -33,7 +33,10 @@ use crate::{
 
 /// A helper trait for customising the lowering of [hugr_core::std_extensions::collections::array]
 /// types, [hugr_core::ops::constant::CustomConst]s, and ops.
-#[deprecated(note = "Use `hugr_llvm::extension::collections::array` instead")]
+#[deprecated(
+    note = "Use `hugr_llvm::extension::collections::array` instead",
+    since = "0.20.0"
+)]
 pub trait ArrayCodegen: Clone {
     /// Return the llvm type of [hugr_core::std_extensions::collections::array::ARRAY_TYPENAME].
     fn array_type<'c>(
@@ -92,13 +95,19 @@ pub trait ArrayCodegen: Clone {
 
 /// A trivial implementation of [ArrayCodegen] which passes all methods
 /// through to their default implementations.
-#[deprecated(note = "Use `hugr_llvm::extension::collections::array` instead")]
+#[deprecated(
+    note = "Use `hugr_llvm::extension::collections::array` instead",
+    since = "0.20.0"
+)]
 #[derive(Default, Clone)]
 pub struct DefaultArrayCodegen;
 
 impl ArrayCodegen for DefaultArrayCodegen {}
 
-#[deprecated(note = "Use `hugr_llvm::extension::collections::array` instead")]
+#[deprecated(
+    note = "Use `hugr_llvm::extension::collections::array` instead",
+    since = "0.20.0"
+)]
 #[derive(Clone, Debug, Default)]
 pub struct ArrayCodegenExtension<CCG>(CCG);
 

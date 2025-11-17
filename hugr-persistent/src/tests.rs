@@ -12,7 +12,7 @@ use hugr_core::{
 use rstest::*;
 
 use crate::{
-    Commit, CommitStateSpace, PatchNode, PersistentHugr, PersistentReplacement, Resolver,
+    Commit, CommitStateSpace, PatchNode, PersistentHugr, PersistentReplacement,
     state_space::CommitId,
 };
 
@@ -142,7 +142,42 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
     SimpleReplacement::try_new(subgraph, hugr, replacement_hugr).unwrap()
 }
 
-/// Creates a state space with 4 commits on top of the base hugr `simple_hugr`:
+/// A state space for testing purposes, along with commits within it.
+pub struct TestStateSpace {
+    #[allow(dead_code)] // this needs to stay in scope for the commits to be alive
+    state_space: CommitStateSpace,
+    // these commits typically borrow from the state space -- we replace the
+    // lifetime with a dummy static lifetime, fixed in the getter methods
+    commits: Vec<Commit<'static>>,
+}
+
+impl TestStateSpace {
+    fn new<'a>(state_space: CommitStateSpace, commits: Vec<Commit<'a>>) -> Self {
+        assert!(commits.iter().all(|c| c.state_space() == state_space));
+        let commits = commits
+            .into_iter()
+            // SAFETY: the commits will be alive as long as the state space is
+            // alive
+            .map(|c| unsafe { c.upgrade_lifetime() })
+            .collect();
+        Self {
+            state_space,
+            commits,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn state_space(&self) -> &CommitStateSpace {
+        &self.state_space
+    }
+
+    pub fn commits<const N: usize>(&self) -> &[Commit<'_>; N] {
+        TryFrom::try_from(self.commits.as_slice()).unwrap()
+    }
+}
+
+/// Creates 4 commits in a shared state space on top of the base hugr
+/// `simple_hugr`:
 ///
 /// ```
 ///    ┌─────────┐
@@ -205,23 +240,23 @@ fn create_not_and_to_xor_replacement(hugr: &Hugr) -> SimpleReplacement {
 /// - `commit1` and `commit2` are disjoint with `commit4` (i.e. compatible),
 /// - `commit2` depends on `commit1`
 #[fixture]
-pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId; 4]) {
+pub(crate) fn test_state_space() -> TestStateSpace {
     let (base_hugr, [not0_node, not1_node, _and_node]) = simple_hugr();
 
-    let mut state_space = CommitStateSpace::<R>::with_base(base_hugr);
+    let state_space = CommitStateSpace::new();
+    let base = state_space.try_set_base(base_hugr).unwrap();
 
     // Create first replacement (replace NOT0 with two NOT gates)
-    let replacement1 = create_double_not_replacement(state_space.base_hugr(), not0_node);
+    let replacement1 = create_double_not_replacement(base.commit_hugr(), not0_node);
 
     // Add first commit to state space, replacing NOT0 with two NOT gates
     let commit1 = {
-        let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
-        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
+        let new_host = PersistentHugr::try_new([base.clone()]).unwrap();
         // translate replacement1 to patch nodes in the base commit of the state space
         let replacement1 = replacement1
-            .map_host_nodes(to_patch_node, &new_host)
+            .map_host_nodes(|n| base.to_patch_node(n), &new_host)
             .unwrap();
-        state_space.try_add_replacement(replacement1).unwrap()
+        Commit::try_from_replacement(replacement1, &state_space).unwrap()
     };
 
     // Add second commit to state space, that applies on top of `commit1` and
@@ -229,7 +264,7 @@ pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId
     let commit2 = {
         // Create second replacement (replace NOT+AND with XOR) that applies on
         // the result of the first
-        let mut direct_hugr = state_space.base_hugr().clone();
+        let mut direct_hugr = base.commit_hugr().clone();
         let node_map = replacement1
             .clone()
             .apply(&mut direct_hugr)
@@ -247,51 +282,52 @@ pub(crate) fn test_state_space<R: Resolver>() -> (CommitStateSpace<R>, [CommitId
             inv
         };
         let to_patch_node = {
-            let base_commit = state_space.base();
-            move |n| {
+            |n| {
                 if let Some(&n) = inv_node_map.get(&n) {
                     // node was replaced by commit1
-                    PatchNode(commit1, n)
+                    commit1.to_patch_node(n)
                 } else {
                     // node is in base hugr
-                    PatchNode(base_commit, n)
+                    base.to_patch_node(n)
                 }
             }
         };
 
         // translate replacement2 to patch nodes
-        let new_host = state_space.try_extract_hugr([commit1]).unwrap();
+        let new_host = PersistentHugr::try_new([commit1.clone()]).unwrap();
         let replacement2 = replacement2
             .map_host_nodes(to_patch_node, &new_host)
             .unwrap();
-        state_space.try_add_replacement(replacement2).unwrap()
+        Commit::try_from_replacement(replacement2, &state_space).unwrap()
     };
 
     // Create a third commit that will conflict with `commit1`, replacing NOT0
     // and AND with XOR
     let commit3 = {
-        let replacement3 = create_not_and_to_xor_replacement(state_space.base_hugr());
-        let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
-        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
+        let replacement3 = create_not_and_to_xor_replacement(base.commit_hugr());
+        let new_host = PersistentHugr::try_new([commit1.clone()]).unwrap();
         let replacement3 = replacement3
-            .map_host_nodes(to_patch_node, &new_host)
+            .map_host_nodes(|n| base.to_patch_node(n), &new_host)
             .unwrap();
-        state_space.try_add_replacement(replacement3).unwrap()
+        Commit::try_from_replacement(replacement3, &state_space).unwrap()
     };
 
     // Create a fourth commit that is disjoint from `commit1`, replacing NOT1
     // with two NOT gates
     let commit4 = {
-        let replacement4 = create_double_not_replacement(state_space.base_hugr(), not1_node);
-        let to_patch_node = |n: Node| PatchNode(state_space.base(), n);
-        let new_host = state_space.try_extract_hugr([state_space.base()]).unwrap();
+        let replacement4 = create_double_not_replacement(base.commit_hugr(), not1_node);
+        let new_host = PersistentHugr::try_new([commit1.clone()]).unwrap();
         let replacement4 = replacement4
-            .map_host_nodes(to_patch_node, &new_host)
+            .map_host_nodes(|n| base.to_patch_node(n), &new_host)
             .unwrap();
-        state_space.try_add_replacement(replacement4).unwrap()
+        Commit::try_from_replacement(replacement4, &state_space).unwrap()
     };
 
-    (state_space, [commit1, commit2, commit3, commit4])
+    // [commit1, commit2, commit3, commit4]
+    TestStateSpace::new(
+        state_space.clone(),
+        vec![commit1, commit2, commit3, commit4],
+    )
 }
 
 #[fixture]
@@ -333,8 +369,8 @@ pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [
 }
 
 #[rstest]
-fn test_successive_replacements(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-    let (state_space, [commit1, commit2, _commit3, _commit4]) = test_state_space;
+fn test_successive_replacements(test_state_space: TestStateSpace) {
+    let [commit1, commit2, _commit3, _commit4] = test_state_space.commits();
     let (mut hugr, [not0_node, _not1_node, _and_node]) = simple_hugr();
 
     // Apply first replacement (replace NOT0 with two NOT gates)
@@ -346,8 +382,7 @@ fn test_successive_replacements(test_state_space: (CommitStateSpace, [CommitId; 
     replacement2.clone().apply(&mut hugr).unwrap();
 
     // Create a persistent hugr
-    let persistent_hugr = state_space
-        .try_extract_hugr([commit1, commit2])
+    let persistent_hugr = PersistentHugr::try_new([commit1.clone(), commit2.clone()])
         .expect("commit1 and commit2 are compatible");
 
     // Get the final hugr from the persistent context
@@ -366,8 +401,9 @@ fn test_successive_replacements(test_state_space: (CommitStateSpace, [CommitId; 
 }
 
 #[rstest]
-fn test_conflicting_replacements(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-    let (state_space, [commit1, _commit2, commit3, _commit4]) = test_state_space;
+fn test_conflicting_replacements(test_state_space: TestStateSpace) {
+    let [commit1, _commit2, commit3, _commit4] = test_state_space.commits();
+    let state_space = commit1.state_space();
     let (hugr, [not0_node, _not1_node, _and_node]) = simple_hugr();
 
     // Apply first replacement directly to a clone
@@ -387,35 +423,31 @@ fn test_conflicting_replacements(test_state_space: (CommitStateSpace, [CommitId;
     };
 
     // Create a persistent hugr and add first replacement
-    let persistent_hugr1 = state_space.try_extract_hugr([commit1]).unwrap();
+    let persistent_hugr1 = PersistentHugr::try_new([commit1.clone()]).unwrap();
 
     // Create another persistent hugr and add second replacement
-    let persistent_hugr2 = state_space.try_extract_hugr([commit3]).unwrap();
+    let persistent_hugr2 = PersistentHugr::try_new([commit3.clone()]).unwrap();
 
     // Both individual replacements should be valid
     assert_eq!(persistent_hugr1.to_hugr().validate(), Ok(()));
     assert_eq!(persistent_hugr2.to_hugr().validate(), Ok(()));
 
     // But trying to create a history with both replacements should fail
-    let common_state_space = {
-        let mut space = persistent_hugr1.clone().into_state_space();
-        space.extend(persistent_hugr2.clone());
-        space
-    };
-    assert_eq!(common_state_space.all_commit_ids().count(), 3);
-    let result = common_state_space.try_extract_hugr(common_state_space.all_commit_ids());
+    let result = state_space.try_create(
+        persistent_hugr1
+            .all_commit_ids()
+            .chain(persistent_hugr2.all_commit_ids()),
+    );
     assert!(
         result.is_err(),
         "Creating history with conflicting patches should fail"
     );
 
-    // TODO: use node-invariant equivalence check, e.g. hash-based comparison
     assert_eq!(
         hugr1.mermaid_string(),
         persistent_hugr1.to_hugr().mermaid_string()
     );
 
-    // TODO: use node-invariant equivalence check, e.g. hash-based comparison
     assert_eq!(
         hugr2.mermaid_string(),
         persistent_hugr2.to_hugr().mermaid_string()
@@ -423,8 +455,8 @@ fn test_conflicting_replacements(test_state_space: (CommitStateSpace, [CommitId;
 }
 
 #[rstest]
-fn test_disjoint_replacements(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-    let (state_space, [commit1, _commit2, _commit3, commit4]) = test_state_space;
+fn test_disjoint_replacements(test_state_space: TestStateSpace) {
+    let [commit1, _commit2, _commit3, commit4] = test_state_space.commits();
     let (mut hugr, [not0_node, not1_node, _and_node]) = simple_hugr();
 
     // Create and apply non-overlapping replacements for NOT0 and NOT1
@@ -434,7 +466,7 @@ fn test_disjoint_replacements(test_state_space: (CommitStateSpace, [CommitId; 4]
     replacement2.clone().apply(&mut hugr).unwrap();
 
     // Create a persistent hugr and add both replacements
-    let persistent_hugr = state_space.try_extract_hugr([commit1, commit4]).unwrap();
+    let persistent_hugr = PersistentHugr::try_new([commit1.clone(), commit4.clone()]).unwrap();
 
     // Get the final hugr
     let persistent_final_hugr = persistent_hugr.to_hugr();
@@ -454,23 +486,22 @@ fn test_disjoint_replacements(test_state_space: (CommitStateSpace, [CommitId; 4]
 }
 
 #[rstest]
-fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-    let (state_space, [commit1, commit2, commit3, commit4]) = test_state_space;
+fn test_try_add_replacement(test_state_space: TestStateSpace) {
+    let [commit1, commit2, commit3, commit4] = test_state_space.commits();
 
     // Create a persistent hugr and add first replacement
-    let persistent_hugr = state_space.try_extract_hugr([commit1, commit2]).unwrap();
+    let persistent_hugr = PersistentHugr::try_new([commit1.clone(), commit2.clone()]).unwrap();
 
     {
         let mut persistent_hugr = persistent_hugr.clone();
-        let repl4 = state_space.get_commit(commit4).replacement().unwrap();
+        let repl4 = commit4.replacement().unwrap();
         let result = persistent_hugr.try_add_replacement(repl4.clone());
         assert!(
             result.is_ok(),
             "[commit1, commit2] + [commit4] are compatible. Got {result:?}"
         );
         let hugr = persistent_hugr.to_hugr();
-        let exp_hugr = state_space
-            .try_extract_hugr([commit1, commit2, commit4])
+        let exp_hugr = PersistentHugr::try_new([commit1.clone(), commit2.clone(), commit4.clone()])
             .unwrap()
             .to_hugr();
         assert_eq!(hugr.mermaid_string(), exp_hugr.mermaid_string());
@@ -478,7 +509,7 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
 
     {
         let mut persistent_hugr = persistent_hugr.clone();
-        let repl3 = state_space.get_commit(commit3).replacement().unwrap();
+        let repl3 = commit3.replacement().unwrap();
         let result = persistent_hugr.try_add_replacement(repl3.clone());
         assert!(
             result.is_err(),
@@ -489,33 +520,27 @@ fn test_try_add_replacement(test_state_space: (CommitStateSpace, [CommitId; 4]))
 
 // same test as above, but using try_add_commit instead of try_add_replacement
 #[rstest]
-fn test_try_add_commit(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-    let (state_space, [commit1, commit2, commit3, commit4]) = test_state_space;
+fn test_try_add_commit(test_state_space: TestStateSpace) {
+    let [commit1, commit2, commit3, commit4] = test_state_space.commits();
+    let state_space = commit1.state_space();
 
     // Create a persistent hugr and add first replacement
-    let persistent_hugr = state_space.try_extract_hugr([commit1, commit2]).unwrap();
+    let persistent_hugr = PersistentHugr::try_new([commit1.clone(), commit2.clone()]).unwrap();
 
     {
         let mut persistent_hugr = persistent_hugr.clone();
-        let repl4 = state_space
-            .get_commit(commit4)
-            .replacement()
-            .unwrap()
-            .clone();
+        let repl4 = commit4.replacement().unwrap().clone();
         let new_commit = Commit::try_from_replacement(repl4, &state_space).unwrap();
-        let commit4 = persistent_hugr
+        let new_commit4_id = persistent_hugr
             .try_add_commit(new_commit)
             .expect("commit4 is compatible");
+        let new_commit4 = persistent_hugr.get_commit(new_commit4_id);
 
-        assert_eq!(persistent_hugr.inserted_nodes(commit4).count(), 2);
+        assert_eq!(new_commit4.inserted_nodes().count(), 2);
     }
     {
         let mut persistent_hugr = persistent_hugr.clone();
-        let repl3 = state_space
-            .get_commit(commit3)
-            .replacement()
-            .unwrap()
-            .clone();
+        let repl3 = commit3.replacement().unwrap().clone();
         let new_commit = Commit::try_from_replacement(repl3, &state_space).unwrap();
         persistent_hugr
             .try_add_commit(new_commit)
@@ -542,7 +567,7 @@ mod serial {
         S: serde::Serializer,
     {
         let mut str = hugr
-            .store_str_with_exts(EnvelopeConfig::text(), &STD_REG)
+            .store_str(EnvelopeConfig::text())
             .map_err(serde::ser::Error::custom)?;
         // TODO: replace this with a proper hugr hash (see https://github.com/CQCL/hugr/issues/2091)
         remove_encoder_version(&mut str);

@@ -111,15 +111,15 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
-        run: cargo test --verbose  --no-default-features --no-run
+        run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: cargo nextest r --verbose  --no-default-features
 
   # Run tests on Rust stable
   tests-stable-all-features:
@@ -137,31 +137,31 @@ jobs:
           toolchain: "stable"
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
-
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
-        run: cargo test --verbose  --all-features --no-run
+        run: cargo nextest r --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: cargo nextest r --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
       - name: Build hugr-persistent
         if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo test -p hugr-persistent --verbose --no-run
+        run: cargo nextest r -p hugr-persistent --verbose --no-run
       - name: Tests hugr-persistent
         if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo test -p hugr-persistent --verbose
+        run: cargo nextest r -p hugr-persistent --verbose
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: hugr_binary
           path: target/debug/hugr
@@ -188,24 +188,25 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
+      - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
-        run: cargo test --verbose  --no-default-features --no-run
+        run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
-        run: cargo test --verbose  --no-default-features
+        run: cargo nextest r --verbose  --no-default-features
       - name: Build with all features
-        run: cargo test --verbose  --all-features --no-run
+        run: cargo nextest r --verbose  --all-features --no-run
       - name: Tests with all features
-        run: cargo test --verbose  --all-features
+        run: cargo nextest r --verbose  --all-features
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
 
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
@@ -267,7 +268,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Download the hugr binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug

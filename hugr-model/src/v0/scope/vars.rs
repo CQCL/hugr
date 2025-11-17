@@ -1,5 +1,5 @@
-use fxhash::FxHasher;
 use indexmap::IndexSet;
+use rustc_hash::FxHasher;
 use std::hash::BuildHasherDefault;
 use thiserror::Error;
 

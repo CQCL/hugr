@@ -8,13 +8,13 @@ expression: ast
 
 (import core.make_adt)
 
-(import core.type)
-
-(import core.fn)
+(import core.title)
 
 (import core.adt)
 
-(import core.title)
+(import core.type)
+
+(import core.fn)
 
 (define-func private _1 (param ?0 core.type) (core.fn [?0] [?0])
   (meta (core.title "example.loop"))

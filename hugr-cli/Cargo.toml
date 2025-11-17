@@ -1,6 +1,6 @@
 [package]
 name = "hugr-cli"
-version = "0.22.3"
+version = "0.24.3"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -15,17 +15,25 @@ categories = ["compilers"]
 [lib]
 bench = false
 
+[features]
+default = ["tracing"]
+tracing = ["dep:tracing", "dep:tracing-subscriber"]
+
 [dependencies]
 clap = { workspace = true, features = ["derive", "cargo"] }
 clap-verbosity-flag.workspace = true
 derive_more = { workspace = true, features = ["display", "error", "from"] }
-hugr = { path = "../hugr", version = "0.22.3" }
+hugr = { path = "../hugr", version = "0.24.3" }
 serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
 clio = { workspace = true, features = ["clap-parse"] }
 anyhow.workspace = true
 thiserror.workspace = true
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.20", features = ["fmt"] }
+tracing = { version = "0.1.41", optional = true }
+tracing-subscriber = { version = "0.3.20", features = ["fmt"], optional = true }
+tabled = "0.20.0"
+schemars = { workspace = true, features = ["derive"] }
+
 
 [lints]
 workspace = true
@@ -49,3 +57,8 @@ name = "hugr"
 path = "src/main.rs"
 doc = false
 bench = false
+
+[package.metadata.binstall]
+# Override binstall default since there are multiple packages in the repo
+# https://github.com/cargo-bins/cargo-binstall/blob/main/SUPPORT.md#Defaults
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-{ target }{ archive-suffix }"

@@ -1,6 +1,6 @@
 //! Basic floating-point types
 
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 
 use crate::ops::constant::{TryHash, ValueName};
 use crate::types::TypeName;
@@ -10,7 +10,6 @@ use crate::{
     ops::constant::CustomConst,
     types::{CustomType, Type, TypeBound},
 };
-use lazy_static::lazy_static;
 
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float.types");
@@ -101,22 +100,21 @@ impl CustomConst for ConstF64 {
     }
 }
 
-lazy_static! {
-    /// Extension defining the float type.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension
-                .add_type(
-                    FLOAT_TYPE_ID,
-                    vec![],
-                    "64-bit IEEE 754-2019 floating-point value".to_owned(),
-                    TypeBound::Copyable.into(),
-                    extension_ref,
-                )
-                .unwrap();
-        })
-    };
-}
+/// Extension defining the float type.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                FLOAT_TYPE_ID,
+                vec![],
+                "64-bit IEEE 754-2019 floating-point value".to_owned(),
+                TypeBound::Copyable.into(),
+                extension_ref,
+            )
+            .unwrap();
+    })
+});
+
 #[cfg(test)]
 mod test {
     use super::*;

@@ -17,7 +17,7 @@ impl<'a> View<'a, TermId> for Term {
             table::Term::Func(region_id) => Term::Func(Arc::new(module.view(*region_id)?)),
             table::Term::List(list_parts) => Term::List(module.view(*list_parts)?),
             table::Term::Literal(literal) => Term::Literal(literal.clone()),
-            table::Term::Tuple(tuple_parts) => Term::List(module.view(*tuple_parts)?),
+            table::Term::Tuple(tuple_parts) => Term::Tuple(module.view(*tuple_parts)?),
         })
     }
 }
