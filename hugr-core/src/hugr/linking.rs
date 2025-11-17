@@ -523,8 +523,9 @@ pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 /// Details a concrete action to link a specific node from source Hugr into a specific target Hugr.
 ///
 /// A separate enum from [NodeLinkingDirective] to allow [NameLinkingPolicy::to_node_linking]
-/// to specify a greater range of actions than that supported by
+/// to (eventually) specify a greater range of actions than that supported by
 /// [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
+/// (For example, to add a function but change it to private.)
 #[derive(Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive]
 pub enum LinkAction<TN> {
