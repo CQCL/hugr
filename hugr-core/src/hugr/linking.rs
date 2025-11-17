@@ -301,7 +301,6 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     #[error("Source ({_1}) and target ({_2}) both contained FuncDefn with same public name {_0}")]
     MultipleImpls(String, SN, TN),
     /// Source and target containing public functions with conflicting signatures
-    // TODO ALAN Should we indicate which were decls or defns? via an extra enum?
     #[error(
         "Conflicting signatures for name {name} - Source ({src_node}) has {src_sig}, Target ({tgt_node}) has ({tgt_sig})"
     )]
