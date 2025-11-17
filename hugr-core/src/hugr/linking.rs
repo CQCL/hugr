@@ -233,6 +233,7 @@ pub trait HugrLinking: HugrMut {
     /// `Some(`[`OnMultiDefn::ErrorDontInsert`]`)`
     ///
     /// [`FuncDefn`]: crate::ops::FuncDefn
+    #[allow(clippy::type_complexity)]
     fn insert_link_from_view<H: HugrView>(
         &mut self,
         parent: Self::Node,
@@ -840,7 +841,7 @@ mod test {
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
+        ModuleBuilder, endo_sig,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
@@ -1331,5 +1332,51 @@ mod test {
             .sorted()
             .collect();
         assert_eq!(all_consts, expect_exist);
+    }
+
+    #[test]
+    fn insert_link() {
+        let insert = {
+            let mut mb = ModuleBuilder::new();
+            let reached = mb.declare("foo", endo_sig(usize_t()).into()).unwrap();
+            let unreached = mb.declare("bar", endo_sig(usize_t()).into()).unwrap();
+            let mut outer = mb.define_function("outer", endo_sig(usize_t())).unwrap();
+            let [i] = outer.input_wires_arr();
+            let [i] = outer.call(&unreached, &[], [i]).unwrap().outputs_arr();
+            let mut dfb = outer.dfg_builder(endo_sig(usize_t()), [i]).unwrap();
+            let [i] = dfb.input_wires_arr();
+            let call = dfb.call(&reached, &[], [i]).unwrap();
+            let dfg = dfb.finish_with_outputs(call.outputs()).unwrap();
+            outer.finish_with_outputs(dfg.outputs()).unwrap();
+            let mut h = mb.finish_hugr().unwrap();
+            h.set_entrypoint(dfg.node());
+            h
+        };
+        let mut fb = FunctionBuilder::new("main", endo_sig(usize_t())).unwrap();
+        let [i] = fb.input_wires_arr();
+        let cst = fb.add_load_value(ConstUsize::new(42));
+        let mut host = fb.finish_hugr_with_outputs([cst]).unwrap();
+
+        // TODO no good equivalent of pytest parametrized fixtures here...
+        // crate rstest_reuse is one way, but seems heavy for just this???
+        let any_pol = NameLinkingPolicy::default();
+
+        let ins = host
+            .insert_link_from_view(host.entrypoint(), &insert, &any_pol)
+            .unwrap();
+        let dfg = *ins.node_map.get(&insert.entrypoint()).unwrap();
+        assert!(host.get_optype(dfg).is_dfg());
+        host.connect(i.node(), i.source(), dfg, 0);
+        host.validate().unwrap();
+        let (decls, defns) = list_decls_defns(&host);
+        assert_eq!(decls.values().collect_vec(), [&"foo"]); // unreached bar not copied
+        assert_eq!(defns.values().collect_vec(), [&"main"]); // as originally in host
+        let (call, tgt) = call_targets(&host).into_iter().exactly_one().unwrap();
+        assert_eq!(host.get_parent(call), Some(dfg));
+        assert_eq!(
+            host.get_parent(dfg),
+            Some(defns.into_keys().exactly_one().unwrap())
+        );
+        assert_eq!(tgt, decls.into_keys().exactly_one().unwrap());
     }
 }
