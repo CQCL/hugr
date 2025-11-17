@@ -2,8 +2,6 @@
 
 use anyhow::Result;
 use clap::Parser;
-use hugr::package::PackageValidationError;
-use hugr::{HugrView, Node};
 use std::io::Read;
 #[cfg(feature = "tracing")]
 use tracing::info;
@@ -35,24 +33,13 @@ impl ValArgs {
     ///   If provided, this reader will be used for input instead of
     ///   `self.input_args.input`.
     pub fn run_with_input<R: Read>(&mut self, input_override: Option<R>) -> Result<()> {
-        if self.input_args.hugr_json {
-            #[allow(deprecated)]
-            let hugr = self.input_args.get_hugr_with_reader(input_override)?;
-            let generator = get_generator(&hugr);
-
-            hugr.validate()
-                .map_err(PackageValidationError::Validation)
-                .map_err(|val_err| CliError::validation(generator, val_err))?;
-        } else {
-            let (desc, package) = self
-                .input_args
-                .get_described_package_with_reader(input_override)?;
-            let generator = desc.generator();
-            package
-                .validate()
-                .map_err(|val_err| CliError::validation(generator, val_err))?;
-        };
-
+        let (desc, package) = self
+            .input_args
+            .get_described_package_with_reader(input_override)?;
+        let generator = desc.generator();
+        package
+            .validate()
+            .map_err(|val_err| CliError::validation(generator, val_err))?;
         #[cfg(feature = "tracing")]
         info!("{VALID_PRINT}");
         #[cfg(not(feature = "tracing"))]
@@ -65,9 +52,4 @@ impl ValArgs {
     pub fn run(&mut self) -> Result<()> {
         self.run_with_input(None::<&[u8]>)
     }
-}
-
-fn get_generator(hugr: &impl HugrView<Node = Node>) -> Option<String> {
-    let mod_desc: hugr::envelope::description::ModuleDesc = hugr.into();
-    mod_desc.generator
 }

@@ -33,32 +33,17 @@ pub struct HugrInputArgs {
         help = "Paths to additional serialised extensions needed to load the Hugr."
     )]
     pub extensions: Vec<PathBuf>,
-    /// Read the input as a HUGR JSON file instead of an envelope.
-    ///
-    /// This is a legacy option for reading old HUGR files.
-    #[clap(long, help_heading = "Input")]
-    pub hugr_json: bool,
 }
 
 impl HugrInputArgs {
     /// Read a hugr envelope from the input and return the package encoded
     /// within.
-    ///
-    /// # Errors
-    ///
-    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
-    /// reading the input as a package will fail.
     pub fn get_package(&mut self) -> Result<Package, CliError> {
         self.get_described_package().map(|(_, package)| package)
     }
 
     /// Read a hugr envelope from the input and return the envelope
     /// description and the decoded package.
-    ///
-    /// # Errors
-    ///
-    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
-    /// reading the input as a package will fail.
     pub fn get_described_package(&mut self) -> Result<(PackageDesc, Package), CliError> {
         self.get_described_package_with_reader::<&[u8]>(None)
     }
@@ -67,11 +52,6 @@ impl HugrInputArgs {
     /// description and the decoded package.
     ///
     /// If `reader` is `None`, reads from the input specified in the args.
-    ///
-    /// # Errors
-    ///
-    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
-    /// reading the input as a package will fail.
     pub fn get_described_package_with_reader<R: Read>(
         &mut self,
         reader: Option<R>,
@@ -88,16 +68,6 @@ impl HugrInputArgs {
                 Ok(read_envelope(buffer, &extensions)?)
             }
         }
-    }
-    /// Read a hugr JSON file from the input.
-    ///
-    /// This is a legacy option for reading old HUGR JSON files when the
-    /// [`HugrInputArgs::hugr_json`] flag is used.
-    ///
-    /// For most cases, [`HugrInputArgs::get_package`] should be called instead.
-    #[deprecated(note = "Use `HugrInputArgs::get_package` instead.", since = "0.22.2")]
-    pub fn get_hugr(&mut self) -> Result<Hugr, CliError> {
-        self.get_hugr_with_reader::<&[u8]>(None)
     }
 
     /// Read a hugr JSON file from an optional reader.

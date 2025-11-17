@@ -43,11 +43,7 @@ impl MermaidArgs {
         input_override: Option<R>,
         output_override: Option<W>,
     ) -> Result<()> {
-        if self.input_args.hugr_json {
-            self.run_print_hugr_with_io(input_override, output_override)
-        } else {
-            self.run_print_envelope_with_io(input_override, output_override)
-        }
+        self.run_print_envelope_with_io(input_override, output_override)
     }
 
     /// Write the mermaid diagram for a HUGR envelope with optional I/O overrides.
