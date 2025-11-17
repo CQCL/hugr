@@ -1183,10 +1183,7 @@ mod test {
             .insert_link_hugr(has_main4.module_root(), main_def_bar, &pol)
             .unwrap();
 
-        let mut count = 0;
         for hugr in [&has_main1, &has_main2, &has_main3, &has_main4] {
-            eprintln!("ALAN count={count}");
-            count += 1;
             hugr.validate().unwrap();
             let (decls, defns) = list_decls_defns(hugr);
             assert_eq!(decls, HashMap::new());
