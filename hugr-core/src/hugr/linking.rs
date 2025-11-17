@@ -498,7 +498,7 @@ fn gather_existing<'a, H: HugrView + ?Sized>(
             let Some((mut acc, sig1)) = acc else {
                 return Some((new.map_right(|n| (n, vec![])), sig2));
             };
-            assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {name}");
+            assert_eq!(sig1, sig2, "Invalid Hugr: different signatures for {}", name);
             let (Either::Right((_, decls)), Either::Right(ndecl)) = (&mut acc, &new) else {
                 let err = match acc.is_left() && new.is_left() {
                     true => "Multiple FuncDefns",
