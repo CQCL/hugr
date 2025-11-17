@@ -3,6 +3,7 @@ use anyhow::Result;
 use clap::Parser;
 use clio::Output;
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, ZstdConfig};
+use std::io::{Read, Write};
 
 use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
@@ -47,9 +48,20 @@ pub struct ConvertArgs {
 }
 
 impl ConvertArgs {
-    /// Convert a HUGR between different envelope formats
-    pub fn run_convert(&mut self) -> Result<()> {
-        let (env_config, package) = self.input_args.get_envelope()?;
+    /// Convert a HUGR between different envelope formats with optional input/output overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `input_override` - Optional reader to use instead of the CLI input argument.
+    /// * `output_override` - Optional writer to use instead of the CLI output argument.
+    pub fn run_convert_with_io<R: Read, W: Write>(
+        &mut self,
+        input_override: Option<R>,
+        mut output_override: Option<W>,
+    ) -> Result<()> {
+        let (env_config, package) = self
+            .input_args
+            .get_described_package_with_reader(input_override)?;
 
         // Handle text and binary format flags, which override the format option
         let mut config = if self.text {
@@ -67,7 +79,7 @@ impl ConvertArgs {
                     "model-text-exts" => EnvelopeFormat::ModelTextWithExtensions,
                     _ => Err(CliError::InvalidFormat(fmt.clone()))?,
                 },
-                None => env_config.format, // Use input format if not specified
+                None => env_config.header.config().format, // Use input format if not specified
             };
             EnvelopeConfig::new(format)
         };
@@ -78,8 +90,17 @@ impl ConvertArgs {
         }
 
         // Write the package with the requested format
-        hugr::envelope::write_envelope(&mut self.output, &package, config)?;
+        if let Some(ref mut writer) = output_override {
+            hugr::envelope::write_envelope(writer, &package, config)?;
+        } else {
+            hugr::envelope::write_envelope(&mut self.output, &package, config)?;
+        }
 
         Ok(())
+    }
+
+    /// Convert a HUGR between different envelope formats
+    pub fn run_convert(&mut self) -> Result<()> {
+        self.run_convert_with_io(None::<&[u8]>, None::<Vec<u8>>)
     }
 }

@@ -1,5 +1,75 @@
 # Changelog
 
+
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-core-v0.24.0...hugr-core-v0.24.1) - 2025-11-03
+
+### Bug Fixes
+
+- validation outside entrypoint, normalize_cfgs w/ nonlocal edges ([#2633](https://github.com/CQCL/hugr/pull/2633))
+- SiblingSubgraph::try_from_nodes for non-entrypoint region ([#2655](https://github.com/CQCL/hugr/pull/2655))
+- Correct conversion of `table::Term::Tuple` to `ast::Term` ([#2653](https://github.com/CQCL/hugr/pull/2653))
+
+### New Features
+
+- track package descriptions when loading ([#2639](https://github.com/CQCL/hugr/pull/2639))
+- *(cli)* describe sub-command ([#2650](https://github.com/CQCL/hugr/pull/2650))
+
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.23.0...hugr-core-v0.24.0) - 2025-10-13
+
+### Bug Fixes
+
+- Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/pull/2606))
+
+### New Features
+
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.4...hugr-core-v0.23.0) - 2025-09-30
+
+### Bug Fixes
+
+- [**breaking**] Appease `cargo-audit` by replacing unmaintained dependencies ([#2572](https://github.com/CQCL/hugr/pull/2572))
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+- [**breaking**] test extension version compatibility on ModelWithExts ([#2587](https://github.com/CQCL/hugr/pull/2587))
+- *(core)* check used extension versions against resolved extensions ([#2588](https://github.com/CQCL/hugr/pull/2588))
+- [**breaking**] model import loads Package extensions ([#2590](https://github.com/CQCL/hugr/pull/2590))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### New Features
+
+- add trait+funcs for linking Hugrs explicitly by Node ([#2521](https://github.com/CQCL/hugr/pull/2521))
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- [**breaking**] Return error instead of panicking in DFGWrapper::add_{in,out}put ([#2571](https://github.com/CQCL/hugr/pull/2571))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+- Normalize CFGs ([#2591](https://github.com/CQCL/hugr/pull/2591))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
+## [0.22.4](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.3...hugr-core-v0.22.4) - 2025-09-24
+
+### Bug Fixes
+
+- *(core)* check extension versions on model import ([#2580](https://github.com/CQCL/hugr/pull/2580))
+
+### New Features
+
+- Documentation and error hints ([#2523](https://github.com/CQCL/hugr/pull/2523))
+- Allow creating DFG builders from existing hugrs ([#2562](https://github.com/CQCL/hugr/pull/2562))
+- add_input/output for arbitrary DFGBuilders ([#2564](https://github.com/CQCL/hugr/pull/2564))
+- *(core)* inner acccesors for WithGenerator error ([#2583](https://github.com/CQCL/hugr/pull/2583))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-core-v0.22.2...hugr-core-v0.22.3) - 2025-09-11
 
 ### Bug Fixes

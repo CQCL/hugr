@@ -1,6 +1,37 @@
 # Changelog
 
 
+## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.24.2...hugr-llvm-v0.24.3) - 2025-11-06
+
+### Bug Fixes
+
+- BorrowArray discard handler allows elements to be borrowed ([#2666](https://github.com/CQCL/hugr/pull/2666))
+
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.23.0...hugr-llvm-v0.24.0) - 2025-10-13
+
+### New Features
+
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
+## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.4...hugr-llvm-v0.23.0) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
+### Testing
+
+- Add framework for LLVM execution tests involving panics ([#2568](https://github.com/CQCL/hugr/pull/2568))
+
 ## [0.22.2](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.22.1...hugr-llvm-v0.22.2) - 2025-08-06
 
 ### Bug Fixes

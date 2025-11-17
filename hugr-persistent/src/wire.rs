@@ -6,7 +6,7 @@ use hugr_core::{
 };
 use itertools::Itertools;
 
-use crate::{CommitId, PatchNode, PersistentHugr, Resolver, Walker};
+use crate::{CommitId, PatchNode, PersistentHugr, Walker, persistent_hugr::NodeStatus};
 
 /// A wire in a [`PersistentHugr`].
 ///
@@ -28,23 +28,23 @@ pub struct PersistentWire {
 struct CommitWire(Wire<PatchNode>);
 
 impl CommitWire {
-    fn from_connected_port<R>(
+    fn from_connected_port(
         PatchNode(commit_id, node): PatchNode,
         port: impl Into<Port>,
-        hugr: &PersistentHugr<R>,
+        hugr: &PersistentHugr,
     ) -> Self {
-        let commit_hugr = hugr.commit_hugr(commit_id);
+        let commit_hugr = hugr.get_commit(commit_id).commit_hugr();
         let wire = Wire::from_connected_port(node, port, commit_hugr);
         Self(Wire::new(PatchNode(commit_id, wire.node()), wire.source()))
     }
 
-    fn all_connected_ports<'h, R>(
+    fn all_connected_ports<'h>(
         &self,
-        hugr: &'h PersistentHugr<R>,
-    ) -> impl Iterator<Item = (PatchNode, Port)> + use<'h, R> {
+        hugr: &'h PersistentHugr,
+    ) -> impl Iterator<Item = (PatchNode, Port)> + use<'h> {
         let wire = Wire::new(self.0.node().1, self.0.source());
         let commit_id = self.commit_id();
-        wire.all_connected_ports(hugr.commit_hugr(commit_id))
+        wire.all_connected_ports(hugr.get_commit(commit_id).commit_hugr())
             .map(move |(node, port)| (hugr.to_persistent_node(node, commit_id), port))
     }
 
@@ -59,47 +59,48 @@ impl CommitWire {
     }
 }
 
-/// A node in a commit of a [`PersistentHugr`] is either a valid node of the
-/// HUGR, a node deleted by a child commit in that [`PersistentHugr`], or an
-/// input or output node in a replacement graph.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum NodeStatus {
-    /// A node deleted by a child commit in that [`PersistentHugr`].
-    ///
-    /// The ID of the child commit is stored in the variant.
-    Deleted(CommitId),
-    /// An input or output node in the replacement graph of a Commit
-    ReplacementIO,
-    /// A valid node in the [`PersistentHugr`]
-    Valid,
-}
-
-impl<R> PersistentHugr<R> {
+impl PersistentHugr {
     pub fn get_wire(&self, node: PatchNode, port: impl Into<Port>) -> PersistentWire {
         PersistentWire::from_port(node, port, self)
     }
 
-    /// Whether a node is valid in `self`, is deleted or is an IO node in a
-    /// replacement graph.
-    fn node_status(&self, per_node @ PatchNode(commit_id, node): PatchNode) -> NodeStatus {
-        debug_assert!(self.contains_id(commit_id), "unknown commit");
-        if self
-            .replacement(commit_id)
-            .is_some_and(|repl| repl.get_replacement_io().contains(&node))
-        {
-            NodeStatus::ReplacementIO
-        } else if let Some(commit_id) = self.find_deleting_commit(per_node) {
-            NodeStatus::Deleted(commit_id)
-        } else {
-            NodeStatus::Valid
-        }
+    /// The unique outgoing port in `self` that `port` is attached to.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `node` is not in `self` (in particular if it is deleted) or if
+    /// `port` is not a value port in `node`.
+    pub(crate) fn single_outgoing_port(
+        &self,
+        node: PatchNode,
+        port: impl Into<IncomingPort>,
+    ) -> (PatchNode, OutgoingPort) {
+        let w = self.get_wire(node, port.into());
+        w.single_outgoing_port(self)
+            .expect("found invalid dfg wire")
+    }
+
+    /// All incoming ports that the given outgoing port is attached to.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `out_node` is not in `self` (in particular if it is deleted)
+    /// or if `out_port` is not a value port in `out_node`.
+    pub(crate) fn all_incoming_ports(
+        &self,
+        out_node: PatchNode,
+        out_port: OutgoingPort,
+    ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
+        let w = self.get_wire(out_node, out_port);
+        w.into_all_ports(self, Direction::Incoming)
+            .map(|(node, port)| (node, port.as_incoming().unwrap()))
     }
 }
 
 impl PersistentWire {
     /// Get the wire connected to a specified port of a pinned node in `hugr`.
-    fn from_port<R>(node: PatchNode, port: impl Into<Port>, per_hugr: &PersistentHugr<R>) -> Self {
-        assert!(per_hugr.contains_node(node), "node not in hugr");
+    fn from_port(node: PatchNode, port: impl Into<Port>, per_hugr: &PersistentHugr) -> Self {
+        debug_assert!(per_hugr.contains_node(node), "node not in hugr");
 
         // Queue of wires within each commit HUGR, that combined will form the
         // persistent wire.
@@ -109,7 +110,8 @@ impl PersistentWire {
 
         while let Some(wire) = queue.pop_front() {
             let commit_id = wire.commit_id();
-            let commit_hugr = per_hugr.commit_hugr(commit_id);
+            let commit = per_hugr.get_commit(commit_id);
+            let commit_hugr = commit.commit_hugr();
             let all_ports = wire.all_connected_ports(per_hugr);
 
             for (per_node @ PatchNode(_, node), port) in all_ports {
@@ -119,15 +121,12 @@ impl PersistentWire {
                         // ports on the opposite end of the wire and boundary
                         // ports in the child commit that deleted the node.
                         for (opp_node, opp_port) in commit_hugr.linked_ports(node, port) {
-                            let opp_node = per_hugr.to_persistent_node(opp_node, commit_id);
-                            for (child_node, child_port) in
-                                per_hugr.as_state_space().linked_child_ports(
-                                    opp_node,
-                                    opp_port,
-                                    deleted_by,
-                                    BoundaryMode::IncludeIO,
-                                )
-                            {
+                            for (child_node, child_port) in commit.linked_child_ports(
+                                opp_node,
+                                opp_port,
+                                per_hugr.get_commit(deleted_by),
+                                BoundaryMode::IncludeIO,
+                            ) {
                                 debug_assert_eq!(child_node.owner(), deleted_by);
                                 let w = CommitWire::from_connected_port(
                                     child_node, child_port, per_hugr,
@@ -144,10 +143,8 @@ impl PersistentWire {
                         // boundary ports of the commit (i.e. the ports connected to
                         // the input resp. output) and ports in a parent commit.
                         for (opp_node, opp_port) in commit_hugr.linked_ports(node, port) {
-                            let opp_node = per_hugr.to_persistent_node(opp_node, commit_id);
-                            for (parent_node, parent_port) in per_hugr
-                                .as_state_space()
-                                .linked_parent_ports(opp_node, opp_port)
+                            for (parent_node, parent_port) in
+                                commit.linked_parent_ports(opp_node, opp_port)
                             {
                                 let w = CommitWire::from_connected_port(
                                     parent_node,
@@ -173,9 +170,9 @@ impl PersistentWire {
     /// Get all ports attached to a wire in `hugr`.
     ///
     /// All ports returned are on nodes that are contained in `hugr`.
-    pub fn all_ports<R>(
+    pub fn all_ports(
         &self,
-        hugr: &PersistentHugr<R>,
+        hugr: &PersistentHugr,
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = (PatchNode, Port)> {
         all_ports_impl(self.wires.iter().copied(), dir.into(), hugr)
@@ -189,31 +186,28 @@ impl PersistentWire {
     /// Consume the wire and return all ports attached to a wire in `hugr`.
     ///
     /// All ports returned are on nodes that are contained in `hugr`.
-    pub fn into_all_ports<R>(
+    pub fn into_all_ports(
         self,
-        hugr: &PersistentHugr<R>,
+        hugr: &PersistentHugr,
         dir: impl Into<Option<Direction>>,
     ) -> impl Iterator<Item = (PatchNode, Port)> {
         all_ports_impl(self.wires.into_iter(), dir.into(), hugr)
     }
 
-    pub fn single_outgoing_port<R>(
-        &self,
-        hugr: &PersistentHugr<R>,
-    ) -> Option<(PatchNode, OutgoingPort)> {
+    pub fn single_outgoing_port(&self, hugr: &PersistentHugr) -> Option<(PatchNode, OutgoingPort)> {
         single_outgoing(self.all_ports(hugr, Direction::Outgoing))
     }
 
-    pub fn all_incoming_ports<R>(
+    pub fn all_incoming_ports(
         &self,
-        hugr: &PersistentHugr<R>,
+        hugr: &PersistentHugr,
     ) -> impl Iterator<Item = (PatchNode, IncomingPort)> {
         self.all_ports(hugr, Direction::Incoming)
             .map(|(node, port)| (node, port.as_incoming().unwrap()))
     }
 }
 
-impl<R: Resolver> Walker<'_, R> {
+impl Walker<'_> {
     /// Get all ports on a wire that are not pinned in `self`.
     pub(crate) fn wire_unpinned_ports(
         &self,
@@ -257,10 +251,10 @@ impl<R: Resolver> Walker<'_, R> {
 
 /// Implementation of the (shared) body of [`PersistentWire::all_ports`] and
 /// [`PersistentWire::into_all_ports`].
-fn all_ports_impl<R>(
+fn all_ports_impl(
     wires: impl Iterator<Item = CommitWire>,
     dir: Option<Direction>,
-    per_hugr: &PersistentHugr<R>,
+    per_hugr: &PersistentHugr,
 ) -> impl Iterator<Item = (PatchNode, Port)> {
     let all_ports = wires.flat_map(move |w| w.all_connected_ports(per_hugr));
 
@@ -279,25 +273,28 @@ fn single_outgoing<N>(iter: impl Iterator<Item = (N, Port)>) -> Option<(N, Outgo
 mod tests {
     use std::collections::BTreeSet;
 
-    use crate::{CommitId, CommitStateSpace, PatchNode, tests::test_state_space};
+    use crate::{
+        PatchNode, PersistentHugr,
+        tests::{TestStateSpace, test_state_space},
+    };
     use hugr_core::{HugrView, OutgoingPort};
     use itertools::Itertools;
     use rstest::rstest;
 
     #[rstest]
-    fn test_all_ports(test_state_space: (CommitStateSpace, [CommitId; 4])) {
-        let (state_space, [_, _, cm3, cm4]) = test_state_space;
-        let hugr = state_space.try_extract_hugr([cm3, cm4]).unwrap();
+    fn test_all_ports(test_state_space: TestStateSpace) {
+        let [_, _, cm3, cm4] = test_state_space.commits();
+        let hugr = PersistentHugr::try_new([cm3.clone(), cm4.clone()]).unwrap();
         let cm4_not = {
-            let hugr4 = state_space.commit_hugr(cm4);
-            let out = state_space.replacement(cm4).unwrap().get_replacement_io()[1];
+            let hugr4 = cm4.commit_hugr();
+            let out = cm4.replacement().unwrap().get_replacement_io()[1];
             let node = hugr4.input_neighbours(out).exactly_one().ok().unwrap();
-            PatchNode(cm4, node)
+            PatchNode(cm4.id(), node)
         };
         let w = hugr.get_wire(cm4_not, OutgoingPort::from(0));
         assert_eq!(
             BTreeSet::from_iter(w.wires.iter().map(|w| w.0.node().0)),
-            BTreeSet::from_iter([cm3, cm4, state_space.base(),])
+            BTreeSet::from_iter([cm3.id(), cm4.id(), hugr.base(),])
         );
     }
 }

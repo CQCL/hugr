@@ -1,5 +1,19 @@
 # Changelog
 
+
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.0...hugr-cli-v0.24.1) - 2025-11-03
+
+### New Features
+
+- track package descriptions when loading ([#2639](https://github.com/CQCL/hugr/pull/2639))
+- *(cli)* describe sub-command ([#2650](https://github.com/CQCL/hugr/pull/2650))
+
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.23.0...hugr-cli-v0.24.0) - 2025-10-13
+
+### Documentation
+
+- update cli readme ([#2601](https://github.com/CQCL/hugr/pull/2601))
+
 ## [0.22.3](https://github.com/CQCL/hugr/compare/hugr-cli-v0.22.2...hugr-cli-v0.22.3) - 2025-09-11
 
 ### New Features

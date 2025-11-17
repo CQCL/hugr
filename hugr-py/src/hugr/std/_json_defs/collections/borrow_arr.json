@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "name": "collections.borrow_arr",
   "types": {
     "borrow_array": {
@@ -70,11 +70,6 @@
           ],
           "output": [
             {
-              "t": "V",
-              "i": 1,
-              "b": "A"
-            },
-            {
               "t": "Opaque",
               "extension": "collections.borrow_arr",
               "id": "borrow_array",
@@ -97,6 +92,11 @@
                 }
               ],
               "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 1,
+              "b": "A"
             }
           ]
         }
@@ -487,6 +487,86 @@
                 }
               ],
               "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "is_borrowed": {
+      "extension": "collections.borrow_arr",
+      "name": "is_borrowed",
+      "description": "Test whether an element in a borrow array has been borrowed",
+      "signature": {
+        "params": [
+          {
+            "tp": "BoundedNat",
+            "bound": null
+          },
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "I"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.borrow_arr",
+              "id": "borrow_array",
+              "args": [
+                {
+                  "tya": "Variable",
+                  "idx": 0,
+                  "cached_decl": {
+                    "tp": "BoundedNat",
+                    "bound": null
+                  }
+                },
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 1,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
             }
           ]
         }

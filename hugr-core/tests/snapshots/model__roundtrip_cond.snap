@@ -8,13 +8,13 @@ expression: ast
 
 (import core.meta.description)
 
-(import core.nat)
+(import core.adt)
 
 (import core.fn)
 
-(import core.adt)
-
 (import arithmetic.int.types.int)
+
+(import core.nat)
 
 (declare-operation
   arithmetic.int.ineg

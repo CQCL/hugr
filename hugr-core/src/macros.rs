@@ -101,7 +101,7 @@ macro_rules! const_extension_ids {
         $($(#[$attr])* $v const $field_name: $crate::extension::ExtensionId =
             $crate::extension::ExtensionId::new_unchecked($ext_name);
 
-        paste::paste! {
+        pastey::paste! {
             #[test]
             fn [<check_ $field_name:lower _wellformed>]() {
                 $crate::extension::ExtensionId::new($ext_name).unwrap();

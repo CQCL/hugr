@@ -1,10 +1,9 @@
 //! A version of the standard fixed-length array extension that includes unsafe
 //! operations for borrowing and returning that may panic.
 
-use std::sync::{self, Arc};
+use std::sync::{self, Arc, LazyLock};
 
 use delegate::delegate;
-use lazy_static::lazy_static;
 
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
@@ -46,7 +45,7 @@ pub const BORROW_ARRAY_VALUENAME: TypeName = TypeName::new_inline("borrow_array"
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.borrow_arr");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
 
 /// A linear, unsafe, fixed-length collection of values.
 ///
@@ -124,6 +123,8 @@ pub enum BArrayUnsafeOpDef {
     discard_all_borrowed,
     /// `new_all_borrowed<size, elem_ty>: () -> borrow_array<size, elem_ty>`
     new_all_borrowed,
+    /// is_borrowed<N, T>: borrow_array<N, T>, usize -> bool, borrow_array<N, T>
+    is_borrowed,
 }
 
 impl BArrayUnsafeOpDef {
@@ -152,7 +153,7 @@ impl BArrayUnsafeOpDef {
         match self {
             Self::borrow => PolyFuncTypeRV::new(
                 params,
-                FuncValueType::new(vec![array_ty.clone(), usize_t], vec![elem_ty_var, array_ty]),
+                FuncValueType::new(vec![array_ty.clone(), usize_t], vec![array_ty, elem_ty_var]),
             ),
             Self::r#return => PolyFuncTypeRV::new(
                 params,
@@ -167,6 +168,13 @@ impl BArrayUnsafeOpDef {
             Self::new_all_borrowed => {
                 PolyFuncTypeRV::new(params, FuncValueType::new(type_row![], vec![array_ty]))
             }
+            Self::is_borrowed => PolyFuncTypeRV::new(
+                params,
+                FuncValueType::new(
+                    vec![array_ty.clone(), usize_t],
+                    vec![array_ty, crate::extension::prelude::bool_t()],
+                ),
+            ),
         }
         .into()
     }
@@ -211,6 +219,7 @@ impl MakeOpDef for BArrayUnsafeOpDef {
                 "Discard a borrow array where all elements have been borrowed"
             }
             Self::new_all_borrowed => "Create a new borrow array that contains no elements",
+            Self::is_borrowed => "Test whether an element in a borrow array has been borrowed",
         }
         .into()
     }
@@ -287,32 +296,43 @@ impl MakeRegisteredOp for BArrayUnsafeOp {
     }
 }
 
-lazy_static! {
-    /// Extension for borrow array operations.
-    pub static ref EXTENSION: Arc<Extension> = {
-        Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
-            extension.add_type(
-                    BORROW_ARRAY_TYPENAME,
-                    vec![ TypeParam::max_nat_type(), TypeBound::Linear.into()],
-                    "Fixed-length borrow array".into(),
-                    // Borrow array is linear, even if the elements are copyable.
-                    TypeDefBound::any(),
-                    extension_ref,
-                )
-                .unwrap();
+/// Extension for borrow array operations.
+pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+    Extension::new_arc(EXTENSION_ID, VERSION, |extension, extension_ref| {
+        extension
+            .add_type(
+                BORROW_ARRAY_TYPENAME,
+                vec![TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                "Fixed-length borrow array".into(),
+                // Borrow array is linear, even if the elements are copyable.
+                TypeDefBound::any(),
+                extension_ref,
+            )
+            .unwrap();
 
-            BArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
-            BArrayCloneDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayDiscardDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayRepeatDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayScanDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayToArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
-            BArrayFromArrayDef::new().add_to_extension(extension, extension_ref).unwrap();
+        BArrayOpDef::load_all_ops(extension, extension_ref).unwrap();
+        BArrayCloneDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayDiscardDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayRepeatDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayScanDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayToArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
+        BArrayFromArrayDef::new()
+            .add_to_extension(extension, extension_ref)
+            .unwrap();
 
-            BArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
-        })
-    };
-}
+        BArrayUnsafeOpDef::load_all_ops(extension, extension_ref).unwrap();
+    })
+});
 
 #[typetag::serde(name = "BArrayValue")]
 impl CustomConst for BArrayValue {
@@ -612,7 +632,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         elem_ty: Type,
         input: Wire,
     ) -> Result<(), BuildError> {
-        self.add_generic_array_discard_empty::<Array>(elem_ty, input)
+        self.add_generic_array_discard_empty::<BorrowArray>(elem_ty, input)
     }
 
     /// Adds a borrow array borrow operation to the dataflow graph.
@@ -623,6 +643,12 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     /// * `size` - The size of the array.
     /// * `input` - The wire representing the array.
     /// * `index` - The wire representing the index to get.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// * The wire representing the updated array with the element marked as borrowed.
+    /// * The wire representing the borrowed element at the specified index.
     ///
     /// # Errors
     ///
@@ -635,10 +661,10 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
         let op = BArrayUnsafeOpDef::borrow.instantiate(&[size.into(), elem_ty.into()])?;
-        let [out, arr] = self
+        let [arr, out] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();
-        Ok((out, arr))
+        Ok((arr, out))
     }
 
     /// Adds a borrow array put operation to the dataflow graph.
@@ -709,6 +735,38 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
             .outputs_arr();
         Ok(arr)
     }
+
+    /// Adds an operation to test whether an element in a borrow array has been borrowed.
+    ///
+    /// # Arguments
+    ///
+    /// * `elem_ty` - The type of the elements in the array.
+    /// * `size` - The size of the array.
+    /// * `input` - The wire representing the array.
+    /// * `index` - The wire representing the index to test.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if building the operation fails.
+    ///
+    /// # Returns
+    ///
+    /// A tuple containing:
+    /// * The wire representing the updated array.
+    /// * The wire representing the boolean result (true if borrowed).
+    fn add_is_borrowed(
+        &mut self,
+        elem_ty: Type,
+        size: u64,
+        input: Wire,
+        index: Wire,
+    ) -> Result<(Wire, Wire), BuildError> {
+        let op = BArrayUnsafeOpDef::is_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+        let [arr, is_borrowed] = self
+            .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
+            .outputs_arr();
+        Ok((arr, is_borrowed))
+    }
 }
 
 impl<D: Dataflow> BArrayOpBuilder for D {}
@@ -747,7 +805,7 @@ mod test {
             let idx1 = builder.add_load_value(ConstUsize::new(11));
             let idx2 = builder.add_load_value(ConstUsize::new(11));
             let [arr] = builder.input_wires_arr();
-            let (el, arr_with_take) = builder
+            let (arr_with_take, el) = builder
                 .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx1)
                 .unwrap();
             let arr_with_put = builder
@@ -767,7 +825,7 @@ mod test {
                 DFGBuilder::new(Signature::new(vec![arr_ty.clone()], vec![qb_t()])).unwrap();
             let idx = builder.add_load_value(ConstUsize::new(0));
             let [arr] = builder.input_wires_arr();
-            let (el, arr_with_borrowed) = builder
+            let (arr_with_borrowed, el) = builder
                 .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
                 .unwrap();
             builder
@@ -793,5 +851,26 @@ mod test {
                 .unwrap();
             builder.finish_hugr_with_outputs([arr_with_put]).unwrap()
         };
+    }
+    #[test]
+    fn test_is_borrowed() {
+        let size = 4;
+        let elem_ty = qb_t();
+        let arr_ty = borrow_array_type(size, elem_ty.clone());
+
+        let mut builder =
+            DFGBuilder::new(Signature::new(vec![arr_ty.clone()], vec![qb_t(), arr_ty])).unwrap();
+        let idx = builder.add_load_value(ConstUsize::new(2));
+        let [arr] = builder.input_wires_arr();
+        // Borrow the element at index 2
+        let (arr_with_borrowed, qb) = builder
+            .add_borrow_array_borrow(elem_ty.clone(), size, arr, idx)
+            .unwrap();
+        let (arr_after_check, _is_borrowed) = builder
+            .add_is_borrowed(elem_ty.clone(), size, arr_with_borrowed, idx)
+            .unwrap();
+        builder
+            .finish_hugr_with_outputs([qb, arr_after_check])
+            .unwrap();
     }
 }

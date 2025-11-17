@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.1...hugr-py-v0.14.2) (2025-11-13)
+
+
+### Features
+
+* **cli, python:** programmatic interface to cli with python bindings ([#2677](https://github.com/CQCL/hugr/issues/2677)) ([0fd0332](https://github.com/CQCL/hugr/commit/0fd0332f6629abd75e3fd5a5681eeefb72fe6766))
+* ComposablePass protocol and ComposedPass for hugr-py (unstable) ([[#2636](https://github.com/CQCL/hugr/issues/2636)](https://github.com/CQCL/hugr/pull/2636)) ([45dc3fc](https://github.com/CQCL/hugr/commit/45dc3fc20623ceb2734e7e3be2b80c47611e9ac6))
+* return description output to python on error ([#2681](https://github.com/CQCL/hugr/issues/2681)) ([f483146](https://github.com/CQCL/hugr/commit/f48314684a1d764c5856dbf09dc384eb3fad719d))
+* track package descriptions when loading ([#2639](https://github.com/CQCL/hugr/issues/2639)) ([349dd61](https://github.com/CQCL/hugr/commit/349dd61784906d433312fc93603f337c6d763e99))
+
+
+### Documentation
+
+* Fix typo in docstring. ([#2656](https://github.com/CQCL/hugr/issues/2656)) ([a1ce622](https://github.com/CQCL/hugr/commit/a1ce622642e2cee091d957fa55612ceebc98b2f3))
+
+## [0.14.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.0...hugr-py-v0.14.1) (2025-10-27)
+
+
+### Bug Fixes
+
+* **py:** loosen dependencies to allow for 3.14 support ([#2634](https://github.com/CQCL/hugr/issues/2634)) ([35b5b7b](https://github.com/CQCL/hugr/commit/35b5b7b3607e8d92b49b3ff4520ef8972e517308))
+
+## [0.14.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.1...hugr-py-v0.14.0) (2025-10-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* BorrowArray::{borrow, is_borrowed} return types have been swapped such that the array is first.
+
+### Features
+
+* Add more options to `DotRenderer` config ([#2540](https://github.com/CQCL/hugr/issues/2540)) ([45f7573](https://github.com/CQCL/hugr/commit/45f7573fc0a863ea26d9e854a20482078bfdbd0c))
+* Allow importing from model data to python. ([#2581](https://github.com/CQCL/hugr/issues/2581)) ([4fb0a5e](https://github.com/CQCL/hugr/commit/4fb0a5e04b1f8f3ee2f062d505307a2698584534))
+* **py, core, llvm:** add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/issues/2610)) ([1cd08ef](https://github.com/CQCL/hugr/commit/1cd08ef7538091b81c6442d014d5aa9a469eea38)), closes [#2569](https://github.com/CQCL/hugr/issues/2569)
+
+
+### Bug Fixes
+
+* Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/issues/2606)) ([69a126d](https://github.com/CQCL/hugr/commit/69a126d8b24e1f03003417ae47fccc3dc9ae4f94))
+
+
+### Code Refactoring
+
+* consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/issues/2621)) ([8fc59f3](https://github.com/CQCL/hugr/commit/8fc59f3ea36ed0c707cd21b4c936d79e1d6baae3))
+
 ## [0.13.1](https://github.com/CQCL/hugr/compare/hugr-py-v0.13.0...hugr-py-v0.13.1) (2025-08-18)
 
 

@@ -173,7 +173,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                         pass
                     case _:
                         raise ValueError(unsupported_op_msg)
-
+                df_op = cast(ops.DataflowOp, df_op)  # checked above, to appease mypy
                 inputs, outputs = None, None
                 try:
                     sig = df_op.outer_signature()
@@ -633,7 +633,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def num_out_ports(self, node: ToNode) -> int:
         """The number of outgoing ports of a node. See :meth:`num_ports`.
 
-        This value cound does not include order ports.
+        This value does not include order ports.
         """
         return self[node]._num_outs
 
@@ -971,7 +971,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     def _constrain_offset(self, p: P) -> PortOffset | None:
         """Constrain an offset to be a valid encoded port offset.
 
-        Order edges and control flow edges should be encoded without an offset.
+        Order edges should be encoded without an offset.
         """
         if p.offset < 0:
             assert p.offset == -1, "Only order edges are allowed with offset < 0"

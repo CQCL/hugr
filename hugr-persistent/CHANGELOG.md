@@ -1,6 +1,32 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.1...hugr-persistent-v0.3.2) - 2025-11-03
+
+### New Features
+
+- *(persistent)* More efficient HugrView iterators for PersistentHugr ([#2595](https://github.com/CQCL/hugr/pull/2595))
+
+## [0.3.1](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.0...hugr-persistent-v0.3.1) - 2025-10-13
+
+### Bug Fixes
+
+- *(test)* No extension serialisation in persistent-hugr testing ([#2612](https://github.com/CQCL/hugr/pull/2612))
+
+### New Features
+
+- *(persistent)* Redesign CommitStateSpace, bound Commit lifetime ([#2534](https://github.com/CQCL/hugr/pull/2534))
+
+## [0.3.0](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.2.3...hugr-persistent-v0.3.0) - 2025-09-30
+
+### Miscellaneous Tasks
+
+- [**breaking**] Cleanup deprecated definitions ([#2594](https://github.com/CQCL/hugr/pull/2594))
+
+### Refactor
+
+- [**breaking**] Replace lazy_static with std::sync::LazyLock ([#2567](https://github.com/CQCL/hugr/pull/2567))
+
 ## [0.2.3](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.2.2...hugr-persistent-v0.2.3) - 2025-09-11
 
 ### Documentation
