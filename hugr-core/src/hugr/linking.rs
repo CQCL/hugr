@@ -211,7 +211,7 @@ pub trait HugrLinking: HugrMut {
         //    return Err(format!("Entrypoint is a top-level function"))
         //}
         let pol = policy
-            .to_node_linking_for(&*self, &other, true)
+            .to_node_linking_for_entrypoint(&*self, &other)
             .map_err(|e| e.to_string())?;
         if matches!(
             pol.get(&entrypoint_func),
@@ -463,7 +463,7 @@ impl NameLinkingPolicy {
         target: &T,
         source: &S,
     ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        self.to_node_linking_for(target, source, false)
+        self.to_node_linking_helper(target, source, false)
     }
 
     /// The result is Ok((action, bool)) where the bool being true
@@ -534,13 +534,19 @@ impl NameLinkingPolicy {
         }
     }
 
-    /// Computes how this policy will act on a specified source (inserted) and target
-    /// (host) Hugr.
-    ///
-    /// `use_entrypoint` tells whether the entrypoint subtree will be inserted (alongside
-    /// any linking). If so, unreached public functions are ignored.
+    /// Computes how this policy will act when inserting the entrypoint-subtree of a
+    /// specified source Hugr into a target (host) Hugr (as per [LinkHugr::insert_link_hugr]).
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking_for<T: HugrView + ?Sized, S: HugrView>(
+    pub fn to_node_linking_for_entrypoint<T: HugrView + ?Sized, S: HugrView>(
+        &self,
+        target: &T,
+        source: &S,
+    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        self.to_node_linking_helper(target, source, true)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn to_node_linking_helper<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
