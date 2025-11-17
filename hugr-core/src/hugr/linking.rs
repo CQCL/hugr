@@ -117,7 +117,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// # Errors
     ///
-    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_impls]
+    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_defn]
     /// are set to [OnNewFunc::RaiseError], and the respective conflict occurs between
     /// `self` and `other`.
     ///
@@ -147,7 +147,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// # Errors
     ///
-    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_impls]
+    /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_defn]
     /// are set to [OnNewFunc::RaiseError], and the respective conflict occurs between
     /// `self` and `other`.
     ///
@@ -382,7 +382,7 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     ///
     /// [FuncDefn]: crate::ops::FuncDefn
     #[error("Source ({_1}) and target ({_2}) both contained FuncDefn with same public name {_0}")]
-    MultipleImpls(String, SN, TN),
+    MultipleDefn(String, SN, TN),
     /// Source and target containing public functions with conflicting signatures
     #[error(
         "Conflicting signatures for name {name} - Source ({src_node}) has {src_sig}, Target ({tgt_node}) has ({tgt_sig})"
@@ -455,14 +455,14 @@ impl NameLinkingPolicy {
 
     /// Sets how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
-    pub fn on_multiple_impls(mut self, mih: OnMultiDefn) -> Self {
-        self.multi_defn = mih;
+    pub fn on_multiple_defn(mut self, multi_defn: OnMultiDefn) -> Self {
+        self.multi_defn = multi_defn;
         self
     }
 
     /// Tells how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
-    pub fn get_multiple_impls(&self) -> OnMultiDefn {
+    pub fn get_on_multiple_defn(&self) -> OnMultiDefn {
         self.multi_defn
     }
 
@@ -521,7 +521,7 @@ impl NameLinkingPolicy {
                             }
                             (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
                                 nfh,
-                                NameLinkingError::MultipleImpls(name.to_string(), sn, *n),
+                                NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
                             ),
                             (Either::Left(n), true, OnMultiDefn::UseExisting) => {
                                 return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
@@ -1243,7 +1243,7 @@ mod test {
         };
         let res = host.link_module(inserted, &pol);
         if multi_defn == OnNewFunc::RaiseError.into() {
-            assert!(matches!(res, Err(NameLinkingError::MultipleImpls(n, _, _)) if n == "foo"));
+            assert!(matches!(res, Err(NameLinkingError::MultipleDefn(n, _, _)) if n == "foo"));
             assert_eq!(host, backup);
             return;
         }
