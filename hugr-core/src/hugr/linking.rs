@@ -182,15 +182,19 @@ pub trait HugrLinking: HugrMut {
     ///  except the entrypoint subtree.)
     ///
     /// If other's entrypoint calls a public function in `other` which
-    /// * has a name or signature different to any in `self`, and `allow_new_names` is `None`
-    /// * has a name equal to that in `self`, but a different signature, and `allow_new_names` is
-    ///   `Some(`[`SignatureConflictHandling::ErrorDontInsert`]`)`
+    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
+    ///  [`OnNewFunc::RaiseError`]
+    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
+    ///   [`OnNewFunc::RaiseError`]
     ///
     /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
-    /// and signature as a public [`FuncDefn`] in `self` and `allow_new_impls` is
-    /// `Some(`[`OnMultiDefn::ErrorDontInsert`]`)`
+    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
+    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
     ///
     /// [`FuncDefn`]: crate::ops::FuncDefn
+    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
+    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
+    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
     fn insert_link_hugr(
         &mut self,
         parent: Self::Node,
@@ -224,15 +228,19 @@ pub trait HugrLinking: HugrMut {
     ///  except the entrypoint subtree.)
     ///
     /// If other's entrypoint calls a public function in `other` which
-    /// * has a name or signature different to any in `self`, and `allow_new_names` is `None`
-    /// * has a name equal to that in `self`, but a different signature, and `allow_new_names` is
-    ///   `Some(`[`SignatureConflictHandling::ErrorDontInsert`]`)`
+    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
+    ///  [`OnNewFunc::RaiseError`]
+    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
+    ///   [`OnNewFunc::RaiseError`]
     ///
     /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
-    /// and signature as a public [`FuncDefn`] in `self` and `allow_new_impls` is
-    /// `Some(`[`OnMultiDefn::ErrorDontInsert`]`)`
+    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
+    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
     ///
     /// [`FuncDefn`]: crate::ops::FuncDefn
+    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
+    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
+    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
     #[allow(clippy::type_complexity)]
     fn insert_link_from_view<H: HugrView>(
         &mut self,
@@ -293,6 +301,7 @@ pub enum NodeLinkingDirective<TN = Node> {
         /// at most one [FuncDefn], or perhaps-multiple, aliased, [FuncDecl]s.)
         ///
         /// [FuncDefn]: crate::ops::FuncDefn
+        /// [FuncDecl]: crate::ops::FuncDecl
         /// [EdgeKind::Const]: crate::types::EdgeKind::Const
         /// [EdgeKind::Function]: crate::types::EdgeKind::Function
         replace: Vec<TN>,
@@ -400,12 +409,12 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     NoNewNames { name: String, src_node: SN },
     /// A [Visibility::Public] function in the source, whose body is being added
     /// to the target, contained the entrypoint which is being added in a different place
-    /// (in a call to [LinkHugr::insert_link_hugr] or [LinkHugr::insert_link_from_view]).
+    /// (in a call to [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view]).
     ///
     /// [Visibility::Public]: crate::Visibility::Public
     #[error("The entrypoint is contained within function {_0} which will be added as {_1:?}")]
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
-    /// The source Hugr's entrypoint is its module-root, in a call to [LinkHugr::insert_link_hugr] or [LinkHugr::insert_link_from_view].
+    /// The source Hugr's entrypoint is its module-root, in a call to [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view].
     #[error("The source Hugr's entrypoint is its module-root")]
     InsertEntrypointIsModuleRoot,
 }
@@ -553,7 +562,7 @@ impl NameLinkingPolicy {
     }
 
     /// Computes how this policy will act when inserting the entrypoint-subtree of a
-    /// specified source Hugr into a target (host) Hugr (as per [LinkHugr::insert_link_hugr]).
+    /// specified source Hugr into a target (host) Hugr (as per [HugrLinking::insert_link_hugr]).
     #[allow(clippy::type_complexity)]
     pub fn to_node_linking_for_entrypoint<T: HugrView + ?Sized, S: HugrView>(
         &self,

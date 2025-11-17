@@ -27,7 +27,7 @@ pub enum CallGraphNode<N = Node> {
     /// either, as such a node could not have edges, so is not represented in the petgraph.
     NonFuncEntrypoint,
     /// petgraph-node corresponds to a constant; will have no outgoing edges, and incoming
-    /// edges will be [CallGraphEdge::Const]
+    /// edges will be [CallGraphEdge::LoadConstant]
     Const(N),
 }
 
@@ -37,9 +37,9 @@ pub enum CallGraphNode<N = Node> {
 /// each edge corresponds to a [`Call`]/[`LoadFunction`] of the edge's target, contained in
 /// the edge's source.
 ///
-/// For Hugrs whose entrypoint is neither a [Module](OpType::Module) nor a [`FuncDefn`], the
-/// call graph will have an additional [`CallGraphNode::NonFuncRoot`] corresponding to the Hugr's
-/// entrypoint, with no incoming edges.
+/// For Hugrs whose entrypoint is neither a [Module](OpType::Module) nor a [`FuncDefn`],
+/// the call graph will have an additional [`CallGraphNode::NonFuncEntrypoint`]
+/// corresponding to the Hugr's entrypoint, with no incoming edges.
 ///
 /// [`Call`]: OpType::Call
 /// [`FuncDecl`]: OpType::FuncDecl
