@@ -480,59 +480,60 @@ impl NameLinkingPolicy {
         new: LinkSig,
     ) -> (Result<LinkAction<TN>, NameLinkingError<SN, TN>>, bool) {
         let just_add = NodeLinkingDirective::add().into();
-        let (nfh, err) = match new {
-            LinkSig::Private => return (Ok(just_add), true),
-            LinkSig::Public {
-                name,
-                is_defn: new_is_defn,
-                sig: new_sig,
-            } => match existing.get(name) {
-                None => (
-                    self.new_names,
-                    NameLinkingError::NoNewNames {
-                        name: name.to_string(),
-                        src_node: sn,
-                    },
-                ),
-                Some((existing, ex_sig)) => {
-                    if *ex_sig == new_sig {
-                        match (existing, new_is_defn, self.multi_defn) {
-                            (Either::Left(n), false, _) => {
-                                return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
-                            }
-                            (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
-                                nfh,
-                                NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
-                            ),
-                            (Either::Left(n), true, OnMultiDefn::UseExisting) => {
-                                return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
-                            }
-                            (Either::Left(n), true, OnMultiDefn::UseNew) => {
-                                return (Ok(NodeLinkingDirective::replace([*n]).into()), false);
-                            }
-                            (Either::Right((n, ns)), _, _) => {
-                                // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
-                                return (
-                                    Ok(NodeLinkingDirective::replace(once(n).chain(ns).copied())
-                                        .into()),
-                                    false,
-                                );
-                            }
+        let LinkSig::Public {
+            name,
+            is_defn: new_is_defn,
+            sig: new_sig,
+        } = new
+        else {
+            return (Ok(just_add), true);
+        };
+        let (nfh, err) = match existing.get(name) {
+            None => (
+                self.new_names,
+                NameLinkingError::NoNewNames {
+                    name: name.to_string(),
+                    src_node: sn,
+                },
+            ),
+            Some((existing, ex_sig)) => {
+                if *ex_sig == new_sig {
+                    match (existing, new_is_defn, self.multi_defn) {
+                        (Either::Left(n), false, _) => {
+                            return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
                         }
-                    } else {
-                        (
-                            self.sig_conflict,
-                            NameLinkingError::SignatureConflict {
-                                name: name.to_string(),
-                                src_node: sn,
-                                src_sig: new_sig.clone().into(),
-                                tgt_node: target_node(existing),
-                                tgt_sig: (*ex_sig).clone().into(),
-                            },
-                        )
+                        (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
+                            nfh,
+                            NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
+                        ),
+                        (Either::Left(n), true, OnMultiDefn::UseExisting) => {
+                            return (Ok(NodeLinkingDirective::UseExisting(*n).into()), false);
+                        }
+                        (Either::Left(n), true, OnMultiDefn::UseNew) => {
+                            return (Ok(NodeLinkingDirective::replace([*n]).into()), false);
+                        }
+                        (Either::Right((n, ns)), _, _) => {
+                            // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
+                            return (
+                                Ok(NodeLinkingDirective::replace(once(n).chain(ns).copied())
+                                    .into()),
+                                false,
+                            );
+                        }
                     }
+                } else {
+                    (
+                        self.sig_conflict,
+                        NameLinkingError::SignatureConflict {
+                            name: name.to_string(),
+                            src_node: sn,
+                            src_sig: new_sig.clone().into(),
+                            tgt_node: target_node(existing),
+                            tgt_sig: (*ex_sig).clone().into(),
+                        },
+                    )
                 }
-            },
+            }
         };
         match nfh {
             OnNewFunc::RaiseError => (Err(err), false),
