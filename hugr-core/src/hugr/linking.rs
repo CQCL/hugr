@@ -318,11 +318,6 @@ pub struct NameLinkingPolicy {
     new_names: OnNewFunc, // ALAN default to Add for link_module but AddIfReached for insert_link....
     sig_conflict: OnNewFunc,
     multi_defn: OnMultiDefn,
-    /// Whether to filter private functions down to only those required (reached from public)
-    /// false means just to copy all private functions.
-    // ALAN remove this? it's just to preserve behaviour of old link_module that was
-    // (explicitly) never guaranteed in the docs.
-    filter_private: bool,
 }
 
 /// Specifies what to do with a function in some situation - used in
@@ -418,7 +413,6 @@ impl NameLinkingPolicy {
             new_names: OnNewFunc::Add,
             multi_defn: multi_defn.into(),
             sig_conflict: OnNewFunc::RaiseError,
-            filter_private: false,
         }
     }
 
@@ -430,7 +424,6 @@ impl NameLinkingPolicy {
             new_names: OnNewFunc::Add,
             multi_defn: OnMultiDefn::NewFunc(OnNewFunc::Add),
             sig_conflict: OnNewFunc::Add,
-            filter_private: false,
         }
     }
 
@@ -498,7 +491,7 @@ impl NameLinkingPolicy {
     ) -> (Result<LinkAction<TN>, NameLinkingError<SN, TN>>, bool) {
         let just_add = NodeLinkingDirective::add().into();
         let (nfh, err) = match new {
-            LinkSig::Private => return (Ok(just_add), self.filter_private),
+            LinkSig::Private => return (Ok(just_add), true),
             LinkSig::Public {
                 name,
                 is_defn: new_is_defn,
@@ -588,8 +581,6 @@ impl NameLinkingPolicy {
                 }
             }
         }
-        // Note: we could optimize the case where self.filter_private is false,
-        // by adding directly to results above, skipping this reachability traversal
         while let Some(sn) = to_visit.pop_front() {
             if !(use_entrypoint && sn == source.entrypoint()) {
                 let Entry::Vacant(ve) = res.entry(sn) else {
@@ -1104,7 +1095,12 @@ mod test {
         };
 
         let inserted = {
-            let mut main_b = FunctionBuilder::new("main", Signature::new(vec![], i64_t())).unwrap();
+            let mut main_b = FunctionBuilder::new_vis(
+                "main",
+                Signature::new(vec![], i64_t()),
+                Visibility::Public,
+            )
+            .unwrap();
             let mut mb = main_b.module_root_builder();
             let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
             let foo2 = mb.declare("foo", foo_sig.clone().into()).unwrap();
@@ -1129,12 +1125,8 @@ mod test {
             h
         };
 
-        let pol = NameLinkingPolicy {
-            new_names: OnNewFunc::RaiseError,
-            sig_conflict,
-            multi_defn,
-            filter_private: false,
-        };
+        let pol =
+            NameLinkingPolicy::err_on_conflict(multi_defn).on_signature_conflict(sig_conflict);
         let mut target2 = target.clone();
 
         target.link_module_view(&inserted, &pol).unwrap();
@@ -1206,17 +1198,13 @@ mod test {
     }
 
     #[rstest]
-    #[case(OnMultiDefn::UseNew, vec![11], false, vec![5, 11])] // Existing constant is not removed
-    #[case(OnMultiDefn::UseNew, vec![11], true, vec![5, 11])]
-    #[case(OnMultiDefn::UseExisting, vec![5], true, vec![5])]
-    #[case(OnMultiDefn::UseExisting, vec![5], false, vec![5, 11])]
-    #[case(OnNewFunc::Add.into(), vec![5, 11], true, vec![5,11])]
-    #[case(OnNewFunc::Add.into(), vec![5, 11], false, vec![5,11])]
-    #[case(OnNewFunc::RaiseError.into(), vec![], true, vec![])] // filter_private ignored
+    #[case(OnMultiDefn::UseNew, vec![11], vec![5, 11])] // Existing constant is not removed
+    #[case(OnMultiDefn::UseExisting, vec![5], vec![5])]
+    #[case(OnNewFunc::Add.into(), vec![5, 11], vec![5,11])]
+    #[case(OnNewFunc::RaiseError.into(), vec![], vec![])]
     fn impl_conflict(
         #[case] multi_defn: OnMultiDefn,
         #[case] expect_used: Vec<u64>,
-        #[case] filter_private: bool,
         #[case] expect_exist: Vec<u64>,
     ) {
         fn build_hugr(cst: u64) -> Hugr {
@@ -1237,7 +1225,6 @@ mod test {
             new_names: OnNewFunc::RaiseError,
             sig_conflict: OnNewFunc::RaiseError,
             multi_defn,
-            filter_private,
         };
         let res = host.link_module(inserted, &pol);
         if multi_defn == OnNewFunc::RaiseError.into() {
