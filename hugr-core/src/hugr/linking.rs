@@ -183,7 +183,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// If other's entrypoint calls a public function in `other` which
     /// * has a name or signature different to any in `self`, and [`on_new_names`] is
-    ///  [`OnNewFunc::RaiseError`]
+    ///   [`OnNewFunc::RaiseError`]
     /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
     ///   [`OnNewFunc::RaiseError`]
     ///
@@ -229,7 +229,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// If other's entrypoint calls a public function in `other` which
     /// * has a name or signature different to any in `self`, and [`on_new_names`] is
-    ///  [`OnNewFunc::RaiseError`]
+    ///   [`OnNewFunc::RaiseError`]
     /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
     ///   [`OnNewFunc::RaiseError`]
     ///
@@ -414,7 +414,8 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     /// [Visibility::Public]: crate::Visibility::Public
     #[error("The entrypoint is contained within function {_0} which will be added as {_1:?}")]
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
-    /// The source Hugr's entrypoint is its module-root, in a call to [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view].
+    /// The source Hugr's entrypoint is its module-root, in a call to
+    /// [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view].
     #[error("The source Hugr's entrypoint is its module-root")]
     InsertEntrypointIsModuleRoot,
 }
