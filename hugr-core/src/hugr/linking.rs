@@ -111,9 +111,7 @@ pub trait HugrLinking: HugrMut {
     /// Insert module-children from another Hugr into this one according to a [NameLinkingPolicy].
     ///
     /// All [Visibility::Public] module-children are inserted, or linked, according to the
-    /// specified policy; private children will also be inserted, at least including all those
-    /// used by the copied public children. (At present all module-children are inserted,
-    /// but this is expected to change in the future.)
+    /// specified policy; private children used by the public children will also be copied.
     ///
     /// # Errors
     ///
@@ -141,9 +139,7 @@ pub trait HugrLinking: HugrMut {
     /// Copy module-children from another Hugr into this one according to a [NameLinkingPolicy].
     ///
     /// All [Visibility::Public] module-children are copied, or linked, according to the
-    /// specified policy; private children will also be copied, at least including all those
-    /// used by the copied public children. (At present all module-children are inserted,
-    /// but this is expected to change in the future.)
+    /// specified policy; private children used by the public children will also be copied.
     ///
     /// # Errors
     ///
