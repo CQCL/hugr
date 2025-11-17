@@ -311,7 +311,7 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
-    new_names: OnNewFunc, // ALAN default to Add for link_module but AddIfReached for insert_link....
+    new_names: OnNewFunc,
     sig_conflict: OnNewFunc,
     multi_defn: OnMultiDefn,
 }
@@ -327,15 +327,10 @@ pub struct NameLinkingPolicy {
 pub enum OnNewFunc {
     /// Do not link the Hugrs together; fail with a [NameLinkingError] instead.
     RaiseError,
-    /// If the new function is reachable, then error; otherwise, just skip it.
-    ErrorIfReached,
     /// Add the new function alongside the existing one in the target Hugr,
     /// preserving (separately) uses of both. (The Hugr will be invalid because
     /// of [duplicate names](crate::hugr::ValidationError::DuplicateExport).)
     Add,
-    /// If the new function is reachable, then add it (as per [Self::Add]);
-    /// otherwise, skip it.
-    AddIfReached,
 }
 
 /// What to do when both target and inserted Hugr
@@ -478,8 +473,7 @@ impl NameLinkingPolicy {
         existing: &HashMap<&str, PubFuncs<TN>>,
         sn: SN,
         new: LinkSig,
-        reached: bool,
-    ) -> Option<Result<LinkAction<TN>, NameLinkingError<SN, TN>>> {
+    ) -> Result<LinkAction<TN>, NameLinkingError<SN, TN>> {
         let just_add = NodeLinkingDirective::add().into();
         let LinkSig::Public {
             name,
@@ -487,7 +481,7 @@ impl NameLinkingPolicy {
             sig: new_sig,
         } = new
         else {
-            return reached.then_some(Ok(just_add));
+            return Ok(just_add);
         };
         let (nfh, err) = match existing.get(name) {
             None => (
@@ -501,22 +495,22 @@ impl NameLinkingPolicy {
                 if *ex_sig == new_sig {
                     match (existing, new_is_defn, self.multi_defn) {
                         (Either::Left(n), false, _) => {
-                            return Some(Ok(NodeLinkingDirective::UseExisting(*n).into()));
+                            return Ok(NodeLinkingDirective::UseExisting(*n).into());
                         }
                         (Either::Left(n), true, OnMultiDefn::NewFunc(nfh)) => (
                             nfh,
                             NameLinkingError::MultipleDefn(name.to_string(), sn, *n),
                         ),
                         (Either::Left(n), true, OnMultiDefn::UseExisting) => {
-                            return Some(Ok(NodeLinkingDirective::UseExisting(*n).into()));
+                            return Ok(NodeLinkingDirective::UseExisting(*n).into());
                         }
                         (Either::Left(n), true, OnMultiDefn::UseNew) => {
-                            return Some(Ok(NodeLinkingDirective::replace([*n]).into()));
+                            return Ok(NodeLinkingDirective::replace([*n]).into());
                         }
                         (Either::Right((n, ns)), _, _) => {
                             // Replace all existing decls. (If the new node is a decl, we only need to add, so tidy as we go.)
                             let nodes = once(n).chain(ns).copied();
-                            return Some(Ok(NodeLinkingDirective::replace(nodes).into()));
+                            return Ok(NodeLinkingDirective::replace(nodes).into());
                         }
                     }
                 } else {
@@ -535,10 +529,8 @@ impl NameLinkingPolicy {
         };
 
         match nfh {
-            OnNewFunc::RaiseError => Some(Err(err)),
-            OnNewFunc::ErrorIfReached => reached.then_some(Err(err)),
-            OnNewFunc::Add => Some(Ok(just_add)),
-            OnNewFunc::AddIfReached => reached.then_some(Ok(just_add)),
+            OnNewFunc::RaiseError => Err(err),
+            OnNewFunc::Add => Ok(just_add),
         }
     }
 
@@ -546,7 +538,7 @@ impl NameLinkingPolicy {
     /// (host) Hugr.
     ///
     /// `use_entrypoint` tells whether the entrypoint subtree will be inserted (alongside
-    /// any linking).
+    /// any linking). If so, unreached public functions are ignored.
     #[allow(clippy::type_complexity)]
     pub fn to_node_linking_for<T: HugrView + ?Sized, S: HugrView>(
         &self,
@@ -554,35 +546,32 @@ impl NameLinkingPolicy {
         source: &S,
         use_entrypoint: bool,
     ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        //let mut source_funcs = source_funcs.into_iter();
         let existing = gather_existing(target);
         let cg = CallGraph::new(&source);
         // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
         // and we need to maintain our own `visited` map anyway
-        let mut to_visit = VecDeque::from_iter(use_entrypoint.then_some(source.entrypoint()));
-        let mut res = LinkActions::new();
-        for sn in source.children(source.module_root()) {
-            if let Some(ls) = link_sig(source, sn) {
-                // Note we'll call process() again below, so a bit inefficient
-                if self.process(&existing, sn, ls, false).is_some() {
-                    to_visit.push_back(sn);
-                }
-            }
+        let mut to_visit = VecDeque::new();
+        if use_entrypoint {
+            to_visit.push_back(source.entrypoint());
+        } else {
+            to_visit.extend(
+                source
+                    .children(source.module_root())
+                    .filter(|&sn| matches!(link_sig(source, sn), Some(LinkSig::Public { .. }))),
+            );
         }
+        let mut res = LinkActions::new();
         while let Some(sn) = to_visit.pop_front() {
             if !(use_entrypoint && sn == source.entrypoint()) {
-                let Entry::Vacant(ve) = res.entry(sn) else {
+                let (Entry::Vacant(ve), Some(ls)) = (res.entry(sn), link_sig(source, sn)) else {
                     continue;
                 };
-                if let Some(ls) = link_sig(source, sn) {
-                    if let Some(act) = self.process(&existing, sn, ls, true).transpose()? {
-                        let LinkAction::LinkNode(dirv) = &act;
-                        let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
-                        ve.insert(act);
-                        if !traverse {
-                            continue;
-                        }
-                    }
+                let act = self.process(&existing, sn, ls)?;
+                let LinkAction::LinkNode(dirv) = &act;
+                let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
+                ve.insert(act);
+                if !traverse {
+                    continue;
                 }
             }
             // For entrypoint, *just* traverse
