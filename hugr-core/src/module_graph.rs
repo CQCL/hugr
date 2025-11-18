@@ -134,4 +134,23 @@ impl<N: HugrNode> ModuleGraph<N> {
             })
         })
     }
+
+    /// Returns an iterator over the in-edges to the given Node, i.e.
+    /// edges from the (necessarily) functions that call/load it.
+    ///
+    /// If the node is not recognised as a function or constant,
+    /// for example if it is a non-function entrypoint, the iterator will be empty.
+    pub fn in_edges(&self, n: N) -> impl Iterator<Item = (&StaticNode<N>, &StaticEdge<N>)> {
+        let g = self.graph();
+        self.node_index(n).into_iter().flat_map(move |n| {
+            self.graph()
+                .edges_directed(n, petgraph::Direction::Incoming)
+                .map(|e| {
+                    (
+                        g.node_weight(e.source()).unwrap(),
+                        g.edge_weight(e.id()).unwrap(),
+                    )
+                })
+        })
+    }
 }
