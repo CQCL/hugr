@@ -666,7 +666,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
         let v = builder
             .build_call(func_ptr, &[], "")?
             .try_as_basic_value()
-            .left()
+            .basic()
             .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
         let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
