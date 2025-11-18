@@ -171,7 +171,6 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
-// TODO also need to apply to replacement consts:
 /// Options for how a replacement (op or type) is processed.
 ///
 /// May be specified by
