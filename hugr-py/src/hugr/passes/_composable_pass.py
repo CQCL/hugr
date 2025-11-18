@@ -52,3 +52,7 @@ class ComposedPass(ComposablePass):
         """Call all of the passes in sequence."""
         for comp_pass in self.passes:
             comp_pass(hugr)
+
+    @property
+    def name(self) -> str:
+        return f"Composed({ ', '.join(pass_.name for pass_ in self.passes) })"
