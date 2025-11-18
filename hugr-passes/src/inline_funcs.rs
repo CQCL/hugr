@@ -68,14 +68,13 @@ mod test {
     use std::collections::HashSet;
 
     use itertools::Itertools;
-    use petgraph::visit::EdgeRef;
     use rstest::rstest;
 
     use hugr_core::HugrView;
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::core::HugrNode;
+    use hugr_core::module_graph::{ModuleGraph, StaticNode};
     use hugr_core::ops::OpType;
-    use hugr_core::static_graph::{ModuleGraph, StaticNode};
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
     use super::inline_acyclic;
@@ -180,11 +179,7 @@ mod test {
     }
 
     fn outgoing_calls<N: HugrNode>(cg: &ModuleGraph<N>, src: N) -> Vec<N> {
-        let src = cg.node_index(src).unwrap();
-        cg.graph()
-            .edges_directed(src, petgraph::Direction::Outgoing)
-            .map(|e| func_node(cg.graph().node_weight(e.target()).unwrap()))
-            .collect()
+        cg.out_edges(src).map(|(_, tgt)| func_node(tgt)).collect()
     }
 
     #[test]
