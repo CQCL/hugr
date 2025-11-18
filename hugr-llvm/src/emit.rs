@@ -213,18 +213,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         let symbol = symbol.as_ref();
         let typ = typ.as_basic_type_enum();
         if let Some(global) = self.module().get_global(symbol) {
-            let global_type = {
-                // TODO This is exposed as `get_value_type` on the master branch
-                // of inkwell, will be in the next release. When it's released
-                // use `get_value_type`.
-                use inkwell::types::AnyTypeEnum;
-                use inkwell::values::AsValueRef;
-                unsafe {
-                    AnyTypeEnum::new(inkwell::llvm_sys::core::LLVMGlobalGetValueType(
-                        global.as_value_ref(),
-                    ))
-                }
-            };
+            let global_type = global.get_value_type();
             if global_type != typ.as_any_type_enum() {
                 Err(anyhow!(
                     "Global '{symbol}' has wrong type: expected: {typ} actual: {global_type}"
@@ -391,12 +380,12 @@ pub fn deaggregate_call_result<'c>(
     let call_result = call_result.try_as_basic_value();
     Ok(match num_results as u32 {
         0 => {
-            call_result.expect_right("void");
+            let _ = call_result.expect_instruction("void");
             vec![]
         }
-        1 => vec![call_result.expect_left("non-void")],
+        1 => vec![call_result.expect_basic("non-void")],
         n => {
-            let return_struct = call_result.expect_left("non-void").into_struct_value();
+            let return_struct = call_result.expect_basic("non-void").into_struct_value();
             (0..n)
                 .map(|i| builder.build_extract_value(return_struct, i, ""))
                 .collect::<Result<Vec<_>, _>>()?

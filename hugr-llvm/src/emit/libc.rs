@@ -45,7 +45,7 @@ pub fn emit_libc_malloc<'c, H: HugrView<Node = Node>>(
         .builder()
         .build_call(malloc, &[size], "")?
         .try_as_basic_value()
-        .unwrap_left();
+        .unwrap_basic();
     Ok(res)
 }
 

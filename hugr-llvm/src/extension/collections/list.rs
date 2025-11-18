@@ -225,7 +225,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(func, &[list.into(), out_ptr.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
             let elem_opt = build_option(ctx, ok, elem, hugr_elem_ty)?;
@@ -238,7 +238,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), out_ptr.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             let elem = build_load_i8_ptr(ctx, out_ptr, elem_ty)?;
             let elem_opt = build_option(ctx, ok, elem, hugr_elem_ty)?;
@@ -251,7 +251,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             let old_elem = build_load_i8_ptr(ctx, elem_ptr, elem.get_type())?;
             let ok_or =
@@ -265,7 +265,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(func, &[list.into(), idx.into(), elem_ptr.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             let unit =
                 ctx.llvm_sum_type(SumType::new_unary(1))?
@@ -279,7 +279,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(func, &[list.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left()
+                .unwrap_basic()
                 .into_int_value();
             args.outputs
                 .finish(ctx.builder(), vec![list, length.into()])?;
@@ -316,7 +316,7 @@ fn emit_list_value<'c, H: HugrView<Node = Node>>(
             "",
         )?
         .try_as_basic_value()
-        .unwrap_left();
+        .unwrap_basic();
     // Push elements onto the list
     let rt_push = ListRtFunc::Push.get_extern(ctx, ccg)?;
     for v in val.get_contents() {
