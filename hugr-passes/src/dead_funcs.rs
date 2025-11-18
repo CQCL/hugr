@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use hugr_core::{
     HugrView, Node,
     hugr::hugrmut::HugrMut,
+    module_graph::{ModuleGraph, StaticNode},
     ops::{OpTag, OpTrait},
 };
 use petgraph::visit::{Dfs, Walker};
@@ -13,8 +14,6 @@ use crate::{
     ComposablePass,
     composable::{ValidatePassError, validate_if_test},
 };
-
-use super::call_graph::{CallGraph, CallGraphNode};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -31,7 +30,7 @@ pub enum RemoveDeadFuncsError<N = Node> {
 }
 
 fn reachable_funcs<'a, H: HugrView>(
-    cg: &'a CallGraph<H::Node>,
+    cg: &'a ModuleGraph<H::Node>,
     h: &'a H,
     entry_points: impl IntoIterator<Item = H::Node>,
 ) -> impl Iterator<Item = H::Node> + 'a {
@@ -41,9 +40,11 @@ fn reachable_funcs<'a, H: HugrView>(
     for n in entry_points {
         d.stack.push(cg.node_index(n).unwrap());
     }
-    d.iter(g).map(|i| match g.node_weight(i).unwrap() {
-        CallGraphNode::FuncDefn(n) | CallGraphNode::FuncDecl(n) => *n,
-        CallGraphNode::NonFuncRoot => h.entrypoint(),
+    d.iter(g).filter_map(|i| match g.node_weight(i).unwrap() {
+        StaticNode::FuncDefn(n) | StaticNode::FuncDecl(n) => Some(*n),
+        StaticNode::NonFuncEntrypoint => Some(h.entrypoint()),
+        StaticNode::Const(_) => None,
+        _ => unreachable!(),
     })
 }
 
@@ -85,7 +86,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
         }
 
         let mut reachable =
-            reachable_funcs(&CallGraph::new(hugr), hugr, entry_points).collect::<HashSet<_>>();
+            reachable_funcs(&ModuleGraph::new(hugr), hugr, entry_points).collect::<HashSet<_>>();
         // Also prevent removing the entrypoint itself
         let mut n = Some(hugr.entrypoint());
         while let Some(n2) = n {
