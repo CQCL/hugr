@@ -43,4 +43,4 @@ hugr-llvm = { "path" = ".", features = ["test-utils"] }
 hugr-passes = { path = "../hugr-passes" }
 
 [build-dependencies]
-cc = "1.2.45"
+cc = "1.2.46"
