@@ -1,5 +1,6 @@
 //! Compilation passes acting on the HUGR program representation.
 
+#[deprecated(note = "Use hugr-core StaticGraph", since = "0.24.1")]
 pub mod call_graph;
 pub mod composable;
 pub use composable::ComposablePass;

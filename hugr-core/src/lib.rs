@@ -10,7 +10,6 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 pub mod builder;
-pub mod static_graph;
 pub mod core;
 pub mod envelope;
 pub mod export;
@@ -20,6 +19,7 @@ pub mod import;
 pub mod macros;
 pub mod ops;
 pub mod package;
+pub mod static_graph;
 pub mod std_extensions;
 pub mod types;
 pub mod utils;

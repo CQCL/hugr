@@ -71,10 +71,7 @@ impl<N: HugrNode> StaticGraph<N> {
             })
             .collect::<HashMap<_, _>>();
         if !hugr.entrypoint_optype().is_module() && !node_to_g.contains_key(&hugr.entrypoint()) {
-            node_to_g.insert(
-                hugr.entrypoint(),
-                g.add_node(StaticNode::NonFuncEntrypoint),
-            );
+            node_to_g.insert(hugr.entrypoint(), g.add_node(StaticNode::NonFuncEntrypoint));
         }
         for (func, cg_node) in &node_to_g {
             traverse(hugr, *cg_node, *func, &mut g, &node_to_g);
