@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::{Graph, visit::EdgeRef};
 
-/// Weight for an edge in a [`StaticGraph`]
+/// Weight for an edge in a [`ModuleGraph`]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StaticEdge<N = Node> {
@@ -16,7 +16,7 @@ pub enum StaticEdge<N = Node> {
     LoadConstant(N),
 }
 
-/// Weight for a petgraph-node in a [`StaticGraph`]
+/// Weight for a petgraph-node in a [`ModuleGraph`]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StaticNode<N = Node> {
@@ -36,7 +36,7 @@ pub enum StaticNode<N = Node> {
 /// Details the [`FuncDefn`]s, [`FuncDecl`]s and module-level [`Const`]s in a Hugr,
 /// in a Hugr, along with the [`Call`]s, [`LoadFunction`]s, and [`LoadConstant`]s connecting them.
 ///
-/// Each node in the `StaticGraph` corresponds to a module-level function or const;
+/// Each node in the `ModuleGraph` corresponds to a module-level function or const;
 /// each edge corresponds to a use of the target contained in the edge's source.
 ///
 /// For Hugrs whose entrypoint is neither a [Module](OpType::Module) nor a [`FuncDefn`],
@@ -49,13 +49,13 @@ pub enum StaticNode<N = Node> {
 /// [`FuncDefn`]: OpType::FuncDefn
 /// [`LoadConstant`]: OpType::LoadConstant
 /// [`LoadFunction`]: OpType::LoadFunction
-pub struct StaticGraph<N = Node> {
+pub struct ModuleGraph<N = Node> {
     g: Graph<StaticNode<N>, StaticEdge<N>>,
     node_to_g: HashMap<N, petgraph::graph::NodeIndex<u32>>,
 }
 
-impl<N: HugrNode> StaticGraph<N> {
-    /// Makes a new `CallGraph` for a Hugr.
+impl<N: HugrNode> ModuleGraph<N> {
+    /// Makes a new `ModuleGraph` for a Hugr.
     pub fn new(hugr: &impl HugrView<Node = N>) -> Self {
         let mut g = Graph::default();
         let mut node_to_g = hugr
@@ -102,7 +102,7 @@ impl<N: HugrNode> StaticGraph<N> {
                 }
             }
         }
-        StaticGraph { g, node_to_g }
+        ModuleGraph { g, node_to_g }
     }
 
     /// Allows access to the petgraph

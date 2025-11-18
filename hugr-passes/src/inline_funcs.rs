@@ -5,7 +5,7 @@ use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
 use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
-use hugr_core::static_graph::{StaticGraph, StaticNode};
+use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
@@ -25,7 +25,7 @@ pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
     call_predicate: impl Fn(&H, H::Node) -> bool,
 ) -> Result<(), InlineFuncsError> {
-    let cg = StaticGraph::new(&*h);
+    let cg = ModuleGraph::new(&*h);
     let g = cg.graph();
     let all_funcs_in_cycles = tarjan_scc(g)
         .into_iter()
@@ -75,7 +75,7 @@ mod test {
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::core::HugrNode;
     use hugr_core::ops::OpType;
-    use hugr_core::static_graph::{StaticGraph, StaticNode};
+    use hugr_core::static_graph::{ModuleGraph, StaticNode};
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
 
     use super::inline_acyclic;
@@ -155,7 +155,7 @@ mod test {
             target_funcs.contains(&tgt)
         })
         .unwrap();
-        let cg = StaticGraph::new(&h);
+        let cg = ModuleGraph::new(&h);
         for fname in check_not_called {
             let fnode = find_func(&h, fname);
             let fnode = cg.node_index(fnode).unwrap();
@@ -179,7 +179,7 @@ mod test {
         }
     }
 
-    fn outgoing_calls<N: HugrNode>(cg: &StaticGraph<N>, src: N) -> Vec<N> {
+    fn outgoing_calls<N: HugrNode>(cg: &ModuleGraph<N>, src: N) -> Vec<N> {
         let src = cg.node_index(src).unwrap();
         cg.graph()
             .edges_directed(src, petgraph::Direction::Outgoing)
@@ -204,7 +204,7 @@ mod test {
             }
         })
         .unwrap();
-        let cg = StaticGraph::new(&h);
+        let cg = ModuleGraph::new(&h);
         // b and then c should have been inlined into g, leaving only cyclic call to f
         assert_eq!(outgoing_calls(&cg, g), [find_func(&h, "f")]);
         // But c should not have been inlined into b:

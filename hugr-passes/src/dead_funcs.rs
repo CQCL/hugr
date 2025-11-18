@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use hugr_core::{
     HugrView, Node,
     hugr::hugrmut::HugrMut,
+    module_graph::{ModuleGraph, StaticNode},
     ops::{OpTag, OpTrait},
-    static_graph::{StaticGraph, StaticNode},
 };
 use petgraph::visit::{Dfs, Walker};
 
@@ -30,7 +30,7 @@ pub enum RemoveDeadFuncsError<N = Node> {
 }
 
 fn reachable_funcs<'a, H: HugrView>(
-    cg: &'a StaticGraph<H::Node>,
+    cg: &'a ModuleGraph<H::Node>,
     h: &'a H,
     entry_points: impl IntoIterator<Item = H::Node>,
 ) -> impl Iterator<Item = H::Node> + 'a {
@@ -86,7 +86,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
         }
 
         let mut reachable =
-            reachable_funcs(&StaticGraph::new(hugr), hugr, entry_points).collect::<HashSet<_>>();
+            reachable_funcs(&ModuleGraph::new(hugr), hugr, entry_points).collect::<HashSet<_>>();
         // Also prevent removing the entrypoint itself
         let mut n = Some(hugr.entrypoint());
         while let Some(n2) = n {
