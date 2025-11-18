@@ -610,21 +610,6 @@ impl NameLinkingPolicy {
         let mut to_visit = VecDeque::new();
         if use_entrypoint {
             to_visit.push_back(source.entrypoint());
-            // Also add public defns not reachable from entrypoint that implement existing decls
-            // (ALAN this is a big API question. They might only be reachable from (the entrypoint via)
-            // functions in the target hugr...or not reachable at all; and they may reach other functions
-            // that cause problems)
-            to_visit.extend(
-                source
-                    .children(source.module_root())
-                    .filter(|&sn| {
-                        match link_sig(source, sn) {
-                            Some(LinkSig::Public { is_defn: true, name, sig }) =>
-                                matches!(existing.get(name), Some((Either::Right(_), ex_sig)) if ex_sig == &sig),
-                            _ => false,
-                        }
-                    }),
-            );
         } else {
             to_visit.extend(
                 source
@@ -1183,45 +1168,38 @@ mod test {
         let mut no_main2 = def_foo.clone();
         no_main2.link_module(main_def_bar.clone(), &pol).unwrap();
         // Insert main_def_bar into def_foo, explicitly adding main
-        let mut has_main3 = def_foo.clone();
-        has_main3
-            .insert_link_from_view(has_main3.module_root(), &main_def_bar, &pol)
+        let mut main_no_bar1 = def_foo.clone();
+        main_no_bar1
+            .insert_link_from_view(main_no_bar1.module_root(), &main_def_bar, &pol)
             .unwrap();
-        let mut has_main4 = def_foo;
-        has_main4
-            .insert_link_hugr(has_main4.module_root(), main_def_bar, &pol)
+        let mut main_no_bar2 = def_foo;
+        main_no_bar2
+            .insert_link_hugr(main_no_bar2.module_root(), main_def_bar, &pol)
             .unwrap();
 
-        for hugr in [&has_main1, &has_main2, &has_main3, &has_main4] {
+        for (hugr, exp_decls, exp_defns) in [
+            (&has_main1, vec![], vec!["bar", "foo", "main"]),
+            (&has_main2, vec![], vec!["bar", "foo", "main"]),
+            (&main_no_bar1, vec!["bar", "bar"], vec!["foo", "main"]),
+            (&main_no_bar2, vec!["bar", "bar"], vec!["foo", "main"]),
+            (&no_main1, vec![], vec!["bar", "foo"]),
+            (&no_main2, vec![], vec!["bar", "foo"]),
+        ] {
             hugr.validate().unwrap();
             let (decls, defns) = list_decls_defns(hugr);
-            assert_eq!(decls, HashMap::new());
-            assert_eq!(
-                defns.values().copied().sorted().collect_vec(),
-                ["bar", "foo", "main"]
-            );
+            assert_eq!(decls.values().copied().sorted().collect_vec(), exp_decls);
+            assert_eq!(defns.values().copied().sorted().collect_vec(), exp_defns);
             let call_tgts = call_targets(&hugr);
-            for (defn, name) in defns {
-                if name != "main" {
-                    // Defns now have two calls each (was one to each alias)
-                    assert_eq!(call_tgts.values().filter(|tgt| **tgt == defn).count(), 2);
-                }
-            }
-        }
-        for hugr in [no_main1, no_main2] {
-            let (decls, defns) = list_decls_defns(&hugr);
-            assert_eq!(decls, HashMap::new());
-            assert_eq!(
-                defns.values().copied().sorted().collect_vec(),
-                ["bar", "foo"]
-            );
-            let call_tgts = call_targets(&hugr);
-            for (defn, name) in defns {
-                let expected = if name == "foo" { 0 } else { 2 };
-                // Defns now have two calls each (was one to each alias)
+            for (func, name) in defns.into_iter().chain(decls) {
+                let expected_calls = match name {
+                    "bar" => 1 + exp_defns.contains(&"bar") as usize, // decls still separate
+                    "foo" => (exp_defns.contains(&"main") as usize) * 2, // called from main
+                    _ => 0,
+                };
                 assert_eq!(
-                    call_tgts.values().filter(|tgt| **tgt == defn).count(),
-                    expected
+                    call_tgts.values().filter(|tgt| **tgt == func).count(),
+                    expected_calls,
+                    "for function {name}"
                 );
             }
         }
