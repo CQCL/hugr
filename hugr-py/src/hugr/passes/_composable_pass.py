@@ -65,6 +65,12 @@ class ComposedPass(ComposablePass):
 
     def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
         """Call all of the passes in sequence."""
-        for comp_pass in self.passes:
-            comp_pass(hugr, inplace)
-        return hugr
+        if inplace:
+            for comp_pass in self.passes:
+                comp_pass(hugr, True)
+            return hugr
+
+        else:
+            for comp_pass in self.passes:
+                res = comp_pass(hugr, False)
+            return res
