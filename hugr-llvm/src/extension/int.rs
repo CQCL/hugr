@@ -244,8 +244,8 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(done_bb)?;
 
         ctx.builder().position_at_end(pow_bb);
-        let acc = ctx.builder().build_load(acc_p, "acc")?;
-        let exp = ctx.builder().build_load(exp_p, "exp")?;
+        let acc = ctx.builder().build_load(lhs.get_type(), acc_p, "acc")?;
+        let exp = ctx.builder().build_load(rhs.get_type(), exp_p, "exp")?;
 
         // Special case if the exponent is 0 or 1
         ctx.builder().build_switch(
@@ -267,7 +267,7 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(pow_bb)?;
 
         ctx.builder().position_at_end(done_bb);
-        let result = ctx.builder().build_load(acc_p, "result")?;
+        let result = ctx.builder().build_load(lhs.get_type(), acc_p, "result")?;
         Ok(vec![result.as_basic_value_enum()])
     })
 }
@@ -940,7 +940,9 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             )?;
 
             ctx.builder().position_at_end(finish);
-            let result = ctx.builder().build_load(result_ptr, "result")?;
+            let result = ctx
+                .builder()
+                .build_load(pair_ty.clone(), result_ptr, "result")?;
             Ok(result)
         } else {
             let quot = ctx

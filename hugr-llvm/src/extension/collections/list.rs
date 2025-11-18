@@ -50,21 +50,21 @@ impl ListRtFunc {
                     iwc.i64_type().into(), // Single element size in bytes
                     iwc.i64_type().into(), // Element alignment
                     // Pointer to element destructor
-                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                    iwc.ptr_type(AddressSpace::default()).into(),
                 ],
                 false,
             ),
             ListRtFunc::Push => iwc.void_type().fn_type(
                 &[
                     ccg.list_type(ts).into(),
-                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                    iwc.ptr_type(AddressSpace::default()).into(),
                 ],
                 false,
             ),
             ListRtFunc::Pop => iwc.bool_type().fn_type(
                 &[
                     ccg.list_type(ts).into(),
-                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                    iwc.ptr_type(AddressSpace::default()).into(),
                 ],
                 false,
             ),
@@ -72,7 +72,7 @@ impl ListRtFunc {
                 &[
                     ccg.list_type(ts).into(),
                     iwc.i64_type().into(),
-                    iwc.i8_type().ptr_type(AddressSpace::default()).into(),
+                    iwc.ptr_type(AddressSpace::default()).into(),
                 ],
                 false,
             ),
@@ -116,7 +116,6 @@ pub trait ListCodegen: Clone {
     fn list_type<'c>(&self, session: TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
         session
             .iw_context()
-            .i8_type()
             .ptr_type(AddressSpace::default())
             .into()
     }
@@ -302,7 +301,7 @@ fn emit_list_value<'c, H: HugrView<Node = Node>>(
     let elem_size = elem_ty.size_of().unwrap();
     let alignment = iwc.i64_type().const_int(8, false);
     // TODO: Lookup destructor for elem_ty
-    let destructor = iwc.i8_type().ptr_type(AddressSpace::default()).const_null();
+    let destructor = iwc.ptr_type(AddressSpace::default()).const_null();
     let list = ctx
         .builder()
         .build_call(
@@ -343,11 +342,8 @@ fn build_alloca_i8_ptr<'c, H: HugrView<Node = Node>>(
     if let Some(val) = value {
         builder.build_store(ptr, val)?;
     }
-    let i8_ptr = builder.build_pointer_cast(
-        ptr,
-        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
-        "",
-    )?;
+    let i8_ptr =
+        builder.build_pointer_cast(ptr, ctx.iw_context().ptr_type(AddressSpace::default()), "")?;
     Ok(i8_ptr)
 }
 
@@ -358,8 +354,12 @@ fn build_load_i8_ptr<'c, H: HugrView<Node = Node>>(
     ty: BasicTypeEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
     let builder = ctx.builder();
-    let ptr = builder.build_pointer_cast(i8_ptr, ty.ptr_type(AddressSpace::default()), "")?;
-    let val = builder.build_load(ptr, "")?;
+    let ptr = builder.build_pointer_cast(
+        i8_ptr,
+        ctx.iw_context().ptr_type(AddressSpace::default()),
+        "",
+    )?;
+    let val = builder.build_load(ty, ptr, "")?;
     Ok(val)
 }
 

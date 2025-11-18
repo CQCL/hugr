@@ -44,7 +44,9 @@ impl<'a> TypeMapping for LLVMTypeMapping<'a> {
     }
 
     fn func_into_out<'c>(&self, sum: Self::FuncOutV<'c>) -> Self::OutV<'c> {
-        sum.ptr_type(Default::default()).as_basic_type_enum()
+        sum.get_context()
+            .ptr_type(Default::default())
+            .as_basic_type_enum()
     }
 
     fn map_sum_type<'c>(
