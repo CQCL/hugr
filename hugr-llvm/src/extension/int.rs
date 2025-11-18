@@ -523,7 +523,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .builder()
                 .build_call(intr, &[arg.into_int_value().into(), true_.into()], "")?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             Ok(vec![r])
         }),
         IntOpDef::imax_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
@@ -540,7 +540,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     "",
                 )?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             Ok(vec![r])
         }),
         IntOpDef::imax_u => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
@@ -557,7 +557,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     "",
                 )?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             Ok(vec![r])
         }),
         IntOpDef::imin_s => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
@@ -574,7 +574,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     "",
                 )?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             Ok(vec![r])
         }),
         IntOpDef::imin_u => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
@@ -591,7 +591,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     "",
                 )?
                 .try_as_basic_value()
-                .unwrap_left();
+                .unwrap_basic();
             Ok(vec![r])
         }),
         IntOpDef::ishl => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {

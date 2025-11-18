@@ -99,7 +99,7 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
                 ctx.builder()
                     .build_call(func, &[lhs.into(), rhs.into()], "")?
                     .try_as_basic_value()
-                    .unwrap_left()
+                    .unwrap_basic()
                     .as_basic_value_enum(),
             ])
         }),
