@@ -154,3 +154,57 @@ impl<N: HugrNode> ModuleGraph<N> {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use itertools::Itertools as _;
+
+    use crate::builder::{
+        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
+    };
+    use crate::extension::prelude::{ConstUsize, usize_t};
+    use crate::ops::{Value, handle::NodeHandle};
+
+    use super::*;
+
+    #[test]
+    fn edges() {
+        let mut mb = ModuleBuilder::new();
+        let cst = mb.add_constant(Value::from(ConstUsize::new(42)));
+        let callee = mb.define_function("callee", endo_sig(usize_t())).unwrap();
+        let ins = callee.input_wires();
+        let callee = callee.finish_with_outputs(ins).unwrap();
+        let mut caller = mb
+            .define_function("caller", inout_sig(vec![], usize_t()))
+            .unwrap();
+        let val = caller.load_const(&cst);
+        let call = caller.call(callee.handle(), &[], vec![val]).unwrap();
+        let caller = caller.finish_with_outputs(call.outputs()).unwrap();
+        let h = mb.finish_hugr().unwrap();
+
+        let mg = ModuleGraph::new(&h);
+        let call_edge = StaticEdge::Call(call.node());
+        let load_const_edge = StaticEdge::LoadConstant(val.node());
+
+        assert_eq!(mg.out_edges(callee.node()).next(), None);
+        assert_eq!(
+            mg.in_edges(callee.node()).collect_vec(),
+            [(&StaticNode::FuncDefn(caller.node()), &call_edge,)]
+        );
+
+        assert_eq!(
+            mg.out_edges(caller.node()).collect_vec(),
+            [
+                (&call_edge, &StaticNode::FuncDefn(callee.node()),),
+                (&load_const_edge, &StaticNode::Const(cst.node()),)
+            ]
+        );
+        assert_eq!(mg.in_edges(caller.node()).next(), None);
+
+        assert_eq!(mg.out_edges(cst.node()).next(), None);
+        assert_eq!(
+            mg.in_edges(cst.node()).collect_vec(),
+            [(&StaticNode::FuncDefn(caller.node()), &load_const_edge,)]
+        );
+    }
+}
