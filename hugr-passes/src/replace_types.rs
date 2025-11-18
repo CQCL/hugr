@@ -580,16 +580,18 @@ impl ReplaceTypes {
         root: Node,
         linearize_unchanged_ops: bool,
     ) -> Result<bool, ReplaceTypesError> {
-        let mut changed = false;
-        for n in hugr.descendants(root).collect::<Vec<_>>() {
+        let mut descs = hugr.descendants(root).collect::<Vec<_>>().into_iter();
+        assert_eq!(descs.next(), Some(root));
+        let mut changed = self.change_node(hugr, root)?;
+        // Do not linearize the root's outputs - that's done by the caller if appropriate,
+        // as any copy/discard ops would be *outside* the root
+        for n in descs {
             if self.change_node(hugr, n)? {
                 changed = true;
             } else if !linearize_unchanged_ops {
                 continue;
             }
-            if n != root {
-                self.linearize_outputs(hugr, n)?;
-            }
+            self.linearize_outputs(hugr, n)?;
         }
         Ok(changed)
     }
@@ -680,7 +682,8 @@ impl ReplaceTypes {
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
                     if opts.process_recursive {
                         self.change_subtree(hugr, n, opts.linearize_unchanged)?;
-                        // change_subtree does not linearize it's root, but that's done by our caller
+                        // change_subtree does not linearize its root, just as change_node
+                        // does not linearize the node it's called on; our caller does.
                     } else if opts.linearize_unchanged {
                         let mut descs = hugr.descendants(n);
                         assert_eq!(descs.next(), Some(n));
