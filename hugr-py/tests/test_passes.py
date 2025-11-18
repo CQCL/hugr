@@ -4,8 +4,8 @@ from hugr.passes._composable_pass import ComposablePass, ComposedPass
 
 def test_composable_pass() -> None:
     class MyDummyPass(ComposablePass):
-        def __call__(self, hugr: Hugr) -> None:
-            return self(hugr)
+        def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
+            return self(hugr, inplace)
 
         def then(self, other: ComposablePass) -> ComposablePass:
             return ComposedPass([self, other])

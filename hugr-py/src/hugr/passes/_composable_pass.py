@@ -5,6 +5,7 @@ Currently unstable.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
@@ -16,9 +17,23 @@ if TYPE_CHECKING:
 class ComposablePass(Protocol):
     """A Protocol which represents a composable Hugr transformation."""
 
-    def __call__(self, hugr: Hugr) -> None:
+    def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
         """Call the pass to transform a HUGR."""
-        ...
+        if inplace:
+            return self._apply_inplace(hugr)
+        else:
+            return self._apply(hugr)
+
+    # At least one of the following must be ovewritten
+    def _apply(self, hugr: Hugr) -> Hugr:
+        hugr = deepcopy(hugr)
+        self._apply_inplace(hugr)
+        return hugr
+
+    def _apply_inplace(self, hugr: Hugr) -> Hugr:
+        new_hugr = self._apply(hugr)
+        hugr.overwrite_hugr(new_hugr)
+        return hugr
 
     @property
     def name(self) -> str:
@@ -48,7 +63,8 @@ class ComposedPass(ComposablePass):
 
     passes: list[ComposablePass]
 
-    def __call__(self, hugr: Hugr):
+    def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
         """Call all of the passes in sequence."""
         for comp_pass in self.passes:
-            comp_pass(hugr)
+            comp_pass(hugr, inplace)
+        return hugr
