@@ -1,6 +1,6 @@
 //! A trait that enum for op definitions that gathers up some shared functionality.
 
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 use strum::IntoEnumIterator;
 
@@ -179,7 +179,7 @@ pub trait MakeExtensionOp {
     fn to_registered(
         self,
         extension_id: ExtensionId,
-        extension: Weak<Extension>,
+        extension: Arc<Extension>,
     ) -> RegisteredOp<Self>
     where
         Self: Sized,
@@ -237,7 +237,7 @@ pub struct RegisteredOp<T> {
     /// The name of the extension these ops belong to.
     pub extension_id: ExtensionId,
     /// A registry of all extensions, used for type computation.
-    extension: Weak<Extension>,
+    extension: Arc<Extension>,
     /// The inner [`MakeExtensionOp`]
     op: T,
 }
@@ -253,7 +253,7 @@ impl<T: MakeExtensionOp> RegisteredOp<T> {
     /// Generate an [`OpType`].
     pub fn to_extension_op(&self) -> Option<ExtensionOp> {
         ExtensionOp::new(
-            self.extension.upgrade()?.get_op(&self.op_id())?.clone(),
+            self.extension.get_op(&self.op_id())?.clone(),
             self.type_args(),
         )
         .ok()
@@ -276,7 +276,7 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
     /// The ID of the extension this op belongs to.
     fn extension_id(&self) -> ExtensionId;
     /// A reference to the [Extension] which defines this operation.
-    fn extension_ref(&self) -> Weak<Extension>;
+    fn extension_ref(&self) -> Arc<Extension>;
 
     /// Convert this operation in to an [`ExtensionOp`]. Returns None if the type
     /// cannot be computed.
@@ -371,8 +371,8 @@ mod test {
             EXT_ID.clone()
         }
 
-        fn extension_ref(&self) -> Weak<Extension> {
-            Arc::downgrade(&EXT)
+        fn extension_ref(&self) -> Arc<Extension> {
+            EXT.clone()
         }
     }
 

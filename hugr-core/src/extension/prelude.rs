@@ -731,8 +731,8 @@ impl MakeRegisteredOp for MakeTuple {
         PRELUDE_ID.clone()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&PRELUDE)
+    fn extension_ref(&self) -> Arc<Extension> {
+        PRELUDE.clone()
     }
 }
 
@@ -786,8 +786,8 @@ impl MakeRegisteredOp for UnpackTuple {
         PRELUDE_ID.clone()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&PRELUDE)
+    fn extension_ref(&self) -> Arc<Extension> {
+        PRELUDE.clone()
     }
 }
 
@@ -897,8 +897,8 @@ impl MakeRegisteredOp for Noop {
         PRELUDE_ID.clone()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&PRELUDE)
+    fn extension_ref(&self) -> Arc<Extension> {
+        PRELUDE.clone()
     }
 }
 
@@ -1014,8 +1014,8 @@ impl MakeRegisteredOp for Barrier {
         PRELUDE_ID.clone()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&PRELUDE)
+    fn extension_ref(&self) -> Arc<Extension> {
+        PRELUDE.clone()
     }
 }
 
