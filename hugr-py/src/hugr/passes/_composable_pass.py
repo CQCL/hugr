@@ -20,7 +20,8 @@ class ComposablePass(Protocol):
     def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
         """Call the pass to transform a HUGR."""
         if inplace:
-            return self._apply_inplace(hugr)
+            self._apply_inplace(hugr)
+            return hugr
         else:
             return self._apply(hugr)
 
@@ -30,10 +31,9 @@ class ComposablePass(Protocol):
         self._apply_inplace(hugr)
         return hugr
 
-    def _apply_inplace(self, hugr: Hugr) -> Hugr:
+    def _apply_inplace(self, hugr: Hugr) -> None:
         new_hugr = self._apply(hugr)
-        hugr.overwrite_hugr(new_hugr)
-        return hugr
+        hugr._overwrite_hugr(new_hugr)
 
     @property
     def name(self) -> str:
