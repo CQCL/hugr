@@ -5,7 +5,7 @@ use crate::builder::{
     Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
     ModuleBuilder, endo_sig, inout_sig, test::closed_dfg_root_hugr,
 };
-use crate::envelope::{EnvelopeConfig, read_described_envelope, write_envelope};
+use crate::envelope::{EnvelopeConfig, read_envelope, write_envelope};
 use crate::extension::ExtensionRegistry;
 use crate::extension::prelude::Noop;
 use crate::extension::prelude::{bool_t, qb_t, usize_t};
@@ -647,7 +647,7 @@ fn cfg_edge_ordering() {
     let _ = write_envelope(&mut data1, &pkg, EnvelopeConfig::text());
 
     let buff1 = Cursor::new(data1);
-    let (_, pkg1) = read_described_envelope(buff1, &std_reg()).unwrap();
+    let (_, pkg1) = read_envelope(buff1, &std_reg()).unwrap();
     pkg1.validate().unwrap();
 }
 

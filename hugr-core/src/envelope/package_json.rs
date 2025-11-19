@@ -1,7 +1,5 @@
-#![allow(deprecated)] // remove when WithGenerator is removed, cannot place on enum
-
 //! Encoding / decoding of Package json, used in the `PackageJson` envelope format.
-use derive_more::{Display, Error, From};
+use derive_more::{Display, Error};
 use std::io;
 
 use crate::extension::ExtensionRegistry;
@@ -33,23 +31,23 @@ pub(super) fn to_json_writer<'h>(
         }
     }
 
-    serde_json::to_writer(writer, &pkg_ser)?;
+    serde_json::to_writer(writer, &pkg_ser).map_err(PackageEncodingError::JsonEncoding)?;
     Ok(())
 }
 
 /// Error raised while loading a package.
-#[derive(Debug, Display, Error, From)]
+#[derive(Debug, Display, Error)]
 #[non_exhaustive]
 #[display("Error reading or writing a package in JSON format.")]
 pub enum PackageEncodingError {
     /// Error raised while parsing the package json.
-    JsonEncoding(#[from] serde_json::Error),
+    JsonEncoding(serde_json::Error),
     /// Error raised while reading from a file.
-    IOError(#[from] io::Error),
+    IOError(io::Error),
     /// Could not resolve the extension needed to encode the hugr.
-    ExtensionResolution(#[from] super::WithGenerator<ExtensionResolutionError>),
+    ExtensionResolution(ExtensionResolutionError),
     /// Error resolving packaged extensions.
-    PackagedExtension(#[from] ExtensionResolutionError),
+    PackagedExtension(ExtensionResolutionError),
 }
 
 /// A private package structure implementing the serde traits.
