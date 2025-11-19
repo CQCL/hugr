@@ -935,7 +935,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return mapping
 
     def _overwrite_hugr(self, new_hugr: Hugr) -> None:
-        """Modify a Hugr in place by replacing attributes with those from a new Hugr."""
+        """Modify a Hugr in place by replacing contents with those from a new Hugr."""
         self.module_root = new_hugr.module_root
         self.entrypoint = new_hugr.entrypoint
         self._nodes = new_hugr._nodes
