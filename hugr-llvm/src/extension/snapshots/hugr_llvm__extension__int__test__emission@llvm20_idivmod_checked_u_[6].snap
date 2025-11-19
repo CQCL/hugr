@@ -1,0 +1,23 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
+
+define private { i1, { i64, i64 }, { i32, i8* } } @_hl.main.1(i64 %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %valid_div = icmp ne i64 %1, 0
+  %quotient = udiv i64 %0, %1
+  %remainder = urem i64 %0, %1
+  %2 = insertvalue { i64, i64 } poison, i64 %quotient, 0
+  %3 = insertvalue { i64, i64 } %2, i64 %remainder, 1
+  %4 = insertvalue { i1, { i64, i64 }, { i32, i8* } } { i1 true, { i64, i64 } poison, { i32, i8* } poison }, { i64, i64 } %3, 1
+  %5 = select i1 %valid_div, { i1, { i64, i64 }, { i32, i8* } } %4, { i1, { i64, i64 }, { i32, i8* } } { i1 false, { i64, i64 } poison, { i32, i8* } { i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0) } }
+  ret { i1, { i64, i64 }, { i32, i8* } } %5
+}

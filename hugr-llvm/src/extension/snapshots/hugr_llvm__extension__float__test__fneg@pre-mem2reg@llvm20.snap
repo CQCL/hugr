@@ -1,0 +1,24 @@
+---
+source: hugr-llvm/src/extension/float.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private double @_hl.main.1(double %0) {
+alloca_block:
+  %"0" = alloca double, align 8
+  %"2_0" = alloca double, align 8
+  %"4_0" = alloca double, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store double %0, double* %"2_0", align 8
+  %"2_01" = load double, double* %"2_0", align 8
+  %1 = fneg double %"2_01"
+  store double %1, double* %"4_0", align 8
+  %"4_02" = load double, double* %"4_0", align 8
+  store double %"4_02", double* %"0", align 8
+  %"03" = load double, double* %"0", align 8
+  ret double %"03"
+}

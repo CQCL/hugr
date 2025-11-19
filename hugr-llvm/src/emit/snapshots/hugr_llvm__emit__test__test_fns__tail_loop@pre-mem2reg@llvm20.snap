@@ -1,0 +1,123 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i64 @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"7_0" = alloca i64, align 8
+  %"5_0" = alloca i64, align 8
+  %"8_0" = alloca i64, align 8
+  %"9_0" = alloca i64, align 8
+  %"9_1" = alloca i64, align 8
+  %"17_0" = alloca { i1, i64 }, align 8
+  %"16_0" = alloca i64, align 8
+  %"15_0" = alloca i64, align 8
+  %"12_0" = alloca i64, align 8
+  %"13_0" = alloca i1, align 1
+  %"011" = alloca { i1, i64 }, align 8
+  %"013" = alloca i64, align 8
+  %"23_0" = alloca i64, align 8
+  %"20_0" = alloca i64, align 8
+  %"24_0" = alloca i64, align 8
+  %"25_0" = alloca { i1, i64 }, align 8
+  %"019" = alloca i64, align 8
+  %"29_0" = alloca { i1, i64 }, align 8
+  %"27_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 7, i64* %"7_0", align 4
+  store i64 3, i64* %"5_0", align 4
+  %"5_01" = load i64, i64* %"5_0", align 4
+  %"7_02" = load i64, i64* %"7_0", align 4
+  store i64 %"5_01", i64* %"9_0", align 4
+  store i64 %"7_02", i64* %"9_1", align 4
+  br label %loop_body
+
+loop_body:                                        ; preds = %8, %entry_block
+  %"9_03" = load i64, i64* %"9_0", align 4
+  %"9_14" = load i64, i64* %"9_1", align 4
+  store i64 2, i64* %"15_0", align 4
+  store i64 0, i64* %"12_0", align 4
+  store i64 %"9_03", i64* %"9_0", align 4
+  store i64 %"9_14", i64* %"9_1", align 4
+  %"9_15" = load i64, i64* %"9_1", align 4
+  %"15_06" = load i64, i64* %"15_0", align 4
+  %0 = mul i64 %"9_15", %"15_06"
+  store i64 %0, i64* %"16_0", align 4
+  %"9_07" = load i64, i64* %"9_0", align 4
+  %"12_08" = load i64, i64* %"12_0", align 4
+  %1 = icmp eq i64 %"9_07", %"12_08"
+  %2 = select i1 %1, i1 true, i1 false
+  store i1 %2, i1* %"13_0", align 1
+  %"13_09" = load i1, i1* %"13_0", align 1
+  %"9_010" = load i64, i64* %"9_0", align 4
+  switch i1 %"13_09", label %3 [
+    i1 true, label %4
+  ]
+
+3:                                                ; preds = %loop_body
+  store i64 %"9_010", i64* %"013", align 4
+  br label %cond_17_case_0
+
+4:                                                ; preds = %loop_body
+  store i64 %"9_010", i64* %"019", align 4
+  br label %cond_17_case_1
+
+loop_out:                                         ; preds = %10
+  %"8_026" = load i64, i64* %"8_0", align 4
+  store i64 %"8_026", i64* %"0", align 4
+  %"027" = load i64, i64* %"0", align 4
+  ret i64 %"027"
+
+cond_17_case_0:                                   ; preds = %3
+  %"014" = load i64, i64* %"013", align 4
+  store i64 1, i64* %"23_0", align 4
+  store i64 %"014", i64* %"20_0", align 4
+  %"20_015" = load i64, i64* %"20_0", align 4
+  %"23_016" = load i64, i64* %"23_0", align 4
+  %5 = sub i64 %"20_015", %"23_016"
+  store i64 %5, i64* %"24_0", align 4
+  %"24_017" = load i64, i64* %"24_0", align 4
+  %6 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %"24_017", 1
+  store { i1, i64 } %6, { i1, i64 }* %"25_0", align 4
+  %"25_018" = load { i1, i64 }, { i1, i64 }* %"25_0", align 4
+  store { i1, i64 } %"25_018", { i1, i64 }* %"011", align 4
+  br label %cond_exit_17
+
+cond_17_case_1:                                   ; preds = %4
+  %"020" = load i64, i64* %"019", align 4
+  store { i1, i64 } { i1 true, i64 poison }, { i1, i64 }* %"29_0", align 4
+  %"29_021" = load { i1, i64 }, { i1, i64 }* %"29_0", align 4
+  store { i1, i64 } %"29_021", { i1, i64 }* %"011", align 4
+  store i64 %"020", i64* %"27_0", align 4
+  br label %cond_exit_17
+
+cond_exit_17:                                     ; preds = %cond_17_case_1, %cond_17_case_0
+  %"012" = load { i1, i64 }, { i1, i64 }* %"011", align 4
+  store { i1, i64 } %"012", { i1, i64 }* %"17_0", align 4
+  %"17_022" = load { i1, i64 }, { i1, i64 }* %"17_0", align 4
+  %"16_023" = load i64, i64* %"16_0", align 4
+  store { i1, i64 } %"17_022", { i1, i64 }* %"17_0", align 4
+  store i64 %"16_023", i64* %"16_0", align 4
+  %"17_024" = load { i1, i64 }, { i1, i64 }* %"17_0", align 4
+  %"16_025" = load i64, i64* %"16_0", align 4
+  %7 = extractvalue { i1, i64 } %"17_024", 0
+  switch i1 %7, label %8 [
+    i1 true, label %10
+  ]
+
+8:                                                ; preds = %cond_exit_17
+  %9 = extractvalue { i1, i64 } %"17_024", 1
+  store i64 %9, i64* %"9_0", align 4
+  store i64 %"16_025", i64* %"9_1", align 4
+  br label %loop_body
+
+10:                                               ; preds = %cond_exit_17
+  store i64 %"16_025", i64* %"8_0", align 4
+  br label %loop_out
+}

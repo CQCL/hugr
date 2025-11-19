@@ -1,0 +1,23 @@
+---
+source: hugr-llvm/src/extension/collections/list.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i1, i16 } @_hl.main.1(i8* %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = alloca i16, align 2
+  %3 = bitcast i16* %2 to i8*
+  %4 = call i1 @__rt__list__get(i8* %0, i64 %1, i8* %3)
+  %5 = bitcast i8* %3 to i16*
+  %6 = load i16, i16* %5, align 2
+  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %6, 1
+  %8 = select i1 %4, { i1, i16 } %7, { i1, i16 } { i1 false, i16 poison }
+  ret { i1, i16 } %8
+}
+
+declare i1 @__rt__list__get(i8*, i64, i8*)

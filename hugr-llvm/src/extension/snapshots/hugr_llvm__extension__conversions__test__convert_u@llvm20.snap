@@ -1,0 +1,15 @@
+---
+source: hugr-llvm/src/extension/conversions.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private double @_hl.main.1(i16 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = uitofp i16 %0 to double
+  ret double %1
+}

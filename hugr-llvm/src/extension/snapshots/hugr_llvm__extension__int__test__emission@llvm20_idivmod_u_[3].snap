@@ -1,0 +1,43 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private { i8, i8 } @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %valid_div = icmp ne i8 %1, 0
+  br label %panic_if_0
+
+panic_if_0:                                       ; preds = %entry_block
+  switch i1 %valid_div, label %panic [
+    i1 true, label %exit
+  ]
+
+panic:                                            ; preds = %panic_if_0
+  %2 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
+  call void @abort()
+  br label %exit
+
+exit:                                             ; preds = %panic_if_0, %panic
+  %quotient = udiv i8 %0, %1
+  %remainder = urem i8 %0, %1
+  %3 = insertvalue { i8, i8 } poison, i8 %quotient, 0
+  %4 = insertvalue { i8, i8 } %3, i8 %remainder, 1
+  %5 = extractvalue { i8, i8 } %4, 0
+  %6 = extractvalue { i8, i8 } %4, 1
+  %mrv = insertvalue { i8, i8 } undef, i8 %5, 0
+  %mrv7 = insertvalue { i8, i8 } %mrv, i8 %6, 1
+  ret { i8, i8 } %mrv7
+}
+
+declare i32 @printf(i8*, ...)
+
+declare void @abort()

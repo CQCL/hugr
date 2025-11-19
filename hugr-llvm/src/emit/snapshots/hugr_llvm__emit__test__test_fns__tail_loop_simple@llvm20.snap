@@ -1,0 +1,32 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private {} @_hl.main.1(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %loop_body
+
+loop_body:                                        ; preds = %3, %entry_block
+  %"5_0.0" = phi i64 [ %0, %entry_block ], [ %4, %3 ]
+  %1 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %"5_0.0", 1
+  %2 = extractvalue { i1, i64 } %1, 0
+  switch i1 %2, label %3 [
+    i1 true, label %5
+  ]
+
+3:                                                ; preds = %loop_body
+  %4 = extractvalue { i1, i64 } %1, 1
+  br label %loop_body
+
+5:                                                ; preds = %loop_body
+  br label %loop_out
+
+loop_out:                                         ; preds = %5
+  ret {} undef
+}

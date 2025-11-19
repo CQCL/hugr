@@ -1,0 +1,35 @@
+---
+source: hugr-llvm/src/extension/collections/list.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i1, i16 } @_hl.main.1(i8* %0, i64 %1) {
+alloca_block:
+  %"0" = alloca { i1, i16 }, align 8
+  %"2_0" = alloca i8*, align 8
+  %"2_1" = alloca i64, align 8
+  %"4_0" = alloca { i1, i16 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i8* %0, i8** %"2_0", align 8
+  store i64 %1, i64* %"2_1", align 4
+  %"2_01" = load i8*, i8** %"2_0", align 8
+  %"2_12" = load i64, i64* %"2_1", align 4
+  %2 = alloca i16, align 2
+  %3 = bitcast i16* %2 to i8*
+  %4 = call i1 @__rt__list__get(i8* %"2_01", i64 %"2_12", i8* %3)
+  %5 = bitcast i8* %3 to i16*
+  %6 = load i16, i16* %5, align 2
+  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %6, 1
+  %8 = select i1 %4, { i1, i16 } %7, { i1, i16 } { i1 false, i16 poison }
+  store { i1, i16 } %8, { i1, i16 }* %"4_0", align 2
+  %"4_03" = load { i1, i16 }, { i1, i16 }* %"4_0", align 2
+  store { i1, i16 } %"4_03", { i1, i16 }* %"0", align 2
+  %"04" = load { i1, i16 }, { i1, i16 }* %"0", align 2
+  ret { i1, i16 } %"04"
+}
+
+declare i1 @__rt__list__get(i8*, i64, i8*)

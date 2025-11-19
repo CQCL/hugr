@@ -1,0 +1,20 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i2 @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i2, align 1
+  %"4_0" = alloca i2, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i2 1, i2* %"4_0", align 1
+  %"4_01" = load i2, i2* %"4_0", align 1
+  store i2 %"4_01", i2* %"0", align 1
+  %"02" = load i2, i2* %"0", align 1
+  ret i2 %"02"
+}

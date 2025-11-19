@@ -1,0 +1,103 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private { i8, i8 } @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  %"0" = alloca i8, align 1
+  %"1" = alloca i8, align 1
+  %"2_0" = alloca i8, align 1
+  %"2_1" = alloca i8, align 1
+  %"4_0" = alloca i8, align 1
+  %"4_1" = alloca i8, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i8 %0, i8* %"2_0", align 1
+  store i8 %1, i8* %"2_1", align 1
+  %"2_01" = load i8, i8* %"2_0", align 1
+  %"2_12" = load i8, i8* %"2_1", align 1
+  %valid_div = icmp ne i8 %"2_12", 0
+  br label %panic_if_0
+
+panic_if_0:                                       ; preds = %entry_block
+  switch i1 %valid_div, label %panic [
+    i1 true, label %exit
+  ]
+
+panic:                                            ; preds = %panic_if_0
+  %2 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
+  call void @abort()
+  br label %exit
+
+exit:                                             ; preds = %panic_if_0, %panic
+  %is_divisor_large = icmp ugt i8 %"2_12", 127
+  %3 = zext i1 %is_divisor_large to i8
+  %is_dividend_negative = icmp slt i8 %"2_01", 0
+  %4 = zext i1 %is_dividend_negative to i8
+  %5 = shl i8 %3, 1
+  %tag = or i8 %5, %4
+  %quotient = sdiv i8 %"2_01", %"2_12"
+  %remainder = srem i8 %"2_01", %"2_12"
+  %result = alloca { i8, i8 }, align 8
+  switch i8 %tag, label %non_negative_smoldiv [
+    i8 1, label %negative_smoldiv
+    i8 2, label %non_negative_bigdiv
+    i8 3, label %negative_bigdiv
+  ]
+
+negative_bigdiv:                                  ; preds = %exit
+  %6 = add i8 %"2_01", %"2_12"
+  %7 = insertvalue { i8, i8 } { i8 -1, i8 poison }, i8 %6, 1
+  store { i8, i8 } %7, { i8, i8 }* %result, align 1
+  br label %finish
+
+negative_smoldiv:                                 ; preds = %exit
+  %8 = insertvalue { i8, i8 } poison, i8 %quotient, 0
+  %9 = insertvalue { i8, i8 } %8, i8 0, 1
+  %10 = sub i8 %quotient, 1
+  %11 = add i8 %"2_12", %remainder
+  %12 = insertvalue { i8, i8 } poison, i8 %10, 0
+  %13 = insertvalue { i8, i8 } %12, i8 %11, 1
+  %is_rem_0 = icmp eq i8 %remainder, 0
+  %14 = select i1 %is_rem_0, { i8, i8 } %9, { i8, i8 } %13
+  store { i8, i8 } %14, { i8, i8 }* %result, align 1
+  br label %finish
+
+non_negative_bigdiv:                              ; preds = %exit
+  %15 = insertvalue { i8, i8 } { i8 0, i8 poison }, i8 %"2_01", 1
+  store { i8, i8 } %15, { i8, i8 }* %result, align 1
+  br label %finish
+
+non_negative_smoldiv:                             ; preds = %exit
+  %16 = insertvalue { i8, i8 } poison, i8 %quotient, 0
+  %17 = insertvalue { i8, i8 } %16, i8 %remainder, 1
+  store { i8, i8 } %17, { i8, i8 }* %result, align 1
+  br label %finish
+
+finish:                                           ; preds = %negative_bigdiv, %non_negative_bigdiv, %negative_smoldiv, %non_negative_smoldiv
+  %result3 = load { i8, i8 }, { i8, i8 }* %result, align 1
+  %18 = extractvalue { i8, i8 } %result3, 0
+  %19 = extractvalue { i8, i8 } %result3, 1
+  store i8 %18, i8* %"4_0", align 1
+  store i8 %19, i8* %"4_1", align 1
+  %"4_04" = load i8, i8* %"4_0", align 1
+  %"4_15" = load i8, i8* %"4_1", align 1
+  store i8 %"4_04", i8* %"0", align 1
+  store i8 %"4_15", i8* %"1", align 1
+  %"06" = load i8, i8* %"0", align 1
+  %"17" = load i8, i8* %"1", align 1
+  %mrv = insertvalue { i8, i8 } undef, i8 %"06", 0
+  %mrv8 = insertvalue { i8, i8 } %mrv, i8 %"17", 1
+  ret { i8, i8 } %mrv8
+}
+
+declare i32 @printf(i8*, ...)
+
+declare void @abort()

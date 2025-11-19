@@ -1,0 +1,33 @@
+---
+source: hugr-llvm/src/extension/collections/stack_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private void @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = insertvalue [2 x i64] undef, i64 1, 0
+  %1 = insertvalue [2 x i64] %0, i64 2, 1
+  %2 = icmp ult i64 1, 2
+  br i1 %2, label %4, label %3
+
+3:                                                ; preds = %entry_block
+  br label %10
+
+4:                                                ; preds = %entry_block
+  %5 = alloca i64, i32 2, align 8
+  %6 = bitcast i64* %5 to [2 x i64]*
+  store [2 x i64] %1, [2 x i64]* %6, align 4
+  %7 = getelementptr inbounds i64, i64* %5, i64 1
+  %8 = load i64, i64* %7, align 4
+  %9 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %8, 1
+  br label %10
+
+10:                                               ; preds = %3, %4
+  %"0.0" = phi { i1, i64 } [ %9, %4 ], [ { i1 false, i64 poison }, %3 ]
+  ret void
+}

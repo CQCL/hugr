@@ -1,0 +1,16 @@
+---
+source: hugr-llvm/src/extension/conversions.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i8 @_hl.main.1(i1 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = icmp eq i1 %0, true
+  %2 = select i1 %1, i8 1, i8 0
+  ret i8 %2
+}

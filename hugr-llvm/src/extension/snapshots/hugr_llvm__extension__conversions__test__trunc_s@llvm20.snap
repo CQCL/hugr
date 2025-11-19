@@ -1,0 +1,22 @@
+---
+source: hugr-llvm/src/extension/conversions.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [58 x i8] c"Float value too big to convert to int of given width (32)\00", align 1
+
+define private { i1, { i32, i8* }, i32 } @_hl.main.1(double %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %within_upper_bound = fcmp olt double %0, 0x41DFFFFFFFC00000
+  %within_lower_bound = fcmp ole double 0xC1E0000000000000, %0
+  %success = and i1 %within_upper_bound, %within_lower_bound
+  %trunc_result = fptosi double %0 to i32
+  %1 = insertvalue { i1, { i32, i8* }, i32 } { i1 true, { i32, i8* } poison, i32 poison }, i32 %trunc_result, 2
+  %2 = select i1 %success, { i1, { i32, i8* }, i32 } %1, { i1, { i32, i8* }, i32 } { i1 false, { i32, i8* } { i32 2, i8* getelementptr inbounds ([58 x i8], [58 x i8]* @0, i32 0, i32 0) }, i32 poison }
+  ret { i1, { i32, i8* }, i32 } %2
+}

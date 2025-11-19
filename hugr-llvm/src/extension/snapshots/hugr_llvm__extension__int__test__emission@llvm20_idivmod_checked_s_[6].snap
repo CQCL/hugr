@@ -1,0 +1,65 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
+
+define private { i1, { i64, i64 }, { i32, i8* } } @_hl.main.1(i64 %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %valid_div = icmp ne i64 %1, 0
+  %is_divisor_large = icmp ugt i64 %1, 9223372036854775807
+  %2 = zext i1 %is_divisor_large to i64
+  %is_dividend_negative = icmp slt i64 %0, 0
+  %3 = zext i1 %is_dividend_negative to i64
+  %4 = shl i64 %2, 1
+  %tag = or i64 %4, %3
+  %quotient = sdiv i64 %0, %1
+  %remainder = srem i64 %0, %1
+  %result = alloca { i64, i64 }, align 8
+  switch i64 %tag, label %non_negative_smoldiv [
+    i64 1, label %negative_smoldiv
+    i64 2, label %non_negative_bigdiv
+    i64 3, label %negative_bigdiv
+  ]
+
+negative_bigdiv:                                  ; preds = %entry_block
+  %5 = add i64 %0, %1
+  %6 = insertvalue { i64, i64 } { i64 -1, i64 poison }, i64 %5, 1
+  store { i64, i64 } %6, { i64, i64 }* %result, align 4
+  br label %finish
+
+negative_smoldiv:                                 ; preds = %entry_block
+  %7 = insertvalue { i64, i64 } poison, i64 %quotient, 0
+  %8 = insertvalue { i64, i64 } %7, i64 0, 1
+  %9 = sub i64 %quotient, 1
+  %10 = add i64 %1, %remainder
+  %11 = insertvalue { i64, i64 } poison, i64 %9, 0
+  %12 = insertvalue { i64, i64 } %11, i64 %10, 1
+  %is_rem_0 = icmp eq i64 %remainder, 0
+  %13 = select i1 %is_rem_0, { i64, i64 } %8, { i64, i64 } %12
+  store { i64, i64 } %13, { i64, i64 }* %result, align 4
+  br label %finish
+
+non_negative_bigdiv:                              ; preds = %entry_block
+  %14 = insertvalue { i64, i64 } { i64 0, i64 poison }, i64 %0, 1
+  store { i64, i64 } %14, { i64, i64 }* %result, align 4
+  br label %finish
+
+non_negative_smoldiv:                             ; preds = %entry_block
+  %15 = insertvalue { i64, i64 } poison, i64 %quotient, 0
+  %16 = insertvalue { i64, i64 } %15, i64 %remainder, 1
+  store { i64, i64 } %16, { i64, i64 }* %result, align 4
+  br label %finish
+
+finish:                                           ; preds = %negative_bigdiv, %non_negative_bigdiv, %negative_smoldiv, %non_negative_smoldiv
+  %result3 = load { i64, i64 }, { i64, i64 }* %result, align 4
+  %17 = insertvalue { i1, { i64, i64 }, { i32, i8* } } { i1 true, { i64, i64 } poison, { i32, i8* } poison }, { i64, i64 } %result3, 1
+  %18 = select i1 %valid_div, { i1, { i64, i64 }, { i32, i8* } } %17, { i1, { i64, i64 }, { i32, i8* } } { i1 false, { i64, i64 } poison, { i32, i8* } { i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0) } }
+  ret { i1, { i64, i64 }, { i32, i8* } } %18
+}

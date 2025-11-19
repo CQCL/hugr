@@ -1,0 +1,91 @@
+---
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i8 @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  %"0" = alloca i8, align 1
+  %"2_0" = alloca i8, align 1
+  %"2_1" = alloca i8, align 1
+  %"4_0" = alloca i8, align 1
+  %"7_0" = alloca i8, align 1
+  %"7_1" = alloca i8, align 1
+  %"03" = alloca i8, align 1
+  %"11_0" = alloca i8, align 1
+  %"11_1" = alloca i8, align 1
+  %"9_0" = alloca { i8, i8 }, align 8
+  %"13_0" = alloca { i1, i8 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i8 %0, i8* %"2_0", align 1
+  store i8 %1, i8* %"2_1", align 1
+  %"2_01" = load i8, i8* %"2_0", align 1
+  %"2_12" = load i8, i8* %"2_1", align 1
+  store i8 %"2_01", i8* %"7_0", align 1
+  store i8 %"2_12", i8* %"7_1", align 1
+  br label %2
+
+2:                                                ; preds = %11, %entry_block
+  %"7_04" = load i8, i8* %"7_0", align 1
+  %"7_15" = load i8, i8* %"7_1", align 1
+  store i8 %"7_04", i8* %"7_0", align 1
+  store i8 %"7_15", i8* %"7_1", align 1
+  %"7_06" = load i8, i8* %"7_0", align 1
+  %"7_17" = load i8, i8* %"7_1", align 1
+  %3 = insertvalue { i8, i8 } poison, i8 %"7_06", 0
+  %4 = insertvalue { i8, i8 } %3, i8 %"7_17", 1
+  store { i8, i8 } %4, { i8, i8 }* %"9_0", align 1
+  %"9_08" = load { i8, i8 }, { i8, i8 }* %"9_0", align 1
+  store { i8, i8 } %"9_08", { i8, i8 }* %"9_0", align 1
+  %"9_09" = load { i8, i8 }, { i8, i8 }* %"9_0", align 1
+  switch i1 false, label %5 [
+  ]
+
+5:                                                ; preds = %2
+  %6 = extractvalue { i8, i8 } %"9_09", 0
+  %7 = extractvalue { i8, i8 } %"9_09", 1
+  store i8 %6, i8* %"11_0", align 1
+  store i8 %7, i8* %"11_1", align 1
+  br label %8
+
+8:                                                ; preds = %5
+  %"11_011" = load i8, i8* %"11_0", align 1
+  %"11_112" = load i8, i8* %"11_1", align 1
+  store i8 %"11_011", i8* %"11_0", align 1
+  store i8 %"11_112", i8* %"11_1", align 1
+  %"11_013" = load i8, i8* %"11_0", align 1
+  %9 = insertvalue { i1, i8 } { i1 false, i8 poison }, i8 %"11_013", 1
+  store { i1, i8 } %9, { i1, i8 }* %"13_0", align 1
+  %"13_014" = load { i1, i8 }, { i1, i8 }* %"13_0", align 1
+  %"11_115" = load i8, i8* %"11_1", align 1
+  store { i1, i8 } %"13_014", { i1, i8 }* %"13_0", align 1
+  store i8 %"11_115", i8* %"11_1", align 1
+  %"13_016" = load { i1, i8 }, { i1, i8 }* %"13_0", align 1
+  %"11_117" = load i8, i8* %"11_1", align 1
+  %10 = extractvalue { i1, i8 } %"13_016", 0
+  switch i1 %10, label %11 [
+    i1 true, label %13
+  ]
+
+11:                                               ; preds = %8
+  %12 = extractvalue { i1, i8 } %"13_016", 1
+  store i8 %12, i8* %"7_0", align 1
+  store i8 %"11_117", i8* %"7_1", align 1
+  br label %2
+
+13:                                               ; preds = %8
+  store i8 %"11_117", i8* %"03", align 1
+  br label %14
+
+14:                                               ; preds = %13
+  %"010" = load i8, i8* %"03", align 1
+  store i8 %"010", i8* %"4_0", align 1
+  %"4_018" = load i8, i8* %"4_0", align 1
+  store i8 %"4_018", i8* %"0", align 1
+  %"019" = load i8, i8* %"0", align 1
+  ret i8 %"019"
+}

@@ -1,0 +1,28 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i1, i1 } @_hl.main.1(i1 %0, i1 %1) {
+alloca_block:
+  %"0" = alloca { i1, i1 }, align 8
+  %"2_0" = alloca i1, align 1
+  %"2_1" = alloca i1, align 1
+  %"4_0" = alloca { i1, i1 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i1 %0, i1* %"2_0", align 1
+  store i1 %1, i1* %"2_1", align 1
+  %"2_01" = load i1, i1* %"2_0", align 1
+  %"2_12" = load i1, i1* %"2_1", align 1
+  %2 = insertvalue { i1, i1 } poison, i1 %"2_01", 0
+  %3 = insertvalue { i1, i1 } %2, i1 %"2_12", 1
+  store { i1, i1 } %3, { i1, i1 }* %"4_0", align 1
+  %"4_03" = load { i1, i1 }, { i1, i1 }* %"4_0", align 1
+  store { i1, i1 } %"4_03", { i1, i1 }* %"0", align 1
+  %"04" = load { i1, i1 }, { i1, i1 }* %"0", align 1
+  ret { i1, i1 } %"04"
+}

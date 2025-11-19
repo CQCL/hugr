@@ -1,0 +1,20 @@
+---
+source: hugr-llvm/src/extension/float.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private double @_hl.main.1(double %0, double %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = call double @llvm.pow.f64(double %0, double %1)
+  ret double %2
+}
+
+; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
+declare double @llvm.pow.f64(double, double) #0
+
+attributes #0 = { nofree nosync nounwind readnone speculatable willreturn }

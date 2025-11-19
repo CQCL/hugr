@@ -74,7 +74,7 @@ pub mod utils;
 #[must_use]
 pub fn llvm_version() -> &'static str {
     #[cfg(feature = "llvm14-0")]
-    return "llvm14";
+    return "llvm20";
     panic!("No recognised llvm feature.")
 }
 

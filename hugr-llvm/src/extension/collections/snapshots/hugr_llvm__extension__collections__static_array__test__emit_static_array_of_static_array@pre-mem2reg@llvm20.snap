@@ -1,0 +1,37 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@sa.inner.6acc1b76.0 = constant { i64, [0 x i64] } zeroinitializer
+@sa.inner.e637bb5.0 = constant { i64, [1 x i64] } { i64 1, [1 x i64] [i64 1] }
+@sa.inner.2b6593f.0 = constant { i64, [2 x i64] } { i64 2, [2 x i64] [i64 2, i64 2] }
+@sa.inner.1b9ad7c.0 = constant { i64, [3 x i64] } { i64 3, [3 x i64] [i64 3, i64 3, i64 3] }
+@sa.inner.e67fbfa4.0 = constant { i64, [4 x i64] } { i64 4, [4 x i64] [i64 4, i64 4, i64 4, i64 4] }
+@sa.inner.15dc27f6.0 = constant { i64, [5 x i64] } { i64 5, [5 x i64] [i64 5, i64 5, i64 5, i64 5, i64 5] }
+@sa.inner.c43a2bb2.0 = constant { i64, [6 x i64] } { i64 6, [6 x i64] [i64 6, i64 6, i64 6, i64 6, i64 6, i64 6] }
+@sa.inner.7f5d5e16.0 = constant { i64, [7 x i64] } { i64 7, [7 x i64] [i64 7, i64 7, i64 7, i64 7, i64 7, i64 7, i64 7] }
+@sa.inner.a0bc9c53.0 = constant { i64, [8 x i64] } { i64 8, [8 x i64] [i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8] }
+@sa.inner.1e8aada3.0 = constant { i64, [9 x i64] } { i64 9, [9 x i64] [i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9] }
+@sa.outer.e55b610a.0 = constant { i64, [10 x { i64, [0 x i64] }*] } { i64 10, [10 x { i64, [0 x i64] }*] [{ i64, [0 x i64] }* @sa.inner.6acc1b76.0, { i64, [0 x i64] }* bitcast ({ i64, [1 x i64] }* @sa.inner.e637bb5.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [2 x i64] }* @sa.inner.2b6593f.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [3 x i64] }* @sa.inner.1b9ad7c.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [4 x i64] }* @sa.inner.e67fbfa4.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [5 x i64] }* @sa.inner.15dc27f6.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [6 x i64] }* @sa.inner.c43a2bb2.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [7 x i64] }* @sa.inner.7f5d5e16.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [8 x i64] }* @sa.inner.a0bc9c53.0 to { i64, [0 x i64] }*), { i64, [0 x i64] }* bitcast ({ i64, [9 x i64] }* @sa.inner.1e8aada3.0 to { i64, [0 x i64] }*)] }
+
+define private i64 @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i64, align 8
+  %"5_0" = alloca { i64, [0 x { i64, [0 x i64] }*] }*, align 8
+  %"6_0" = alloca i64, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i64, [0 x { i64, [0 x i64] }*] }* bitcast ({ i64, [10 x { i64, [0 x i64] }*] }* @sa.outer.e55b610a.0 to { i64, [0 x { i64, [0 x i64] }*] }*), { i64, [0 x { i64, [0 x i64] }*] }** %"5_0", align 8
+  %"5_01" = load { i64, [0 x { i64, [0 x i64] }*] }*, { i64, [0 x { i64, [0 x i64] }*] }** %"5_0", align 8
+  %0 = getelementptr inbounds { i64, [0 x { i64, [0 x i64] }*] }, { i64, [0 x { i64, [0 x i64] }*] }* %"5_01", i32 0, i32 0
+  %1 = load i64, i64* %0, align 4
+  store i64 %1, i64* %"6_0", align 4
+  %"6_02" = load i64, i64* %"6_0", align 4
+  store i64 %"6_02", i64* %"0", align 4
+  %"03" = load i64, i64* %"0", align 4
+  ret i64 %"03"
+}

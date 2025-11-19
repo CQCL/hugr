@@ -1,0 +1,43 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
+
+define private { i1, { i32, i8* }, i8 } @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  %"0" = alloca { i1, { i32, i8* }, i8 }, align 8
+  %"2_0" = alloca i8, align 1
+  %"2_1" = alloca i8, align 1
+  %"4_0" = alloca { i1, { i32, i8* }, i8 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i8 %0, i8* %"2_0", align 1
+  store i8 %1, i8* %"2_1", align 1
+  %"2_01" = load i8, i8* %"2_0", align 1
+  %"2_12" = load i8, i8* %"2_1", align 1
+  %valid_div = icmp ne i8 %"2_12", 0
+  %quotient = udiv i8 %"2_01", %"2_12"
+  %remainder = urem i8 %"2_01", %"2_12"
+  %2 = insertvalue { i8, i8 } poison, i8 %quotient, 0
+  %3 = insertvalue { i8, i8 } %2, i8 %remainder, 1
+  %4 = insertvalue { i1, { i8, i8 }, { i32, i8* } } { i1 true, { i8, i8 } poison, { i32, i8* } poison }, { i8, i8 } %3, 1
+  %5 = select i1 %valid_div, { i1, { i8, i8 }, { i32, i8* } } %4, { i1, { i8, i8 }, { i32, i8* } } { i1 false, { i8, i8 } poison, { i32, i8* } { i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0) } }
+  %6 = extractvalue { i1, { i8, i8 }, { i32, i8* } } %5, 1
+  %7 = extractvalue { i8, i8 } %6, 0
+  %8 = extractvalue { i8, i8 } %6, 1
+  %9 = extractvalue { i1, { i8, i8 }, { i32, i8* } } %5, 2
+  %tag = extractvalue { i1, { i8, i8 }, { i32, i8* } } %5, 0
+  %data_variant = insertvalue { i1, { i32, i8* }, i8 } { i1 true, { i32, i8* } poison, i8 poison }, i8 %7, 2
+  %err_variant = insertvalue { i1, { i32, i8* }, i8 } { i1 false, { i32, i8* } poison, i8 poison }, { i32, i8* } %9, 1
+  %10 = select i1 %tag, { i1, { i32, i8* }, i8 } %data_variant, { i1, { i32, i8* }, i8 } %err_variant
+  store { i1, { i32, i8* }, i8 } %10, { i1, { i32, i8* }, i8 }* %"4_0", align 8
+  %"4_03" = load { i1, { i32, i8* }, i8 }, { i1, { i32, i8* }, i8 }* %"4_0", align 8
+  store { i1, { i32, i8* }, i8 } %"4_03", { i1, { i32, i8* }, i8 }* %"0", align 8
+  %"04" = load { i1, { i32, i8* }, i8 }, { i1, { i32, i8* }, i8 }* %"0", align 8
+  ret { i1, { i32, i8* }, i8 } %"04"
+}

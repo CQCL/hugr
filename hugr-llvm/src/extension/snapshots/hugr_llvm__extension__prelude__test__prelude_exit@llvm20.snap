@@ -1,0 +1,27 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [5 x i8] c"EXIT\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private { i16, i16 } @_hl.main.1(i16 %0, i16 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = extractvalue { i32, i8* } { i32 42, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @0, i32 0, i32 0) }, 0
+  %3 = extractvalue { i32, i8* } { i32 42, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @0, i32 0, i32 0) }, 1
+  %4 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %2, i8* %3)
+  call void @abort()
+  %mrv = insertvalue { i16, i16 } undef, i16 0, 0
+  %mrv8 = insertvalue { i16, i16 } %mrv, i16 0, 1
+  ret { i16, i16 } %mrv8
+}
+
+declare i32 @printf(i8*, ...)
+
+declare void @abort()

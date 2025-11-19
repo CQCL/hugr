@@ -1,0 +1,21 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@sym2 = external global { i1, i64, i2 }
+@sym1 = external constant i64
+
+define private { i64, { i1, i64, i2 } } @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %sym2 = load { i1, i64, i2 }, { i1, i64, i2 }* @sym2, align 4
+  %sym1 = load i64, i64* @sym1, align 4
+  %mrv = insertvalue { i64, { i1, i64, i2 } } undef, i64 %sym1, 0
+  %mrv5 = insertvalue { i64, { i1, i64, i2 } } %mrv, { i1, i64, i2 } %sym2, 1
+  ret { i64, { i1, i64, i2 } } %mrv5
+}

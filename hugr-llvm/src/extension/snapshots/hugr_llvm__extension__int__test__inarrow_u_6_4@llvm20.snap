@@ -1,0 +1,21 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [25 x i8] c"Can't narrow into bounds\00", align 1
+
+define private { i1, { i32, i8* }, i16 } @_hl.main.1(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %upper_bounds_check = icmp ugt i64 %0, 65535
+  %inbounds = xor i1 %upper_bounds_check, true
+  %1 = trunc i64 %0 to i16
+  %2 = insertvalue { i1, { i32, i8* }, i16 } { i1 true, { i32, i8* } poison, i16 poison }, i16 %1, 2
+  %3 = select i1 %inbounds, { i1, { i32, i8* }, i16 } %2, { i1, { i32, i8* }, i16 } { i1 false, { i32, i8* } { i32 2, i8* getelementptr inbounds ([25 x i8], [25 x i8]* @0, i32 0, i32 0) }, i16 poison }
+  ret { i1, { i32, i8* }, i16 } %3
+}

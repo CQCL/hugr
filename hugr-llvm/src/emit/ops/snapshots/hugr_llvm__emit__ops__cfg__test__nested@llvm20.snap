@@ -1,0 +1,83 @@
+---
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i1 @_hl.main.1(i2 %0, i1 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+2:                                                ; preds = %entry_block
+  br label %8
+
+3:                                                ; preds = %19
+  switch i1 false, label %4 [
+  ]
+
+4:                                                ; preds = %3
+  br label %7
+
+5:                                                ; preds = %20
+  switch i1 false, label %6 [
+  ]
+
+6:                                                ; preds = %5
+  br label %7
+
+7:                                                ; preds = %6, %4
+  %"03.0" = phi i1 [ true, %4 ], [ false, %6 ]
+  ret i1 %"03.0"
+
+8:                                                ; preds = %2
+  switch i2 %0, label %9 [
+    i2 1, label %10
+    i2 -2, label %11
+  ]
+
+9:                                                ; preds = %8
+  br label %12
+
+10:                                               ; preds = %8
+  br label %14
+
+11:                                               ; preds = %8
+  br label %16
+
+12:                                               ; preds = %9
+  switch i1 false, label %13 [
+  ]
+
+13:                                               ; preds = %12
+  br label %18
+
+14:                                               ; preds = %10
+  switch i1 false, label %15 [
+  ]
+
+15:                                               ; preds = %14
+  br label %18
+
+16:                                               ; preds = %11
+  switch i1 false, label %17 [
+  ]
+
+17:                                               ; preds = %16
+  br label %18
+
+18:                                               ; preds = %17, %15, %13
+  %"06.0" = phi i1 [ true, %13 ], [ %1, %17 ], [ false, %15 ]
+  switch i1 %"06.0", label %19 [
+    i1 true, label %20
+  ]
+
+19:                                               ; preds = %18
+  br label %3
+
+20:                                               ; preds = %18
+  br label %5
+}

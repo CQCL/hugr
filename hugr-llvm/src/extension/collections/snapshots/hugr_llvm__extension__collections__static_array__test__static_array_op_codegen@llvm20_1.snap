@@ -1,0 +1,30 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i1, i1 } @_hl.main.1({ i64, [0 x i1] }* %0, i64 %1) {
+alloca_block:
+  br label %entry_block
+
+static_array_get_out_of_bounds:                   ; preds = %entry_block
+  br label %static_array_get_exit
+
+static_array_get_in_bounds:                       ; preds = %entry_block
+  %2 = getelementptr inbounds { i64, [0 x i1] }, { i64, [0 x i1] }* %0, i32 0, i32 1, i64 %1
+  %3 = load i1, i1* %2, align 1
+  %4 = insertvalue { i1, i1 } { i1 true, i1 poison }, i1 %3, 1
+  br label %static_array_get_exit
+
+static_array_get_exit:                            ; preds = %static_array_get_in_bounds, %static_array_get_out_of_bounds
+  %"03.0" = phi { i1, i1 } [ %4, %static_array_get_in_bounds ], [ { i1 false, i1 poison }, %static_array_get_out_of_bounds ]
+  ret { i1, i1 } %"03.0"
+
+entry_block:                                      ; preds = %alloca_block
+  %5 = getelementptr inbounds { i64, [0 x i1] }, { i64, [0 x i1] }* %0, i32 0, i32 0
+  %6 = load i64, i64* %5, align 4
+  %7 = icmp ult i64 %1, %6
+  br i1 %7, label %static_array_get_in_bounds, label %static_array_get_out_of_bounds
+}

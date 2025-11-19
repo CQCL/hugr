@@ -1,0 +1,44 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private i8 @_hl.main.1(i8 %0) {
+alloca_block:
+  %"0" = alloca i8, align 1
+  %"2_0" = alloca i8, align 1
+  %"4_0" = alloca i8, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i8 %0, i8* %"2_0", align 1
+  %"2_01" = load i8, i8* %"2_0", align 1
+  %bounds_check = icmp sge i8 %"2_01", 0
+  br label %panic_if_0
+
+panic_if_0:                                       ; preds = %entry_block
+  switch i1 %bounds_check, label %panic [
+    i1 true, label %exit
+  ]
+
+panic:                                            ; preds = %panic_if_0
+  %1 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([33 x i8], [33 x i8]* @0, i32 0, i32 0))
+  call void @abort()
+  br label %exit
+
+exit:                                             ; preds = %panic_if_0, %panic
+  store i8 %"2_01", i8* %"4_0", align 1
+  %"4_02" = load i8, i8* %"4_0", align 1
+  store i8 %"4_02", i8* %"0", align 1
+  %"03" = load i8, i8* %"0", align 1
+  ret i8 %"03"
+}
+
+declare i32 @printf(i8*, ...)
+
+declare void @abort()

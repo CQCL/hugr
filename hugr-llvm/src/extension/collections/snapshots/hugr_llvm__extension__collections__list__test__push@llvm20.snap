@@ -1,0 +1,20 @@
+---
+source: hugr-llvm/src/extension/collections/list.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i8* @_hl.main.1(i8* %0, i16 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = alloca i16, align 2
+  store i16 %1, i16* %2, align 2
+  %3 = bitcast i16* %2 to i8*
+  call void @__rt__list__push(i8* %0, i8* %3)
+  ret i8* %0
+}
+
+declare void @__rt__list__push(i8*, i8*)

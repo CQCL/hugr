@@ -1,0 +1,43 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i1 @_hl.main.1() {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"4_0" = alloca i1, align 1
+  %"01" = alloca i1, align 1
+  %"11_0" = alloca {}, align 8
+  %"12_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %0
+
+0:                                                ; preds = %entry_block
+  store i1 false, i1* %"12_0", align 1
+  store {} undef, {}* %"11_0", align 1
+  %"11_02" = load {}, {}* %"11_0", align 1
+  %"12_03" = load i1, i1* %"12_0", align 1
+  store {} %"11_02", {}* %"11_0", align 1
+  store i1 %"12_03", i1* %"12_0", align 1
+  %"11_04" = load {}, {}* %"11_0", align 1
+  %"12_05" = load i1, i1* %"12_0", align 1
+  switch i1 false, label %1 [
+  ]
+
+1:                                                ; preds = %0
+  store i1 %"12_05", i1* %"01", align 1
+  br label %2
+
+2:                                                ; preds = %1
+  %"06" = load i1, i1* %"01", align 1
+  store i1 %"06", i1* %"4_0", align 1
+  %"4_07" = load i1, i1* %"4_0", align 1
+  store i1 %"4_07", i1* %"0", align 1
+  %"08" = load i1, i1* %"0", align 1
+  ret i1 %"08"
+}

@@ -1,0 +1,14 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i64 @_hl.main.1(i64 %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  ret i64 %0
+}

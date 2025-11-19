@@ -1,0 +1,16 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@sa.a.97cb22bf.0 = constant { i64, [10 x i64] } { i64 10, [10 x i64] [i64 0, i64 1, i64 2, i64 3, i64 4, i64 5, i64 6, i64 7, i64 8, i64 9] }
+
+define private { i64, [0 x i64] }* @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  ret { i64, [0 x i64] }* bitcast ({ i64, [10 x i64] }* @sa.a.97cb22bf.0 to { i64, [0 x i64] }*)
+}

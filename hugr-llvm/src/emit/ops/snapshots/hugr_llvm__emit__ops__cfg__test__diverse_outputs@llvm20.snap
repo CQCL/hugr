@@ -1,0 +1,44 @@
+---
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i8 @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %2
+
+2:                                                ; preds = %11, %entry_block
+  %"7_0.0" = phi i8 [ %0, %entry_block ], [ %12, %11 ]
+  %"7_1.0" = phi i8 [ %1, %entry_block ], [ %7, %11 ]
+  %3 = insertvalue { i8, i8 } poison, i8 %"7_0.0", 0
+  %4 = insertvalue { i8, i8 } %3, i8 %"7_1.0", 1
+  switch i1 false, label %5 [
+  ]
+
+5:                                                ; preds = %2
+  %6 = extractvalue { i8, i8 } %4, 0
+  %7 = extractvalue { i8, i8 } %4, 1
+  br label %8
+
+8:                                                ; preds = %5
+  %9 = insertvalue { i1, i8 } { i1 false, i8 poison }, i8 %6, 1
+  %10 = extractvalue { i1, i8 } %9, 0
+  switch i1 %10, label %11 [
+    i1 true, label %13
+  ]
+
+11:                                               ; preds = %8
+  %12 = extractvalue { i1, i8 } %9, 1
+  br label %2
+
+13:                                               ; preds = %8
+  br label %14
+
+14:                                               ; preds = %13
+  ret i8 %7
+}

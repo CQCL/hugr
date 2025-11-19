@@ -1,0 +1,46 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { { i2, i2, i1 }, {} } @_hl.main.1({ i2, i2, i1 } %0, {} %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = extractvalue { i2, i2, i1 } %0, 0
+  switch i2 %2, label %3 [
+    i2 1, label %4
+    i2 -2, label %6
+  ]
+
+3:                                                ; preds = %entry_block
+  br label %cond_4_case_0
+
+4:                                                ; preds = %entry_block
+  %5 = extractvalue { i2, i2, i1 } %0, 2
+  br label %cond_4_case_1
+
+6:                                                ; preds = %entry_block
+  %7 = extractvalue { i2, i2, i1 } %0, 1
+  br label %cond_4_case_2
+
+cond_4_case_0:                                    ; preds = %3
+  br label %cond_exit_4
+
+cond_4_case_1:                                    ; preds = %4
+  %8 = insertvalue { i2, i2, i1 } { i2 1, i2 poison, i1 poison }, i1 %5, 2
+  br label %cond_exit_4
+
+cond_4_case_2:                                    ; preds = %6
+  %9 = insertvalue { i2, i2, i1 } { i2 0, i2 poison, i1 poison }, i2 %7, 1
+  br label %cond_exit_4
+
+cond_exit_4:                                      ; preds = %cond_4_case_2, %cond_4_case_1, %cond_4_case_0
+  %"03.0" = phi { i2, i2, i1 } [ { i2 -2, i2 poison, i1 poison }, %cond_4_case_0 ], [ %9, %cond_4_case_2 ], [ %8, %cond_4_case_1 ]
+  %mrv = insertvalue { { i2, i2, i1 }, {} } undef, { i2, i2, i1 } %"03.0", 0
+  %mrv32 = insertvalue { { i2, i2, i1 }, {} } %mrv, {} %1, 1
+  ret { { i2, i2, i1 }, {} } %mrv32
+}

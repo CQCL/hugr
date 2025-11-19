@@ -1,0 +1,64 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define void @_hl.main_void.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  call void @_hl.main_void.1()
+  ret void
+}
+
+define i1 @_hl.main_unary.5(i1 %0) {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"6_0" = alloca i1, align 1
+  %"8_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i1 %0, i1* %"6_0", align 1
+  %"6_01" = load i1, i1* %"6_0", align 1
+  %1 = call i1 @_hl.main_unary.5(i1 %"6_01")
+  store i1 %1, i1* %"8_0", align 1
+  %"8_02" = load i1, i1* %"8_0", align 1
+  store i1 %"8_02", i1* %"0", align 1
+  %"03" = load i1, i1* %"0", align 1
+  ret i1 %"03"
+}
+
+define { i1, i1 } @_hl.main_binary.9(i1 %0, i1 %1) {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"1" = alloca i1, align 1
+  %"10_0" = alloca i1, align 1
+  %"10_1" = alloca i1, align 1
+  %"12_0" = alloca i1, align 1
+  %"12_1" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i1 %0, i1* %"10_0", align 1
+  store i1 %1, i1* %"10_1", align 1
+  %"10_01" = load i1, i1* %"10_0", align 1
+  %"10_12" = load i1, i1* %"10_1", align 1
+  %2 = call { i1, i1 } @_hl.main_binary.9(i1 %"10_01", i1 %"10_12")
+  %3 = extractvalue { i1, i1 } %2, 0
+  %4 = extractvalue { i1, i1 } %2, 1
+  store i1 %3, i1* %"12_0", align 1
+  store i1 %4, i1* %"12_1", align 1
+  %"12_03" = load i1, i1* %"12_0", align 1
+  %"12_14" = load i1, i1* %"12_1", align 1
+  store i1 %"12_03", i1* %"0", align 1
+  store i1 %"12_14", i1* %"1", align 1
+  %"05" = load i1, i1* %"0", align 1
+  %"16" = load i1, i1* %"1", align 1
+  %mrv = insertvalue { i1, i1 } undef, i1 %"05", 0
+  %mrv7 = insertvalue { i1, i1 } %mrv, i1 %"16", 1
+  ret { i1, i1 } %mrv7
+}

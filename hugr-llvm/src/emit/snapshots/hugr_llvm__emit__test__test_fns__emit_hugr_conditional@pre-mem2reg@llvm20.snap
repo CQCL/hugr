@@ -1,0 +1,118 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { { i2, i2, i1 }, {} } @_hl.main.1({ i2, i2, i1 } %0, {} %1) {
+alloca_block:
+  %"0" = alloca { i2, i2, i1 }, align 8
+  %"1" = alloca {}, align 8
+  %"2_0" = alloca { i2, i2, i1 }, align 8
+  %"2_1" = alloca {}, align 8
+  %"4_0" = alloca { i2, i2, i1 }, align 8
+  %"4_1" = alloca {}, align 8
+  %"03" = alloca { i2, i2, i1 }, align 8
+  %"14" = alloca {}, align 8
+  %"07" = alloca {}, align 8
+  %"18" = alloca {}, align 8
+  %"6_0" = alloca {}, align 8
+  %"6_1" = alloca {}, align 8
+  %"8_0" = alloca { i2, i2, i1 }, align 8
+  %"014" = alloca i1, align 1
+  %"115" = alloca {}, align 8
+  %"10_0" = alloca i1, align 1
+  %"10_1" = alloca {}, align 8
+  %"12_0" = alloca { i2, i2, i1 }, align 8
+  %"021" = alloca i2, align 1
+  %"122" = alloca {}, align 8
+  %"14_0" = alloca i2, align 1
+  %"14_1" = alloca {}, align 8
+  %"16_0" = alloca { i2, i2, i1 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i2, i2, i1 } %0, { i2, i2, i1 }* %"2_0", align 1
+  store {} %1, {}* %"2_1", align 1
+  %"2_01" = load { i2, i2, i1 }, { i2, i2, i1 }* %"2_0", align 1
+  %"2_12" = load {}, {}* %"2_1", align 1
+  %2 = extractvalue { i2, i2, i1 } %"2_01", 0
+  switch i2 %2, label %3 [
+    i2 1, label %4
+    i2 -2, label %6
+  ]
+
+3:                                                ; preds = %entry_block
+  store {} undef, {}* %"07", align 1
+  store {} %"2_12", {}* %"18", align 1
+  br label %cond_4_case_0
+
+4:                                                ; preds = %entry_block
+  %5 = extractvalue { i2, i2, i1 } %"2_01", 2
+  store i1 %5, i1* %"014", align 1
+  store {} %"2_12", {}* %"115", align 1
+  br label %cond_4_case_1
+
+6:                                                ; preds = %entry_block
+  %7 = extractvalue { i2, i2, i1 } %"2_01", 1
+  store i2 %7, i2* %"021", align 1
+  store {} %"2_12", {}* %"122", align 1
+  br label %cond_4_case_2
+
+cond_4_case_0:                                    ; preds = %3
+  %"09" = load {}, {}* %"07", align 1
+  %"110" = load {}, {}* %"18", align 1
+  store {} %"09", {}* %"6_0", align 1
+  store {} %"110", {}* %"6_1", align 1
+  %"6_011" = load {}, {}* %"6_0", align 1
+  store { i2, i2, i1 } { i2 -2, i2 poison, i1 poison }, { i2, i2, i1 }* %"8_0", align 1
+  %"8_012" = load { i2, i2, i1 }, { i2, i2, i1 }* %"8_0", align 1
+  %"6_113" = load {}, {}* %"6_1", align 1
+  store { i2, i2, i1 } %"8_012", { i2, i2, i1 }* %"03", align 1
+  store {} %"6_113", {}* %"14", align 1
+  br label %cond_exit_4
+
+cond_4_case_1:                                    ; preds = %4
+  %"016" = load i1, i1* %"014", align 1
+  %"117" = load {}, {}* %"115", align 1
+  store i1 %"016", i1* %"10_0", align 1
+  store {} %"117", {}* %"10_1", align 1
+  %"10_018" = load i1, i1* %"10_0", align 1
+  %8 = insertvalue { i2, i2, i1 } { i2 1, i2 poison, i1 poison }, i1 %"10_018", 2
+  store { i2, i2, i1 } %8, { i2, i2, i1 }* %"12_0", align 1
+  %"12_019" = load { i2, i2, i1 }, { i2, i2, i1 }* %"12_0", align 1
+  %"10_120" = load {}, {}* %"10_1", align 1
+  store { i2, i2, i1 } %"12_019", { i2, i2, i1 }* %"03", align 1
+  store {} %"10_120", {}* %"14", align 1
+  br label %cond_exit_4
+
+cond_4_case_2:                                    ; preds = %6
+  %"023" = load i2, i2* %"021", align 1
+  %"124" = load {}, {}* %"122", align 1
+  store i2 %"023", i2* %"14_0", align 1
+  store {} %"124", {}* %"14_1", align 1
+  %"14_025" = load i2, i2* %"14_0", align 1
+  %9 = insertvalue { i2, i2, i1 } { i2 0, i2 poison, i1 poison }, i2 %"14_025", 1
+  store { i2, i2, i1 } %9, { i2, i2, i1 }* %"16_0", align 1
+  %"16_026" = load { i2, i2, i1 }, { i2, i2, i1 }* %"16_0", align 1
+  %"14_127" = load {}, {}* %"14_1", align 1
+  store { i2, i2, i1 } %"16_026", { i2, i2, i1 }* %"03", align 1
+  store {} %"14_127", {}* %"14", align 1
+  br label %cond_exit_4
+
+cond_exit_4:                                      ; preds = %cond_4_case_2, %cond_4_case_1, %cond_4_case_0
+  %"05" = load { i2, i2, i1 }, { i2, i2, i1 }* %"03", align 1
+  %"16" = load {}, {}* %"14", align 1
+  store { i2, i2, i1 } %"05", { i2, i2, i1 }* %"4_0", align 1
+  store {} %"16", {}* %"4_1", align 1
+  %"4_028" = load { i2, i2, i1 }, { i2, i2, i1 }* %"4_0", align 1
+  %"4_129" = load {}, {}* %"4_1", align 1
+  store { i2, i2, i1 } %"4_028", { i2, i2, i1 }* %"0", align 1
+  store {} %"4_129", {}* %"1", align 1
+  %"030" = load { i2, i2, i1 }, { i2, i2, i1 }* %"0", align 1
+  %"131" = load {}, {}* %"1", align 1
+  %mrv = insertvalue { { i2, i2, i1 }, {} } undef, { i2, i2, i1 } %"030", 0
+  %mrv32 = insertvalue { { i2, i2, i1 }, {} } %mrv, {} %"131", 1
+  ret { { i2, i2, i1 }, {} } %mrv32
+}

@@ -1,0 +1,24 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i1 @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %0
+
+0:                                                ; preds = %entry_block
+  switch i1 false, label %1 [
+  ]
+
+1:                                                ; preds = %0
+  br label %2
+
+2:                                                ; preds = %1
+  ret i1 false
+}

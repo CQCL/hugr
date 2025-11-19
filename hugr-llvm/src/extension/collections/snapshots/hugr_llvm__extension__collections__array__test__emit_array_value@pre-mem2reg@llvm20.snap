@@ -1,0 +1,30 @@
+---
+source: hugr-llvm/src/extension/collections/array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i64*, i64 } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { i64*, i64 }, align 8
+  %"5_0" = alloca { i64*, i64 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call i8* @malloc(i64 mul (i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 2))
+  %1 = bitcast i8* %0 to i64*
+  %2 = insertvalue { i64*, i64 } poison, i64* %1, 0
+  %3 = insertvalue { i64*, i64 } %2, i64 0, 1
+  %4 = getelementptr inbounds i64, i64* %1, i32 0
+  store i64 1, i64* %4, align 4
+  %5 = getelementptr inbounds i64, i64* %1, i32 1
+  store i64 2, i64* %5, align 4
+  store { i64*, i64 } %3, { i64*, i64 }* %"5_0", align 8
+  %"5_01" = load { i64*, i64 }, { i64*, i64 }* %"5_0", align 8
+  store { i64*, i64 } %"5_01", { i64*, i64 }* %"0", align 8
+  %"02" = load { i64*, i64 }, { i64*, i64 }* %"0", align 8
+  ret { i64*, i64 } %"02"
+}
+
+declare i8* @malloc(i64)

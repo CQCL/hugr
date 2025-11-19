@@ -1,0 +1,45 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { i1, i1 } @_hl.main.1({ i64, [0 x i1] }* %0, i64 %1) {
+alloca_block:
+  %"0" = alloca { i1, i1 }, align 8
+  %"2_0" = alloca { i64, [0 x i1] }*, align 8
+  %"2_1" = alloca i64, align 8
+  %"4_0" = alloca { i1, i1 }, align 8
+  %"03" = alloca { i1, i1 }, align 8
+  br label %entry_block
+
+static_array_get_out_of_bounds:                   ; preds = %entry_block
+  store { i1, i1 } { i1 false, i1 poison }, { i1, i1 }* %"03", align 1
+  br label %static_array_get_exit
+
+static_array_get_in_bounds:                       ; preds = %entry_block
+  %2 = getelementptr inbounds { i64, [0 x i1] }, { i64, [0 x i1] }* %"2_01", i32 0, i32 1, i64 %"2_12"
+  %3 = load i1, i1* %2, align 1
+  %4 = insertvalue { i1, i1 } { i1 true, i1 poison }, i1 %3, 1
+  store { i1, i1 } %4, { i1, i1 }* %"03", align 1
+  br label %static_array_get_exit
+
+static_array_get_exit:                            ; preds = %static_array_get_in_bounds, %static_array_get_out_of_bounds
+  %"04" = load { i1, i1 }, { i1, i1 }* %"03", align 1
+  store { i1, i1 } %"04", { i1, i1 }* %"4_0", align 1
+  %"4_05" = load { i1, i1 }, { i1, i1 }* %"4_0", align 1
+  store { i1, i1 } %"4_05", { i1, i1 }* %"0", align 1
+  %"06" = load { i1, i1 }, { i1, i1 }* %"0", align 1
+  ret { i1, i1 } %"06"
+
+entry_block:                                      ; preds = %alloca_block
+  store { i64, [0 x i1] }* %0, { i64, [0 x i1] }** %"2_0", align 8
+  store i64 %1, i64* %"2_1", align 4
+  %"2_01" = load { i64, [0 x i1] }*, { i64, [0 x i1] }** %"2_0", align 8
+  %"2_12" = load i64, i64* %"2_1", align 4
+  %5 = getelementptr inbounds { i64, [0 x i1] }, { i64, [0 x i1] }* %"2_01", i32 0, i32 0
+  %6 = load i64, i64* %5, align 4
+  %7 = icmp ult i64 %"2_12", %6
+  br i1 %7, label %static_array_get_in_bounds, label %static_array_get_out_of_bounds
+}

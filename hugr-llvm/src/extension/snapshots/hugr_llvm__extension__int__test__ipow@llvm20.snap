@@ -1,0 +1,41 @@
+---
+source: hugr-llvm/src/extension/int.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i8 @_hl.main.1(i8 %0, i8 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %acc_ptr = alloca i8, align 1
+  %exp_ptr = alloca i8, align 1
+  store i8 %0, i8* %acc_ptr, align 1
+  store i8 %1, i8* %exp_ptr, align 1
+  br label %pow
+
+pow:                                              ; preds = %pow_body, %entry_block
+  %acc = load i8, i8* %acc_ptr, align 1
+  %exp = load i8, i8* %exp_ptr, align 1
+  switch i8 %exp, label %pow_body [
+    i8 1, label %done
+    i8 0, label %power_of_zero
+  ]
+
+power_of_zero:                                    ; preds = %pow
+  store i8 1, i8* %acc_ptr, align 1
+  br label %done
+
+pow_body:                                         ; preds = %pow
+  %new_acc = mul i8 %acc, %0
+  %new_exp = sub i8 %exp, 1
+  store i8 %new_acc, i8* %acc_ptr, align 1
+  store i8 %new_exp, i8* %exp_ptr, align 1
+  br label %pow
+
+done:                                             ; preds = %pow, %power_of_zero
+  %result = load i8, i8* %acc_ptr, align 1
+  ret i8 %result
+}

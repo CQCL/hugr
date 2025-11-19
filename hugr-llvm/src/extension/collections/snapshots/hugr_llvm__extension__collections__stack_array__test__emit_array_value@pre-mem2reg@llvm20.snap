@@ -1,0 +1,20 @@
+---
+source: hugr-llvm/src/extension/collections/stack_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private [2 x i64] @_hl.main.1() {
+alloca_block:
+  %"0" = alloca [2 x i64], align 8
+  %"5_0" = alloca [2 x i64], align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store [2 x i64] [i64 1, i64 2], [2 x i64]* %"5_0", align 4
+  %"5_01" = load [2 x i64], [2 x i64]* %"5_0", align 4
+  store [2 x i64] %"5_01", [2 x i64]* %"0", align 4
+  %"02" = load [2 x i64], [2 x i64]* %"0", align 4
+  ret [2 x i64] %"02"
+}

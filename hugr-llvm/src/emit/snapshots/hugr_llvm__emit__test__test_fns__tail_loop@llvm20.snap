@@ -1,0 +1,55 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i64 @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  br label %loop_body
+
+loop_body:                                        ; preds = %8, %entry_block
+  %"9_0.0" = phi i64 [ 3, %entry_block ], [ %9, %8 ]
+  %"9_1.0" = phi i64 [ 7, %entry_block ], [ %0, %8 ]
+  %0 = mul i64 %"9_1.0", 2
+  %1 = icmp eq i64 %"9_0.0", 0
+  %2 = select i1 %1, i1 true, i1 false
+  switch i1 %2, label %3 [
+    i1 true, label %4
+  ]
+
+3:                                                ; preds = %loop_body
+  br label %cond_17_case_0
+
+4:                                                ; preds = %loop_body
+  br label %cond_17_case_1
+
+loop_out:                                         ; preds = %10
+  ret i64 %0
+
+cond_17_case_0:                                   ; preds = %3
+  %5 = sub i64 %"9_0.0", 1
+  %6 = insertvalue { i1, i64 } { i1 false, i64 poison }, i64 %5, 1
+  br label %cond_exit_17
+
+cond_17_case_1:                                   ; preds = %4
+  br label %cond_exit_17
+
+cond_exit_17:                                     ; preds = %cond_17_case_1, %cond_17_case_0
+  %"011.0" = phi { i1, i64 } [ %6, %cond_17_case_0 ], [ { i1 true, i64 poison }, %cond_17_case_1 ]
+  %7 = extractvalue { i1, i64 } %"011.0", 0
+  switch i1 %7, label %8 [
+    i1 true, label %10
+  ]
+
+8:                                                ; preds = %cond_exit_17
+  %9 = extractvalue { i1, i64 } %"011.0", 1
+  br label %loop_body
+
+10:                                               ; preds = %cond_exit_17
+  br label %loop_out
+}

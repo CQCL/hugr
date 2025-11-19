@@ -1,0 +1,22 @@
+---
+source: hugr-llvm/src/emit/test.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private void ()* @_hl.main.2() {
+alloca_block:
+  %"0" = alloca void ()*, align 8
+  %"5_0" = alloca void ()*, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store void ()* @_hl.target_func.1, void ()** %"5_0", align 8
+  %"5_01" = load void ()*, void ()** %"5_0", align 8
+  store void ()* %"5_01", void ()** %"0", align 8
+  %"02" = load void ()*, void ()** %"0", align 8
+  ret void ()* %"02"
+}
+
+declare void @_hl.target_func.1()

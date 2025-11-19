@@ -1,0 +1,16 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i64 @_hl.main.1({ i64, [0 x i1] }* %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = getelementptr inbounds { i64, [0 x i1] }, { i64, [0 x i1] }* %0, i32 0, i32 0
+  %2 = load i64, i64* %1, align 4
+  ret i64 %2
+}
