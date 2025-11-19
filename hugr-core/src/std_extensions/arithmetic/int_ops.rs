@@ -405,7 +405,7 @@ mod test {
             IntOpDef::iwiden_u
                 .with_two_log_widths(4, 3)
                 .to_extension_op()
-                .is_none(),
+                .is_err(),
             "type arguments invalid"
         );
 
@@ -423,7 +423,7 @@ mod test {
             IntOpDef::inarrow_u
                 .with_two_log_widths(1, 2)
                 .to_extension_op()
-                .is_none()
+                .is_err()
         );
     }
 

@@ -232,7 +232,7 @@ mod test {
             ConvertOpDef::itobool
                 .with_log_width(1)
                 .to_extension_op()
-                .is_none(),
+                .is_err(),
             "type arguments invalid"
         );
 

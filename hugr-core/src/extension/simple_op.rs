@@ -251,12 +251,9 @@ impl<T> RegisteredOp<T> {
 
 impl<T: MakeExtensionOp> RegisteredOp<T> {
     /// Generate an [`OpType`].
-    pub fn to_extension_op(&self) -> Option<ExtensionOp> {
-        ExtensionOp::new(
-            self.extension.get_op(&self.op_id())?.clone(),
-            self.type_args(),
-        )
-        .ok()
+    pub fn to_extension_op(&self) -> Result<ExtensionOp, SignatureError> {
+        let op_def = self.extension.get_op(&self.op_id()).unwrap();
+        ExtensionOp::new(op_def.clone(), self.type_args())
     }
 
     delegate! {
@@ -280,7 +277,7 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
 
     /// Convert this operation in to an [`ExtensionOp`]. Returns None if the type
     /// cannot be computed.
-    fn to_extension_op(self) -> Option<ExtensionOp>
+    fn to_extension_op(self) -> Result<ExtensionOp, SignatureError>
     where
         Self: Sized,
     {
