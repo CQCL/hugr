@@ -13,8 +13,8 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @prelude.print_template, i32 0, i32 0), i8* getelementptr inbounds ([14 x i8], [14 x i8]* @0, i32 0, i32 0))
+  %0 = call i32 (ptr, ...) @printf(ptr @prelude.print_template, ptr @0)
   ret void
 }
 
-declare i32 @printf(i8*, ...)
+declare i32 @printf(ptr, ...)

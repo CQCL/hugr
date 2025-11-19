@@ -15,19 +15,19 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store { i1, i1 } %0, { i1, i1 }* %"2_0", align 1
-  %"2_01" = load { i1, i1 }, { i1, i1 }* %"2_0", align 1
+  store { i1, i1 } %0, ptr %"2_0", align 1
+  %"2_01" = load { i1, i1 }, ptr %"2_0", align 1
   %1 = extractvalue { i1, i1 } %"2_01", 0
   %2 = extractvalue { i1, i1 } %"2_01", 1
-  store i1 %1, i1* %"4_0", align 1
-  store i1 %2, i1* %"4_1", align 1
-  %"4_02" = load i1, i1* %"4_0", align 1
-  %"4_13" = load i1, i1* %"4_1", align 1
-  store i1 %"4_02", i1* %"0", align 1
-  store i1 %"4_13", i1* %"1", align 1
-  %"04" = load i1, i1* %"0", align 1
-  %"15" = load i1, i1* %"1", align 1
-  %mrv = insertvalue { i1, i1 } undef, i1 %"04", 0
+  store i1 %1, ptr %"4_0", align 1
+  store i1 %2, ptr %"4_1", align 1
+  %"4_02" = load i1, ptr %"4_0", align 1
+  %"4_13" = load i1, ptr %"4_1", align 1
+  store i1 %"4_02", ptr %"0", align 1
+  store i1 %"4_13", ptr %"1", align 1
+  %"04" = load i1, ptr %"0", align 1
+  %"15" = load i1, ptr %"1", align 1
+  %mrv = insertvalue { i1, i1 } poison, i1 %"04", 0
   %mrv6 = insertvalue { i1, i1 } %mrv, i1 %"15", 1
   ret { i1, i1 } %mrv6
 }

@@ -13,12 +13,12 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i8 %0, i8* %"2_0", align 1
-  %"2_01" = load i8, i8* %"2_0", align 1
+  store i8 %0, ptr %"2_0", align 1
+  %"2_01" = load i8, ptr %"2_0", align 1
   %1 = sext i8 %"2_01" to i64
-  store i64 %1, i64* %"4_0", align 4
-  %"4_02" = load i64, i64* %"4_0", align 4
-  store i64 %"4_02", i64* %"0", align 4
-  %"03" = load i64, i64* %"0", align 4
+  store i64 %1, ptr %"4_0", align 4
+  %"4_02" = load i64, ptr %"4_0", align 4
+  store i64 %"4_02", ptr %"0", align 4
+  %"03" = load i64, ptr %"0", align 4
   ret i64 %"03"
 }

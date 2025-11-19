@@ -22,7 +22,7 @@ panic_if_0:                                       ; preds = %entry_block
   ]
 
 panic:                                            ; preds = %panic_if_0
-  %2 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
+  %2 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0)
   call void @abort()
   br label %exit
 
@@ -45,7 +45,7 @@ exit:                                             ; preds = %panic_if_0, %panic
 negative_bigdiv:                                  ; preds = %exit
   %6 = add i8 %0, %1
   %7 = insertvalue { i8, i8 } { i8 -1, i8 poison }, i8 %6, 1
-  store { i8, i8 } %7, { i8, i8 }* %result, align 1
+  store { i8, i8 } %7, ptr %result, align 1
   br label %finish
 
 negative_smoldiv:                                 ; preds = %exit
@@ -57,27 +57,27 @@ negative_smoldiv:                                 ; preds = %exit
   %13 = insertvalue { i8, i8 } %12, i8 %11, 1
   %is_rem_0 = icmp eq i8 %remainder, 0
   %14 = select i1 %is_rem_0, { i8, i8 } %9, { i8, i8 } %13
-  store { i8, i8 } %14, { i8, i8 }* %result, align 1
+  store { i8, i8 } %14, ptr %result, align 1
   br label %finish
 
 non_negative_bigdiv:                              ; preds = %exit
   %15 = insertvalue { i8, i8 } { i8 0, i8 poison }, i8 %0, 1
-  store { i8, i8 } %15, { i8, i8 }* %result, align 1
+  store { i8, i8 } %15, ptr %result, align 1
   br label %finish
 
 non_negative_smoldiv:                             ; preds = %exit
   %16 = insertvalue { i8, i8 } poison, i8 %quotient, 0
   %17 = insertvalue { i8, i8 } %16, i8 %remainder, 1
-  store { i8, i8 } %17, { i8, i8 }* %result, align 1
+  store { i8, i8 } %17, ptr %result, align 1
   br label %finish
 
 finish:                                           ; preds = %negative_bigdiv, %non_negative_bigdiv, %negative_smoldiv, %non_negative_smoldiv
-  %result3 = load { i8, i8 }, { i8, i8 }* %result, align 1
+  %result3 = load { i8, i8 }, ptr %result, align 1
   %18 = extractvalue { i8, i8 } %result3, 0
   %19 = extractvalue { i8, i8 } %result3, 1
   ret i8 %18
 }
 
-declare i32 @printf(i8*, ...)
+declare i32 @printf(ptr, ...)
 
 declare void @abort()

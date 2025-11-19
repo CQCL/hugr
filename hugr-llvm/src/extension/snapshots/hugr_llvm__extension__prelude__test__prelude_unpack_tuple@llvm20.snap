@@ -12,7 +12,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   %1 = extractvalue { i1, i1 } %0, 0
   %2 = extractvalue { i1, i1 } %0, 1
-  %mrv = insertvalue { i1, i1 } undef, i1 %1, 0
+  %mrv = insertvalue { i1, i1 } poison, i1 %1, 0
   %mrv6 = insertvalue { i1, i1 } %mrv, i1 %2, 1
   ret { i1, i1 } %mrv6
 }

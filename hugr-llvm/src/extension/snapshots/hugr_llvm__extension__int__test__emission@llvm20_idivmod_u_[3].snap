@@ -22,7 +22,7 @@ panic_if_0:                                       ; preds = %entry_block
   ]
 
 panic:                                            ; preds = %panic_if_0
-  %2 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 2, i8* getelementptr inbounds ([24 x i8], [24 x i8]* @0, i32 0, i32 0))
+  %2 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0)
   call void @abort()
   br label %exit
 
@@ -33,11 +33,11 @@ exit:                                             ; preds = %panic_if_0, %panic
   %4 = insertvalue { i8, i8 } %3, i8 %remainder, 1
   %5 = extractvalue { i8, i8 } %4, 0
   %6 = extractvalue { i8, i8 } %4, 1
-  %mrv = insertvalue { i8, i8 } undef, i8 %5, 0
+  %mrv = insertvalue { i8, i8 } poison, i8 %5, 0
   %mrv7 = insertvalue { i8, i8 } %mrv, i8 %6, 1
   ret { i8, i8 } %mrv7
 }
 
-declare i32 @printf(i8*, ...)
+declare i32 @printf(ptr, ...)
 
 declare void @abort()

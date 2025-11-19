@@ -12,9 +12,9 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i2 1, i2* %"4_0", align 1
-  %"4_01" = load i2, i2* %"4_0", align 1
-  store i2 %"4_01", i2* %"0", align 1
-  %"02" = load i2, i2* %"0", align 1
+  store i2 1, ptr %"4_0", align 1
+  %"4_01" = load i2, ptr %"4_0", align 1
+  store i2 %"4_01", ptr %"0", align 1
+  %"02" = load i2, ptr %"0", align 1
   ret i2 %"02"
 }

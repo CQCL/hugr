@@ -12,9 +12,9 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i64 17, i64* %"5_0", align 4
-  %"5_01" = load i64, i64* %"5_0", align 4
-  store i64 %"5_01", i64* %"0", align 4
-  %"02" = load i64, i64* %"0", align 4
+  store i64 17, ptr %"5_0", align 4
+  %"5_01" = load i64, ptr %"5_0", align 4
+  store i64 %"5_01", ptr %"0", align 4
+  %"02" = load i64, ptr %"0", align 4
   ret i64 %"02"
 }

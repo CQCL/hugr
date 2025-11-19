@@ -5,12 +5,12 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define private void ()* @_hl.main.2() {
+define private ptr @_hl.main.2() {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  ret void ()* @_hl.target_func.1
+  ret ptr @_hl.target_func.1
 }
 
 declare void @_hl.target_func.1()

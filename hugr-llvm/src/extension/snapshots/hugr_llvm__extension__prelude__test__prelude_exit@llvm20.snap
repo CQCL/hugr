@@ -13,15 +13,15 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %2 = extractvalue { i32, i8* } { i32 42, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @0, i32 0, i32 0) }, 0
-  %3 = extractvalue { i32, i8* } { i32 42, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @0, i32 0, i32 0) }, 1
-  %4 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %2, i8* %3)
+  %2 = extractvalue { i32, ptr } { i32 42, ptr @0 }, 0
+  %3 = extractvalue { i32, ptr } { i32 42, ptr @0 }, 1
+  %4 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 %2, ptr %3)
   call void @abort()
-  %mrv = insertvalue { i16, i16 } undef, i16 0, 0
+  %mrv = insertvalue { i16, i16 } poison, i16 0, 0
   %mrv8 = insertvalue { i16, i16 } %mrv, i16 0, 1
   ret { i16, i16 } %mrv8
 }
 
-declare i32 @printf(i8*, ...)
+declare i32 @printf(ptr, ...)
 
 declare void @abort()

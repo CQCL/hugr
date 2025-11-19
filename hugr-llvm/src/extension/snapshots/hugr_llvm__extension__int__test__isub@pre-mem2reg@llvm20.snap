@@ -14,14 +14,14 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store i64 %0, i64* %"2_0", align 4
-  store i64 %1, i64* %"2_1", align 4
-  %"2_01" = load i64, i64* %"2_0", align 4
-  %"2_12" = load i64, i64* %"2_1", align 4
+  store i64 %0, ptr %"2_0", align 4
+  store i64 %1, ptr %"2_1", align 4
+  %"2_01" = load i64, ptr %"2_0", align 4
+  %"2_12" = load i64, ptr %"2_1", align 4
   %2 = sub i64 %"2_01", %"2_12"
-  store i64 %2, i64* %"4_0", align 4
-  %"4_03" = load i64, i64* %"4_0", align 4
-  store i64 %"4_03", i64* %"0", align 4
-  %"04" = load i64, i64* %"0", align 4
+  store i64 %2, ptr %"4_0", align 4
+  %"4_03" = load i64, ptr %"4_0", align 4
+  store i64 %"4_03", ptr %"0", align 4
+  %"04" = load i64, ptr %"0", align 4
   ret i64 %"04"
 }

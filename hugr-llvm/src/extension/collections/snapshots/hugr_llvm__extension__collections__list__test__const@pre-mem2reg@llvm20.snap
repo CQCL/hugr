@@ -5,33 +5,30 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define private i8* @_hl.main.1() {
+define private ptr @_hl.main.1() {
 alloca_block:
-  %"0" = alloca i8*, align 8
-  %"5_0" = alloca i8*, align 8
+  %"0" = alloca ptr, align 8
+  %"5_0" = alloca ptr, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = call i8* @__rt__list__new(i64 3, i64 ptrtoint (i64* getelementptr (i64, i64* null, i32 1) to i64), i64 8, i8* null)
+  %0 = call ptr @__rt__list__new(i64 3, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 8, ptr null)
   %1 = alloca i64, align 8
-  store i64 1, i64* %1, align 4
-  %2 = bitcast i64* %1 to i8*
-  call void @__rt__list__push(i8* %0, i8* %2)
+  store i64 1, ptr %1, align 4
+  call void @__rt__list__push(ptr %0, ptr %1)
+  %2 = alloca i64, align 8
+  store i64 2, ptr %2, align 4
+  call void @__rt__list__push(ptr %0, ptr %2)
   %3 = alloca i64, align 8
-  store i64 2, i64* %3, align 4
-  %4 = bitcast i64* %3 to i8*
-  call void @__rt__list__push(i8* %0, i8* %4)
-  %5 = alloca i64, align 8
-  store i64 3, i64* %5, align 4
-  %6 = bitcast i64* %5 to i8*
-  call void @__rt__list__push(i8* %0, i8* %6)
-  store i8* %0, i8** %"5_0", align 8
-  %"5_01" = load i8*, i8** %"5_0", align 8
-  store i8* %"5_01", i8** %"0", align 8
-  %"02" = load i8*, i8** %"0", align 8
-  ret i8* %"02"
+  store i64 3, ptr %3, align 4
+  call void @__rt__list__push(ptr %0, ptr %3)
+  store ptr %0, ptr %"5_0", align 8
+  %"5_01" = load ptr, ptr %"5_0", align 8
+  store ptr %"5_01", ptr %"0", align 8
+  %"02" = load ptr, ptr %"0", align 8
+  ret ptr %"02"
 }
 
-declare i8* @__rt__list__new(i64, i64, i64, i8*)
+declare ptr @__rt__list__new(i64, i64, i64, ptr)
 
-declare void @__rt__list__push(i8*, i8*)
+declare void @__rt__list__push(ptr, ptr)

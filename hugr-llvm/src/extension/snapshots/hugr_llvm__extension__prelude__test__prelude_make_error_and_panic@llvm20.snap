@@ -14,15 +14,15 @@ alloca_block:
 
 entry_block:                                      ; preds = %alloca_block
   %0 = trunc i64 100 to i32
-  %1 = insertvalue { i32, i8* } undef, i32 %0, 0
-  %2 = insertvalue { i32, i8* } %1, i8* getelementptr inbounds ([7 x i8], [7 x i8]* @0, i32 0, i32 0), 1
-  %3 = extractvalue { i32, i8* } %2, 0
-  %4 = extractvalue { i32, i8* } %2, 1
-  %5 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([34 x i8], [34 x i8]* @prelude.panic_template, i32 0, i32 0), i32 %3, i8* %4)
+  %1 = insertvalue { i32, ptr } undef, i32 %0, 0
+  %2 = insertvalue { i32, ptr } %1, ptr @0, 1
+  %3 = extractvalue { i32, ptr } %2, 0
+  %4 = extractvalue { i32, ptr } %2, 1
+  %5 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 %3, ptr %4)
   call void @abort()
   ret void
 }
 
-declare i32 @printf(i8*, ...)
+declare i32 @printf(ptr, ...)
 
 declare void @abort()

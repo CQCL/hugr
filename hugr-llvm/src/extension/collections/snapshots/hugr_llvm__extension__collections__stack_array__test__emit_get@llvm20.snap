@@ -16,18 +16,17 @@ entry_block:                                      ; preds = %alloca_block
   br i1 %2, label %4, label %3
 
 3:                                                ; preds = %entry_block
-  br label %10
+  br label %9
 
 4:                                                ; preds = %entry_block
   %5 = alloca i64, i32 2, align 8
-  %6 = bitcast i64* %5 to [2 x i64]*
-  store [2 x i64] %1, [2 x i64]* %6, align 4
-  %7 = getelementptr inbounds i64, i64* %5, i64 1
-  %8 = load i64, i64* %7, align 4
-  %9 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %8, 1
-  br label %10
+  store [2 x i64] %1, ptr %5, align 4
+  %6 = getelementptr inbounds i64, ptr %5, i64 1
+  %7 = load i64, ptr %6, align 4
+  %8 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %7, 1
+  br label %9
 
-10:                                               ; preds = %3, %4
-  %"0.0" = phi { i1, i64 } [ %9, %4 ], [ { i1 false, i64 poison }, %3 ]
+9:                                                ; preds = %3, %4
+  %"0.0" = phi { i1, i64 } [ %8, %4 ], [ { i1 false, i64 poison }, %3 ]
   ret void
 }
