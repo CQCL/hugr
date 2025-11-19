@@ -22,8 +22,8 @@ env:
   HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
   # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_VERSION: "14.0"
-  LLVM_FEATURE_NAME: "14-0"
+  LLVM_VERSION: "20"
+  LLVM_FEATURE_NAME: "20-1"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -343,7 +343,7 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo llvm-cov --no-report  --no-default-features --doctests
           cargo llvm-cov --no-report  --all-features --doctests
-          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
+          cargo llvm-cov --no-report  -p hugr-llvm --features llvm20-1 --doctests
           cargo llvm-cov --no-report  -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
