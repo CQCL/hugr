@@ -2,9 +2,7 @@
 
 use std::io;
 
-use crate::envelope::{
-    EnvelopeConfig, ReadError, WriteError, read_described_envelope, write_envelope,
-};
+use crate::envelope::{EnvelopeConfig, ReadError, WriteError, read_envelope, write_envelope};
 use crate::extension::ExtensionRegistry;
 use crate::hugr::{HugrView, ValidationError};
 use crate::std_extensions::STD_REG;
@@ -70,7 +68,7 @@ impl Package {
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, ReadError> {
         let extensions = extensions.unwrap_or(&STD_REG);
-        let (_, pkg) = read_described_envelope(reader, extensions)?;
+        let (_, pkg) = read_envelope(reader, extensions)?;
         Ok(pkg)
     }
 

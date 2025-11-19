@@ -109,9 +109,7 @@ pub fn format_generator(json_val: &serde_json::Value) -> String {
 /// - [`ReadError::EnvelopeHeader`] if there was an error reading the envelope header.
 /// - [`ReadError::Payload`] if there was an error reading the package payload,
 ///   including a partial description of the envelope read before the error occurred.
-///
-// TODO deprecate and rename to read_envelope when removing old version
-pub fn read_described_envelope(
+pub fn read_envelope(
     reader: impl BufRead,
     registry: &ExtensionRegistry,
 ) -> Result<(PackageDesc, Package), ReadError> {
@@ -124,6 +122,15 @@ pub fn read_described_envelope(
             partial_description: desc,
         }),
     }
+}
+
+/// Deprecated alias for [`read_envelope`].
+#[deprecated(since = "0.25.0", note = "Use `read_envelope` instead.")]
+pub fn read_described_envelope(
+    reader: impl BufRead,
+    registry: &ExtensionRegistry,
+) -> Result<(PackageDesc, Package), ReadError> {
+    read_envelope(reader, registry)
 }
 
 /// Errors during reading a HUGR envelope.
@@ -372,7 +379,7 @@ pub(crate) mod test {
         }
 
         let (desc, new_package) =
-            read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
+            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
         let decoded_config = desc.header.config();
         assert_eq!(config.format, decoded_config.format);
         assert_eq!(config.zstd.is_some(), decoded_config.zstd.is_some());
@@ -401,7 +408,7 @@ pub(crate) mod test {
         package.store(&mut buffer, config).unwrap();
 
         let (desc, new_package) =
-            read_described_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
+            read_envelope(BufReader::new(buffer.as_slice()), &PRELUDE_REGISTRY).unwrap();
         let decoded_config = desc.header.config();
 
         assert_eq!(config.format, decoded_config.format);

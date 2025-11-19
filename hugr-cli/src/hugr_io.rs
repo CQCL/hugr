@@ -2,7 +2,7 @@
 
 use clio::Input;
 use hugr::envelope::description::PackageDesc;
-use hugr::envelope::read_described_envelope;
+use hugr::envelope::read_envelope;
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -81,11 +81,11 @@ impl HugrInputArgs {
         match reader {
             Some(r) => {
                 let buffer = BufReader::new(r);
-                Ok(read_described_envelope(buffer, &extensions)?)
+                Ok(read_envelope(buffer, &extensions)?)
             }
             None => {
                 let buffer = BufReader::new(&mut self.input);
-                Ok(read_described_envelope(buffer, &extensions)?)
+                Ok(read_envelope(buffer, &extensions)?)
             }
         }
     }
