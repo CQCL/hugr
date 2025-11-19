@@ -25,7 +25,7 @@ class ComposablePass(Protocol):
         else:
             return self._apply(hugr)
 
-    # At least one of the following _apply methods must be ovewritten
+    # At least one of the following _apply methods must be overriden
     def _apply(self, hugr: Hugr) -> Hugr:
         hugr = deepcopy(hugr)
         self._apply_inplace(hugr)
@@ -64,9 +64,10 @@ class ComposedPass(ComposablePass):
     passes: list[ComposablePass]
 
     def _apply(self, hugr: Hugr) -> Hugr:
+        result_hugr = hugr
         for comp_pass in self.passes:
-            res = comp_pass(hugr, inplace=False)
-        return res
+            result_hugr = comp_pass(result_hugr, inplace=False)
+        return result_hugr
 
     def _apply_inplace(self, hugr: Hugr) -> None:
         for comp_pass in self.passes:
