@@ -67,10 +67,14 @@ class ComposedPass(ComposablePass):
         """Call all of the passes in sequence."""
         if inplace:
             for comp_pass in self.passes:
-                comp_pass(hugr, True)
+                comp_pass(hugr, inplace=True)
             return hugr
 
         else:
             for comp_pass in self.passes:
-                res = comp_pass(hugr, False)
+                res = comp_pass(hugr, inplace=False)
             return res
+
+    @property
+    def name(self) -> str:
+        return f"Composed({ ', '.join(pass_.name for pass_ in self.passes) })"
