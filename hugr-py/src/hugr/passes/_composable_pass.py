@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class ComposablePass(Protocol):
     """A Protocol which represents a composable Hugr transformation."""
 
-    def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
+    def __call__(self, hugr: Hugr, *, inplace: bool = True) -> Hugr:
         """Call the pass to transform a HUGR."""
         if inplace:
             self._apply_inplace(hugr)
@@ -63,7 +63,7 @@ class ComposedPass(ComposablePass):
 
     passes: list[ComposablePass]
 
-    def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
+    def __call__(self, hugr: Hugr, *, inplace: bool = True) -> Hugr:
         """Call all of the passes in sequence."""
         if inplace:
             for comp_pass in self.passes:
