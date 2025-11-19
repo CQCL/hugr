@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
 import hugr._serialization.ops as sops
@@ -337,9 +337,6 @@ class Extension(Value):
     typ: tys.Type
     #: Value payload.
     val: Any
-
-    #: Extension set. Deprecated, no longer used. Will be removed in hugr v0.13.
-    extensions: tys.ExtensionSet = field(default_factory=tys.ExtensionSet)
 
     def type_(self) -> tys.Type:
         return self.typ
