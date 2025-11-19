@@ -2,7 +2,7 @@
 
 use clio::Input;
 use hugr::envelope::description::PackageDesc;
-use hugr::envelope::{EnvelopeConfig, read_described_envelope};
+use hugr::envelope::read_envelope;
 use hugr::extension::ExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
@@ -53,19 +53,6 @@ impl HugrInputArgs {
     }
 
     /// Read a hugr envelope from the input and return the envelope
-    /// configuration and the package encoded within.
-    ///
-    /// # Errors
-    ///
-    /// If [`HugrInputArgs::hugr_json`] is `true`, [`HugrInputArgs::get_hugr`] should be called instead as
-    /// reading the input as a package will fail.
-    #[deprecated(since = "0.24.1", note = "Use get_described_envelope instead")]
-    pub fn get_envelope(&mut self) -> Result<(EnvelopeConfig, Package), CliError> {
-        let (desc, package) = self.get_described_package()?;
-        Ok((desc.header.config(), package))
-    }
-
-    /// Read a hugr envelope from the input and return the envelope
     /// description and the decoded package.
     ///
     /// # Errors
@@ -94,11 +81,11 @@ impl HugrInputArgs {
         match reader {
             Some(r) => {
                 let buffer = BufReader::new(r);
-                Ok(read_described_envelope(buffer, &extensions)?)
+                Ok(read_envelope(buffer, &extensions)?)
             }
             None => {
                 let buffer = BufReader::new(&mut self.input);
-                Ok(read_described_envelope(buffer, &extensions)?)
+                Ok(read_envelope(buffer, &extensions)?)
             }
         }
     }

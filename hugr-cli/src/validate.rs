@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use hugr::HugrView;
 use hugr::package::PackageValidationError;
+use hugr::{HugrView, Node};
 use std::io::Read;
 #[cfg(feature = "tracing")]
 use tracing::info;
@@ -38,8 +38,7 @@ impl ValArgs {
         if self.input_args.hugr_json {
             #[allow(deprecated)]
             let hugr = self.input_args.get_hugr_with_reader(input_override)?;
-            #[allow(deprecated)]
-            let generator = hugr::envelope::get_generator(&[&hugr]);
+            let generator = get_generator(&hugr);
 
             hugr.validate()
                 .map_err(PackageValidationError::Validation)
@@ -66,4 +65,9 @@ impl ValArgs {
     pub fn run(&mut self) -> Result<()> {
         self.run_with_input(None::<&[u8]>)
     }
+}
+
+fn get_generator(hugr: &impl HugrView<Node = Node>) -> Option<String> {
+    let mod_desc: hugr::envelope::description::ModuleDesc = hugr.into();
+    mod_desc.generator
 }

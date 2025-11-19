@@ -7,7 +7,7 @@ use std::str::FromStr;
 use hugr::{
     Extension, Hugr,
     builder::{Dataflow as _, DataflowHugr as _},
-    envelope::{EnvelopeConfig, EnvelopeFormat, read_described_envelope, write_envelope},
+    envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
     extension::prelude::bool_t,
     package::Package,
     std_extensions::std_reg,
@@ -121,7 +121,7 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     write_envelope(&mut bytes, &package, EnvelopeConfig::new(format)).unwrap();
 
     let buff = std::io::BufReader::new(bytes.as_slice());
-    let (_, loaded_pkg) = read_described_envelope(buff, &std_reg()).unwrap();
+    let (_, loaded_pkg) = read_envelope(buff, &std_reg()).unwrap();
 
     assert_eq!(loaded_pkg.extensions.len(), 1);
     let read_ext = loaded_pkg.extensions.iter().next().unwrap();
