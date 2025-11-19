@@ -116,7 +116,7 @@ fn encode_model_text<'h>(
 #[derive(Error, Debug)]
 #[non_exhaustive]
 #[error(transparent)]
-pub struct WriteError(WriteErrorInner);
+pub struct WriteError(pub(crate) WriteErrorInner);
 
 impl WriteError {
     /// Create a new error for a non-ASCII format.
@@ -129,7 +129,7 @@ impl WriteError {
 #[non_exhaustive]
 #[error(transparent)]
 /// Error encoding an envelope payload with enumerated variants.
-enum WriteErrorInner {
+pub(crate) enum WriteErrorInner {
     /// Error encoding a JSON format package.
     JsonWrite(#[from] PackageEncodingError),
     /// Error encoding a binary model format package.
@@ -165,14 +165,14 @@ impl<T: Into<WriteErrorInner>> From<T> for WriteError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelTextWriteError {
+pub(crate) enum ModelTextWriteError {
     JsonSerialize(#[from] serde_json::Error),
     StringWrite(#[from] std::io::Error),
 }
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelBinaryWriteError {
+pub(crate) enum ModelBinaryWriteError {
     WriteBinary(#[from] hugr_model::v0::binary::WriteError),
     JsonSerialize(#[from] serde_json::Error),
 }

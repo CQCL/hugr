@@ -277,7 +277,7 @@ pub struct PayloadError(PayloadErrorInner);
 #[non_exhaustive]
 #[error(transparent)]
 /// Error decoding an envelope payload with enumerated variants.
-enum PayloadErrorInner {
+pub(crate) enum PayloadErrorInner {
     /// Error decoding a JSON format package.
     JsonRead(#[from] PackageEncodingError),
     /// Error decoding a binary model format package.
@@ -298,7 +298,7 @@ impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelTextReadError {
+pub(crate) enum ModelTextReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     Import(#[from] ImportError),
     ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
@@ -310,7 +310,7 @@ enum ModelTextReadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelBinaryReadError {
+pub(crate) enum ModelBinaryReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     ReadBinary(#[from] hugr_model::v0::binary::ReadError),
     Import(#[from] ImportError),

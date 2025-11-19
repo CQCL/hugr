@@ -186,7 +186,7 @@ pub(crate) fn write_envelope_impl<'h>(
         None => String::new()
     },
 )]
-struct FormatUnsupportedError {
+pub(crate) struct FormatUnsupportedError {
     /// The unsupported format.
     format: EnvelopeFormat,
     /// Optionally, the feature required to support this format.
@@ -284,6 +284,7 @@ pub(crate) mod test {
 
     use crate::HugrView;
     use crate::builder::test::{multi_module_package, simple_package};
+    use crate::envelope::writer::WriteErrorInner;
     use crate::extension::{Extension, ExtensionRegistry, Version};
     use crate::extension::{ExtensionId, PRELUDE_REGISTRY};
     use crate::hugr::HugrMut;
@@ -291,7 +292,6 @@ pub(crate) mod test {
     use crate::std_extensions::STD_REG;
     use serde_json::json;
     use std::sync::Arc;
-
     /// Returns an `ExtensionRegistry` with the extensions from both
     /// sets. Avoids cloning if the first one already contains all
     /// extensions from the second one.
@@ -333,7 +333,10 @@ pub(crate) mod test {
     fn errors() {
         let package = simple_package();
         // The binary format is not ASCII-printable, so store_str should fail
-        assert!(package.store_str(EnvelopeConfig::binary()).is_err());
+        assert_matches!(
+            package.store_str(EnvelopeConfig::binary()),
+            Err(WriteError(WriteErrorInner::NonASCIIFormat { .. }))
+        );
     }
 
     #[rstest]
@@ -363,7 +366,7 @@ pub(crate) mod test {
             true => res.unwrap(),
             false => {
                 // ZstdUnsupported error should be raised
-                assert!(res.is_err());
+                assert_matches!(res, Err(WriteError(WriteErrorInner::ZstdUnsupported)));
                 return;
             }
         }
