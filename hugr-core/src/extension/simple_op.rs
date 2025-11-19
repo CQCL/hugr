@@ -252,7 +252,12 @@ impl<T> RegisteredOp<T> {
 impl<T: MakeExtensionOp> RegisteredOp<T> {
     /// Generate an [`OpType`].
     pub fn to_extension_op(&self) -> Result<ExtensionOp, SignatureError> {
-        let op_def = self.extension.get_op(&self.op_id()).unwrap();
+        let op_def = self.extension.get_op(&self.op_id()).unwrap_or_else(|| {
+            panic!(
+                "Extension::get_op() called with an invalid name ({}).",
+                self.op_id()
+            )
+        });
         ExtensionOp::new(op_def.clone(), self.type_args())
     }
 
