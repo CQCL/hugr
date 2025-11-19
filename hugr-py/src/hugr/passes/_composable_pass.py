@@ -25,7 +25,7 @@ class ComposablePass(Protocol):
         else:
             return self._apply(hugr)
 
-    # At least one of the following must be ovewritten
+    # At least one of the following _apply methods must be ovewritten
     def _apply(self, hugr: Hugr) -> Hugr:
         hugr = deepcopy(hugr)
         self._apply_inplace(hugr)
@@ -63,17 +63,14 @@ class ComposedPass(ComposablePass):
 
     passes: list[ComposablePass]
 
-    def __call__(self, hugr: Hugr, *, inplace: bool = True) -> Hugr:
-        """Call all of the passes in sequence."""
-        if inplace:
-            for comp_pass in self.passes:
-                comp_pass(hugr, inplace=True)
-            return hugr
+    def _apply(self, hugr: Hugr) -> Hugr:
+        for comp_pass in self.passes:
+            res = comp_pass(hugr, inplace=False)
+        return res
 
-        else:
-            for comp_pass in self.passes:
-                res = comp_pass(hugr, inplace=False)
-            return res
+    def _apply_inplace(self, hugr: Hugr) -> None:
+        for comp_pass in self.passes:
+            comp_pass(hugr, inplace=True)
 
     @property
     def name(self) -> str:
