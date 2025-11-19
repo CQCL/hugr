@@ -26,7 +26,6 @@ use clap::{Parser, crate_version};
 #[cfg(feature = "tracing")]
 use clap_verbosity_flag::VerbosityFilter;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use hugr::envelope::EnvelopeError;
 use hugr::package::PackageValidationError;
 use thiserror::Error;
 #[cfg(feature = "tracing")]
@@ -90,9 +89,6 @@ pub enum CliError {
     #[error("Error validating HUGR.")]
     /// Errors produced by the `validate` subcommand.
     Validate(#[from] PackageValidationError),
-    #[error("Error decoding HUGR envelope.")]
-    /// Errors produced by the `validate` subcommand.
-    Envelope(#[from] EnvelopeError),
     /// Pretty error when the user passes a non-envelope file.
     #[error(
         "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
