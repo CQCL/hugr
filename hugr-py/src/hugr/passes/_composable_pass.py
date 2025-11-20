@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from hugr.hugr.base import Hugr
 
 
@@ -18,22 +20,10 @@ class ComposablePass(Protocol):
     """A Protocol which represents a composable Hugr transformation."""
 
     def __call__(self, hugr: Hugr, *, inplace: bool = True) -> Hugr:
-        """Call the pass to transform a HUGR."""
-        if inplace:
-            self._apply_inplace(hugr)
-            return hugr
-        else:
-            return self._apply(hugr)
+        """Call the pass to transform a HUGR.
 
-    # At least one of the following _apply methods must be overriden
-    def _apply(self, hugr: Hugr) -> Hugr:
-        hugr = deepcopy(hugr)
-        self._apply_inplace(hugr)
-        return hugr
-
-    def _apply_inplace(self, hugr: Hugr) -> None:
-        new_hugr = self._apply(hugr)
-        hugr._overwrite_hugr(new_hugr)
+        See :func:`_impl_pass_call` for a helper function to implement this method.
+        """
 
     @property
     def name(self) -> str:
@@ -57,21 +47,65 @@ class ComposablePass(Protocol):
         return ComposedPass(pass_list)
 
 
+def impl_pass_call(
+    *,
+    hugr: Hugr,
+    inplace: bool,
+    inplace_call: Callable[[Hugr], None] | None = None,
+    copy_call: Callable[[Hugr], Hugr] | None = None,
+) -> Hugr:
+    """Helper function to implement a ComposablePass.__call__ method, given an
+    inplace or copy-returning pass methods.
+
+    At least one of the `inplace_call` or `copy_call` arguments must be provided.
+
+    :param hugr: The Hugr to apply the pass to.
+    :param inplace: Whether to apply the pass inplace.
+    :param inplace_call: The method to apply the pass inplace.
+    :param copy_call: The method to apply the pass by copying the Hugr.
+    :return: The transformed Hugr.
+    """
+    if inplace and inplace_call is not None:
+        inplace_call(hugr)
+        return hugr
+    elif inplace and copy_call is not None:
+        new_hugr = copy_call(hugr)
+        hugr._overwrite_hugr(new_hugr)
+        return hugr
+    elif not inplace and copy_call is not None:
+        return copy_call(hugr)
+    elif not inplace and inplace_call is not None:
+        new_hugr = deepcopy(hugr)
+        inplace_call(new_hugr)
+        return new_hugr
+    else:
+        msg = "Pass must implement at least an inplace or copy run method"
+        raise ValueError(msg)
+
+
 @dataclass
 class ComposedPass(ComposablePass):
     """A sequence of composable passes."""
 
     passes: list[ComposablePass]
 
-    def _apply(self, hugr: Hugr) -> Hugr:
-        result_hugr = hugr
-        for comp_pass in self.passes:
-            result_hugr = comp_pass(result_hugr, inplace=False)
-        return result_hugr
+    def __call__(self, hugr: Hugr, *, inplace: bool = True) -> Hugr:
+        def apply(hugr: Hugr) -> Hugr:
+            result_hugr = hugr
+            for comp_pass in self.passes:
+                result_hugr = comp_pass(result_hugr, inplace=False)
+            return result_hugr
 
-    def _apply_inplace(self, hugr: Hugr) -> None:
-        for comp_pass in self.passes:
-            comp_pass(hugr, inplace=True)
+        def apply_inplace(hugr: Hugr) -> None:
+            for comp_pass in self.passes:
+                comp_pass(hugr, inplace=True)
+
+        return impl_pass_call(
+            hugr=hugr,
+            inplace=inplace,
+            inplace_call=apply_inplace,
+            copy_call=apply,
+        )
 
     @property
     def name(self) -> str:
