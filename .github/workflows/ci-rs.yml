@@ -142,13 +142,36 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      # - name: Build with all features
+      - name: Set LLVM environment variables
+        run: |
+          echo "LLVM_SYS_201_PREFIX=$LLVM_PATH" >> $GITHUB_ENV
+          echo "LLVM_SYS_200_PREFIX=$LLVM_PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$LLVM_PATH/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+      - name: Debug LLVM installation
+        run: |
+          echo "LLVM_PATH: $LLVM_PATH"
+          ls -la $LLVM_PATH/lib/ || true
+          echo "Looking for libclang:"
+          find $LLVM_PATH/lib -name "libclang*" || true
+          echo "Looking for libLLVM:"
+          find $LLVM_PATH/lib -name "libLLVM*" || true
+          echo "System ldconfig:"
+          ldconfig -p | grep -i llvm || true
+          echo "Testing llvm-config:"
+          $LLVM_PATH/bin/llvm-config --version || true
+          $LLVM_PATH/bin/llvm-config --libs || true
+          $LLVM_PATH/bin/llvm-config --libdir || true
+      
+          # - name: Build with all features
       #   run: cargo nextest r --verbose  --all-features --no-run
       # - name: Tests with all features
       #   run: cargo nextest r --verbose  --all-features
+      
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+        env:
+          RUST_BACKTRACE: "1"
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
