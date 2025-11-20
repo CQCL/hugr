@@ -15,6 +15,10 @@ if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
 
 
+# Type alias for a pass name
+PassName = str
+
+
 @runtime_checkable
 class ComposablePass(Protocol):
     """A Protocol which represents a composable Hugr transformation."""
@@ -30,7 +34,7 @@ class ComposablePass(Protocol):
         """
 
     @property
-    def name(self) -> str:
+    def name(self) -> PassName:
         """Returns the name of the pass."""
         return self.__class__.__name__
 
@@ -109,7 +113,7 @@ class ComposedPass(ComposablePass):
         )
 
     @property
-    def name(self) -> str:
+    def name(self) -> PassName:
         return f"Composed({ ', '.join(pass_.name for pass_ in self.passes) })"
 
 
@@ -133,7 +137,7 @@ class PassResult:
     hugr: Hugr
     original_dirty: bool = False
     modified: bool = False
-    results: list[tuple[ComposablePass, Any]] = field(default_factory=list)
+    results: list[tuple[PassName, Any]] = field(default_factory=list)
 
     @classmethod
     def for_pass(
@@ -157,7 +161,7 @@ class PassResult:
             hugr=hugr,
             original_dirty=inline and modified,
             modified=modified,
-            results=[(pass_, result)],
+            results=[(pass_.name, result)],
         )
 
     def then(self, other: PassResult) -> PassResult:
