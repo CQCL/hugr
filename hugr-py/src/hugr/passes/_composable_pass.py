@@ -44,6 +44,7 @@ class ComposablePass(Protocol):
 
 
 def impl_pass_run(
+    pass_: ComposablePass,
     *,
     hugr: Hugr,
     inplace: bool,
@@ -55,6 +56,7 @@ def impl_pass_run(
 
     At least one of the `inplace_call` or `copy_call` arguments must be provided.
 
+    :param pass_: The pass being run. Used for error messages.
     :param hugr: The Hugr to apply the pass to.
     :param inplace: Whether to apply the pass inplace.
     :param inplace_call: The method to apply the pass inplace.
@@ -79,7 +81,7 @@ def impl_pass_run(
         pass_result.original_dirty = False
         return pass_result
     else:
-        msg = "Pass must implement at least an inplace or copy run method"
+        msg = f"{pass_.name} needs to implement at least an inplace or copy run method"
         raise ValueError(msg)
 
 
@@ -106,6 +108,7 @@ class ComposedPass(ComposablePass):
             return pass_result
 
         return impl_pass_run(
+            self,
             hugr=hugr,
             inplace=inplace,
             inplace_call=apply,
