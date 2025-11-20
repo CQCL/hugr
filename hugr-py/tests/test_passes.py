@@ -1,5 +1,7 @@
 from copy import deepcopy
 
+import pytest
+
 from hugr.hugr.base import Hugr
 from hugr.passes._composable_pass import (
     ComposablePass,
@@ -13,6 +15,7 @@ def test_composable_pass() -> None:
     class MyDummyInlinePass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
+                self,
                 hugr=hugr,
                 inplace=inplace,
                 inplace_call=lambda hugr: PassResult.for_pass(
@@ -28,6 +31,7 @@ def test_composable_pass() -> None:
     class MyDummyCopyPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
+                self,
                 hugr=hugr,
                 inplace=inplace,
                 copy_call=lambda hugr: PassResult.for_pass(
@@ -82,3 +86,20 @@ def test_composable_pass() -> None:
         ("MyDummyCopyPass", None),
     ]
     assert copy_result.hugr is not hugr
+
+
+def test_invalid_composable_pass() -> None:
+    class MyDummyInvalidPass(ComposablePass):
+        def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
+            return impl_pass_run(
+                self,
+                hugr=hugr,
+                inplace=inplace,
+            )
+
+    dummy_invalid = MyDummyInvalidPass()
+    with pytest.raises(
+        ValueError,
+        match="MyDummyInvalidPass needs to implement at least an inplace or copy run method",  # noqa: E501
+    ):
+        dummy_invalid.run(Hugr())
