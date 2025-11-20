@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from hugr.hugr.base import Hugr
 from hugr.passes._composable_pass import (
     ComposablePass,
@@ -8,7 +10,7 @@ from hugr.passes._composable_pass import (
 
 
 def test_composable_pass() -> None:
-    class MyDummyPass(ComposablePass):
+    class MyDummyInlinePass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
                 hugr=hugr,
@@ -18,24 +20,65 @@ def test_composable_pass() -> None:
                     hugr,
                     result=None,
                     inline=True,
-                    modified=False,
+                    # Say that we modified the HUGR even though we didn't
+                    modified=True,
                 ),
             )
 
-    dummy = MyDummyPass()
+    class MyDummyCopyPass(ComposablePass):
+        def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
+            return impl_pass_run(
+                hugr=hugr,
+                inplace=inplace,
+                copy_call=lambda hugr: PassResult.for_pass(
+                    self,
+                    deepcopy(hugr),
+                    result=None,
+                    inline=False,
+                    # Say that we modified the HUGR even though we didn't
+                    modified=True,
+                ),
+            )
 
-    composed_dummies = dummy.then(dummy)
+    dummy_inline = MyDummyInlinePass()
+    dummy_copy = MyDummyCopyPass()
 
-    my_composed_pass = ComposedPass(dummy, dummy)
-    assert my_composed_pass.passes == [dummy, dummy]
+    composed_dummies = dummy_inline.then(dummy_copy)
+    assert isinstance(composed_dummies, ComposedPass)
 
-    assert isinstance(composed_dummies, ComposablePass)
-    assert composed_dummies == my_composed_pass
-
-    assert dummy.name == "MyDummyPass"
-    assert composed_dummies.name == "Composed(MyDummyPass, MyDummyPass)"
-
-    assert (
-        composed_dummies.then(my_composed_pass).name
-        == "Composed(MyDummyPass, MyDummyPass, MyDummyPass, MyDummyPass)"
+    assert dummy_inline.name == "MyDummyInlinePass"
+    assert dummy_copy.name == "MyDummyCopyPass"
+    assert composed_dummies.name == "Composed(MyDummyInlinePass, MyDummyCopyPass)"
+    assert composed_dummies.then(dummy_inline).then(composed_dummies).name == (
+        "Composed("
+        + "MyDummyInlinePass, MyDummyCopyPass, "
+        + "MyDummyInlinePass, "
+        + "MyDummyInlinePass, MyDummyCopyPass)"
     )
+
+    # Apply the passes
+    hugr: Hugr = Hugr()
+    new_hugr = composed_dummies(hugr, inplace=False)
+    assert hugr == new_hugr
+    assert new_hugr is not hugr
+
+    # Verify the pass results
+    hugr = Hugr()
+    inplace_result = composed_dummies.run(hugr, inplace=True)
+    assert inplace_result.modified
+    assert inplace_result.original_dirty
+    assert inplace_result.results == [
+        ("MyDummyInlinePass", None),
+        ("MyDummyCopyPass", None),
+    ]
+    assert inplace_result.hugr is hugr
+
+    hugr = Hugr()
+    copy_result = composed_dummies.run(hugr, inplace=False)
+    assert copy_result.modified
+    assert not copy_result.original_dirty
+    assert copy_result.results == [
+        ("MyDummyInlinePass", None),
+        ("MyDummyCopyPass", None),
+    ]
+    assert copy_result.hugr is not hugr
