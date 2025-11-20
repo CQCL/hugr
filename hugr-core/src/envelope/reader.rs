@@ -205,7 +205,6 @@ impl<R: BufRead> EnvelopeReader<R> {
         } else {
             ExtensionRegistry::new([])
         };
-        self.register_packaged(&packaged_extensions);
 
         self.import_package(&model_package, packaged_extensions)
             .map_err(Into::into)
@@ -248,6 +247,7 @@ impl<R: BufRead> EnvelopeReader<R> {
         packaged_extensions: ExtensionRegistry,
     ) -> Result<Package, crate::import::ImportError> {
         self.description.set_n_modules(package.modules.len());
+        self.register_packaged(&packaged_extensions);
 
         let modules = package
             .modules
