@@ -1,21 +1,32 @@
 from hugr.hugr.base import Hugr
-from hugr.passes._composable_pass import ComposablePass, ComposedPass, impl_pass_call
+from hugr.passes._composable_pass import (
+    ComposablePass,
+    ComposedPass,
+    PassResult,
+    impl_pass_run,
+)
 
 
 def test_composable_pass() -> None:
     class MyDummyPass(ComposablePass):
-        def __call__(self, hugr: Hugr, inplace: bool = True) -> Hugr:
-            return impl_pass_call(
+        def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
+            return impl_pass_run(
                 hugr=hugr,
                 inplace=inplace,
-                inplace_call=lambda hugr: None,
+                inplace_call=lambda hugr: PassResult.for_pass(
+                    self,
+                    hugr,
+                    result=None,
+                    inline=True,
+                    modified=False,
+                ),
             )
 
     dummy = MyDummyPass()
 
     composed_dummies = dummy.then(dummy)
 
-    my_composed_pass = ComposedPass([dummy, dummy])
+    my_composed_pass = ComposedPass(dummy, dummy)
     assert my_composed_pass.passes == [dummy, dummy]
 
     assert isinstance(composed_dummies, ComposablePass)
