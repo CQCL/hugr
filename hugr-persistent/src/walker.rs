@@ -62,7 +62,7 @@ use hugr_core::ops::handle::DataflowParentID;
 use itertools::{Either, Itertools};
 use thiserror::Error;
 
-use hugr_core::{Direction, Hugr, HugrView, Port, PortIndex, hugr::views::RootCheckable};
+use hugr_core::{Direction, Hugr, HugrView, Port, PortIndex, hugr::views::RootChecked};
 
 use crate::{Commit, PersistentReplacement, PinnedSubgraph};
 
@@ -302,7 +302,7 @@ impl<'a> Walker<'a> {
     pub fn try_create_commit(
         &self,
         subgraph: impl Into<PinnedSubgraph>,
-        repl: impl RootCheckable<Hugr, DataflowParentID>,
+        mut repl: RootChecked<Hugr, DataflowParentID>,
         map_boundary: impl Fn(PatchNode, Port) -> Port,
     ) -> Result<Commit<'a>, InvalidCommit> {
         let pinned_subgraph = subgraph.into();
@@ -312,7 +312,6 @@ impl<'a> Walker<'a> {
             .map(|id| self.selected_commits.get_commit(id).clone());
 
         let repl = {
-            let mut repl = repl.try_into_checked().expect("replacement is not DFG");
             let new_inputs = subgraph
                 .incoming_ports()
                 .iter()
@@ -783,7 +782,7 @@ mod tests {
         let commit = walker
             .try_create_commit(
                 PinnedSubgraph::try_from_pinned(std::iter::empty(), [wire], &walker).unwrap(),
-                empty_hugr,
+                RootChecked::try_new(empty_hugr).unwrap(),
                 |node, port| {
                     assert_eq!(port.index(), 0);
                     assert!([not0, not2].contains(&node));
