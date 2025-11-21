@@ -1325,10 +1325,13 @@ mod test {
         let insert = {
             let mut mb = ModuleBuilder::new();
             let reached = mb.declare("foo", endo_sig(usize_t()).into()).unwrap();
-            let unreached = mb.declare("bar", endo_sig(usize_t()).into()).unwrap();
+            // This would conflict signature, but is not reached:
+            let unreached = mb
+                .declare("bar", inout_sig(vec![], usize_t()).into())
+                .unwrap();
             let mut outer = mb.define_function("outer", endo_sig(usize_t())).unwrap();
-            let [i] = outer.input_wires_arr();
-            let [i] = outer.call(&unreached, &[], [i]).unwrap().outputs_arr();
+            // ...as this first call is outside the region we insert:
+            let [i] = outer.call(&unreached, &[], []).unwrap().outputs_arr();
             let mut dfb = outer.dfg_builder(endo_sig(usize_t()), [i]).unwrap();
             let [i] = dfb.input_wires_arr();
             let call = dfb.call(&reached, &[], [i]).unwrap();
@@ -1343,12 +1346,10 @@ mod test {
         let cst = fb.add_load_value(ConstUsize::new(42));
         let mut host = fb.finish_hugr_with_outputs([cst]).unwrap();
 
-        // TODO no good equivalent of pytest parametrized fixtures here...
-        // crate rstest_reuse is one way, but seems heavy for just this???
-        let any_pol = NameLinkingPolicy::default();
+        let pol = NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError);
 
         let ins = host
-            .insert_link_from_view(host.entrypoint(), &insert, &any_pol)
+            .insert_link_from_view(host.entrypoint(), &insert, &pol)
             .unwrap();
         let dfg = *ins.node_map.get(&insert.entrypoint()).unwrap();
         assert!(host.get_optype(dfg).is_dfg());
@@ -1364,5 +1365,60 @@ mod test {
             Some(defns.into_keys().exactly_one().unwrap())
         );
         assert_eq!(tgt, decls.into_keys().exactly_one().unwrap());
+    }
+
+    #[rstest]
+    fn no_new_names_module(#[values(Visibility::Public, Visibility::Private)] vis: Visibility) {
+        let pub_sig = endo_sig(usize_t());
+        let bar_sig = Signature::new(vec![usize_t(); 2], usize_t());
+        let existing = {
+            let mut mb = ModuleBuilder::new();
+            mb.declare("pub_func", pub_sig.clone().into()).unwrap();
+            mb.finish_hugr().unwrap()
+        };
+        let (insert, new_func) = {
+            let mut mb = ModuleBuilder::new();
+            let bar = mb
+                .declare_vis("new_func", bar_sig.into(), vis.clone())
+                .unwrap();
+            let mut pf = mb
+                .define_function_vis("pub_func", pub_sig.clone(), Visibility::Public)
+                .unwrap();
+            let [i] = pf.input_wires_arr();
+            let [i] = pf.call(&bar, &[], [i, i]).unwrap().outputs_arr();
+            pf.finish_with_outputs([i]).unwrap();
+            (mb.finish_hugr().unwrap(), bar.node())
+        };
+        let pol = NameLinkingPolicy::keep_both_invalid().on_new_names(OnNewFunc::RaiseError);
+        let mut host = existing.clone();
+        let res = host.link_module(insert, &pol);
+        match vis {
+            Visibility::Public => {
+                assert_eq!(
+                    res.err(),
+                    Some(NameLinkingError::NoNewNames {
+                        name: "new_func".to_string(),
+                        src_node: new_func
+                    })
+                );
+                assert_eq!(host, existing);
+            }
+            Visibility::Private => {
+                let ins = res.unwrap();
+                host.validate().unwrap();
+                let (decls, defns) = list_decls_defns(&host);
+                // Original pubfunc decl replaced by new definition
+                assert_eq!(defns.into_values().collect_vec(), ["pub_func"]);
+                // New private bar decl added
+                let new_added = ins.node_map[&new_func];
+                assert_eq!(decls.into_iter().collect_vec(), [(new_added, "new_func")]);
+                assert_eq!(
+                    host.get_optype(new_added)
+                        .as_func_decl()
+                        .map(FuncDecl::visibility),
+                    Some(&Visibility::Private)
+                );
+            }
+        }
     }
 }
