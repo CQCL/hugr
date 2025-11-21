@@ -8,6 +8,7 @@ use hugr_core::{
     Hugr, HugrView, IncomingPort, OutgoingPort, Port, PortIndex,
     builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
     extension::prelude::qb_t,
+    hugr::views::RootChecked,
     ops::OpType,
     types::EdgeKind,
 };
@@ -251,7 +252,7 @@ fn create_commit<'a>(wire: PersistentWire, walker: &Walker<'a>) -> Option<Commit
             // Create the commit
             walker.try_create_commit(
                 PinnedSubgraph::try_from_wires(wires, walker).unwrap(),
-                empty_2qb_hugr(add_swap),
+                RootChecked::try_new(empty_2qb_hugr(add_swap)).expect("Root should be DFG."),
                 |_, port| {
                     // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
                     // HUGR
@@ -273,7 +274,7 @@ fn create_commit<'a>(wire: PersistentWire, walker: &Walker<'a>) -> Option<Commit
 
             walker.try_create_commit(
                 PinnedSubgraph::try_from_wires([wire], walker).unwrap(),
-                repl_hugr,
+                RootChecked::try_new(repl_hugr).expect("Root should be DFG."),
                 |node, port| {
                     // map the incoming/outgoing ports of the subgraph to the replacement as
                     // follows:

@@ -7,9 +7,7 @@ use itertools::{Either, Itertools as _};
 use crate::HugrView as _;
 use crate::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
-use crate::envelope::{
-    EnvelopeError, EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError,
-};
+use crate::envelope::{EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::{Extension, ExtensionRegistry};
 use crate::import::{ImportError, import_described_hugr};
@@ -89,10 +87,6 @@ impl<R: BufRead> EnvelopeReader<R> {
             reader: MaybeZstdRead(reader),
             registry: registry.clone(),
         })
-    }
-
-    pub(crate) fn description(&self) -> &PackageDesc {
-        &self.description
     }
 
     fn header(&self) -> &EnvelopeHeader {
@@ -184,12 +178,14 @@ impl<R: BufRead> EnvelopeReader<R> {
         let super::package_json::PackageDeser {
             modules,
             extensions: pkg_extensions,
-        } = serde_json::from_reader(&mut self.reader)?;
+        } = serde_json::from_reader(&mut self.reader)
+            .map_err(PackageEncodingError::JsonEncoding)?;
         let modules = modules.into_iter().map(|h| h.0).collect_vec();
         let pkg_extensions = ExtensionRegistry::new_with_extension_resolution(
             pkg_extensions,
             &WeakExtensionRegistry::from(&self.registry),
-        )?;
+        )
+        .map_err(PackageEncodingError::ExtensionResolution)?;
 
         // Resolve the operations in the modules using the defined registries.
         self.register_packaged(&pkg_extensions);
@@ -281,7 +277,7 @@ pub struct PayloadError(PayloadErrorInner);
 #[non_exhaustive]
 #[error(transparent)]
 /// Error decoding an envelope payload with enumerated variants.
-enum PayloadErrorInner {
+pub(crate) enum PayloadErrorInner {
     /// Error decoding a JSON format package.
     JsonRead(#[from] PackageEncodingError),
     /// Error decoding a binary model format package.
@@ -293,22 +289,6 @@ enum PayloadErrorInner {
     /// Error resolving extensions while decoding the payload.
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
-impl From<PayloadError> for EnvelopeError {
-    fn from(value: PayloadError) -> Self {
-        match value.0 {
-            PayloadErrorInner::JsonRead(e) => e.into(),
-            PayloadErrorInner::ModelBinary(e) => e.into(),
-            PayloadErrorInner::ModelText(e) => e.into(),
-            #[expect(deprecated)]
-            PayloadErrorInner::ExtensionsBreaking(e) => super::WithGenerator {
-                inner: Box::new(e),
-                generator: None,
-            }
-            .into(),
-            PayloadErrorInner::ExtensionResolution(e) => e.into(),
-        }
-    }
-}
 
 impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
     fn from(value: T) -> Self {
@@ -318,7 +298,7 @@ impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelTextReadError {
+pub(crate) enum ModelTextReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     Import(#[from] ImportError),
     ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
@@ -327,46 +307,15 @@ enum ModelTextReadError {
     StringRead(#[from] std::io::Error),
     ResolveError(#[from] hugr_model::v0::ast::ResolveError),
 }
-impl From<ModelTextReadError> for EnvelopeError {
-    fn from(value: ModelTextReadError) -> Self {
-        match value {
-            ModelTextReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelTextReadError::ParseString(e) => e.into(),
-            ModelTextReadError::Import(e) => e.into(),
-            ModelTextReadError::ExtensionLoad(e) => e.into(),
-            ModelTextReadError::ExtensionDeserialize(e) => e.into(),
-            ModelTextReadError::StringRead(e) => e.into(),
-            ModelTextReadError::ResolveError(e) => e.into(),
-        }
-    }
-}
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-enum ModelBinaryReadError {
+pub(crate) enum ModelBinaryReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     ReadBinary(#[from] hugr_model::v0::binary::ReadError),
     Import(#[from] ImportError),
     Extensions(#[from] crate::extension::ExtensionRegistryLoadError),
     FormatUnsupported(#[from] FormatUnsupportedError),
-}
-
-impl From<ModelBinaryReadError> for EnvelopeError {
-    fn from(value: ModelBinaryReadError) -> Self {
-        match value {
-            ModelBinaryReadError::FormatUnsupported(e) => EnvelopeError::FormatUnsupported {
-                format: e.format,
-                feature: e.feature,
-            },
-            ModelBinaryReadError::ParseString(e) => e.into(),
-            ModelBinaryReadError::ReadBinary(e) => e.into(),
-            ModelBinaryReadError::Import(e) => e.into(),
-            ModelBinaryReadError::Extensions(e) => e.into(),
-        }
-    }
 }
 
 #[cfg(test)]

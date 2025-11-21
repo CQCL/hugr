@@ -171,20 +171,30 @@ fn call<H: HugrView<Node = Node>>(
     Ok(Call::try_new(func_sig, type_args)?)
 }
 
-/// Options for how the replacement for an op is processed.
+/// Options for how a replacement (op or type) is processed.
 ///
-/// May be specified by [ReplaceTypes::replace_op_with] and [ReplaceTypes::replace_parametrized_op_with].
-/// Otherwise (the default), replacements are inserted as is (without further processing).
+/// May be specified by
+/// [ReplaceTypes::replace_op_with], [ReplaceTypes::replace_parametrized_op_with],
+/// [ReplaceTypes::replace_type_opts] or [ReplaceTypes::replace_parametrized_type_opts].
+/// Otherwise (the default), replacements are inserted as given (without further processing).
 #[derive(Clone, Default, PartialEq, Eq)] // More derives might inhibit future extension
 pub struct ReplacementOptions {
-    linearize: bool,
+    process_recursive: bool,
+    linearize_unchanged: bool,
 }
 
 impl ReplacementOptions {
-    /// Specifies that all operations within the replacement should have their
+    fn recursive() -> Self {
+        Self {
+            process_recursive: true,
+            linearize_unchanged: false,
+        }
+    }
+
+    /// Specifies whether all nodes within the replacement should have their
     /// output ports linearized.
     pub fn with_linearization(mut self, lin: bool) -> Self {
-        self.linearize = lin;
+        self.linearize_unchanged = lin;
         self
     }
 }
@@ -218,14 +228,20 @@ impl ReplacementOptions {
 /// [monomorphization]: super::monomorphize()
 #[derive(Clone)]
 pub struct ReplaceTypes {
-    type_map: HashMap<CustomType, Type>,
-    param_types: HashMap<ParametricType, Arc<dyn Fn(&[TypeArg]) -> Option<Type>>>,
+    type_map: HashMap<CustomType, (Type, ReplacementOptions)>,
+    param_types:
+        HashMap<ParametricType, (Arc<dyn Fn(&[TypeArg]) -> Option<Type>>, ReplacementOptions)>,
     linearize: DelegatingLinearizer,
     op_map: HashMap<OpHashWrapper, (NodeTemplate, ReplacementOptions)>,
     param_ops: HashMap<
         ParametricOp,
         (
-            Arc<dyn Fn(&[TypeArg]) -> Option<NodeTemplate>>,
+            Arc<
+                dyn Fn(
+                    &[TypeArg],
+                    &ReplaceTypes,
+                ) -> Result<Option<NodeTemplate>, ReplaceTypesError>,
+            >,
             ReplacementOptions,
         ),
     >,
@@ -255,19 +271,25 @@ impl TypeTransformer for ReplaceTypes {
     type Err = ReplaceTypesError;
 
     fn apply_custom(&self, ct: &CustomType) -> Result<Option<Type>, Self::Err> {
-        Ok(if let Some(res) = self.type_map.get(ct) {
-            Some(res.clone())
-        } else if let Some(dest_fn) = self.param_types.get(&ct.into()) {
+        let mut ty_and_opts = None;
+        if let Some(res) = self.type_map.get(ct) {
+            ty_and_opts = Some(res.clone())
+        } else if let Some((dest_fn, opts)) = self.param_types.get(&ct.into()) {
             // `ct` has not had args transformed
             let mut nargs = ct.args().to_vec();
             // We don't care if `nargs` are changed, we're just calling `dest_fn`
             nargs
                 .iter_mut()
                 .try_for_each(|ta| ta.transform(self).map(|_ch| ()))?;
-            dest_fn(&nargs)
-        } else {
-            None
-        })
+            ty_and_opts = dest_fn(&nargs).map(|ty| (ty, opts.clone()))
+        };
+        let Some((mut ty, opts)) = ty_and_opts else {
+            return Ok(None);
+        };
+        if opts.process_recursive {
+            ty.transform(self)?;
+        }
+        Ok(Some(ty))
     }
 }
 
@@ -304,6 +326,19 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
+    #[deprecated(note = "Use set_replace_type")]
+    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
+        #[expect(deprecated)] // remove together
+        self.replace_type_opts(src, dest, ReplacementOptions::default())
+    }
+
+    /// Configures this instance to replace occurrences of type `src` with `dest`.
+    ///
+    /// `dest` will be recursively transformed by this [ReplaceTypes] before replacement.
+    /// (Cases where a type should be replaced by a type containing an instance of
+    /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
+    /// type. )
+    ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
     /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
     /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
@@ -316,23 +351,50 @@ impl ReplaceTypes {
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
     /// [`SignatureError`] will be raised if this leads to an impossible type e.g. ArrayOfCopyables(src).
     /// (This can be overridden by an additional [`Self::replace_type`].)
-    pub fn replace_type(&mut self, src: CustomType, dest: Type) {
-        // We could check that 'dest' is copyable or 'src' is linear, but since we can't
-        // check that for parametrized types, we'll be consistent and not check here either.
-        self.type_map.insert(src, dest);
+    pub fn set_replace_type(&mut self, src: CustomType, dest: Type) {
+        // We could check that 'dest' is copyable, 'src' is linear, or relevant copy and
+        // discard functions are registered with the linearizer; but since we can't check
+        // that for parametrized types, we'll be consistent and not check here either.
+        self.type_map
+            .insert(src, (dest, ReplacementOptions::recursive()));
+    }
+
+    /// Configures this instance to replace occurrences of type `src` with `dest`,
+    /// according to the given `ReplacementOptions`.
+    #[deprecated(note = "Use set_replace_type")]
+    pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
+        self.type_map.insert(src, (dest, opts));
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    #[deprecated(note = "Use set_replace_parametrized_type")]
+    pub fn replace_parametrized_type(
+        &mut self,
+        src: &TypeDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
+    ) {
+        #[expect(deprecated)] // remove together
+        self.replace_parametrized_type_opts(src, dest_fn, ReplacementOptions::default())
+    }
+
+    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    ///
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
     /// fit the bounds of the original type). The callback may return `None` to indicate
     /// no change (in which case the supplied `TypeArgs` will be given to `src`).
+    /// The returned type will also be subject to recursive processing by this [ReplaceTypes].
+    /// (Cases where a type should be replaced by a type containing an instance of
+    /// the first type, must be handled by two separate [ReplaceTypes]'s via a temporary
+    /// type. )
     ///
     /// If there are any [`LoadConstant`]s of any of these types, callers should also call
     /// [`Self::replace_consts_parametrized`] (or [`Self::replace_consts`]) as the
     /// [`LoadConstant`]s will be reparametrized (and this will break the edge from [Const] to
     /// [`LoadConstant`]).
-    pub fn replace_parametrized_type(
+    /// See [Self::set_replace_type] for more details (including recursion).
+    pub fn set_replace_parametrized_type(
         &mut self,
         src: &TypeDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
@@ -346,7 +408,31 @@ impl ReplaceTypes {
         // dest_fn: impl Fn(&TypeArg) -> (Type,
         //                                Fn(&Linearizer) -> NodeTemplate, // copy
         //                                Fn(&Linearizer) -> NodeTemplate)` // discard
-        self.param_types.insert(src.into(), Arc::new(dest_fn));
+        self.param_types.insert(
+            src.into(),
+            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of a parametrized type `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s,
+    /// and using the given [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_parametrized_type")]
+    pub fn replace_parametrized_type_opts(
+        &mut self,
+        src: &TypeDef,
+        dest_fn: impl Fn(&[TypeArg]) -> Option<Type> + 'static,
+        opts: ReplacementOptions,
+    ) {
+        self.param_types
+            .insert(src.into(), (Arc::new(dest_fn), opts));
+    }
+
+    /// Allows to configure how to deal with types/wires that were `Copyable`
+    /// but have become linear as a result of type-changing.
+    #[deprecated(note = "Use get_linearizer or linearizer_mut")]
+    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+        &mut self.linearize
     }
 
     /// Allows to configure how to deal with types/wires that were [Copyable]
@@ -358,23 +444,44 @@ impl ReplaceTypes {
     ///
     /// [Copyable]: hugr_core::types::TypeBound::Copyable
     /// [`array`]: hugr_core::std_extensions::collections::array::array_type
-    pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
+    pub fn linearizer_mut(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
     }
 
+    /// Allows use of the linearizer (e.g. in a callback passed to
+    /// [Self::set_replace_parametrized_op])
+    pub fn get_linearizer(&self) -> &impl Linearizer {
+        &self.linearize
+    }
+
     /// Configures this instance to change occurrences of `src` to `dest`.
-    /// Equivalent to [Self::replace_op_with] with default [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_op")]
     pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        #[expect(deprecated)] // remove together
         self.replace_op_with(src, dest, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
     ///
+    /// The RHS will be recursively processed by this [ReplaceTypes].
+    /// (Cases where an op should be replaced by a container including an
+    /// instance of the same op, must be handled by two separate [ReplaceTypes]'s
+    /// via a temporary op.)
+    ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
-    /// precedence over [`Self::replace_parametrized_op`] where the `src`s overlap. Thus,
-    /// this should only be used on already-*[monomorphize](super::monomorphize())d*
+    /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
+    /// Thus, this method should only be used for already-*[monomorphize](super::monomorphize())d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
+    pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
+        self.op_map.insert(
+            OpHashWrapper::from(src),
+            (dest, ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of `src` to `dest`.
+    #[deprecated(note = "Use set_replace_op")]
     pub fn replace_op_with(
         &mut self,
         src: &ExtensionOp,
@@ -386,28 +493,50 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    /// Equivalent to [Self::replace_parametrized_op_with] with default [ReplacementOptions].
+    #[deprecated(note = "Use set_replace_parametrized_op")]
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
     ) {
+        #[expect(deprecated)] // remove together
         self.replace_parametrized_op_with(src, dest_fn, ReplacementOptions::default())
     }
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
     /// Note that the `TypeArgs` will already have been updated (e.g. they may not
-    /// fit the bounds of the original op).
+    /// fit the bounds of the original op); and the returned [NodeTemplate] will be
+    /// recursively processed by this [ReplaceTypes]. (Cases where an op should be
+    /// replaced by a container including an instance of the same op, must be handled
+    /// by two separate [ReplaceTypes]'s via a temporary op.)
     ///
     /// If the Callback returns None, the new typeargs will be applied to the original op.
+    pub fn set_replace_parametrized_op(
+        &mut self,
+        src: &OpDef,
+        dest_fn: impl Fn(&[TypeArg], &ReplaceTypes) -> Result<Option<NodeTemplate>, ReplaceTypesError>
+        + 'static,
+    ) {
+        self.param_ops.insert(
+            src.into(),
+            (Arc::new(dest_fn), ReplacementOptions::recursive()),
+        );
+    }
+
+    /// Configures this instance to change occurrences of a parametrized op `src`
+    /// via a callback that builds the replacement type given the [`TypeArg`]s.
+    #[deprecated(note = "Use set_replace_parametrized_op")]
     pub fn replace_parametrized_op_with(
         &mut self,
         src: &OpDef,
         dest_fn: impl Fn(&[TypeArg]) -> Option<NodeTemplate> + 'static,
         opts: ReplacementOptions,
     ) {
-        self.param_ops.insert(src.into(), (Arc::new(dest_fn), opts));
+        self.param_ops.insert(
+            src.into(),
+            (Arc::new(move |args, _| Ok(dest_fn(args))), opts),
+        );
     }
 
     /// Configures this instance to change [Const]s of type `src_ty`, using
@@ -443,6 +572,28 @@ impl ReplaceTypes {
     /// Each call to overwrites any previous calls to `set_regions`.
     pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
         self.regions = Some(regions.into_iter().collect());
+    }
+
+    fn change_subtree(
+        &self,
+        hugr: &mut impl HugrMut<Node = Node>,
+        root: Node,
+        linearize_unchanged_ops: bool,
+    ) -> Result<bool, ReplaceTypesError> {
+        let mut descs = hugr.descendants(root).collect::<Vec<_>>().into_iter();
+        assert_eq!(descs.next(), Some(root));
+        let mut changed = self.change_node(hugr, root)?;
+        // Do not linearize the root's outputs - that's done by the caller if appropriate,
+        // as any copy/discard ops would be *outside* the root
+        for n in descs {
+            if self.change_node(hugr, n)? {
+                changed = true;
+            } else if !linearize_unchanged_ops {
+                continue;
+            }
+            self.linearize_outputs(hugr, n)?;
+        }
+        Ok(changed)
     }
 
     fn change_node(
@@ -513,10 +664,12 @@ impl ReplaceTypes {
                     None => {
                         let mut args = ext_op.args().to_vec();
                         changed = args.transform(self)?;
-                        let r2 = self
-                            .param_ops
-                            .get(&def.as_ref().into())
-                            .and_then(|(rep_fn, opts)| rep_fn(&args).map(|nt| (nt, opts.clone())));
+                        let r2 = match self.param_ops.get(&def.as_ref().into()) {
+                            None => None,
+                            Some((rep_fn, opts)) => {
+                                rep_fn(&args, self)?.map(|nt| (nt, opts.clone()))
+                            }
+                        };
                         if r2.is_none() && changed {
                             *ext_op = ExtensionOp::new(def.clone(), args)?;
                         }
@@ -527,11 +680,15 @@ impl ReplaceTypes {
                     replacement
                         .replace(hugr, n)
                         .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if opts.linearize {
-                        for d in hugr.descendants(n).collect::<Vec<_>>() {
-                            if d != n {
-                                self.linearize_outputs(hugr, d)?;
-                            }
+                    if opts.process_recursive {
+                        self.change_subtree(hugr, n, opts.linearize_unchanged)?;
+                        // change_subtree does not linearize its root, just as change_node
+                        // does not linearize the node it's called on; our caller does.
+                    } else if opts.linearize_unchanged {
+                        let mut descs = hugr.descendants(n);
+                        assert_eq!(descs.next(), Some(n));
+                        for n in descs.collect::<Vec<_>>() {
+                            self.linearize_outputs(hugr, n)?;
                         }
                     }
                     true
@@ -620,12 +777,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
         };
         let mut changed = false;
         for region_root in regions {
-            for n in hugr.descendants(*region_root).collect::<Vec<_>>() {
-                changed |= self.change_node(hugr, n)?;
-                if n != hugr.entrypoint() && changed {
-                    self.linearize_outputs(hugr, n)?;
-                }
-            }
+            changed |= self.change_subtree(hugr, *region_root, false)?;
         }
         Ok(changed)
     }
@@ -686,15 +838,17 @@ mod test {
     use hugr_core::extension::prelude::{
         ConstUsize, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
     };
+    use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
-    use hugr_core::ops::constant::CustomConst;
-    use hugr_core::ops::constant::OpaqueValue;
-    use hugr_core::ops::{ExtensionOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::ops::constant::{CustomConst, OpaqueValue};
+    use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
-    use hugr_core::std_extensions::collections::array::{Array, ArrayKind, GenericArrayValue};
+    use hugr_core::std_extensions::collections::array::{
+        self, Array, ArrayKind, ArrayOpDef, GenericArrayValue, array_type, array_type_def,
+    };
     use hugr_core::std_extensions::collections::list::{
         ListOp, ListValue, list_type, list_type_def,
     };
@@ -703,7 +857,7 @@ mod test {
     };
 
     use hugr_core::types::{
-        EdgeKind, PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeRow,
+        EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
     };
     use hugr_core::{Direction, Extension, HugrView, Port, type_row};
     use itertools::Itertools;
@@ -802,12 +956,12 @@ mod test {
     fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
-        lw.replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
-        lw.replace_parametrized_type(
+        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_parametrized_type(
             pv,
             Box::new(|args: &[TypeArg]| Some(value_array_type(64, just_elem_type(args).clone()))),
         );
-        lw.replace_op(
+        lw.set_replace_op(
             &read_op(ext, bool_t()),
             NodeTemplate::SingleOp(
                 ExtensionOp::new(ext.get_op("lowered_read_bool").unwrap().clone(), [])
@@ -815,12 +969,12 @@ mod test {
                     .into(),
             ),
         );
-        lw.replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args| {
-            Some(NodeTemplate::CompoundOp(Box::new(
+        lw.set_replace_parametrized_op(ext.get_op(READ).unwrap().as_ref(), |type_args, _| {
+            Ok(Some(NodeTemplate::CompoundOp(Box::new(
                 lowered_read(just_elem_type(type_args).clone(), DFGBuilder::new)
                     .finish_hugr()
                     .unwrap(),
-            )))
+            ))))
         });
         lw
     }
@@ -970,7 +1124,7 @@ mod test {
         let mut lowerer = ReplaceTypes::default();
 
         // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
-        lowerer.replace_parametrized_type(list_type_def(), |args| {
+        lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (![usize_t(), i64_t()].contains(ty)).then_some(value_array_type(10, ty.clone()))
         });
@@ -987,7 +1141,7 @@ mod test {
 
         // 2. Now we'll also change usize's to i64_t's
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        lowerer.replace_type(usize_custom_t.clone(), i64_t());
+        lowerer.set_replace_type(usize_custom_t.clone(), i64_t());
         lowerer.replace_consts(usize_custom_t, |opaq, _| {
             Ok(ConstInt::new_u(
                 6,
@@ -1017,7 +1171,7 @@ mod test {
 
         // 3. Lower all List<T> to Array<4,T>
         let mut h = backup;
-        lowerer.replace_parametrized_type(
+        lowerer.set_replace_parametrized_type(
             list_type_def(),
             Box::new(|args: &[TypeArg]| Some(value_array_type(4, just_elem_type(args).clone()))),
         );
@@ -1089,26 +1243,23 @@ mod test {
         let mut h = dfb.finish_hugr_with_outputs([i, oi]).unwrap();
 
         let mut lowerer = ReplaceTypes::default();
-        lowerer.replace_type(i32_custom_t, qb_t());
+        lowerer.set_replace_type(i32_custom_t, qb_t());
         // Lower list<option<x>> to list<x>
-        lowerer.replace_parametrized_type(list_type_def(), |args| {
+        lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             option_contents(just_elem_type(args)).map(list_type)
         });
         // and read<option<x>> to get<x> - the latter has the expected option<x> return type
-        lowerer.replace_parametrized_op(
-            e.get_op(READ).unwrap().as_ref(),
-            Box::new(|args: &[TypeArg]| {
-                option_contents(just_elem_type(args)).map(|elem| {
-                    NodeTemplate::SingleOp(
-                        ListOp::get
-                            .with_type(elem)
-                            .to_extension_op()
-                            .unwrap()
-                            .into(),
-                    )
-                })
-            }),
-        );
+        lowerer.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), |args, _| {
+            Ok(option_contents(just_elem_type(args)).map(|elem| {
+                NodeTemplate::SingleOp(
+                    ListOp::get
+                        .with_type(elem)
+                        .to_extension_op()
+                        .unwrap()
+                        .into(),
+                )
+            }))
+        });
         assert!(lowerer.run(&mut h).unwrap());
         // list<usz>      -> read<usz>      -> usz just becomes list<qb> -> read<qb> -> qb
         // list<opt<usz>> -> read<opt<usz>> -> opt<usz> becomes list<qb> -> get<qb>  -> opt<qb>
@@ -1150,7 +1301,7 @@ mod test {
 
         let mut repl = ReplaceTypes::new_empty();
         let usize_custom_t = usize_t().as_extension().unwrap().clone();
-        repl.replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
+        repl.set_replace_type(usize_custom_t.clone(), INT_TYPES[6].clone());
         repl.replace_consts(usize_custom_t, |cst: &OpaqueValue, _| {
             let cu = cst.value().downcast_ref::<ConstUsize>().unwrap();
             Ok(ConstInt::new_u(6, cu.value())?.into())
@@ -1201,8 +1352,8 @@ mod test {
             .inserted_entrypoint;
 
         let mut lw = lowerer(&e);
-        lw.replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args| {
-            Some(NodeTemplate::Call(read_func, args.to_owned()))
+        lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
+            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
         });
         lw.run(&mut h).unwrap();
 
@@ -1254,5 +1405,97 @@ mod test {
                 to_kind: Box::new(EdgeKind::Value(v_u))
             })
         );
+    }
+
+    #[test]
+    fn compositionality() {
+        let ext = ext();
+        let mut lowerer = lowerer(&ext);
+        // Replace std Array's with 64 elements with PackedVec's
+        let ext2 = ext.clone();
+        lowerer.set_replace_parametrized_type(array_type_def(), move |args| {
+            let [sz, ty] = args else {
+                panic!("Expected two args to array")
+            };
+            (sz == &Term::BoundedNat(64)).then_some(
+                ext2.get_type(PACKED_VEC)
+                    .unwrap()
+                    .instantiate([ty.clone()])
+                    .unwrap()
+                    .into(),
+            )
+        });
+
+        // Replacement of `get` is complex because we need to wrap result of read into a Some
+        let ext = ext.clone();
+        lowerer.set_replace_parametrized_op(
+            array::EXTENSION
+                .get_op(ArrayOpDef::get.opdef_id().as_str())
+                .unwrap()
+                .as_ref(),
+            move |args, _| {
+                let [sz, Term::Runtime(ty)] = args else {
+                    panic!("Expected two args to array-get")
+                };
+                if sz != &Term::BoundedNat(64) {
+                    return Ok(None);
+                }
+                let pv = ext
+                    .get_type(PACKED_VEC)
+                    .unwrap()
+                    .instantiate([ty.clone().into()])
+                    .unwrap();
+
+                let mut dfb = DFGBuilder::new(Signature::new(
+                    vec![pv.clone().into(), usize_t()],
+                    vec![option_type(ty.clone()).into(), pv.into()],
+                ))
+                .unwrap();
+                let [pvec, idx] = dfb.input_wires_arr();
+                let [idx] = dfb
+                    .add_dataflow_op(ConvertOpDef::ifromusize.without_log_width(), [idx])
+                    .unwrap()
+                    .outputs_arr();
+                let [elem] = dfb
+                    .add_dataflow_op(read_op(&ext, ty.clone()), [pvec, idx])
+                    .unwrap()
+                    .outputs_arr();
+                let [wrapped_elem] = dfb
+                    .add_dataflow_op(
+                        ops::Tag::new(1, vec![type_row![], ty.clone().into()]),
+                        [elem],
+                    )
+                    .unwrap()
+                    .outputs_arr();
+                Ok(Some(NodeTemplate::CompoundOp(Box::new(
+                    dfb.finish_hugr_with_outputs([wrapped_elem, pvec]).unwrap(),
+                ))))
+            },
+        );
+
+        // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
+        // Arrays of 64 non-bools should thus become PackedVec<T> and then back to ValueArray<64, T>
+        let a64 = |t| array_type(64, t);
+        let opt = |t| Type::from(option_type(t));
+        let mut dfb = DFGBuilder::new(Signature::new(
+            vec![a64(bool_t()), a64(usize_t())],
+            vec![opt(bool_t()), a64(bool_t()), opt(usize_t()), a64(usize_t())],
+        ))
+        .unwrap();
+        let [bools, usizes] = dfb.input_wires_arr();
+        let idx = dfb.add_load_value(ConstUsize::new(5));
+        let [b, bools] = dfb
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(bool_t(), 64), [bools, idx])
+            .unwrap()
+            .outputs_arr();
+        let [u, usizes] = dfb
+            .add_dataflow_op(ArrayOpDef::get.to_concrete(usize_t(), 64), [usizes, idx])
+            .unwrap()
+            .outputs_arr();
+        let mut h = dfb.finish_hugr_with_outputs([b, bools, u, usizes]).unwrap();
+
+        lowerer.run(&mut h).unwrap();
+
+        h.validate().unwrap();
     }
 }
