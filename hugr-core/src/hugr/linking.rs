@@ -833,14 +833,14 @@ mod test {
     use super::{HugrLinking, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
-        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder, endo_sig,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
     use crate::hugr::linking::{NameLinkingError, NameLinkingPolicy, OnMultiDefn, OnNewFunc};
     use crate::hugr::{ValidationError, hugrmut::HugrMut};
-    use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
+    use crate::ops::{Const, FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::{Hugr, HugrView, Visibility, types::Signature};
@@ -1419,6 +1419,78 @@ mod test {
                     Some(&Visibility::Private)
                 );
             }
+        }
+    }
+
+    #[rstest]
+    fn no_new_names_entrypoint(#[values(true, false)] call_new: bool) {
+        let (insert, new_func) = {
+            let mut dfb = DFGBuilder::new(inout_sig(vec![], usize_t())).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let cst_used = mb.add_constant(Value::from(ConstUsize::new(5)));
+            mb.add_constant(Value::from(ConstUsize::new(10)));
+
+            let nf = mb.declare("new_func", endo_sig(usize_t()).into()).unwrap();
+            let pf = mb
+                .define_function_vis("pub_func", endo_sig(usize_t()), Visibility::Public)
+                .unwrap();
+            let [i] = pf.input_wires_arr();
+            let pf = pf.finish_with_outputs([i]).unwrap();
+
+            let i = dfb.load_const(&cst_used);
+            let call = if call_new {
+                dfb.call(&nf, &[], [i]).unwrap()
+            } else {
+                dfb.call(pf.handle(), &[], [i]).unwrap()
+            };
+            (
+                dfb.finish_hugr_with_outputs(call.outputs()).unwrap(),
+                nf.node(),
+            )
+        };
+
+        let (backup, ex_main) = {
+            let mut mb = ModuleBuilder::new();
+            mb.declare("pub_func", endo_sig(usize_t()).into()).unwrap();
+            let fb = mb.define_function("main", endo_sig(usize_t())).unwrap();
+            let ins = fb.input_wires();
+            let main = fb.finish_with_outputs(ins).unwrap();
+            (mb.finish_hugr().unwrap(), main.node())
+        };
+
+        let mut target = backup.clone();
+        let res = target.insert_link_hugr(
+            ex_main,
+            insert,
+            &NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError)
+                .on_new_names(OnNewFunc::RaiseError),
+        );
+        if call_new {
+            assert_eq!(
+                res.err(),
+                Some(NameLinkingError::NoNewNames {
+                    name: "new_func".to_string(),
+                    src_node: new_func
+                })
+            );
+            assert_eq!(target, backup);
+        } else {
+            res.unwrap();
+            target.validate().unwrap();
+            let (decls, defns) = list_decls_defns(&target);
+            assert_eq!(
+                defns.into_values().sorted().collect_vec(),
+                ["main", "pub_func"]
+            );
+            assert!(decls.is_empty());
+            assert_eq!(
+                target
+                    .nodes()
+                    .filter_map(|n| target.get_optype(n).as_const())
+                    .map(Const::value)
+                    .collect_vec(),
+                [&ConstUsize::new(5).into()]
+            );
         }
     }
 }
