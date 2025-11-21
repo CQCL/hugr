@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pyzstd
 
-from hugr import cli
+import hugr._hugr as rust
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
@@ -64,7 +64,6 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
     if not isinstance(package, Package):
         package = Package(modules=[package], extensions=[])
 
-    # Currently only uncompressed JSON is supported.
     payload: bytes
     match config.format:
         case EnvelopeFormat.JSON:
@@ -103,6 +102,7 @@ def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
 def read_envelope(envelope: bytes) -> Package:
     """Decode a HUGR package from an envelope."""
     import hugr._serialization.extension as ext_s
+    from hugr.package import Package
 
     header = EnvelopeHeader.from_bytes(envelope)
     payload = envelope[10:]
@@ -113,12 +113,23 @@ def read_envelope(envelope: bytes) -> Package:
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODEL | EnvelopeFormat.MODEL_WITH_EXTS:
-            # TODO Going via JSON is a temporary solution, until we get model import to
-            # python properly implemented.
-            # https://github.com/CQCL/hugr/issues/2287
-            json_data = cli.convert(envelope, format="json")
-            return read_envelope(json_data)
+        case EnvelopeFormat.MODEL:
+            model_package, suffix = rust.bytes_to_package(payload)
+            if suffix:
+                msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
+                raise ValueError(msg)
+            return Package.from_model(model_package)
+        case EnvelopeFormat.MODEL_WITH_EXTS:
+            from hugr.ext import Extension
+
+            model_package, suffix = rust.bytes_to_package(payload)
+            return Package(
+                modules=Package.from_model(model_package).modules,
+                extensions=[
+                    Extension.from_json(json.dumps(extension))
+                    for extension in json.loads(suffix)
+                ],
+            )
 
 
 def read_envelope_hugr(envelope: bytes) -> Hugr:
