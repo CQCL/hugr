@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.15.0) (2025-11-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** Removes `extensions` field of `val.Extension`.
+
+### Features
+
+* **hugr-py:** Remove `extensions` field of `val.Extension`. ([#2686](https://github.com/CQCL/hugr/issues/2686)) ([911c089](https://github.com/CQCL/hugr/commit/911c08921b9057f3854dd4431e4a7854b8b6991e))
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.1...hugr-py-v0.14.2) (2025-11-13)
 
 
