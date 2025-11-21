@@ -45,11 +45,10 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use hugr_core::hugr::patch::outline_cfg::OutlineCfg;
-use hugr_core::hugr::views::{HugrView, RootCheckable};
+use hugr_core::hugr::views::HugrView;
 use hugr_core::hugr::{Patch, hugrmut::HugrMut};
 use hugr_core::ops::OpTag;
 use hugr_core::ops::OpTrait;
-use hugr_core::ops::handle::CfgID;
 use hugr_core::{Direction, Hugr, Node};
 
 /// A "view" of a CFG in a Hugr which allows basic blocks in the underlying CFG to be split into
@@ -220,10 +219,7 @@ pub struct IdentityCfgMap<H: HugrView> {
 }
 impl<H: HugrView> IdentityCfgMap<H> {
     /// Creates an [`IdentityCfgMap`] for the specified CFG
-    pub fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
-        let h = h.try_into_checked().expect("Hugr must be a CFG region");
-        let h = h.into_hugr();
-
+    pub fn new(h: H) -> Self {
         // Panic if malformed enough not to have two children
         let (entry, exit) = h.children(h.entrypoint()).take(2).collect_tuple().unwrap();
         debug_assert_eq!(h.get_optype(exit).tag(), OpTag::BasicBlockExit);
@@ -582,7 +578,6 @@ pub(crate) mod test {
 
     use hugr_core::Node;
     use hugr_core::hugr::patch::insert_identity::{IdentityInsertion, IdentityInsertionError};
-    use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::Value;
     use hugr_core::ops::handle::{BasicBlockID, ConstID, NodeHandle};
     use hugr_core::types::{EdgeKind, Signature};
@@ -632,11 +627,11 @@ pub(crate) mod test {
         let exit = cfg_builder.exit_block();
         cfg_builder.branch(&tail, 0, &exit)?;
 
-        let mut h = cfg_builder.finish_hugr()?;
-        let rc = RootChecked::<_, CfgID>::try_new(&mut h).unwrap();
+        let h = cfg_builder.finish_hugr()?;
         let (entry, exit) = (entry.node(), exit.node());
         let (split, merge, head, tail) = (split.node(), merge.node(), head.node(), tail.node());
-        let edge_classes = EdgeClassifier::get_edge_classes(&IdentityCfgMap::new(rc.as_ref()));
+        let mut v = IdentityCfgMap::new(h);
+        let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let [&left, &right] = edge_classes
             .keys()
             .filter(|(s, _)| *s == split)
@@ -657,7 +652,8 @@ pub(crate) mod test {
                 sorted([(entry, split), (merge, head), (tail, exit)]), // Two regions, conditional and then loop.
             ])
         );
-        transform_cfg_to_nested(&mut IdentityCfgMap::new(rc));
+        transform_cfg_to_nested(&mut v);
+        let h = v.h;
         h.validate().unwrap();
         assert_eq!(3, depth(&h, entry));
         assert_eq!(3, depth(&h, exit));
@@ -693,7 +689,7 @@ pub(crate) mod test {
             .try_into()
             .unwrap();
 
-        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
+        let v = IdentityCfgMap::new(h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let [&left, &right] = edge_classes
             .keys()
@@ -783,7 +779,7 @@ pub(crate) mod test {
         // Here we would like an indication that we can make two nested regions,
         // but there is no edge to act as entry to a region containing just the conditional :-(.
 
-        let v = IdentityCfgMap::new(RootChecked::try_new(&h).unwrap());
+        let v = IdentityCfgMap::new(h);
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let IdentityCfgMap { h: _, entry, exit } = v;
         // merge is unique predecessor of tail
