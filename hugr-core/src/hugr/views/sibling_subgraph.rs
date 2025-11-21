@@ -1649,7 +1649,7 @@ mod tests {
         let (mut hugr, func_root) = build_hugr().unwrap();
         let func = hugr.with_entrypoint(func_root);
         let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func).unwrap(),
+            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
         )?;
         assert!(sub.validate(&func, Default::default()).is_ok());
 
@@ -1699,7 +1699,7 @@ mod tests {
         let (hugr, dfg) = build_hugr().unwrap();
         let func = hugr.with_entrypoint(dfg);
         let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func).unwrap(),
+            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
         )?;
         assert!(sub.validate(&func, Default::default()).is_ok());
         assert_eq!(
@@ -1734,7 +1734,7 @@ mod tests {
         let func = hugr.with_entrypoint(func_root);
         assert_eq!(
             SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-                RootChecked::try_new(&func).unwrap()
+                RootChecked::try_new(&func).expect("Root should be FuncDefn.")
             )
             .unwrap()
             .nodes()
@@ -1852,7 +1852,7 @@ mod tests {
         let (hugr, func_root) = build_hugr_classical().unwrap();
         let func_graph = hugr.with_entrypoint(func_root);
         let func = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func_graph).unwrap(),
+            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
         )
         .unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
@@ -1864,7 +1864,7 @@ mod tests {
         let (hugr, func_root) = build_hugr().unwrap();
         let func_graph = hugr.with_entrypoint(func_root);
         let subgraph = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func_graph).unwrap(),
+            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
         )
         .unwrap();
         let extracted = subgraph.extract_subgraph(&hugr, "region");
@@ -1891,7 +1891,7 @@ mod tests {
         let outw = [outw1].into_iter().chain(outw2);
         let h = builder.finish_hugr_with_outputs(outw).unwrap();
         let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(
-            RootChecked::try_new(&h).unwrap(),
+            RootChecked::try_new(&h).expect("Root should be DFG."),
         )
         .unwrap();
         assert_eq!(subg.nodes().len(), 2);
@@ -2189,7 +2189,7 @@ mod tests {
     #[rstest]
     fn test_call_subgraph_from_dfg(hugr_call_subgraph: Hugr) {
         let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(
-            RootChecked::try_new(&hugr_call_subgraph).unwrap(),
+            RootChecked::try_new(&hugr_call_subgraph).expect("Root should be DFG container."),
         )
         .unwrap();
 

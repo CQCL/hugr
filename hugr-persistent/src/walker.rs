@@ -782,7 +782,7 @@ mod tests {
         let commit = walker
             .try_create_commit(
                 PinnedSubgraph::try_from_pinned(std::iter::empty(), [wire], &walker).unwrap(),
-                RootChecked::try_new(empty_hugr).unwrap(),
+                RootChecked::try_new(empty_hugr).expect("Root should be DFG."),
                 |node, port| {
                     assert_eq!(port.index(), 0);
                     assert!([not0, not2].contains(&node));

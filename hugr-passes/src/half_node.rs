@@ -118,7 +118,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
-        let v = HalfNodeView::new(RootChecked::try_new(&h).unwrap());
+        let v = HalfNodeView::new(RootChecked::try_new(&h).expect("Root should be CFG."));
 
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;

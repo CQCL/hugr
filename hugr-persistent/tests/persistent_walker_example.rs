@@ -252,7 +252,7 @@ fn create_commit<'a>(wire: PersistentWire, walker: &Walker<'a>) -> Option<Commit
             // Create the commit
             walker.try_create_commit(
                 PinnedSubgraph::try_from_wires(wires, walker).unwrap(),
-                RootChecked::try_new(empty_2qb_hugr(add_swap)).unwrap(),
+                RootChecked::try_new(empty_2qb_hugr(add_swap)).expect("Root should be DFG."),
                 |_, port| {
                     // the incoming/outgoing ports of the subgraph map trivially to the empty 2qb
                     // HUGR
@@ -274,7 +274,7 @@ fn create_commit<'a>(wire: PersistentWire, walker: &Walker<'a>) -> Option<Commit
 
             walker.try_create_commit(
                 PinnedSubgraph::try_from_wires([wire], walker).unwrap(),
-                RootChecked::try_new(repl_hugr).unwrap(),
+                RootChecked::try_new(repl_hugr).expect("Root should be DFG."),
                 |node, port| {
                     // map the incoming/outgoing ports of the subgraph to the replacement as
                     // follows:
