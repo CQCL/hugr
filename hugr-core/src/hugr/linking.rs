@@ -1,16 +1,16 @@
 //! Directives and errors relating to linking Hugrs.
 
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, VecDeque, hash_map::Entry},
+    fmt::Display,
+    iter::once,
+};
 
 use itertools::{Either, Itertools};
 
-use crate::{
-    Hugr, HugrView, Node, Visibility,
-    core::HugrNode,
-    hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
-    ops::OpType,
-    types::PolyFuncType,
-};
+use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
+use crate::module_graph::{ModuleGraph, StaticNode};
+use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// Methods that merge Hugrs, adding static edges between old and inserted nodes.
 ///
@@ -111,9 +111,7 @@ pub trait HugrLinking: HugrMut {
     /// Insert module-children from another Hugr into this one according to a [NameLinkingPolicy].
     ///
     /// All [Visibility::Public] module-children are inserted, or linked, according to the
-    /// specified policy; private children will also be inserted, at least including all those
-    /// used by the copied public children. (At present all module-children are inserted,
-    /// but this is expected to change in the future.)
+    /// specified policy; private children used by the public children will also be copied.
     ///
     /// # Errors
     ///
@@ -141,9 +139,7 @@ pub trait HugrLinking: HugrMut {
     /// Copy module-children from another Hugr into this one according to a [NameLinkingPolicy].
     ///
     /// All [Visibility::Public] module-children are copied, or linked, according to the
-    /// specified policy; private children will also be copied, at least including all those
-    /// used by the copied public children. (At present all module-children are inserted,
-    /// but this is expected to change in the future.)
+    /// specified policy; private children used by the public children will also be copied.
     ///
     /// # Errors
     ///
@@ -166,6 +162,99 @@ pub trait HugrLinking: HugrMut {
             .collect();
         Ok(self
             .insert_link_view_by_node(None, other, directives)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
+
+    /// Inserts the entrypoint-subtree of another Hugr into this one,
+    /// including copying any private functions it calls and using linking
+    /// to resolve any public functions.
+    ///
+    /// `parent` is the parent node under which to insert the entrypoint.
+    ///
+    /// # Errors
+    ///
+    /// If other's entrypoint is its module-root (recommend using [Self::link_module] instead)
+    ///
+    /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
+    /// (an exception is made if the called+containing function is public and is being replaced
+    ///  by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///  the call is redirected to the existing function, and the new one is not inserted
+    ///  except the entrypoint subtree.)
+    ///
+    /// If other's entrypoint calls a public function in `other` which
+    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
+    ///   [`OnNewFunc::RaiseError`]
+    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
+    ///   [`OnNewFunc::RaiseError`]
+    ///
+    /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
+    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
+    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
+    ///
+    /// [`FuncDefn`]: crate::ops::FuncDefn
+    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
+    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
+    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
+    fn insert_link_hugr(
+        &mut self,
+        parent: Self::Node,
+        other: Hugr,
+        policy: &NameLinkingPolicy,
+    ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
+        let pol = policy.to_node_linking_for_entrypoint(&*self, &other)?;
+        let per_node = pol
+            .into_iter()
+            .map(|(k, LinkAction::LinkNode(v))| (k, v))
+            .collect();
+        Ok(self
+            .insert_link_hugr_by_node(Some(parent), other, per_node)
+            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+    }
+
+    /// Inserts the entrypoint-subtree of another Hugr into this one,
+    /// including copying any private functions it calls and using linking
+    /// to resolve any public functions.
+    ///
+    /// `parent` is the parent node under which to insert the entrypoint.
+    ///
+    /// # Errors
+    ///
+    /// If other's entrypoint is its module-root (recommend using [Self::link_module] instead)
+    ///
+    /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
+    /// (an exception is made if the called+containing function is public and is being replaced
+    ///  by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///  the call is redirected to the existing function, and the new one is not inserted
+    ///  except the entrypoint subtree.)
+    ///
+    /// If other's entrypoint calls a public function in `other` which
+    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
+    ///   [`OnNewFunc::RaiseError`]
+    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
+    ///   [`OnNewFunc::RaiseError`]
+    ///
+    /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
+    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
+    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
+    ///
+    /// [`FuncDefn`]: crate::ops::FuncDefn
+    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
+    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
+    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
+    #[allow(clippy::type_complexity)]
+    fn insert_link_from_view<H: HugrView>(
+        &mut self,
+        parent: Self::Node,
+        other: &H,
+        policy: &NameLinkingPolicy,
+    ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
+        let pol = policy.to_node_linking_for_entrypoint(&*self, &other)?;
+        let per_node = pol
+            .into_iter()
+            .map(|(k, LinkAction::LinkNode(v))| (k, v))
+            .collect();
+        Ok(self
+            .insert_link_view_by_node(Some(parent), other, per_node)
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 }
@@ -211,8 +300,8 @@ pub enum NodeLinkingDirective<TN = Node> {
         /// to leave the newly-inserted node instead. (Typically, this `Vec` would contain
         /// at most one [FuncDefn], or perhaps-multiple, aliased, [FuncDecl]s.)
         ///
-        /// [FuncDecl]: crate::ops::FuncDecl
         /// [FuncDefn]: crate::ops::FuncDefn
+        /// [FuncDecl]: crate::ops::FuncDecl
         /// [EdgeKind::Const]: crate::types::EdgeKind::Const
         /// [EdgeKind::Function]: crate::types::EdgeKind::Function
         replace: Vec<TN>,
@@ -251,6 +340,7 @@ impl<TN> NodeLinkingDirective<TN> {
 /// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
+    new_names: OnNewFunc,
     sig_conflict: OnNewFunc,
     multi_defn: OnMultiDefn,
 }
@@ -313,13 +403,22 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
         tgt_node: TN,
         tgt_sig: Box<PolyFuncType>,
     },
+    /// The source Hugr contained names not in the target and this was requested
+    /// to be an error (via [NameLinkingPolicy::on_new_name]([OnNewFunc::RaiseError]))
+    #[error("Node {src_node} adds new name {name} which was specified to be an error")]
+    #[allow(missing_docs)]
+    NoNewNames { name: String, src_node: SN },
     /// A [Visibility::Public] function in the source, whose body is being added
-    /// to the target, contained the entrypoint (which needs to be added
-    /// in a different place).
+    /// to the target, contained the entrypoint which is being added in a different place
+    /// (in a call to [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view]).
     ///
     /// [Visibility::Public]: crate::Visibility::Public
     #[error("The entrypoint is contained within function {_0} which will be added as {_1:?}")]
     AddFunctionContainingEntrypoint(SN, NodeLinkingDirective<TN>),
+    /// The source Hugr's entrypoint is its module-root, in a call to
+    /// [HugrLinking::insert_link_hugr] or [HugrLinking::insert_link_from_view].
+    #[error("The source Hugr's entrypoint is its module-root")]
+    InsertEntrypointIsModuleRoot,
 }
 
 impl NameLinkingPolicy {
@@ -330,6 +429,7 @@ impl NameLinkingPolicy {
     /// [FuncDefn]: crate::ops::FuncDefn
     pub fn err_on_conflict(multi_defn: impl Into<OnMultiDefn>) -> Self {
         Self {
+            new_names: OnNewFunc::Add,
             multi_defn: multi_defn.into(),
             sig_conflict: OnNewFunc::RaiseError,
         }
@@ -340,6 +440,7 @@ impl NameLinkingPolicy {
     /// a (potentially-invalid) Hugr is always produced.
     pub fn keep_both_invalid() -> Self {
         Self {
+            new_names: OnNewFunc::Add,
             multi_defn: OnMultiDefn::NewFunc(OnNewFunc::Add),
             sig_conflict: OnNewFunc::Add,
         }
@@ -375,48 +476,168 @@ impl NameLinkingPolicy {
         self.multi_defn
     }
 
+    /// Sets how to behave when the source Hugr adds a ([Visibility::Public])
+    /// name not already in the target.
+    pub fn on_new_names(mut self, nn: OnNewFunc) -> Self {
+        self.new_names = nn;
+        self
+    }
+
+    /// Tells how to behave when the source Hugr adds a ([Visibility::Public])
+    /// name not already in the target.
+    pub fn get_on_new_names(&self) -> OnNewFunc {
+        self.new_names
+    }
+
     /// Computes how this policy will act on a specified source (inserted) and target
-    /// (host) Hugr.
+    /// (host) Hugr when *not* inserting the entrypoint.
     #[allow(clippy::type_complexity)]
     pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
     ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
-        let existing = gather_existing(target);
-        let mut res = LinkActions::new();
+        self.to_node_linking_helper(target, source, false)
+    }
 
-        let NameLinkingPolicy {
-            sig_conflict,
-            multi_defn,
-        } = self;
-        for n in source.children(source.module_root()) {
-            let dirv = match link_sig(source, n) {
-                None => continue,
-                Some(LinkSig::Private) => NodeLinkingDirective::add(),
-                Some(LinkSig::Public { name, is_defn, sig }) => {
-                    if let Some((ex_ns, ex_sig)) = existing.get(name) {
-                        match *sig_conflict {
-                            _ if sig == *ex_sig => directive(name, n, is_defn, ex_ns, multi_defn)?,
-                            OnNewFunc::RaiseError => {
-                                return Err(NameLinkingError::SignatureConflict {
-                                    name: name.to_string(),
-                                    src_node: n,
-                                    src_sig: Box::new(sig.clone()),
-                                    tgt_node: target_node(ex_ns),
-                                    tgt_sig: Box::new((*ex_sig).clone()),
-                                });
-                            }
-                            OnNewFunc::Add => NodeLinkingDirective::add(),
-                        }
-                    } else {
-                        NodeLinkingDirective::add()
-                    }
-                }
-            };
-            res.insert(n, dirv.into());
+    fn action_for<SN: Display, TN: Copy + Display + std::fmt::Debug>(
+        &self,
+        existing: &HashMap<&str, PubFuncs<TN>>,
+        sn: SN,
+        new: LinkSig,
+    ) -> Result<LinkAction<TN>, NameLinkingError<SN, TN>> {
+        let just_add = NodeLinkingDirective::add().into();
+        let LinkSig::Public {
+            name,
+            is_defn: new_is_defn,
+            sig: new_sig,
+        } = new
+        else {
+            return Ok(just_add);
+        };
+        let chk_add = |onf: OnNewFunc, e| match onf {
+            OnNewFunc::RaiseError => Err(e),
+            OnNewFunc::Add => Ok(just_add),
+        };
+        let Some((existing, ex_sig)) = existing.get(name) else {
+            return chk_add(
+                self.new_names,
+                NameLinkingError::NoNewNames {
+                    name: name.to_string(),
+                    src_node: sn,
+                },
+            );
+        };
+        if *ex_sig != new_sig {
+            return chk_add(
+                self.sig_conflict,
+                NameLinkingError::SignatureConflict {
+                    name: name.to_string(),
+                    src_node: sn,
+                    src_sig: new_sig.clone().into(),
+                    tgt_node: target_node(existing),
+                    tgt_sig: (*ex_sig).clone().into(),
+                },
+            );
         }
+        let ex_defn = match existing {
+            Either::Right((n, ns)) => {
+                // Replace all existing decls. (If the new node is a decl, we only need to add, but tidy as we go.)
+                let nodes = once(n).chain(ns).copied();
+                return Ok(NodeLinkingDirective::replace(nodes).into());
+            }
+            Either::Left(n) => *n,
+        };
+        if !new_is_defn {
+            return Ok(NodeLinkingDirective::UseExisting(ex_defn).into());
+        }
+        match self.multi_defn {
+            OnMultiDefn::NewFunc(nfh) => chk_add(
+                nfh,
+                NameLinkingError::MultipleDefn(name.to_string(), sn, ex_defn),
+            ),
+            OnMultiDefn::UseExisting => Ok(NodeLinkingDirective::UseExisting(ex_defn).into()),
+            OnMultiDefn::UseNew => Ok(NodeLinkingDirective::replace([ex_defn]).into()),
+        }
+    }
 
+    /// Computes how this policy will act when inserting the entrypoint-subtree of a
+    /// specified source Hugr into a target (host) Hugr (as per [HugrLinking::insert_link_hugr]).
+    #[allow(clippy::type_complexity)]
+    pub fn to_node_linking_for_entrypoint<T: HugrView + ?Sized, S: HugrView>(
+        &self,
+        target: &T,
+        source: &S,
+    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        let entrypoint_func = {
+            let mut n = source.entrypoint();
+            loop {
+                let p = source
+                    .get_parent(n)
+                    .ok_or(NameLinkingError::InsertEntrypointIsModuleRoot)?;
+                if p == source.module_root() {
+                    break n;
+                };
+                n = p;
+            }
+        };
+        //if entrypoint_func == other.entrypoint() { // Do we need to check this? Ok if parent is self.module_root() ??
+        //    return Err(format!("Entrypoint is a top-level function"))
+        //}
+        let pol = self.to_node_linking_helper(target, source, true)?;
+        if let Some(LinkAction::LinkNode(add @ NodeLinkingDirective::Add { .. })) = pol
+            .get(&entrypoint_func)
+            .filter(|_| entrypoint_func != source.entrypoint())
+        {
+            return Err(NameLinkingError::AddFunctionContainingEntrypoint(
+                entrypoint_func,
+                add.clone(),
+            ));
+        }
+        Ok(pol)
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn to_node_linking_helper<T: HugrView + ?Sized, S: HugrView>(
+        &self,
+        target: &T,
+        source: &S,
+        use_entrypoint: bool,
+    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        let existing = gather_existing(target);
+        let g = ModuleGraph::new(&source);
+        // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
+        // and we need to maintain our own `visited` map anyway
+        let mut to_visit = VecDeque::new();
+        if use_entrypoint {
+            to_visit.push_back(source.entrypoint());
+        } else {
+            to_visit.extend(
+                source
+                    .children(source.module_root())
+                    .filter(|&sn| matches!(link_sig(source, sn), Some(LinkSig::Public { .. }))),
+            );
+        }
+        let mut res = LinkActions::new();
+        while let Some(sn) = to_visit.pop_front() {
+            if !(use_entrypoint && sn == source.entrypoint()) {
+                let (Entry::Vacant(ve), Some(ls)) = (res.entry(sn), link_sig(source, sn)) else {
+                    continue;
+                };
+                let act = self.action_for(&existing, sn, ls)?;
+                let LinkAction::LinkNode(dirv) = &act;
+                let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
+                ve.insert(act);
+                if !traverse {
+                    continue;
+                }
+            }
+            // For entrypoint, *just* traverse
+            to_visit.extend(g.out_edges(sn).map(|(_, nw)| match nw {
+                StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
+                _ => unreachable!("unknown / cannot call non-func entrypoint"),
+            }));
+        }
         Ok(res)
     }
 }
@@ -425,30 +646,6 @@ impl Default for NameLinkingPolicy {
     fn default() -> Self {
         Self::err_on_conflict(OnNewFunc::RaiseError)
     }
-}
-
-fn directive<SN: Display, TN: HugrNode>(
-    name: &str,
-    new_n: SN,
-    new_defn: bool,
-    ex_ns: &Either<TN, (TN, Vec<TN>)>,
-    multi_defn: &OnMultiDefn,
-) -> Result<NodeLinkingDirective<TN>, NameLinkingError<SN, TN>> {
-    Ok(match (new_defn, ex_ns) {
-        (false, Either::Right(_)) => NodeLinkingDirective::add(), // another alias
-        (false, Either::Left(defn)) => NodeLinkingDirective::UseExisting(*defn), // resolve decl
-        (true, Either::Right((decl, decls))) => {
-            NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
-        }
-        (true, &Either::Left(defn)) => match multi_defn {
-            OnMultiDefn::UseExisting => NodeLinkingDirective::UseExisting(defn),
-            OnMultiDefn::UseNew => NodeLinkingDirective::replace([defn]),
-            OnMultiDefn::NewFunc(OnNewFunc::RaiseError) => {
-                return Err(NameLinkingError::MultipleDefn(name.to_owned(), new_n, defn));
-            }
-            OnMultiDefn::NewFunc(OnNewFunc::Add) => NodeLinkingDirective::add(),
-        },
-    })
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
@@ -635,14 +832,14 @@ mod test {
     use super::{HugrLinking, NodeLinkingDirective, NodeLinkingError};
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
-        Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
-        ModuleBuilder,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
     use crate::hugr::hugrmut::test::check_calls_defn_decl;
     use crate::hugr::linking::{NameLinkingError, NameLinkingPolicy, OnMultiDefn, OnNewFunc};
     use crate::hugr::{ValidationError, hugrmut::HugrMut};
-    use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
+    use crate::ops::{Const, FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use crate::{Hugr, HugrView, Visibility, types::Signature};
@@ -911,7 +1108,7 @@ mod test {
         let i64_t = || INT_TYPES[6].to_owned();
         let foo_sig = Signature::new_endo(i64_t());
         let bar_sig = Signature::new(vec![i64_t(); 2], i64_t());
-        let mut target = {
+        let def_foo = {
             let mut fb =
                 FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
             let mut mb = fb.module_root_builder();
@@ -931,7 +1128,7 @@ mod test {
             h
         };
 
-        let inserted = {
+        let main_def_bar = {
             let mut main_b = FunctionBuilder::new("main", Signature::new(vec![], i64_t())).unwrap();
             let mut mb = main_b.module_root_builder();
             let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
@@ -957,28 +1154,52 @@ mod test {
             h
         };
 
-        let pol = NameLinkingPolicy {
-            sig_conflict,
-            multi_defn,
-        };
-        let mut target2 = target.clone();
+        let pol =
+            NameLinkingPolicy::err_on_conflict(multi_defn).on_signature_conflict(sig_conflict);
+        // Insert def_foo into main_def_bar
+        let mut has_main1 = main_def_bar.clone();
+        has_main1.link_module_view(&def_foo, &pol).unwrap();
+        let mut has_main2 = main_def_bar.clone();
+        has_main2.link_module(def_foo.clone(), &pol).unwrap();
+        // Insert main_def_bar into def_foo
+        let mut no_main1 = def_foo.clone();
+        no_main1.link_module_view(&main_def_bar, &pol).unwrap();
+        let mut no_main2 = def_foo.clone();
+        no_main2.link_module(main_def_bar.clone(), &pol).unwrap();
+        // Insert main_def_bar into def_foo, explicitly adding main
+        let mut main_no_bar1 = def_foo.clone();
+        main_no_bar1
+            .insert_link_from_view(main_no_bar1.module_root(), &main_def_bar, &pol)
+            .unwrap();
+        let mut main_no_bar2 = def_foo;
+        main_no_bar2
+            .insert_link_hugr(main_no_bar2.module_root(), main_def_bar, &pol)
+            .unwrap();
 
-        target.link_module_view(&inserted, &pol).unwrap();
-        target2.link_module(inserted, &pol).unwrap();
-        for tgt in [target, target2] {
-            tgt.validate().unwrap();
-            let (decls, defns) = list_decls_defns(&tgt);
-            assert_eq!(decls, HashMap::new());
-            assert_eq!(
-                defns.values().copied().sorted().collect_vec(),
-                ["bar", "foo", "main"]
-            );
-            let call_tgts = call_targets(&tgt);
-            for (defn, name) in defns {
-                if name != "main" {
-                    // Defns now have two calls each (was one to each alias)
-                    assert_eq!(call_tgts.values().filter(|tgt| **tgt == defn).count(), 2);
-                }
+        for (hugr, exp_decls, exp_defns) in [
+            (&has_main1, vec![], vec!["bar", "foo", "main"]),
+            (&has_main2, vec![], vec!["bar", "foo", "main"]),
+            (&main_no_bar1, vec!["bar", "bar"], vec!["foo", "main"]),
+            (&main_no_bar2, vec!["bar", "bar"], vec!["foo", "main"]),
+            (&no_main1, vec![], vec!["bar", "foo"]),
+            (&no_main2, vec![], vec!["bar", "foo"]),
+        ] {
+            hugr.validate().unwrap();
+            let (decls, defns) = list_decls_defns(hugr);
+            assert_eq!(decls.values().copied().sorted().collect_vec(), exp_decls);
+            assert_eq!(defns.values().copied().sorted().collect_vec(), exp_defns);
+            let call_tgts = call_targets(&hugr);
+            for (func, name) in defns.into_iter().chain(decls) {
+                let expected_calls = match name {
+                    "bar" => 1 + exp_defns.contains(&"bar") as usize, // decls still separate
+                    "foo" => (exp_defns.contains(&"main") as usize) * 2, // called from main
+                    _ => 0,
+                };
+                assert_eq!(
+                    call_tgts.values().filter(|tgt| **tgt == func).count(),
+                    expected_calls,
+                    "for function {name}"
+                );
             }
         }
     }
@@ -1032,11 +1253,15 @@ mod test {
     }
 
     #[rstest]
-    #[case(OnMultiDefn::UseNew, vec![11])]
-    #[case(OnMultiDefn::UseExisting, vec![5])]
-    #[case(OnNewFunc::Add.into(), vec![5, 11])]
-    #[case(OnNewFunc::RaiseError.into(), vec![])]
-    fn impl_conflict(#[case] multi_defn: OnMultiDefn, #[case] expected: Vec<u64>) {
+    #[case(OnMultiDefn::UseNew, vec![11], vec![5, 11])] // Existing constant is not removed
+    #[case(OnMultiDefn::UseExisting, vec![5], vec![5])]
+    #[case(OnNewFunc::Add.into(), vec![5, 11], vec![5,11])]
+    #[case(OnNewFunc::RaiseError.into(), vec![], vec![])]
+    fn impl_conflict(
+        #[case] multi_defn: OnMultiDefn,
+        #[case] expect_used: Vec<u64>,
+        #[case] expect_exist: Vec<u64>,
+    ) {
         fn build_hugr(cst: u64) -> Hugr {
             let mut mb = ModuleBuilder::new();
             let cst = mb.add_constant(Value::from(ConstUsize::new(cst)));
@@ -1051,7 +1276,11 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let pol = NameLinkingPolicy::keep_both_invalid().on_multiple_defn(multi_defn);
+        let pol = NameLinkingPolicy {
+            new_names: OnNewFunc::RaiseError,
+            sig_conflict: OnNewFunc::RaiseError,
+            multi_defn,
+        };
         let res = host.link_module(inserted, &pol);
         if multi_defn == OnNewFunc::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleDefn(n, _, _)) if n == "foo"));
@@ -1080,14 +1309,187 @@ mod test {
                     .unwrap()
             })
             .collect_vec();
-        assert_eq!(func_consts, expected);
-        // At the moment we copy all the constants regardless of whether they are used:
+        assert_eq!(func_consts, expect_used);
         let all_consts: Vec<_> = host
             .children(host.module_root())
             .filter_map(|ch| host.get_optype(ch).as_const())
             .map(|c| c.get_custom_value::<ConstUsize>().unwrap().value())
             .sorted()
             .collect();
-        assert_eq!(all_consts, [5, 11]);
+        assert_eq!(all_consts, expect_exist);
+    }
+
+    #[test]
+    fn insert_link() {
+        let insert = {
+            let mut mb = ModuleBuilder::new();
+            let reached = mb.declare("foo", endo_sig(usize_t()).into()).unwrap();
+            // This would conflict signature, but is not reached:
+            let unreached = mb
+                .declare("bar", inout_sig(vec![], usize_t()).into())
+                .unwrap();
+            let mut outer = mb.define_function("outer", endo_sig(usize_t())).unwrap();
+            // ...as this first call is outside the region we insert:
+            let [i] = outer.call(&unreached, &[], []).unwrap().outputs_arr();
+            let mut dfb = outer.dfg_builder(endo_sig(usize_t()), [i]).unwrap();
+            let [i] = dfb.input_wires_arr();
+            let call = dfb.call(&reached, &[], [i]).unwrap();
+            let dfg = dfb.finish_with_outputs(call.outputs()).unwrap();
+            outer.finish_with_outputs(dfg.outputs()).unwrap();
+            let mut h = mb.finish_hugr().unwrap();
+            h.set_entrypoint(dfg.node());
+            h
+        };
+        let mut fb = FunctionBuilder::new("main", endo_sig(usize_t())).unwrap();
+        let [i] = fb.input_wires_arr();
+        let cst = fb.add_load_value(ConstUsize::new(42));
+        let mut host = fb.finish_hugr_with_outputs([cst]).unwrap();
+
+        let pol = NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError);
+
+        let ins = host
+            .insert_link_from_view(host.entrypoint(), &insert, &pol)
+            .unwrap();
+        let dfg = *ins.node_map.get(&insert.entrypoint()).unwrap();
+        assert!(host.get_optype(dfg).is_dfg());
+        host.connect(i.node(), i.source(), dfg, 0);
+        host.validate().unwrap();
+        let (decls, defns) = list_decls_defns(&host);
+        assert_eq!(decls.values().collect_vec(), [&"foo"]); // unreached bar not copied
+        assert_eq!(defns.values().collect_vec(), [&"main"]); // as originally in host
+        let (call, tgt) = call_targets(&host).into_iter().exactly_one().unwrap();
+        assert_eq!(host.get_parent(call), Some(dfg));
+        assert_eq!(
+            host.get_parent(dfg),
+            Some(defns.into_keys().exactly_one().unwrap())
+        );
+        assert_eq!(tgt, decls.into_keys().exactly_one().unwrap());
+    }
+
+    #[rstest]
+    fn no_new_names_module(#[values(Visibility::Public, Visibility::Private)] vis: Visibility) {
+        let pub_sig = endo_sig(usize_t());
+        let bar_sig = Signature::new(vec![usize_t(); 2], usize_t());
+        let existing = {
+            let mut mb = ModuleBuilder::new();
+            mb.declare("pub_func", pub_sig.clone().into()).unwrap();
+            mb.finish_hugr().unwrap()
+        };
+        let (insert, new_func) = {
+            let mut mb = ModuleBuilder::new();
+            let bar = mb
+                .declare_vis("new_func", bar_sig.into(), vis.clone())
+                .unwrap();
+            let mut pf = mb
+                .define_function_vis("pub_func", pub_sig.clone(), Visibility::Public)
+                .unwrap();
+            let [i] = pf.input_wires_arr();
+            let [i] = pf.call(&bar, &[], [i, i]).unwrap().outputs_arr();
+            pf.finish_with_outputs([i]).unwrap();
+            (mb.finish_hugr().unwrap(), bar.node())
+        };
+        let pol = NameLinkingPolicy::keep_both_invalid().on_new_names(OnNewFunc::RaiseError);
+        let mut host = existing.clone();
+        let res = host.link_module(insert, &pol);
+        match vis {
+            Visibility::Public => {
+                assert_eq!(
+                    res.err(),
+                    Some(NameLinkingError::NoNewNames {
+                        name: "new_func".to_string(),
+                        src_node: new_func
+                    })
+                );
+                assert_eq!(host, existing);
+            }
+            Visibility::Private => {
+                let ins = res.unwrap();
+                host.validate().unwrap();
+                let (decls, defns) = list_decls_defns(&host);
+                // Original pubfunc decl replaced by new definition
+                assert_eq!(defns.into_values().collect_vec(), ["pub_func"]);
+                // New private bar decl added
+                let new_added = ins.node_map[&new_func];
+                assert_eq!(decls.into_iter().collect_vec(), [(new_added, "new_func")]);
+                assert_eq!(
+                    host.get_optype(new_added)
+                        .as_func_decl()
+                        .map(FuncDecl::visibility),
+                    Some(&Visibility::Private)
+                );
+            }
+        }
+    }
+
+    #[rstest]
+    fn no_new_names_entrypoint(#[values(true, false)] call_new: bool) {
+        let (insert, new_func) = {
+            let mut dfb = DFGBuilder::new(inout_sig(vec![], usize_t())).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let cst_used = mb.add_constant(Value::from(ConstUsize::new(5)));
+            mb.add_constant(Value::from(ConstUsize::new(10)));
+
+            let nf = mb.declare("new_func", endo_sig(usize_t()).into()).unwrap();
+            let pf = mb
+                .define_function_vis("pub_func", endo_sig(usize_t()), Visibility::Public)
+                .unwrap();
+            let [i] = pf.input_wires_arr();
+            let pf = pf.finish_with_outputs([i]).unwrap();
+
+            let i = dfb.load_const(&cst_used);
+            let call = if call_new {
+                dfb.call(&nf, &[], [i]).unwrap()
+            } else {
+                dfb.call(pf.handle(), &[], [i]).unwrap()
+            };
+            (
+                dfb.finish_hugr_with_outputs(call.outputs()).unwrap(),
+                nf.node(),
+            )
+        };
+
+        let (backup, ex_main) = {
+            let mut mb = ModuleBuilder::new();
+            mb.declare("pub_func", endo_sig(usize_t()).into()).unwrap();
+            let fb = mb.define_function("main", endo_sig(usize_t())).unwrap();
+            let ins = fb.input_wires();
+            let main = fb.finish_with_outputs(ins).unwrap();
+            (mb.finish_hugr().unwrap(), main.node())
+        };
+
+        let mut target = backup.clone();
+        let res = target.insert_link_hugr(
+            ex_main,
+            insert,
+            &NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError)
+                .on_new_names(OnNewFunc::RaiseError),
+        );
+        if call_new {
+            assert_eq!(
+                res.err(),
+                Some(NameLinkingError::NoNewNames {
+                    name: "new_func".to_string(),
+                    src_node: new_func
+                })
+            );
+            assert_eq!(target, backup);
+        } else {
+            res.unwrap();
+            target.validate().unwrap();
+            let (decls, defns) = list_decls_defns(&target);
+            assert_eq!(
+                defns.into_values().sorted().collect_vec(),
+                ["main", "pub_func"]
+            );
+            assert!(decls.is_empty());
+            assert_eq!(
+                target
+                    .nodes()
+                    .filter_map(|n| target.get_optype(n).as_const())
+                    .map(Const::value)
+                    .collect_vec(),
+                [&ConstUsize::new(5).into()]
+            );
+        }
     }
 }
