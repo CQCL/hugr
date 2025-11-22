@@ -585,9 +585,9 @@ impl NameLinkingPolicy {
         //    return Err(format!("Entrypoint is a top-level function"))
         //}
         let pol = self.to_node_linking_helper(target, source, true)?;
-        if let Some(LinkAction::LinkNode(add @ NodeLinkingDirective::Add { .. })) =
-            pol.get(&entrypoint_func)
-            && entrypoint_func != source.entrypoint()
+        if let Some(LinkAction::LinkNode(add @ NodeLinkingDirective::Add { .. })) = pol
+            .get(&entrypoint_func)
+            .filter(|_| entrypoint_func != source.entrypoint())
         {
             return Err(NameLinkingError::AddFunctionContainingEntrypoint(
                 entrypoint_func,
