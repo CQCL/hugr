@@ -1,0 +1,19 @@
+---
+source: hugr-llvm/src/extension/collections/list.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private ptr @_hl.main.1(ptr %0, i16 %1) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %2 = alloca i16, align 2
+  store i16 %1, ptr %2, align 2
+  call void @__rt__list__push(ptr %0, ptr %2)
+  ret ptr %0
+}
+
+declare void @__rt__list__push(ptr, ptr)

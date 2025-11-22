@@ -8,7 +8,7 @@ on:
 
 
 env:
-  LLVM_VERSION: "14.0"
+  LLVM_VERSION: "20.1"
 
 jobs:
   release-plz-pr:

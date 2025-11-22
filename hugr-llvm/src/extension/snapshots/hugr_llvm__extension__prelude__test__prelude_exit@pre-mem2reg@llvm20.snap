@@ -1,0 +1,48 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [5 x i8] c"EXIT\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private { i16, i16 } @_hl.main.1(i16 %0, i16 %1) {
+alloca_block:
+  %"0" = alloca i16, align 2
+  %"1" = alloca i16, align 2
+  %"5_0" = alloca { i32, ptr }, align 8
+  %"2_0" = alloca i16, align 2
+  %"2_1" = alloca i16, align 2
+  %"6_0" = alloca i16, align 2
+  %"6_1" = alloca i16, align 2
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store { i32, ptr } { i32 42, ptr @0 }, ptr %"5_0", align 8
+  store i16 %0, ptr %"2_0", align 2
+  store i16 %1, ptr %"2_1", align 2
+  %"5_01" = load { i32, ptr }, ptr %"5_0", align 8
+  %"2_02" = load i16, ptr %"2_0", align 2
+  %"2_13" = load i16, ptr %"2_1", align 2
+  %2 = extractvalue { i32, ptr } %"5_01", 0
+  %3 = extractvalue { i32, ptr } %"5_01", 1
+  %4 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 %2, ptr %3)
+  call void @abort()
+  store i16 0, ptr %"6_0", align 2
+  store i16 0, ptr %"6_1", align 2
+  %"6_04" = load i16, ptr %"6_0", align 2
+  %"6_15" = load i16, ptr %"6_1", align 2
+  store i16 %"6_04", ptr %"0", align 2
+  store i16 %"6_15", ptr %"1", align 2
+  %"06" = load i16, ptr %"0", align 2
+  %"17" = load i16, ptr %"1", align 2
+  %mrv = insertvalue { i16, i16 } poison, i16 %"06", 0
+  %mrv8 = insertvalue { i16, i16 } %mrv, i16 %"17", 1
+  ret { i16, i16 } %mrv8
+}
+
+declare i32 @printf(ptr, ...)
+
+declare void @abort()

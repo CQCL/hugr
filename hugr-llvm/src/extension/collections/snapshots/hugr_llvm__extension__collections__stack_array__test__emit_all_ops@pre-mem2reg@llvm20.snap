@@ -1,0 +1,442 @@
+---
+source: hugr-llvm/src/extension/collections/stack_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
+@prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+@1 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
+@prelude.panic_template.1 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+@2 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
+@prelude.panic_template.2 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+@3 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
+@prelude.panic_template.3 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+@4 = private unnamed_addr constant [37 x i8] c"Expected variant 1 but got variant 0\00", align 1
+@prelude.panic_template.4 = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
+
+define private void @_hl.main.1() {
+alloca_block:
+  %"12_0" = alloca i64, align 8
+  %"10_0" = alloca i64, align 8
+  %"15_0" = alloca [2 x i64], align 8
+  %"13_0" = alloca [2 x i64], align 8
+  %"14_0" = alloca i64, align 8
+  %"14_1" = alloca i64, align 8
+  %"8_0" = alloca i64, align 8
+  %"18_0" = alloca { i1, [2 x i64] }, align 8
+  %"0" = alloca { i1, [2 x i64] }, align 8
+  %"19_0" = alloca [2 x i64], align 8
+  %"012" = alloca [2 x i64], align 8
+  %"014" = alloca [2 x i64], align 8
+  %"24_0" = alloca { i32, ptr }, align 8
+  %"21_0" = alloca [2 x i64], align 8
+  %"25_0" = alloca [2 x i64], align 8
+  %"019" = alloca [2 x i64], align 8
+  %"27_0" = alloca [2 x i64], align 8
+  %"29_0" = alloca { i1, i64 }, align 8
+  %"29_1" = alloca [2 x i64], align 8
+  %"024" = alloca { i1, i64 }, align 8
+  %"1" = alloca [2 x i64], align 8
+  %"31_0" = alloca i64, align 8
+  %"028" = alloca i64, align 8
+  %"36_0" = alloca { i32, ptr }, align 8
+  %"37_0" = alloca i64, align 8
+  %"032" = alloca i64, align 8
+  %"39_0" = alloca i64, align 8
+  %"41_0" = alloca { i1, i64, [2 x i64] }, align 8
+  %"038" = alloca { i1, i64, [2 x i64] }, align 8
+  %"42_0" = alloca i64, align 8
+  %"42_1" = alloca [2 x i64], align 8
+  %"041" = alloca i64, align 8
+  %"142" = alloca [2 x i64], align 8
+  %"045" = alloca i64, align 8
+  %"146" = alloca [2 x i64], align 8
+  %"47_0" = alloca { i32, ptr }, align 8
+  %"44_0" = alloca i64, align 8
+  %"44_1" = alloca [2 x i64], align 8
+  %"48_0" = alloca i64, align 8
+  %"48_1" = alloca [2 x i64], align 8
+  %"054" = alloca i64, align 8
+  %"155" = alloca [2 x i64], align 8
+  %"50_0" = alloca i64, align 8
+  %"50_1" = alloca [2 x i64], align 8
+  %"52_0" = alloca { i1, i64, [1 x i64] }, align 8
+  %"53_0" = alloca i64, align 8
+  %"53_1" = alloca [1 x i64], align 8
+  %"062" = alloca i64, align 8
+  %"163" = alloca [1 x i64], align 8
+  %"58_0" = alloca { i32, ptr }, align 8
+  %"59_0" = alloca i64, align 8
+  %"59_1" = alloca [1 x i64], align 8
+  %"069" = alloca i64, align 8
+  %"170" = alloca [1 x i64], align 8
+  %"61_0" = alloca i64, align 8
+  %"61_1" = alloca [1 x i64], align 8
+  %"63_0" = alloca { i1, i64 }, align 8
+  %"64_0" = alloca i64, align 8
+  %"64_1" = alloca [0 x i64], align 8
+  %"077" = alloca i64, align 8
+  %"178" = alloca [0 x i64], align 8
+  %"69_0" = alloca { i32, ptr }, align 8
+  %"70_0" = alloca i64, align 8
+  %"70_1" = alloca [0 x i64], align 8
+  %"084" = alloca i64, align 8
+  %"185" = alloca [0 x i64], align 8
+  %"72_0" = alloca i64, align 8
+  %"72_1" = alloca [0 x i64], align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 2, ptr %"12_0", align 4
+  store i64 1, ptr %"10_0", align 4
+  %"10_01" = load i64, ptr %"10_0", align 4
+  %"12_02" = load i64, ptr %"12_0", align 4
+  %0 = insertvalue [2 x i64] undef, i64 %"10_01", 0
+  %1 = insertvalue [2 x i64] %0, i64 %"12_02", 1
+  store [2 x i64] %1, ptr %"15_0", align 4
+  %"10_03" = load i64, ptr %"10_0", align 4
+  %"12_04" = load i64, ptr %"12_0", align 4
+  %2 = insertvalue [2 x i64] undef, i64 %"10_03", 0
+  %3 = insertvalue [2 x i64] %2, i64 %"12_04", 1
+  store [2 x i64] %3, ptr %"13_0", align 4
+  %"13_05" = load [2 x i64], ptr %"13_0", align 4
+  %extract = extractvalue [2 x i64] %"13_05", 0
+  %extract6 = extractvalue [2 x i64] %"13_05", 1
+  store i64 %extract, ptr %"14_0", align 4
+  store i64 %extract6, ptr %"14_1", align 4
+  store i64 0, ptr %"8_0", align 4
+  %"15_07" = load [2 x i64], ptr %"15_0", align 4
+  %"8_08" = load i64, ptr %"8_0", align 4
+  %"10_09" = load i64, ptr %"10_0", align 4
+  %4 = icmp ult i64 %"8_08", 2
+  %5 = icmp ult i64 %"10_09", 2
+  %6 = and i1 %4, %5
+  br i1 %6, label %9, label %7
+
+7:                                                ; preds = %entry_block
+  %8 = insertvalue { i1, [2 x i64] } { i1 false, [2 x i64] poison }, [2 x i64] %"15_07", 1
+  store { i1, [2 x i64] } %8, ptr %"0", align 4
+  br label %17
+
+9:                                                ; preds = %entry_block
+  %10 = alloca i64, i32 2, align 8
+  store [2 x i64] %"15_07", ptr %10, align 4
+  %11 = getelementptr inbounds i64, ptr %10, i64 %"8_08"
+  %12 = load i64, ptr %11, align 4
+  %13 = getelementptr inbounds i64, ptr %10, i64 %"10_09"
+  %14 = load i64, ptr %13, align 4
+  store i64 %14, ptr %11, align 4
+  store i64 %12, ptr %13, align 4
+  %15 = load [2 x i64], ptr %10, align 4
+  %16 = insertvalue { i1, [2 x i64] } { i1 true, [2 x i64] poison }, [2 x i64] %15, 1
+  store { i1, [2 x i64] } %16, ptr %"0", align 4
+  br label %17
+
+17:                                               ; preds = %7, %9
+  %"010" = load { i1, [2 x i64] }, ptr %"0", align 4
+  store { i1, [2 x i64] } %"010", ptr %"18_0", align 4
+  %"18_011" = load { i1, [2 x i64] }, ptr %"18_0", align 4
+  %18 = extractvalue { i1, [2 x i64] } %"18_011", 0
+  switch i1 %18, label %19 [
+    i1 true, label %21
+  ]
+
+19:                                               ; preds = %17
+  %20 = extractvalue { i1, [2 x i64] } %"18_011", 1
+  store [2 x i64] %20, ptr %"014", align 4
+  br label %cond_19_case_0
+
+21:                                               ; preds = %17
+  %22 = extractvalue { i1, [2 x i64] } %"18_011", 1
+  store [2 x i64] %22, ptr %"019", align 4
+  br label %cond_19_case_1
+
+cond_19_case_0:                                   ; preds = %19
+  %"015" = load [2 x i64], ptr %"014", align 4
+  store { i32, ptr } { i32 1, ptr @0 }, ptr %"24_0", align 8
+  store [2 x i64] %"015", ptr %"21_0", align 4
+  %"24_016" = load { i32, ptr }, ptr %"24_0", align 8
+  %"21_017" = load [2 x i64], ptr %"21_0", align 4
+  %23 = extractvalue { i32, ptr } %"24_016", 0
+  %24 = extractvalue { i32, ptr } %"24_016", 1
+  %25 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 %23, ptr %24)
+  call void @abort()
+  store [2 x i64] zeroinitializer, ptr %"25_0", align 4
+  %"25_018" = load [2 x i64], ptr %"25_0", align 4
+  store [2 x i64] %"25_018", ptr %"012", align 4
+  br label %cond_exit_19
+
+cond_19_case_1:                                   ; preds = %21
+  %"020" = load [2 x i64], ptr %"019", align 4
+  store [2 x i64] %"020", ptr %"27_0", align 4
+  %"27_021" = load [2 x i64], ptr %"27_0", align 4
+  store [2 x i64] %"27_021", ptr %"012", align 4
+  br label %cond_exit_19
+
+cond_exit_19:                                     ; preds = %cond_19_case_1, %cond_19_case_0
+  %"013" = load [2 x i64], ptr %"012", align 4
+  store [2 x i64] %"013", ptr %"19_0", align 4
+  %"19_022" = load [2 x i64], ptr %"19_0", align 4
+  %"8_023" = load i64, ptr %"8_0", align 4
+  %26 = icmp ult i64 %"8_023", 2
+  br i1 %26, label %28, label %27
+
+27:                                               ; preds = %cond_exit_19
+  store { i1, i64 } { i1 false, i64 poison }, ptr %"024", align 4
+  store [2 x i64] %"19_022", ptr %"1", align 4
+  br label %33
+
+28:                                               ; preds = %cond_exit_19
+  %29 = alloca i64, i32 2, align 8
+  store [2 x i64] %"19_022", ptr %29, align 4
+  %30 = getelementptr inbounds i64, ptr %29, i64 %"8_023"
+  %31 = load i64, ptr %30, align 4
+  %32 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %31, 1
+  store { i1, i64 } %32, ptr %"024", align 4
+  store [2 x i64] %"19_022", ptr %"1", align 4
+  br label %33
+
+33:                                               ; preds = %27, %28
+  %"025" = load { i1, i64 }, ptr %"024", align 4
+  %"126" = load [2 x i64], ptr %"1", align 4
+  store { i1, i64 } %"025", ptr %"29_0", align 4
+  store [2 x i64] %"126", ptr %"29_1", align 4
+  %"29_027" = load { i1, i64 }, ptr %"29_0", align 4
+  %34 = extractvalue { i1, i64 } %"29_027", 0
+  switch i1 %34, label %35 [
+    i1 true, label %36
+  ]
+
+35:                                               ; preds = %33
+  br label %cond_31_case_0
+
+36:                                               ; preds = %33
+  %37 = extractvalue { i1, i64 } %"29_027", 1
+  store i64 %37, ptr %"032", align 4
+  br label %cond_31_case_1
+
+cond_31_case_0:                                   ; preds = %35
+  store { i32, ptr } { i32 1, ptr @1 }, ptr %"36_0", align 8
+  %"36_030" = load { i32, ptr }, ptr %"36_0", align 8
+  %38 = extractvalue { i32, ptr } %"36_030", 0
+  %39 = extractvalue { i32, ptr } %"36_030", 1
+  %40 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.1, i32 %38, ptr %39)
+  call void @abort()
+  store i64 0, ptr %"37_0", align 4
+  %"37_031" = load i64, ptr %"37_0", align 4
+  store i64 %"37_031", ptr %"028", align 4
+  br label %cond_exit_31
+
+cond_31_case_1:                                   ; preds = %36
+  %"033" = load i64, ptr %"032", align 4
+  store i64 %"033", ptr %"39_0", align 4
+  %"39_034" = load i64, ptr %"39_0", align 4
+  store i64 %"39_034", ptr %"028", align 4
+  br label %cond_exit_31
+
+cond_exit_31:                                     ; preds = %cond_31_case_1, %cond_31_case_0
+  %"029" = load i64, ptr %"028", align 4
+  store i64 %"029", ptr %"31_0", align 4
+  %"29_135" = load [2 x i64], ptr %"29_1", align 4
+  %"10_036" = load i64, ptr %"10_0", align 4
+  %"31_037" = load i64, ptr %"31_0", align 4
+  %41 = icmp ult i64 %"10_036", 2
+  br i1 %41, label %45, label %42
+
+42:                                               ; preds = %cond_exit_31
+  %43 = insertvalue { i1, i64, [2 x i64] } { i1 false, i64 poison, [2 x i64] poison }, i64 %"31_037", 1
+  %44 = insertvalue { i1, i64, [2 x i64] } %43, [2 x i64] %"29_135", 2
+  store { i1, i64, [2 x i64] } %44, ptr %"038", align 4
+  br label %52
+
+45:                                               ; preds = %cond_exit_31
+  %46 = alloca i64, i32 2, align 8
+  store [2 x i64] %"29_135", ptr %46, align 4
+  %47 = getelementptr inbounds i64, ptr %46, i64 %"10_036"
+  %48 = load i64, ptr %47, align 4
+  store i64 %"31_037", ptr %47, align 4
+  %49 = load [2 x i64], ptr %46, align 4
+  %50 = insertvalue { i1, i64, [2 x i64] } { i1 true, i64 poison, [2 x i64] poison }, i64 %48, 1
+  %51 = insertvalue { i1, i64, [2 x i64] } %50, [2 x i64] %49, 2
+  store { i1, i64, [2 x i64] } %51, ptr %"038", align 4
+  br label %52
+
+52:                                               ; preds = %42, %45
+  %"039" = load { i1, i64, [2 x i64] }, ptr %"038", align 4
+  store { i1, i64, [2 x i64] } %"039", ptr %"41_0", align 4
+  %"41_040" = load { i1, i64, [2 x i64] }, ptr %"41_0", align 4
+  %53 = extractvalue { i1, i64, [2 x i64] } %"41_040", 0
+  switch i1 %53, label %54 [
+    i1 true, label %57
+  ]
+
+54:                                               ; preds = %52
+  %55 = extractvalue { i1, i64, [2 x i64] } %"41_040", 1
+  %56 = extractvalue { i1, i64, [2 x i64] } %"41_040", 2
+  store i64 %55, ptr %"045", align 4
+  store [2 x i64] %56, ptr %"146", align 4
+  br label %cond_42_case_0
+
+57:                                               ; preds = %52
+  %58 = extractvalue { i1, i64, [2 x i64] } %"41_040", 1
+  %59 = extractvalue { i1, i64, [2 x i64] } %"41_040", 2
+  store i64 %58, ptr %"054", align 4
+  store [2 x i64] %59, ptr %"155", align 4
+  br label %cond_42_case_1
+
+cond_42_case_0:                                   ; preds = %54
+  %"047" = load i64, ptr %"045", align 4
+  %"148" = load [2 x i64], ptr %"146", align 4
+  store { i32, ptr } { i32 1, ptr @2 }, ptr %"47_0", align 8
+  store i64 %"047", ptr %"44_0", align 4
+  store [2 x i64] %"148", ptr %"44_1", align 4
+  %"47_049" = load { i32, ptr }, ptr %"47_0", align 8
+  %"44_050" = load i64, ptr %"44_0", align 4
+  %"44_151" = load [2 x i64], ptr %"44_1", align 4
+  %60 = extractvalue { i32, ptr } %"47_049", 0
+  %61 = extractvalue { i32, ptr } %"47_049", 1
+  %62 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.2, i32 %60, ptr %61)
+  call void @abort()
+  store i64 0, ptr %"48_0", align 4
+  store [2 x i64] zeroinitializer, ptr %"48_1", align 4
+  %"48_052" = load i64, ptr %"48_0", align 4
+  %"48_153" = load [2 x i64], ptr %"48_1", align 4
+  store i64 %"48_052", ptr %"041", align 4
+  store [2 x i64] %"48_153", ptr %"142", align 4
+  br label %cond_exit_42
+
+cond_42_case_1:                                   ; preds = %57
+  %"056" = load i64, ptr %"054", align 4
+  %"157" = load [2 x i64], ptr %"155", align 4
+  store i64 %"056", ptr %"50_0", align 4
+  store [2 x i64] %"157", ptr %"50_1", align 4
+  %"50_058" = load i64, ptr %"50_0", align 4
+  %"50_159" = load [2 x i64], ptr %"50_1", align 4
+  store i64 %"50_058", ptr %"041", align 4
+  store [2 x i64] %"50_159", ptr %"142", align 4
+  br label %cond_exit_42
+
+cond_exit_42:                                     ; preds = %cond_42_case_1, %cond_42_case_0
+  %"043" = load i64, ptr %"041", align 4
+  %"144" = load [2 x i64], ptr %"142", align 4
+  store i64 %"043", ptr %"42_0", align 4
+  store [2 x i64] %"144", ptr %"42_1", align 4
+  %"42_160" = load [2 x i64], ptr %"42_1", align 4
+  %63 = alloca i64, i32 2, align 8
+  store [2 x i64] %"42_160", ptr %63, align 4
+  %64 = getelementptr i64, ptr %63, i32 1
+  %65 = load i64, ptr %63, align 4
+  %66 = load [1 x i64], ptr %64, align 4
+  %67 = insertvalue { i1, i64, [1 x i64] } { i1 true, i64 poison, [1 x i64] poison }, i64 %65, 1
+  %68 = insertvalue { i1, i64, [1 x i64] } %67, [1 x i64] %66, 2
+  store { i1, i64, [1 x i64] } %68, ptr %"52_0", align 4
+  %"52_061" = load { i1, i64, [1 x i64] }, ptr %"52_0", align 4
+  %69 = extractvalue { i1, i64, [1 x i64] } %"52_061", 0
+  switch i1 %69, label %70 [
+    i1 true, label %71
+  ]
+
+70:                                               ; preds = %cond_exit_42
+  br label %cond_53_case_0
+
+71:                                               ; preds = %cond_exit_42
+  %72 = extractvalue { i1, i64, [1 x i64] } %"52_061", 1
+  %73 = extractvalue { i1, i64, [1 x i64] } %"52_061", 2
+  store i64 %72, ptr %"069", align 4
+  store [1 x i64] %73, ptr %"170", align 4
+  br label %cond_53_case_1
+
+cond_53_case_0:                                   ; preds = %70
+  store { i32, ptr } { i32 1, ptr @3 }, ptr %"58_0", align 8
+  %"58_066" = load { i32, ptr }, ptr %"58_0", align 8
+  %74 = extractvalue { i32, ptr } %"58_066", 0
+  %75 = extractvalue { i32, ptr } %"58_066", 1
+  %76 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.3, i32 %74, ptr %75)
+  call void @abort()
+  store i64 0, ptr %"59_0", align 4
+  store [1 x i64] zeroinitializer, ptr %"59_1", align 4
+  %"59_067" = load i64, ptr %"59_0", align 4
+  %"59_168" = load [1 x i64], ptr %"59_1", align 4
+  store i64 %"59_067", ptr %"062", align 4
+  store [1 x i64] %"59_168", ptr %"163", align 4
+  br label %cond_exit_53
+
+cond_53_case_1:                                   ; preds = %71
+  %"071" = load i64, ptr %"069", align 4
+  %"172" = load [1 x i64], ptr %"170", align 4
+  store i64 %"071", ptr %"61_0", align 4
+  store [1 x i64] %"172", ptr %"61_1", align 4
+  %"61_073" = load i64, ptr %"61_0", align 4
+  %"61_174" = load [1 x i64], ptr %"61_1", align 4
+  store i64 %"61_073", ptr %"062", align 4
+  store [1 x i64] %"61_174", ptr %"163", align 4
+  br label %cond_exit_53
+
+cond_exit_53:                                     ; preds = %cond_53_case_1, %cond_53_case_0
+  %"064" = load i64, ptr %"062", align 4
+  %"165" = load [1 x i64], ptr %"163", align 4
+  store i64 %"064", ptr %"53_0", align 4
+  store [1 x i64] %"165", ptr %"53_1", align 4
+  %"53_175" = load [1 x i64], ptr %"53_1", align 4
+  %77 = alloca i64, align 8
+  store [1 x i64] %"53_175", ptr %77, align 4
+  %78 = getelementptr i64, ptr %77, i32 0
+  %79 = load i64, ptr %78, align 4
+  %80 = load [0 x i64], ptr %77, align 4
+  %81 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %79, 1
+  store { i1, i64 } %81, ptr %"63_0", align 4
+  %"63_076" = load { i1, i64 }, ptr %"63_0", align 4
+  %82 = extractvalue { i1, i64 } %"63_076", 0
+  switch i1 %82, label %83 [
+    i1 true, label %84
+  ]
+
+83:                                               ; preds = %cond_exit_53
+  br label %cond_64_case_0
+
+84:                                               ; preds = %cond_exit_53
+  %85 = extractvalue { i1, i64 } %"63_076", 1
+  store i64 %85, ptr %"084", align 4
+  store [0 x i64] undef, ptr %"185", align 4
+  br label %cond_64_case_1
+
+cond_64_case_0:                                   ; preds = %83
+  store { i32, ptr } { i32 1, ptr @4 }, ptr %"69_0", align 8
+  %"69_081" = load { i32, ptr }, ptr %"69_0", align 8
+  %86 = extractvalue { i32, ptr } %"69_081", 0
+  %87 = extractvalue { i32, ptr } %"69_081", 1
+  %88 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.4, i32 %86, ptr %87)
+  call void @abort()
+  store i64 0, ptr %"70_0", align 4
+  store [0 x i64] zeroinitializer, ptr %"70_1", align 4
+  %"70_082" = load i64, ptr %"70_0", align 4
+  %"70_183" = load [0 x i64], ptr %"70_1", align 4
+  store i64 %"70_082", ptr %"077", align 4
+  store [0 x i64] %"70_183", ptr %"178", align 4
+  br label %cond_exit_64
+
+cond_64_case_1:                                   ; preds = %84
+  %"086" = load i64, ptr %"084", align 4
+  %"187" = load [0 x i64], ptr %"185", align 4
+  store i64 %"086", ptr %"72_0", align 4
+  store [0 x i64] %"187", ptr %"72_1", align 4
+  %"72_088" = load i64, ptr %"72_0", align 4
+  %"72_189" = load [0 x i64], ptr %"72_1", align 4
+  store i64 %"72_088", ptr %"077", align 4
+  store [0 x i64] %"72_189", ptr %"178", align 4
+  br label %cond_exit_64
+
+cond_exit_64:                                     ; preds = %cond_64_case_1, %cond_64_case_0
+  %"079" = load i64, ptr %"077", align 4
+  %"180" = load [0 x i64], ptr %"178", align 4
+  store i64 %"079", ptr %"64_0", align 4
+  store [0 x i64] %"180", ptr %"64_1", align 4
+  %"64_190" = load [0 x i64], ptr %"64_1", align 4
+  ret void
+}
+
+declare i32 @printf(ptr, ...)
+
+declare void @abort()

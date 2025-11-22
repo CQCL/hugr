@@ -18,8 +18,9 @@ categories = ["compilers"]
 [features]
 test-utils = ["insta", "rstest", "portgraph"]
 
-default = ["llvm14-0"]
-llvm14-0 = ["inkwell/llvm14-0"]
+# LLVM 20 only.
+default = ["llvm20-1"]
+llvm20-1 = ["inkwell/llvm20-1"]
 
 [lints]
 workspace = true
