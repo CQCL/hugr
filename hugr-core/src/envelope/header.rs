@@ -6,8 +6,6 @@ use std::num::NonZeroU8;
 use itertools::Itertools;
 use thiserror::Error;
 
-use super::EnvelopeError;
-
 /// Magic number identifying the start of an envelope.
 ///
 /// In ascii, this is "`HUGRiHJv`". The second half is a randomly generated string
@@ -256,24 +254,6 @@ pub(super) enum HeaderErrorInner {
     #[error("Zstd compression is not supported. This requires the 'zstd' feature for `hugr`.")]
     ZstdUnsupported,
 }
-impl From<HeaderError> for EnvelopeError {
-    fn from(err: HeaderError) -> Self {
-        match err.0 {
-            HeaderErrorInner::IO { source } => EnvelopeError::IO { source },
-            HeaderErrorInner::MagicNumber { expected, found } => {
-                EnvelopeError::MagicNumber { expected, found }
-            }
-            HeaderErrorInner::InvalidFormatDescriptor { descriptor } => {
-                EnvelopeError::InvalidFormatDescriptor { descriptor }
-            }
-            HeaderErrorInner::FlagUnsupported { flag_ids } => {
-                EnvelopeError::FlagUnsupported { flag_ids }
-            }
-            #[cfg(not(feature = "zstd"))]
-            HeaderErrorInner::ZstdUnsupported => EnvelopeError::ZstdUnsupported,
-        }
-    }
-}
 
 impl<T: Into<HeaderErrorInner>> From<T> for HeaderError {
     fn from(value: T) -> Self {
@@ -298,7 +278,7 @@ impl EnvelopeHeader {
     /// Write an envelope header to a writer.
     ///
     /// See the [`crate::envelope`] module documentation for the binary format.
-    pub fn write(&self, writer: &mut impl Write) -> Result<(), EnvelopeError> {
+    pub fn write(&self, writer: &mut impl Write) -> Result<(), HeaderError> {
         // The first 8 bytes are the magic number in little-endian.
         writer.write_all(MAGIC_NUMBERS)?;
         // Next is the format descriptor.

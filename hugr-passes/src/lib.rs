@@ -1,5 +1,6 @@
 //! Compilation passes acting on the HUGR program representation.
 
+#[deprecated(note = "Use hugr-core::module_graph::ModuleGraph", since = "0.24.1")]
 pub mod call_graph;
 pub mod composable;
 pub use composable::ComposablePass;
@@ -24,7 +25,7 @@ pub mod untuple;
 /// Merge basic blocks. Subset of [normalize_cfgs], use the latter.
 #[deprecated(note = "Use normalize_cfgs", since = "0.23.0")]
 pub mod merge_bbs {
-    use hugr_core::hugr::{hugrmut::HugrMut, views::RootCheckable};
+    use hugr_core::hugr::{hugrmut::HugrMut, views::RootChecked};
     use hugr_core::ops::handle::CfgID;
 
     /// Merge any basic blocks that are direct children of the specified CFG
@@ -37,11 +38,8 @@ pub mod merge_bbs {
     ///
     /// [OpType::CFG]: hugr_core::ops::OpType::CFG
     #[deprecated(note = "Use version in normalize_cfgs", since = "0.23.0")]
-    pub fn merge_basic_blocks<'h, H: 'h + HugrMut>(
-        cfg: impl RootCheckable<&'h mut H, CfgID<H::Node>>,
-    ) {
-        let checked = cfg.try_into_checked().expect("Hugr must be a CFG region");
-        super::normalize_cfgs::merge_basic_blocks(checked.into_hugr()).unwrap();
+    pub fn merge_basic_blocks<'h, H: 'h + HugrMut>(cfg: RootChecked<&'h mut H, CfgID<H::Node>>) {
+        super::normalize_cfgs::merge_basic_blocks(cfg.into_hugr()).unwrap();
     }
 }
 

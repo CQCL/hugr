@@ -1,12 +1,11 @@
 //! Contains a pass to inline calls to selected functions in a Hugr.
 use std::collections::{HashSet, VecDeque};
 
-use hugr_core::hugr::hugrmut::HugrMut;
-use hugr_core::hugr::patch::inline_call::InlineCall;
 use itertools::Itertools;
 use petgraph::algo::tarjan_scc;
 
-use crate::call_graph::{CallGraph, CallGraphNode};
+use hugr_core::hugr::{hugrmut::HugrMut, patch::inline_call::InlineCall};
+use hugr_core::module_graph::{ModuleGraph, StaticNode};
 
 /// Error raised by [inline_acyclic]
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
@@ -26,7 +25,7 @@ pub fn inline_acyclic<H: HugrMut>(
     h: &mut H,
     call_predicate: impl Fn(&H, H::Node) -> bool,
 ) -> Result<(), InlineFuncsError> {
-    let cg = CallGraph::new(&*h);
+    let cg = ModuleGraph::new(&*h);
     let g = cg.graph();
     let all_funcs_in_cycles = tarjan_scc(g)
         .into_iter()
@@ -37,7 +36,7 @@ pub fn inline_acyclic<H: HugrMut>(
                 }
             }
             ns.into_iter().map(|n| {
-                let CallGraphNode::FuncDefn(fd) = g.node_weight(n).unwrap() else {
+                let StaticNode::FuncDefn(fd) = g.node_weight(n).unwrap() else {
                     panic!("Expected only FuncDefns in sccs")
                 };
                 *fd
@@ -68,18 +67,17 @@ pub fn inline_acyclic<H: HugrMut>(
 mod test {
     use std::collections::HashSet;
 
-    use hugr_core::core::HugrNode;
-    use hugr_core::ops::OpType;
     use itertools::Itertools;
-    use petgraph::visit::EdgeRef;
+    use rstest::rstest;
 
     use hugr_core::HugrView;
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use hugr_core::core::HugrNode;
+    use hugr_core::module_graph::{ModuleGraph, StaticNode};
+    use hugr_core::ops::OpType;
     use hugr_core::{Hugr, extension::prelude::qb_t, types::Signature};
-    use rstest::rstest;
 
-    use crate::call_graph::{CallGraph, CallGraphNode};
-    use crate::inline_funcs::inline_acyclic;
+    use super::inline_acyclic;
 
     ///          /->-\
     /// main -> f     g -> b -> c
@@ -156,7 +154,7 @@ mod test {
             target_funcs.contains(&tgt)
         })
         .unwrap();
-        let cg = CallGraph::new(&h);
+        let cg = ModuleGraph::new(&h);
         for fname in check_not_called {
             let fnode = find_func(&h, fname);
             let fnode = cg.node_index(fnode).unwrap();
@@ -180,12 +178,8 @@ mod test {
         }
     }
 
-    fn outgoing_calls<N: HugrNode>(cg: &CallGraph<N>, src: N) -> Vec<N> {
-        let src = cg.node_index(src).unwrap();
-        cg.graph()
-            .edges_directed(src, petgraph::Direction::Outgoing)
-            .map(|e| func_node(cg.graph().node_weight(e.target()).unwrap()))
-            .collect()
+    fn outgoing_calls<N: HugrNode>(cg: &ModuleGraph<N>, src: N) -> Vec<N> {
+        cg.out_edges(src).map(|(_, tgt)| func_node(tgt)).collect()
     }
 
     #[test]
@@ -205,17 +199,17 @@ mod test {
             }
         })
         .unwrap();
-        let cg = CallGraph::new(&h);
+        let cg = ModuleGraph::new(&h);
         // b and then c should have been inlined into g, leaving only cyclic call to f
         assert_eq!(outgoing_calls(&cg, g), [find_func(&h, "f")]);
         // But c should not have been inlined into b:
         assert_eq!(outgoing_calls(&cg, b), [c]);
     }
 
-    fn func_node<N: Copy>(cgn: &CallGraphNode<N>) -> N {
+    fn func_node<N: Copy>(cgn: &StaticNode<N>) -> N {
         match cgn {
-            CallGraphNode::FuncDecl(n) | CallGraphNode::FuncDefn(n) => *n,
-            CallGraphNode::NonFuncRoot => panic!(),
+            StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) => *n,
+            _ => panic!(),
         }
     }
 
