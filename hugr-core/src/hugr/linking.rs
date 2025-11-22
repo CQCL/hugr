@@ -293,6 +293,7 @@ pub enum OnMultiDefn {
 /// An error in using names to determine how to link functions in source and target Hugrs.
 /// (SN = Source Node, TN = Target Node)
 #[derive(Clone, Debug, thiserror::Error, PartialEq)]
+#[non_exhaustive]
 pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
     /// Both source and target contained a [FuncDefn] (public and with same name
     /// and signature).
