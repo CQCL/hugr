@@ -8,8 +8,8 @@ use std::{
 
 use itertools::{Either, Itertools};
 
-use crate::call_graph::{CallGraph, CallGraphNode};
 use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
+use crate::module_graph::{ModuleGraph, StaticNode};
 use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// Methods that merge Hugrs, adding static edges between old and inserted nodes.
@@ -605,7 +605,7 @@ impl NameLinkingPolicy {
         use_entrypoint: bool,
     ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
         let existing = gather_existing(target);
-        let cg = CallGraph::new(&source);
+        let g = ModuleGraph::new(&source);
         // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
         // and we need to maintain our own `visited` map anyway
         let mut to_visit = VecDeque::new();
@@ -633,11 +633,9 @@ impl NameLinkingPolicy {
                 }
             }
             // For entrypoint, *just* traverse
-            to_visit.extend(cg.callees(sn).map(|(_, nw)| match nw {
-                CallGraphNode::FuncDecl(n)
-                | CallGraphNode::FuncDefn(n)
-                | CallGraphNode::Const(n) => *n,
-                CallGraphNode::NonFuncEntrypoint => unreachable!("cannot call non-func"),
+            to_visit.extend(g.out_edges(sn).map(|(_, nw)| match nw {
+                StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
+                _ => unreachable!("unknown / cannot call non-func entrypoint"),
             }));
         }
         Ok(res)
