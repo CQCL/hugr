@@ -19,7 +19,7 @@ pub use self::petgraph::PetgraphWrapper;
 use self::render::{MermaidFormatter, RenderConfig};
 pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
-pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
+pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;

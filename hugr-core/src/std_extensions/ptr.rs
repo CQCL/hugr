@@ -165,8 +165,8 @@ impl MakeRegisteredOp for PtrOp {
         EXTENSION_ID.clone()
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&EXTENSION)
+    fn extension_ref(&self) -> Arc<Extension> {
+        EXTENSION.clone()
     }
 }
 

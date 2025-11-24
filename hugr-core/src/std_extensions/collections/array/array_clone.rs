@@ -166,8 +166,8 @@ impl<AK: ArrayKind> MakeRegisteredOp for GenericArrayClone<AK> {
         AK::EXTENSION_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(AK::extension())
+    fn extension_ref(&self) -> Arc<Extension> {
+        AK::extension().clone()
     }
 }
 
