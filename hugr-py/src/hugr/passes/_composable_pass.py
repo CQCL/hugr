@@ -102,7 +102,7 @@ class ComposedPass(ComposablePass):
                 self.passes.append(pass_)
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
-        def apply(hugr: Hugr) -> PassResult:
+        def apply(inplace: bool, hugr: Hugr) -> PassResult:
             pass_result = PassResult(hugr=hugr)
             for comp_pass in self.passes:
                 new_result = comp_pass.run(pass_result.hugr, inplace=inplace)
@@ -113,8 +113,8 @@ class ComposedPass(ComposablePass):
             self,
             hugr=hugr,
             inplace=inplace,
-            inplace_call=apply,
-            copy_call=apply,
+            inplace_call=lambda hugr: apply(True, hugr),
+            copy_call=lambda hugr: apply(False, hugr),
         )
 
     @property
