@@ -30,7 +30,7 @@ class ComposablePass(Protocol):
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         """Run the pass to transform a HUGR, returning a PassResult.
 
-        See :func:`_impl_pass_call` for a helper function to implement this method.
+        See :func:`_impl_pass_run` for a helper function to implement this method.
         """
 
     @property
