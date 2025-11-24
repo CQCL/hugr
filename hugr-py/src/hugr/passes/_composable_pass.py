@@ -64,25 +64,27 @@ def impl_pass_run(
     :return: The result of the pass application.
     :raises ValueError: If neither `inplace_call` nor `copy_call` is provided.
     """
-    if inplace and inplace_call is not None:
-        return inplace_call(hugr)
-    elif inplace and copy_call is not None:
-        pass_result = copy_call(hugr)
-        pass_result.hugr = hugr
-        if pass_result.modified:
-            hugr._overwrite_hugr(pass_result.hugr)
-            pass_result.original_dirty = True
-        return pass_result
-    elif not inplace and copy_call is not None:
-        return copy_call(hugr)
-    elif not inplace and inplace_call is not None:
-        new_hugr = deepcopy(hugr)
-        pass_result = inplace_call(new_hugr)
-        pass_result.original_dirty = False
-        return pass_result
-    else:
-        msg = f"{pass_.name} needs to implement at least an inplace or copy run method"
-        raise ValueError(msg)
+    if inplace:
+        if inplace_call is not None:
+            return inplace_call(hugr)
+        elif copy_call is not None:
+            pass_result = copy_call(hugr)
+            pass_result.hugr = hugr
+            if pass_result.modified:
+                hugr._overwrite_hugr(pass_result.hugr)
+                pass_result.original_dirty = True
+            return pass_result
+    elif not inplace:
+        if copy_call is not None:
+            return copy_call(hugr)
+        elif inplace_call is not None:
+            new_hugr = deepcopy(hugr)
+            pass_result = inplace_call(new_hugr)
+            pass_result.original_dirty = False
+            return pass_result
+
+    msg = f"{pass_.name} needs to implement at least an inplace or copy run method"
+    raise ValueError(msg)
 
 
 @dataclass
