@@ -52,7 +52,7 @@ def implement_pass_run(
     copy_call: Callable[[Hugr], PassResult] | None = None,
 ) -> PassResult:
     """Helper function to implement a ComposablePass.run method, given an
-    inplace or copy-returning pass methods.
+    inplace or copy-returning pass method.
 
     At least one of the `inplace_call` or `copy_call` arguments must be provided.
 
@@ -139,7 +139,7 @@ class PassResult:
     :attr hugr: The transformed Hugr.
     :attr original_dirty: Whether the original HUGR was modified by the pass.
     :attr modified: Whether the pass made changes to the HUGR.
-    :attr results: The result of each applied pass, as a tuple of the pass and
+    :attr results: The result of each applied pass, as a tuple of the pass name and
         the result.
     """
 
