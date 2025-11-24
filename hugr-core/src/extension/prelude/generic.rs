@@ -138,8 +138,8 @@ impl MakeRegisteredOp for LoadNat {
         PRELUDE_ID
     }
 
-    fn extension_ref(&self) -> Weak<Extension> {
-        Arc::downgrade(&PRELUDE)
+    fn extension_ref(&self) -> Arc<Extension> {
+        PRELUDE.clone()
     }
 }
 

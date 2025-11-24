@@ -3,7 +3,7 @@ use std::hash::Hash;
 use super::nest_cfgs::CfgNodeMap;
 
 use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::hugr::views::RootCheckable;
+use hugr_core::hugr::views::RootChecked;
 use hugr_core::ops::handle::CfgID;
 use hugr_core::ops::{OpTag, OpTrait};
 use hugr_core::{Direction, HugrView, Node};
@@ -32,9 +32,8 @@ struct HalfNodeView<H: HugrInternals> {
 
 impl<H: HugrView> HalfNodeView<H> {
     #[allow(unused)]
-    pub(crate) fn new(h: impl RootCheckable<H, CfgID<H::Node>>) -> Self {
-        let checked = h.try_into_checked().expect("Hugr must be a CFG region");
-        let h = checked.into_hugr();
+    pub(crate) fn new(h: RootChecked<H, CfgID<H::Node>>) -> Self {
+        let h = h.into_hugr();
 
         let (entry, exit) = {
             let mut children = h.children(h.entrypoint());
@@ -99,6 +98,7 @@ mod test {
     use super::super::nest_cfgs::{EdgeClassifier, test::*};
     use super::{HalfNode, HalfNodeView};
     use hugr_core::builder::BuildError;
+    use hugr_core::hugr::views::RootChecked;
     use hugr_core::ops::handle::NodeHandle;
 
     use itertools::Itertools;
@@ -118,7 +118,7 @@ mod test {
         //               \---<---<---<---<---<---<---<---<---<---/
         // Allowing to identify two nested regions (and fixing the problem with an IdentityCfgMap on the same example)
 
-        let v = HalfNodeView::new(&h);
+        let v = HalfNodeView::new(RootChecked::try_new(&h).expect("Root should be CFG."));
 
         let edge_classes = EdgeClassifier::get_edge_classes(&v);
         let HalfNodeView { h: _, entry, exit } = v;

@@ -87,6 +87,42 @@ def impl_pass_run(
     raise ValueError(msg)
 
 
+def impl_pass_call(
+    *,
+    hugr: Hugr,
+    inplace: bool,
+    inplace_call: Callable[[Hugr], None] | None = None,
+    copy_call: Callable[[Hugr], Hugr] | None = None,
+) -> Hugr:
+    """Helper function to implement a ComposablePass.__call__ method, given an
+    inplace or copy-returning pass methods.
+
+    At least one of the `inplace_call` or `copy_call` arguments must be provided.
+
+    :param hugr: The Hugr to apply the pass to.
+    :param inplace: Whether to apply the pass inplace.
+    :param inplace_call: The method to apply the pass inplace.
+    :param copy_call: The method to apply the pass by copying the Hugr.
+    :return: The transformed Hugr.
+    """
+    if inplace and inplace_call is not None:
+        inplace_call(hugr)
+        return hugr
+    elif inplace and copy_call is not None:
+        new_hugr = copy_call(hugr)
+        hugr._overwrite_hugr(new_hugr)
+        return hugr
+    elif not inplace and copy_call is not None:
+        return copy_call(hugr)
+    elif not inplace and inplace_call is not None:
+        new_hugr = deepcopy(hugr)
+        inplace_call(new_hugr)
+        return new_hugr
+    else:
+        msg = "Pass must implement at least an inplace or copy run method"
+        raise ValueError(msg)
+
+
 @dataclass
 class ComposedPass(ComposablePass):
     """A sequence of composable passes."""
