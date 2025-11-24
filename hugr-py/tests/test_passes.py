@@ -7,14 +7,14 @@ from hugr.passes._composable_pass import (
     ComposablePass,
     ComposedPass,
     PassResult,
-    impl_pass_run,
+    implement_pass_run,
 )
 
 
 def test_composable_pass() -> None:
     class DummyInlinePass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
-            return impl_pass_run(
+            return implement_pass_run(
                 self,
                 hugr=hugr,
                 inplace=inplace,
@@ -30,7 +30,7 @@ def test_composable_pass() -> None:
 
     class DummyCopyPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
-            return impl_pass_run(
+            return implement_pass_run(
                 self,
                 hugr=hugr,
                 inplace=inplace,
@@ -91,7 +91,7 @@ def test_composable_pass() -> None:
 def test_invalid_composable_pass() -> None:
     class DummyInvalidPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
-            return impl_pass_run(
+            return implement_pass_run(
                 self,
                 hugr=hugr,
                 inplace=inplace,
