@@ -44,7 +44,7 @@ class ComposablePass(Protocol):
 
 
 def implement_pass_run(
-    pass_: ComposablePass,
+    composable_pass: ComposablePass,
     *,
     hugr: Hugr,
     inplace: bool,
@@ -56,7 +56,7 @@ def implement_pass_run(
 
     At least one of the `inplace_call` or `copy_call` arguments must be provided.
 
-    :param pass_: The pass being run. Used for error messages.
+    :param composable_pass: The pass being run. Used for error messages.
     :param hugr: The Hugr to apply the pass to.
     :param inplace: Whether to apply the pass inplace.
     :param inplace_call: The method to apply the pass inplace.
@@ -83,7 +83,10 @@ def implement_pass_run(
             pass_result.original_dirty = False
             return pass_result
 
-    msg = f"{pass_.name} needs to implement at least an inplace or copy run method"
+    msg = (
+        f"{composable_pass.name} needs to implement at least "
+        + "an inplace or copy run method"
+    )
     raise ValueError(msg)
 
 
@@ -95,11 +98,11 @@ class ComposedPass(ComposablePass):
 
     def __init__(self, *passes: ComposablePass) -> None:
         self.passes = []
-        for pass_ in passes:
-            if isinstance(pass_, ComposedPass):
-                self.passes.extend(pass_.passes)
+        for composable_pass in passes:
+            if isinstance(composable_pass, ComposedPass):
+                self.passes.extend(composable_pass.passes)
             else:
-                self.passes.append(pass_)
+                self.passes.append(composable_pass)
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         def apply(inplace: bool, hugr: Hugr) -> PassResult:
@@ -119,7 +122,8 @@ class ComposedPass(ComposablePass):
 
     @property
     def name(self) -> PassName:
-        return f"Composed({ ', '.join(pass_.name for pass_ in self.passes) })"
+        names = [composable_pass.name for composable_pass in self.passes]
+        return f"Composed({ ', '.join(names) })"
 
 
 @dataclass
@@ -147,7 +151,7 @@ class PassResult:
     @classmethod
     def for_pass(
         cls,
-        pass_: ComposablePass,
+        composable_pass: ComposablePass,
         hugr: Hugr,
         *,
         result: Any,
@@ -157,7 +161,7 @@ class PassResult:
         """Create a new PassResult after a pass application.
 
         :param hugr: The Hugr that was transformed.
-        :param pass_: The pass that was applied.
+        :param composable_pass: The pass that was applied.
         :param result: The result of the pass application.
         :param inline: Whether the pass was applied inplace.
         :param modified: Whether the pass modified the HUGR.
@@ -166,7 +170,7 @@ class PassResult:
             hugr=hugr,
             original_dirty=inline and modified,
             modified=modified,
-            results=[(pass_.name, result)],
+            results=[(composable_pass.name, result)],
         )
 
     def then(self, other: PassResult) -> PassResult:
