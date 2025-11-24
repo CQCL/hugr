@@ -1,16 +1,12 @@
 //! Directives and errors relating to linking Hugrs.
 
-use std::{collections::HashMap, fmt::Display};
+use std::collections::{BTreeMap, HashMap};
+use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 
-use crate::{
-    Hugr, HugrView, Node, Visibility,
-    core::HugrNode,
-    hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals},
-    ops::OpType,
-    types::PolyFuncType,
-};
+use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
+use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
 /// Methods that merge Hugrs, adding static edges between old and inserted nodes.
 ///
@@ -535,7 +531,10 @@ pub enum LinkAction<TN> {
 ///
 /// Computed from a [NameLinkingPolicy] and contains all actions required to implement
 /// that policy for those specific Hugrs.
-pub type LinkActions<SN, TN> = HashMap<SN, LinkAction<TN>>;
+///
+/// [BTreeMap] is used to give deterministic ordering of printing for debugging; the order
+/// of actions (that arise from any [NameLinkingPolicy]) should not affect the linking itself.
+pub type LinkActions<SN, TN> = BTreeMap<SN, LinkAction<TN>>;
 
 /// Invariant: no `SourceNode` can be in both maps (by type of [NodeLinkingDirective])
 /// `TargetNode`s can be (in RHS of multiple directives)
