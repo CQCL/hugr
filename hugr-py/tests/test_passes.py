@@ -22,7 +22,7 @@ def test_composable_pass() -> None:
                     self,
                     hugr,
                     result=None,
-                    inline=True,
+                    inplace=True,
                     # Say that we modified the HUGR even though we didn't
                     modified=True,
                 ),
@@ -38,7 +38,7 @@ def test_composable_pass() -> None:
                     self,
                     deepcopy(hugr),
                     result=None,
-                    inline=False,
+                    inplace=False,
                     # Say that we modified the HUGR even though we didn't
                     modified=True,
                 ),
@@ -70,7 +70,7 @@ def test_composable_pass() -> None:
     hugr = Hugr()
     inplace_result = composed_dummies.run(hugr, inplace=True)
     assert inplace_result.modified
-    assert inplace_result.original_dirty
+    assert inplace_result.inplace
     assert inplace_result.results == [
         ("DummyInlinePass", None),
         ("DummyCopyPass", None),
@@ -80,7 +80,7 @@ def test_composable_pass() -> None:
     hugr = Hugr()
     copy_result = composed_dummies.run(hugr, inplace=False)
     assert copy_result.modified
-    assert not copy_result.original_dirty
+    assert not copy_result.inplace
     assert copy_result.results == [
         ("DummyInlinePass", None),
         ("DummyCopyPass", None),

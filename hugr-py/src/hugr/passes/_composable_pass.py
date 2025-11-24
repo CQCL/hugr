@@ -72,7 +72,7 @@ def implement_pass_run(
             pass_result.hugr = hugr
             if pass_result.modified:
                 hugr._overwrite_hugr(pass_result.hugr)
-                pass_result.original_dirty = True
+                pass_result.inplace = True
             return pass_result
     elif not inplace:
         if copy_call is not None:
@@ -80,7 +80,7 @@ def implement_pass_run(
         elif inplace_call is not None:
             new_hugr = deepcopy(hugr)
             pass_result = inplace_call(new_hugr)
-            pass_result.original_dirty = False
+            pass_result.inplace = False
             return pass_result
 
     msg = (
@@ -106,7 +106,7 @@ class ComposedPass(ComposablePass):
 
     def run(self, hugr: Hugr, *, inplace: bool = True) -> PassResult:
         def apply(inplace: bool, hugr: Hugr) -> PassResult:
-            pass_result = PassResult(hugr=hugr)
+            pass_result = PassResult(hugr=hugr, inplace=inplace)
             for comp_pass in self.passes:
                 new_result = comp_pass.run(pass_result.hugr, inplace=inplace)
                 pass_result = pass_result.then(new_result)
@@ -133,18 +133,19 @@ class PassResult:
     Includes a flag indicating whether the passes modified the HUGR, and an
     arbitrary result object for each pass.
 
-    In some cases, `modified` may be set to `True` even if the pass did not
-    modify the program.
-
     :attr hugr: The transformed Hugr.
-    :attr original_dirty: Whether the original HUGR was modified by the pass.
+    :attr inplace: Whether the pass was applied inplace.
+        If this is `True`, `hugr` will be the same object passed as input.
+        If this is `False`, `hugr` will be an independent copy of the original Hugr.
     :attr modified: Whether the pass made changes to the HUGR.
-    :attr results: The result of each applied pass, as a tuple of the pass name and
-        the result.
+        If `False`, `hugr` will have the same contents as the original Hugr.
+        If `True`, no guarantees are made about the contents of `hugr`.
+    :attr results: The result of each applied pass, as a tuple of the pass name
+        and the result.
     """
 
     hugr: Hugr
-    original_dirty: bool = False
+    inplace: bool = False
     modified: bool = False
     results: list[tuple[PassName, Any]] = field(default_factory=list)
 
@@ -155,7 +156,7 @@ class PassResult:
         hugr: Hugr,
         *,
         result: Any,
-        inline: bool,
+        inplace: bool,
         modified: bool = True,
     ) -> PassResult:
         """Create a new PassResult after a pass application.
@@ -163,12 +164,12 @@ class PassResult:
         :param hugr: The Hugr that was transformed.
         :param composable_pass: The pass that was applied.
         :param result: The result of the pass application.
-        :param inline: Whether the pass was applied inplace.
+        :param inplace: Whether the pass was applied inplace.
         :param modified: Whether the pass modified the HUGR.
         """
         return cls(
             hugr=hugr,
-            original_dirty=inline and modified,
+            inplace=inplace,
             modified=modified,
             results=[(composable_pass.name, result)],
         )
@@ -180,7 +181,7 @@ class PassResult:
         """
         return PassResult(
             hugr=other.hugr,
-            original_dirty=self.original_dirty or other.original_dirty,
+            inplace=self.inplace and other.inplace,
             modified=self.modified or other.modified,
             results=self.results + other.results,
         )
