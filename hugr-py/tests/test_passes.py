@@ -12,7 +12,7 @@ from hugr.passes._composable_pass import (
 
 
 def test_composable_pass() -> None:
-    class MyDummyInlinePass(ComposablePass):
+    class DummyInlinePass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
                 self,
@@ -28,7 +28,7 @@ def test_composable_pass() -> None:
                 ),
             )
 
-    class MyDummyCopyPass(ComposablePass):
+    class DummyCopyPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
                 self,
@@ -44,20 +44,20 @@ def test_composable_pass() -> None:
                 ),
             )
 
-    dummy_inline = MyDummyInlinePass()
-    dummy_copy = MyDummyCopyPass()
+    dummy_inline = DummyInlinePass()
+    dummy_copy = DummyCopyPass()
 
     composed_dummies = dummy_inline.then(dummy_copy)
     assert isinstance(composed_dummies, ComposedPass)
 
-    assert dummy_inline.name == "MyDummyInlinePass"
-    assert dummy_copy.name == "MyDummyCopyPass"
-    assert composed_dummies.name == "Composed(MyDummyInlinePass, MyDummyCopyPass)"
+    assert dummy_inline.name == "DummyInlinePass"
+    assert dummy_copy.name == "DummyCopyPass"
+    assert composed_dummies.name == "Composed(DummyInlinePass, DummyCopyPass)"
     assert composed_dummies.then(dummy_inline).then(composed_dummies).name == (
         "Composed("
-        + "MyDummyInlinePass, MyDummyCopyPass, "
-        + "MyDummyInlinePass, "
-        + "MyDummyInlinePass, MyDummyCopyPass)"
+        + "DummyInlinePass, DummyCopyPass, "
+        + "DummyInlinePass, "
+        + "DummyInlinePass, DummyCopyPass)"
     )
 
     # Apply the passes
@@ -72,8 +72,8 @@ def test_composable_pass() -> None:
     assert inplace_result.modified
     assert inplace_result.original_dirty
     assert inplace_result.results == [
-        ("MyDummyInlinePass", None),
-        ("MyDummyCopyPass", None),
+        ("DummyInlinePass", None),
+        ("DummyCopyPass", None),
     ]
     assert inplace_result.hugr is hugr
 
@@ -82,14 +82,14 @@ def test_composable_pass() -> None:
     assert copy_result.modified
     assert not copy_result.original_dirty
     assert copy_result.results == [
-        ("MyDummyInlinePass", None),
-        ("MyDummyCopyPass", None),
+        ("DummyInlinePass", None),
+        ("DummyCopyPass", None),
     ]
     assert copy_result.hugr is not hugr
 
 
 def test_invalid_composable_pass() -> None:
-    class MyDummyInvalidPass(ComposablePass):
+    class DummyInvalidPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return impl_pass_run(
                 self,
@@ -97,9 +97,9 @@ def test_invalid_composable_pass() -> None:
                 inplace=inplace,
             )
 
-    dummy_invalid = MyDummyInvalidPass()
+    dummy_invalid = DummyInvalidPass()
     with pytest.raises(
         ValueError,
-        match="MyDummyInvalidPass needs to implement at least an inplace or copy run method",  # noqa: E501
+        match="DummyInvalidPass needs to implement at least an inplace or copy run method",  # noqa: E501
     ):
         dummy_invalid.run(Hugr())
