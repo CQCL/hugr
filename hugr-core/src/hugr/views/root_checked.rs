@@ -67,26 +67,6 @@ impl<H: AsRef<Hugr>, Handle> AsRef<Hugr> for RootChecked<H, Handle> {
     }
 }
 
-/// A trait for types that can be checked for a specific [`OpTag`] at their entrypoint node.
-///
-/// This is used mainly specifying function inputs that may either be a [`HugrView`] or an already checked [`RootChecked`].
-pub trait RootCheckable<H: HugrView, Handle: NodeHandle<H::Node>>: Sized {
-    /// Wrap the Hugr in a [`RootChecked`] if it is valid for the required [`OpTag`].
-    ///
-    /// If `Self` is already a [`RootChecked`], it is a no-op.
-    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError>;
-}
-impl<H: HugrView, Handle: NodeHandle<H::Node>> RootCheckable<H, Handle> for H {
-    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError> {
-        RootChecked::try_new(self)
-    }
-}
-impl<H: HugrView, Handle: NodeHandle<H::Node>> RootCheckable<H, Handle> for RootChecked<H, Handle> {
-    fn try_into_checked(self) -> Result<RootChecked<H, Handle>, HugrError> {
-        Ok(self)
-    }
-}
-
 /// Check that the node in a HUGR can be represented by the required tag.
 pub fn check_tag<Required: NodeHandle<N>, N>(
     hugr: &impl HugrView<Node = N>,
