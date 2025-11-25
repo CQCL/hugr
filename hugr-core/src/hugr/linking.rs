@@ -1,7 +1,7 @@
 //! Directives and errors relating to linking Hugrs.
 
 use std::{
-    collections::{HashMap, VecDeque, hash_map::Entry},
+    collections::{BTreeMap, HashMap, VecDeque, hash_map::Entry},
     fmt::Display,
     iter::once,
 };
@@ -113,6 +113,8 @@ pub trait HugrLinking: HugrMut {
     /// All [Visibility::Public] module-children are inserted, or linked, according to the
     /// specified policy; private children used by the public children will also be copied.
     ///
+    /// The entrypoints of both `self` and `other` are ignored.
+    ///
     /// # Errors
     ///
     /// If [NameLinkingPolicy::on_signature_conflict] or [NameLinkingPolicy::on_multiple_defn]
@@ -126,7 +128,7 @@ pub trait HugrLinking: HugrMut {
         other: Hugr,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
-        let actions = policy.to_node_linking(self, &other)?;
+        let actions = policy.link_actions(self, &other)?;
         let directives = actions
             .into_iter()
             .map(|(k, LinkAction::LinkNode(d))| (k, d))
@@ -140,6 +142,8 @@ pub trait HugrLinking: HugrMut {
     ///
     /// All [Visibility::Public] module-children are copied, or linked, according to the
     /// specified policy; private children used by the public children will also be copied.
+    ///
+    /// The entrypoints of both `self` and `other` are ignored.
     ///
     /// # Errors
     ///
@@ -155,7 +159,7 @@ pub trait HugrLinking: HugrMut {
         other: &H,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
-        let actions = policy.to_node_linking(self, &other)?;
+        let actions = policy.link_actions(self, &other)?;
         let directives = actions
             .into_iter()
             .map(|(k, LinkAction::LinkNode(d))| (k, d))
@@ -337,7 +341,8 @@ impl<TN> NodeLinkingDirective<TN> {
     }
 }
 
-/// Describes ways to link a "Source" Hugr being inserted into a target Hugr.
+/// Describes how to link two Hugrs (a source Hugr bing inserted into a target Hugr),
+/// abstracted from any specific Hugrs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NameLinkingPolicy {
     new_names: OnNewFunc,
@@ -348,9 +353,6 @@ pub struct NameLinkingPolicy {
 /// Specifies what to do with a function in some situation - used in
 /// * [NameLinkingPolicy::on_signature_conflict]
 /// * [OnMultiDefn::NewFunc]
-///
-/// [FuncDefn]: crate::ops::FuncDefn
-/// [Visibility::Public]: crate::Visibility::Public
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum OnNewFunc {
@@ -363,9 +365,10 @@ pub enum OnNewFunc {
 }
 
 /// What to do when both target and inserted Hugr
-/// have a [Visibility::Public] FuncDefn with the same name and signature.
+/// have a [Public] [FuncDefn] with the same name and signature.
 ///
-/// [Visibility::Public]: crate::Visibility::Public
+/// [FuncDefn]: crate::ops::FuncDefn
+/// [Public]: crate::Visibility::Public
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, derive_more::From)]
 #[non_exhaustive] // could consider e.g. disconnections
 pub enum OnMultiDefn {
@@ -489,10 +492,10 @@ impl NameLinkingPolicy {
         self.new_names
     }
 
-    /// Computes how this policy will act on a specified source (inserted) and target
-    /// (host) Hugr when *not* inserting the entrypoint.
+    /// Computes concrete actions to link a specific source (inserted) and target
+    /// (host) Hugr according to this policy.
     #[allow(clippy::type_complexity)]
-    pub fn to_node_linking<T: HugrView + ?Sized, S: HugrView>(
+    pub fn link_actions<T: HugrView + ?Sized, S: HugrView>(
         &self,
         target: &T,
         source: &S,
@@ -714,7 +717,7 @@ pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
 
 /// Details a concrete action to link a specific node from source Hugr into a specific target Hugr.
 ///
-/// A separate enum from [NodeLinkingDirective] to allow [NameLinkingPolicy::to_node_linking]
+/// A separate enum from [NodeLinkingDirective] to allow [NameLinkingPolicy::link_actions]
 /// to (eventually) specify a greater range of actions than that supported by
 /// [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
 /// (For example, to add a function but change it to private.)
@@ -728,11 +731,14 @@ pub enum LinkAction<TN> {
 /// Details the concrete actions to link a specific source Hugr into a specific target Hugr.
 ///
 /// Computed from a [NameLinkingPolicy] and contains all actions required to implement
-/// that policy (for those specific Hugrs).
-pub type LinkActions<SN, TN> = HashMap<SN, LinkAction<TN>>;
+/// that policy for those specific Hugrs.
+///
+/// [BTreeMap] is used to give deterministic ordering of printing for debugging; the order
+/// of actions (that arise from any [NameLinkingPolicy]) should not affect the linking itself.
+pub type LinkActions<SN, TN> = BTreeMap<SN, LinkAction<TN>>;
 
-/// Invariant: no SourceNode can be in both maps (by type of [NodeLinkingDirective])
-/// TargetNodes can be (in RHS of multiple directives)
+/// Invariant: no `SourceNode` can be in both maps (by type of [NodeLinkingDirective])
+/// `TargetNode`s can be (in RHS of multiple directives)
 struct Transfers<SourceNode, TargetNode> {
     use_existing: HashMap<SourceNode, TargetNode>,
     replace: HashMap<TargetNode, SourceNode>,
