@@ -1,7 +1,7 @@
 //! Directives and errors relating to linking Hugrs.
 
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque, hash_map::Entry},
+    collections::{BTreeMap, HashMap, VecDeque, btree_map::Entry},
     fmt::Display,
     iter::once,
 };
