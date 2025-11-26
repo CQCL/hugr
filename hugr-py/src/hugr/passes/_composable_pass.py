@@ -32,6 +32,7 @@ class ComposablePass(Protocol):
 
         See :func:`implement_pass_run` for a helper function to implement this method.
         """
+        ...
 
     @property
     def name(self) -> PassName:
