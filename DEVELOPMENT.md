@@ -255,4 +255,4 @@ the release-please workflow automatically runs on it. This will create the draft
 PR with ChangeLog updates. When approved, merge, and this will trigger release-please to actually make the release.
 
 Finally, make a separate PR into branch main, that cherry-picks just the final commit
-from the release tag (updating ChangeLog) and the version numbers.
+from the release tag (updating ChangeLog and the version numbers).
