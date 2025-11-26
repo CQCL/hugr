@@ -29,7 +29,7 @@ jobs:
       python: ${{ steps.filter.outputs.python }}
       extensions: ${{ steps.filter.outputs.llvm }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -45,7 +45,7 @@ jobs:
         python-version: ['3.10', '3.14']
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -78,7 +78,7 @@ jobs:
           - { py: '3.10', coverage: false }
           - { py: '3.14', coverage: true }
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -118,7 +118,7 @@ jobs:
     name: Check serialization schema
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.9
 
@@ -150,7 +150,7 @@ jobs:
     if: ${{ needs.changes.outputs.extensions == 'true' }}
     name: Check std extensions versions
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Need full history to compare with main
 
