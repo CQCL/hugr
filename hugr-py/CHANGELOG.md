@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.3...hugr-py-v0.14.4) (2025-11-26)
+
+
+### Bug Fixes
+
+* set hugr field of `PassResult` correctly ([#2715](https://github.com/CQCL/hugr/issues/2715)) ([4abedab](https://github.com/CQCL/hugr/commit/4abedabfd9015e79cfbe84ca2d369ec2175f9492))
+
 ## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.14.3) (2025-11-24)
 
 
