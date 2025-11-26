@@ -70,8 +70,8 @@ def implement_pass_run(
             return inplace_call(hugr)
         elif copy_call is not None:
             pass_result = copy_call(hugr)
-            pass_result.hugr = hugr
             if pass_result.modified:
+                pass_result.hugr = hugr
                 hugr._overwrite_hugr(pass_result.hugr)
                 pass_result.inplace = True
             return pass_result
