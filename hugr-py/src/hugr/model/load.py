@@ -179,7 +179,7 @@ class ModelImport:
 
     local_vars: dict[str, "LocalVarData"]
     current_symbol: str | None
-    link_prefix: int
+    link_prefix: int | None
     linked_ports: dict[str, tuple[list[InPort], list[OutPort]]]
     static_edges: list[tuple[Node, Node]]
 
@@ -195,7 +195,7 @@ class ModelImport:
         self.module = module
         self.symbols = {}
         self.hugr = Hugr()
-        self.link_prefix = 0
+        self.link_prefix = None
         self.linked_ports = {}
         self.static_edges = []
         self.fn_nodes = {}
@@ -730,24 +730,27 @@ class ModelImport:
                 self.hugr.module_root,
             )
 
+        imported_node = None
         match node.operation:
             case model.DeclareFunc(symbol):
-                return import_declare_func(symbol)
+                imported_node = import_declare_func(symbol)
             case model.DefineFunc(symbol):
-                return import_define_func(symbol)
+                imported_node = import_define_func(symbol)
             case model.DeclareAlias(symbol):
-                return import_declare_alias(symbol)
+                imported_node = import_declare_alias(symbol)
             case model.DefineAlias(symbol, value):
-                return import_define_alias(symbol, value)
+                imported_node = import_define_alias(symbol, value)
             case model.Import():
-                return None
+                pass
             case model.DeclareConstructor():
-                return None
+                pass
             case model.DeclareOperation():
-                return None
+                pass
             case _:
                 error = "Unexpected node in module region."
                 raise ModelImportError(error, node)
+        self.link_prefix = None
+        return imported_node
 
     def enter_symbol(self, symbol: model.Symbol) -> PolyFuncType:
         assert len(self.local_vars) == 0
