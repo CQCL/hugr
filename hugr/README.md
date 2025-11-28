@@ -38,7 +38,7 @@ version will only change on major releases.
 
 ## Development
 
-See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for instructions on setting up the development environment.
+See [DEVELOPMENT.md](https://github.com/CQCL/hugr/blob/main/DEVELOPMENT.md) for instructions on setting up the development environment and on making releases.
 
 ## License
 

@@ -240,10 +240,19 @@ release-plz release --git-token $GITHUB_TOKEN
 
 #### Python patch releases
 
-You will need to modify the version and changelog manually in this case. Check
+First create your branch with appropriate cherry-picks if necessary.
+
+**Manual method** Modify the version and changelog manually, check
 the existing release PRs for examples on how to do this. Once the branch is
 ready, create a draft PR so that the release team can review it.
 
 The wheel building process and publication to PyPI is handled by the CI.
 Just create a [github release](https://github.com/CQCL/hugr/releases/new) from the **unmerged** branch.
 The release tag should follow the format used in the previous releases, e.g. `hugr-py-v0.1.1`.
+
+**Release-please method** Make sure the name of your branch begins `release/` so
+the release-please workflow automatically runs on it. This will create the draft
+PR with ChangeLog updates. When approved, merge, and this will trigger release-please to actually make the release.
+
+Finally, make a separate PR into branch main, that cherry-picks just the final commit
+from the release tag (updating ChangeLog and the version numbers).

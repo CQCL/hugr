@@ -32,6 +32,7 @@ class ComposablePass(Protocol):
 
         See :func:`implement_pass_run` for a helper function to implement this method.
         """
+        ...
 
     @property
     def name(self) -> PassName:
@@ -69,10 +70,10 @@ def implement_pass_run(
             return inplace_call(hugr)
         elif copy_call is not None:
             pass_result = copy_call(hugr)
-            pass_result.hugr = hugr
             if pass_result.modified:
                 hugr._overwrite_hugr(pass_result.hugr)
                 pass_result.inplace = True
+            pass_result.hugr = hugr
             return pass_result
     elif not inplace:
         if copy_call is not None:
