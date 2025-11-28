@@ -32,13 +32,12 @@ pub trait HugrLinking: HugrMut {
     /// # Panics
     ///
     /// If `parent` is `Some` but not in the graph.
-    #[allow(clippy::type_complexity)]
-    fn insert_link_view_by_node<H: HugrView>(
+    fn insert_link_view_by_node<HN: HugrNode>(
         &mut self,
         parent: Option<Self::Node>,
-        other: &H,
-        children: NodeLinkingDirectives<H::Node, Self::Node>,
-    ) -> Result<InsertedForest<H::Node, Self::Node>, NodeLinkingError<H::Node, Self::Node>> {
+        other: &impl HugrView<Node = HN>,
+        children: NodeLinkingDirectives<HN, Self::Node>,
+    ) -> Result<InsertedForest<HN, Self::Node>, NodeLinkingError<HN, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
         let nodes =
             parent
