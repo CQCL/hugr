@@ -1,0 +1,5 @@
+---
+source: hugr-llvm/src/types.rs
+expression: "[int(6), Unit]+[Bool, int(2)]"
+---
+"{ i1, i8, i64, i1 }"

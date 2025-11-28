@@ -1,0 +1,5 @@
+---
+source: hugr-llvm/src/types.rs
+expression: int(6)
+---
+"i64"

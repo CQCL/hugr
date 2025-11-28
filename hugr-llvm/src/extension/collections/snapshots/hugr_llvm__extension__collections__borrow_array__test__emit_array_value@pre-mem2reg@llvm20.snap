@@ -1,0 +1,37 @@
+---
+source: hugr-llvm/src/extension/collections/borrow_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { ptr, ptr, i64 } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { ptr, ptr, i64 }, align 8
+  %"5_0" = alloca { ptr, ptr, i64 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call ptr @malloc(i64 mul (i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 2))
+  %1 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64))
+  call void @llvm.memset.p0.i64(ptr %1, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false)
+  %2 = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0
+  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1
+  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2
+  %5 = getelementptr inbounds i64, ptr %0, i32 0
+  store i64 1, ptr %5, align 4
+  %6 = getelementptr inbounds i64, ptr %0, i32 1
+  store i64 2, ptr %6, align 4
+  store { ptr, ptr, i64 } %4, ptr %"5_0", align 8
+  %"5_01" = load { ptr, ptr, i64 }, ptr %"5_0", align 8
+  store { ptr, ptr, i64 } %"5_01", ptr %"0", align 8
+  %"02" = load { ptr, ptr, i64 }, ptr %"0", align 8
+  ret { ptr, ptr, i64 } %"02"
+}
+
+declare ptr @malloc(i64)
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: write)
+declare void @llvm.memset.p0.i64(ptr nocapture writeonly, i8, i64, i1 immarg) #0
+
+attributes #0 = { nocallback nofree nounwind willreturn memory(argmem: write) }

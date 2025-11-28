@@ -1,0 +1,5 @@
+---
+source: hugr-llvm/src/types.rs
+expression: "[[]+[]+[]+[], Unit]+[Bool, []+[]+[]]"
+---
+"{ i1, i2, i1 }"

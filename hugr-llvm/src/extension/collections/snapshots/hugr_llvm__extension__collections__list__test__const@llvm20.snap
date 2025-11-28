@@ -1,0 +1,28 @@
+---
+source: hugr-llvm/src/extension/collections/list.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private ptr @_hl.main.1() {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = call ptr @__rt__list__new(i64 3, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 8, ptr null)
+  %1 = alloca i64, align 8
+  store i64 1, ptr %1, align 4
+  call void @__rt__list__push(ptr %0, ptr %1)
+  %2 = alloca i64, align 8
+  store i64 2, ptr %2, align 4
+  call void @__rt__list__push(ptr %0, ptr %2)
+  %3 = alloca i64, align 8
+  store i64 3, ptr %3, align 4
+  call void @__rt__list__push(ptr %0, ptr %3)
+  ret ptr %0
+}
+
+declare ptr @__rt__list__new(i64, i64, i64, ptr)
+
+declare void @__rt__list__push(ptr, ptr)

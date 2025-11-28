@@ -25,8 +25,8 @@ path = "src/lib.rs"
 default = ["zstd"]
 
 declarative = ["hugr-core/declarative"]
-llvm = ["hugr-llvm/llvm14-0"]
-llvm-test = ["hugr-llvm/llvm14-0", "hugr-llvm/test-utils"]
+llvm = ["hugr-llvm/llvm20-1"]
+llvm-test = ["hugr-llvm/llvm20-1", "hugr-llvm/test-utils"]
 zstd = ["hugr-core/zstd"]
 persistent_unstable = ["hugr-persistent"]
 
