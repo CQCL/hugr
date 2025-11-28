@@ -244,13 +244,12 @@ pub trait HugrLinking: HugrMut {
     /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
     /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
     /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
-    #[allow(clippy::type_complexity)]
-    fn insert_link_from_view<H: HugrView>(
+    fn insert_link_from_view<HN: HugrNode, H: HugrView<Node = HN>>(
         &mut self,
         parent: Self::Node,
         other: &H,
         policy: &NameLinkingPolicy,
-    ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
+    ) -> Result<InsertedForest<HN, Self::Node>, NameLinkingError<HN, Self::Node>> {
         let pol = policy.to_node_linking_for_entrypoint(&*self, &other)?;
         let per_node = pol
             .into_iter()
@@ -564,12 +563,11 @@ impl NameLinkingPolicy {
 
     /// Computes how this policy will act when inserting the entrypoint-subtree of a
     /// specified source Hugr into a target (host) Hugr (as per [HugrLinking::insert_link_hugr]).
-    #[allow(clippy::type_complexity)]
-    pub fn to_node_linking_for_entrypoint<T: HugrView + ?Sized, S: HugrView>(
+    pub fn to_node_linking_for_entrypoint<SN: HugrNode, TN: HugrNode>(
         &self,
-        target: &T,
-        source: &S,
-    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        target: &(impl HugrView<Node = TN> + ?Sized),
+        source: &impl HugrView<Node = SN>,
+    ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
         let entrypoint_func = {
             let mut n = source.entrypoint();
             loop {
@@ -598,13 +596,12 @@ impl NameLinkingPolicy {
         Ok(pol)
     }
 
-    #[allow(clippy::type_complexity)]
-    fn to_node_linking_helper<T: HugrView + ?Sized, S: HugrView>(
+    fn to_node_linking_helper<TN: HugrNode, SN: HugrNode>(
         &self,
-        target: &T,
-        source: &S,
+        target: &(impl HugrView<Node = TN> + ?Sized),
+        source: &impl HugrView<Node = SN>,
         use_entrypoint: bool,
-    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+    ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
         let existing = gather_existing(target);
         let g = ModuleGraph::new(&source);
         // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
