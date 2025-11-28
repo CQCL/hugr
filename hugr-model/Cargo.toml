@@ -1,6 +1,6 @@
 [package]
 name = "hugr-model"
-version = "0.24.3"
+version = "0.25.0"
 readme = "README.md"
 documentation = "https://docs.rs/hugr-model/"
 description = "Data model for Quantinuum's HUGR intermediate representation"

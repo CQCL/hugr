@@ -1,6 +1,6 @@
 [package]
 name = "hugr-persistent"
-version = "0.3.4"
+version = "0.4.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -16,7 +16,7 @@ categories = ["compilers"]
 name = "persistent_walker_example"
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.24.3" }
+hugr-core = { path = "../hugr-core", version = "0.25.0" }
 
 derive_more = { workspace = true, features = [
     "display",
