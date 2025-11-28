@@ -153,12 +153,11 @@ pub trait HugrLinking: HugrMut {
     ///
     /// [Visibility::Public]: crate::Visibility::Public
     /// [FuncDefn]: crate::ops::FuncDefn
-    #[allow(clippy::type_complexity)]
-    fn link_module_view<H: HugrView>(
+    fn link_module_view<HN: HugrNode>(
         &mut self,
-        other: &H,
+        other: &impl HugrView<Node = HN>,
         policy: &NameLinkingPolicy,
-    ) -> Result<InsertedForest<H::Node, Self::Node>, NameLinkingError<H::Node, Self::Node>> {
+    ) -> Result<InsertedForest<HN, Self::Node>, NameLinkingError<HN, Self::Node>> {
         let actions = policy.link_actions(self, &other)?;
         let directives = actions
             .into_iter()
@@ -376,12 +375,11 @@ impl NameLinkingPolicy {
 
     /// Computes concrete actions to link a specific source (inserted) and target
     /// (host) Hugr according to this policy.
-    #[allow(clippy::type_complexity)]
-    pub fn link_actions<T: HugrView + ?Sized, S: HugrView>(
+    pub fn link_actions<TN: HugrNode, SN: HugrNode>(
         &self,
-        target: &T,
-        source: &S,
-    ) -> Result<LinkActions<S::Node, T::Node>, NameLinkingError<S::Node, T::Node>> {
+        target: &(impl HugrView<Node = TN> + ?Sized),
+        source: &impl HugrView<Node = SN>,
+    ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
         let existing = gather_existing(target);
         let mut res = LinkActions::new();
 
@@ -634,16 +632,19 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use super::{HugrLinking, NodeLinkingDirective, NodeLinkingError};
+    use super::{
+        HugrLinking, NameLinkingError, NameLinkingPolicy, NodeLinkingDirective, NodeLinkingError,
+        OnMultiDefn, OnNewFunc,
+    };
     use crate::builder::test::{dfg_calling_defn_decl, simple_dfg_hugr};
     use crate::builder::{
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
         ModuleBuilder,
     };
+    use crate::core::HugrNode;
     use crate::extension::prelude::{ConstUsize, usize_t};
-    use crate::hugr::hugrmut::test::check_calls_defn_decl;
-    use crate::hugr::linking::{NameLinkingError, NameLinkingPolicy, OnMultiDefn, OnNewFunc};
-    use crate::hugr::{ValidationError, hugrmut::HugrMut};
+    use crate::hugr::ValidationError;
+    use crate::hugr::hugrmut::{HugrMut, test::check_calls_defn_decl};
     use crate::ops::{FuncDecl, OpTag, OpTrait, OpType, Value, handle::NodeHandle};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -878,8 +879,9 @@ mod test {
         }
     }
 
-    #[allow(clippy::type_complexity)]
-    fn list_decls_defns<H: HugrView>(h: &H) -> (HashMap<H::Node, &str>, HashMap<H::Node, &str>) {
+    fn list_decls_defns<N: HugrNode>(
+        h: &impl HugrView<Node = N>,
+    ) -> (HashMap<N, &str>, HashMap<N, &str>) {
         let mut decls = HashMap::new();
         let mut defns = HashMap::new();
         for n in h.children(h.module_root()) {
