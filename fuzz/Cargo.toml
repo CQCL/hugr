@@ -1,0 +1,29 @@
+[package]
+name = "fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+hugr-model = { path = "../hugr-model/", features = ["arbitrary"] }
+
+# [dependencies.hugr]
+# path = ".."
+
+[[bin]]
+name = "fuzz_random"
+path = "fuzz_targets/fuzz_random.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_structure"
+path = "fuzz_targets/fuzz_structure.rs"
+test = false
+doc = false
+bench = false
