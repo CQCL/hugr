@@ -168,36 +168,41 @@ pub trait HugrLinking: HugrMut {
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 
-    /// Inserts the entrypoint-subtree of another Hugr into this one,
-    /// including copying any private functions it calls and using linking
-    /// to resolve any public functions.
+    /// Inserts the entrypoint-subtree of another Hugr into this one, along with
+    /// any private functions it calls and using linking to resolve any public functions.
     ///
     /// `parent` is the parent node under which to insert the entrypoint.
     ///
     /// # Errors
     ///
-    /// If other's entrypoint is its module-root (recommend using [Self::link_module] instead)
+    /// * [NameLinkingError::InsertEntrypointIsModuleRoot] if `other`'s entrypoint is its
+    ///   module-root,  (recommend using [Self::link_module] instead).
     ///
-    /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
-    /// (an exception is made if the called+containing function is public and is being replaced
-    ///  by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
-    ///  the call is redirected to the existing function, and the new one is not inserted
-    ///  except the entrypoint subtree.)
+    /// * [NameLinkingError::AddFunctionContainingEntrypoint] if `other`'s entrypoint
+    ///   calls (perhaps transitively) the function containing said entrypoint.
+    ///   An exception is made if the called+containing function is public and is being replaced
+    ///   by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///   the call is redirected to the existing function (the part of the new function
+    ///   outside the entrypoint subtree is not inserted).
     ///
-    /// If other's entrypoint calls a public function in `other` which
-    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
-    ///   [`OnNewFunc::RaiseError`]
-    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
-    ///   [`OnNewFunc::RaiseError`]
+    /// * [NameLinkingError::NoNewNames] if `other`'s entrypoint calls (perhaps
+    ///   transitively) a public function in `other` which has a name different to any in
+    ///  `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
     ///
-    /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
-    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
-    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
+    /// * [NameLinkingError::SignatureConflict] if `other`' entrypoint calls (perhaps
+    ///   transitively) a public function in `other` that has a name equal to one in
+    ///   `self`, but a different signature, and [`on_signature_conflict`] is
+    ///   [`OnNewFunc::RaiseError`].
+    ///
+    /// * [NameLinkingError::MultipleDefn] if `other`'s entrypoint calls (perhaps
+    ///   transitively) a public [`FuncDefn`] in `other` which has the same name
+    ///   and signature as a public [`FuncDefn`] in `self` and [`on_multiple_defn`] is
+    ///   [`OnMultiDefn::NewFunc`] or [`OnNewFunc::RaiseError`].
     ///
     /// [`FuncDefn`]: crate::ops::FuncDefn
-    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
-    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
-    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
+    /// [`on_new_names`]: NameLinkingPolicy::on_new_names
+    /// [`on_multiple_defn`]: NameLinkingPolicy::on_multiple_defn
+    /// [`on_signature_conflict`]: NameLinkingPolicy::on_signature_conflict
     fn insert_link_hugr(
         &mut self,
         parent: Self::Node,
@@ -214,36 +219,41 @@ pub trait HugrLinking: HugrMut {
             .expect("NodeLinkingPolicy was constructed to avoid any error"))
     }
 
-    /// Inserts the entrypoint-subtree of another Hugr into this one,
-    /// including copying any private functions it calls and using linking
-    /// to resolve any public functions.
+    /// Inserts (copies) the entrypoint-subtree of another Hugr into this one, along with
+    /// any private functions it calls and using linking to resolve any public functions.
     ///
     /// `parent` is the parent node under which to insert the entrypoint.
     ///
     /// # Errors
     ///
-    /// If other's entrypoint is its module-root (recommend using [Self::link_module] instead)
+    /// * [NameLinkingError::InsertEntrypointIsModuleRoot] if `other`'s entrypoint is its
+    ///   module-root,  (recommend using [Self::link_module] instead).
     ///
-    /// If other's entrypoint calls (perhaps transitively) the function containing said entrypoint
-    /// (an exception is made if the called+containing function is public and is being replaced
-    ///  by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
-    ///  the call is redirected to the existing function, and the new one is not inserted
-    ///  except the entrypoint subtree.)
+    /// * [NameLinkingError::AddFunctionContainingEntrypoint] if `other`'s entrypoint
+    ///   calls (perhaps transitively) the function containing said entrypoint.
+    ///   An exception is made if the called+containing function is public and is being replaced
+    ///   by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///   the call is redirected to the existing function (the part of the new function
+    ///   outside the entrypoint subtree is not inserted).
     ///
-    /// If other's entrypoint calls a public function in `other` which
-    /// * has a name or signature different to any in `self`, and [`on_new_names`] is
-    ///   [`OnNewFunc::RaiseError`]
-    /// * has a name equal to that in `self`, but a different signature, and [`on_sig_conflict`] is
-    ///   [`OnNewFunc::RaiseError`]
+    /// * [NameLinkingError::NoNewNames] if `other`'s entrypoint calls (perhaps
+    ///   transitively) a public function in `other` which has a name different to any in
+    ///  `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
     ///
-    /// If other's entrypoint calls a public [`FuncDefn`] in `other` which has the same name
-    /// and signature as a public [`FuncDefn`] in `self` and [`on_multi_defn`] is
-    /// [`OnMultiDefn::NewFunc`] of [`OnNewFunc::RaiseError`]
+    /// * [NameLinkingError::SignatureConflict] if `other`' entrypoint calls (perhaps
+    ///   transitively) a public function in `other` that has a name equal to one in
+    ///   `self`, but a different signature, and [`on_signature_conflict`] is
+    ///   [`OnNewFunc::RaiseError`].
+    ///
+    /// * [NameLinkingError::MultipleDefn] if `other`'s entrypoint calls (perhaps
+    ///   transitively) a public [`FuncDefn`] in `other` which has the same name
+    ///   and signature as a public [`FuncDefn`] in `self` and [`on_multiple_defn`] is
+    ///   [`OnMultiDefn::NewFunc`] or [`OnNewFunc::RaiseError`].
     ///
     /// [`FuncDefn`]: crate::ops::FuncDefn
-    /// [`on_new_names`]: NameLinkingPolicy::get_on_new_names
-    /// [`on_multi_defn`]: NameLinkingPolicy::get_on_multiple_defn
-    /// [`on_sig_conflict`]: NameLinkingPolicy::get_signature_conflict
+    /// [`on_new_names`]: NameLinkingPolicy::on_new_names
+    /// [`on_multiple_defn`]: NameLinkingPolicy::on_multiple_defn
+    /// [`on_signature_conflict`]: NameLinkingPolicy::on_signature_conflict
     fn insert_link_from_view<HN: HugrNode, H: HugrView<Node = HN>>(
         &mut self,
         parent: Self::Node,
@@ -448,44 +458,52 @@ impl NameLinkingPolicy {
     }
 
     /// Sets how to behave when both target and inserted Hugr have a
-    /// [Public] function with the same name but different signatures.
+    /// ([Visibility::Public]) function with the same name but different signatures.
     ///
-    /// [Public]: crate::Visibility::Public
+    /// See [Self::get_on_signature_conflict].
     pub fn on_signature_conflict(mut self, sc: OnNewFunc) -> Self {
         self.sig_conflict = sc;
         self
     }
 
-    /// Tells how to behave when both target and inserted Hugr have a
-    /// [Public] function with the same name but different signatures.
+    /// Returns how this policy will behave when both target and inserted Hugr have a
+    /// ([Visibility::Public]) function with the same name but different signatures.
     ///
-    /// [Public]: crate::Visibility::Public
+    /// Can be changed via [Self::on_signature_conflict].
     pub fn get_on_signature_conflict(&self) -> OnNewFunc {
         self.sig_conflict
     }
 
     /// Sets how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
+    ///
+    /// See [Self::get_on_multiple_defn].
     pub fn on_multiple_defn(mut self, multi_defn: OnMultiDefn) -> Self {
         self.multi_defn = multi_defn;
         self
     }
 
-    /// Tells how to behave when both target and inserted Hugr have a
+    /// Returns how this policy will behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
+    ///
+    /// Can be changed via [Self::on_multiple_defn].
     pub fn get_on_multiple_defn(&self) -> OnMultiDefn {
         self.multi_defn
     }
 
     /// Sets how to behave when the source Hugr adds a ([Visibility::Public])
     /// name not already in the target.
+    ///
+    /// See [Self::get_on_new_names].
     pub fn on_new_names(mut self, nn: OnNewFunc) -> Self {
         self.new_names = nn;
         self
     }
 
-    /// Tells how to behave when the source Hugr adds a ([Visibility::Public])
+    /// Returns how this policy behaves when the source Hugr adds a [Visibility::Public]
     /// name not already in the target.
+    ///
+    /// Can be changed via [Self::on_new_names].
     pub fn get_on_new_names(&self) -> OnNewFunc {
         self.new_names
     }
@@ -561,8 +579,8 @@ impl NameLinkingPolicy {
         }
     }
 
-    /// Computes how this policy will act when inserting the entrypoint-subtree of a
-    /// specified source Hugr into a target (host) Hugr (as per [HugrLinking::insert_link_hugr]).
+    /// Computes concrete actions to link the entrypoint-subtree of a specific source
+    /// (inserted) Hugr into a specific target (host) Hugr according to this policy.
     pub fn link_actions_with_entrypoint<SN: HugrNode, TN: HugrNode>(
         &self,
         target: &(impl HugrView<Node = TN> + ?Sized),
