@@ -1343,10 +1343,10 @@ mod test {
     fn insert_link() {
         let insert = {
             let mut mb = ModuleBuilder::new();
-            let reached = mb.declare("foo", endo_sig(usize_t()).into()).unwrap();
+            let reached = mb.declare("reached", endo_sig(usize_t()).into()).unwrap();
             // This would conflict signature, but is not reached:
             let unreached = mb
-                .declare("bar", inout_sig(vec![], usize_t()).into())
+                .declare("unreached", inout_sig(vec![], usize_t()).into())
                 .unwrap();
             let mut outer = mb.define_function("outer", endo_sig(usize_t())).unwrap();
             // ...as this first call is outside the region we insert:
@@ -1375,7 +1375,7 @@ mod test {
         host.connect(i.node(), i.source(), dfg, 0);
         host.validate().unwrap();
         let (decls, defns) = list_decls_defns(&host);
-        assert_eq!(decls.values().collect_vec(), [&"foo"]); // unreached bar not copied
+        assert_eq!(decls.values().collect_vec(), [&"reached"]); // unreached not copied
         assert_eq!(defns.values().collect_vec(), [&"main"]); // as originally in host
         let (call, tgt) = call_targets(&host).into_iter().exactly_one().unwrap();
         assert_eq!(host.get_parent(call), Some(dfg));
