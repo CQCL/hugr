@@ -204,7 +204,7 @@ pub trait HugrLinking: HugrMut {
         other: Hugr,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
-        let pol = policy.to_node_linking_for_entrypoint(&*self, &other)?;
+        let pol = policy.link_actions_with_entrypoint(&*self, &other)?;
         let per_node = pol
             .into_iter()
             .map(|(k, LinkAction::LinkNode(v))| (k, v))
@@ -250,7 +250,7 @@ pub trait HugrLinking: HugrMut {
         other: &H,
         policy: &NameLinkingPolicy,
     ) -> Result<InsertedForest<HN, Self::Node>, NameLinkingError<HN, Self::Node>> {
-        let pol = policy.to_node_linking_for_entrypoint(&*self, &other)?;
+        let pol = policy.link_actions_with_entrypoint(&*self, &other)?;
         let per_node = pol
             .into_iter()
             .map(|(k, LinkAction::LinkNode(v))| (k, v))
@@ -460,7 +460,7 @@ impl NameLinkingPolicy {
     /// [Public] function with the same name but different signatures.
     ///
     /// [Public]: crate::Visibility::Public
-    pub fn get_signature_conflict(&self) -> OnNewFunc {
+    pub fn get_on_signature_conflict(&self) -> OnNewFunc {
         self.sig_conflict
     }
 
@@ -497,7 +497,7 @@ impl NameLinkingPolicy {
         target: &(impl HugrView<Node = TN> + ?Sized),
         source: &impl HugrView<Node = SN>,
     ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
-        self.to_node_linking_helper(target, source, false)
+        self.link_actions_helper(target, source, false)
     }
 
     fn action_for<SN: Display, TN: Copy + Display + std::fmt::Debug>(
@@ -563,7 +563,7 @@ impl NameLinkingPolicy {
 
     /// Computes how this policy will act when inserting the entrypoint-subtree of a
     /// specified source Hugr into a target (host) Hugr (as per [HugrLinking::insert_link_hugr]).
-    pub fn to_node_linking_for_entrypoint<SN: HugrNode, TN: HugrNode>(
+    pub fn link_actions_with_entrypoint<SN: HugrNode, TN: HugrNode>(
         &self,
         target: &(impl HugrView<Node = TN> + ?Sized),
         source: &impl HugrView<Node = SN>,
@@ -580,11 +580,8 @@ impl NameLinkingPolicy {
                 n = p;
             }
         };
-        //if entrypoint_func == other.entrypoint() { // Do we need to check this? Ok if parent is self.module_root() ??
-        //    return Err(format!("Entrypoint is a top-level function"))
-        //}
-        let pol = self.to_node_linking_helper(target, source, true)?;
-        if let Some(LinkAction::LinkNode(add @ NodeLinkingDirective::Add { .. })) = pol
+        let actions = self.link_actions_helper(target, source, true)?;
+        if let Some(LinkAction::LinkNode(add @ NodeLinkingDirective::Add { .. })) = actions
             .get(&entrypoint_func)
             .filter(|_| entrypoint_func != source.entrypoint())
         {
@@ -593,10 +590,10 @@ impl NameLinkingPolicy {
                 add.clone(),
             ));
         }
-        Ok(pol)
+        Ok(actions)
     }
 
-    fn to_node_linking_helper<TN: HugrNode, SN: HugrNode>(
+    fn link_actions_helper<TN: HugrNode, SN: HugrNode>(
         &self,
         target: &(impl HugrView<Node = TN> + ?Sized),
         source: &impl HugrView<Node = SN>,
