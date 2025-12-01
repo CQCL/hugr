@@ -8,7 +8,11 @@ use std::{
 
 use itertools::{Either, Itertools};
 
-use crate::hugr::{HugrMut, hugrmut::InsertedForest, internal::HugrMutInternals};
+use crate::hugr::{
+    HugrMut,
+    hugrmut::{InsertedForest, InsertionResult},
+    internal::HugrMutInternals,
+};
 use crate::module_graph::{ModuleGraph, StaticNode};
 use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
@@ -208,15 +212,21 @@ pub trait HugrLinking: HugrMut {
         parent: Self::Node,
         other: Hugr,
         policy: &NameLinkingPolicy,
-    ) -> Result<InsertedForest<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
+    ) -> Result<InsertionResult<Node, Self::Node>, NameLinkingError<Node, Self::Node>> {
         let pol = policy.link_actions_with_entrypoint(&*self, &other)?;
         let per_node = pol
             .into_iter()
             .map(|(k, LinkAction::LinkNode(v))| (k, v))
             .collect();
-        Ok(self
+        let ep = other.entrypoint();
+        let node_map = self
             .insert_link_hugr_by_node(Some(parent), other, per_node)
-            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+            .expect("NodeLinkingPolicy was constructed to avoid any error")
+            .node_map;
+        Ok(InsertionResult {
+            inserted_entrypoint: node_map[&ep],
+            node_map,
+        })
     }
 
     /// Inserts (copies) the entrypoint-subtree of another Hugr into this one, along with
@@ -259,15 +269,20 @@ pub trait HugrLinking: HugrMut {
         parent: Self::Node,
         other: &H,
         policy: &NameLinkingPolicy,
-    ) -> Result<InsertedForest<HN, Self::Node>, NameLinkingError<HN, Self::Node>> {
+    ) -> Result<InsertionResult<HN, Self::Node>, NameLinkingError<HN, Self::Node>> {
         let pol = policy.link_actions_with_entrypoint(&*self, &other)?;
         let per_node = pol
             .into_iter()
             .map(|(k, LinkAction::LinkNode(v))| (k, v))
             .collect();
-        Ok(self
+        let node_map = self
             .insert_link_view_by_node(Some(parent), other, per_node)
-            .expect("NodeLinkingPolicy was constructed to avoid any error"))
+            .expect("NodeLinkingPolicy was constructed to avoid any error")
+            .node_map;
+        Ok(InsertionResult {
+            inserted_entrypoint: node_map[&other.entrypoint()],
+            node_map,
+        })
     }
 }
 
