@@ -187,7 +187,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// * [NameLinkingError::NoNewNames] if `other`'s entrypoint calls (perhaps
     ///   transitively) a public function in `other` which has a name different to any in
-    ///  `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
+    ///   `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
     ///
     /// * [NameLinkingError::SignatureConflict] if `other`' entrypoint calls (perhaps
     ///   transitively) a public function in `other` that has a name equal to one in
@@ -238,7 +238,7 @@ pub trait HugrLinking: HugrMut {
     ///
     /// * [NameLinkingError::NoNewNames] if `other`'s entrypoint calls (perhaps
     ///   transitively) a public function in `other` which has a name different to any in
-    ///  `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
+    ///   `self` and [`on_new_names`] is [`OnNewFunc::RaiseError`].
     ///
     /// * [NameLinkingError::SignatureConflict] if `other`' entrypoint calls (perhaps
     ///   transitively) a public function in `other` that has a name equal to one in
