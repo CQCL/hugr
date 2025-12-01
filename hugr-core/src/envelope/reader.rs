@@ -322,7 +322,7 @@ pub(crate) enum ModelBinaryReadError {
 mod test {
     use super::*;
 
-    use crate::extension::ExtensionRegistry;
+    use crate::extension::{ExtensionId, ExtensionRegistry};
 
     use crate::envelope::header::EnvelopeHeader;
     use cool_asserts::assert_matches;
@@ -465,5 +465,42 @@ mod test {
         };
         handle_error(&mut desc, &error);
         assert!(desc.used_extensions_resolved.is_none());
+    }
+
+    #[test]
+    fn test_decode_model_ast_with_packaged_extensions() {
+        let mut simple_package = crate::builder::test::simple_package();
+        // Create a simple extension to package
+        let ext_id = ExtensionId::new("test.packaged.extension").unwrap();
+        let extension = Extension::new(ext_id.clone(), crate::extension::Version::new(1, 0, 0));
+
+        simple_package
+            .extensions
+            .register(std::sync::Arc::new(extension))
+            .unwrap();
+
+        let header = EnvelopeHeader {
+            format: EnvelopeFormat::ModelTextWithExtensions,
+            ..Default::default()
+        };
+
+        let mut cursor = Cursor::new(Vec::new());
+        simple_package.store(&mut cursor, header.config()).unwrap();
+        cursor.set_position(0);
+
+        let registry = ExtensionRegistry::new([]);
+        let mut reader = EnvelopeReader::new(cursor, &registry).unwrap();
+
+        // Before decoding, the packaged extension should not be registered
+        assert!(!reader.registry.contains(&ext_id));
+
+        let result = reader.decode_model_ast();
+
+        // After decoding, the packaged extension should be registered
+        assert!(result.is_ok());
+        assert!(reader.registry.contains(&ext_id));
+
+        let package = result.unwrap();
+        assert!(package.extensions.contains(&ext_id));
     }
 }
