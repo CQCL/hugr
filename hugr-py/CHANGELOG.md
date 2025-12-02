@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.15.0](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.15.0) (2025-12-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-py:** Removes `extensions` field of `val.Extension`.
+
+### Features
+
+* **hugr-py:** Remove `extensions` field of `val.Extension`. ([#2686](https://github.com/CQCL/hugr/issues/2686)) ([911c089](https://github.com/CQCL/hugr/commit/911c08921b9057f3854dd4431e4a7854b8b6991e))
+* Make `ComposablePass.__call__` return a Hugr ([#2697](https://github.com/CQCL/hugr/issues/2697)) ([dbf8c8e](https://github.com/CQCL/hugr/commit/dbf8c8e6fe72febd709921c10283fddc1f257983))
+* Result type for ComposablePasses ([#2703](https://github.com/CQCL/hugr/issues/2703)) ([b8df28e](https://github.com/CQCL/hugr/commit/b8df28e5b89eb3130d12e5cf429d642be3514e63))
+
+
+### Bug Fixes
+
+* set hugr field of `PassResult` correctly ([#2715](https://github.com/CQCL/hugr/issues/2715)) ([d860722](https://github.com/CQCL/hugr/commit/d8607227ce6e2f79a5bf339100f303c750c7fdab))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.3...hugr-py-v0.14.4) (2025-11-26)
 
 
