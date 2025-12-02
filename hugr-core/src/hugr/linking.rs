@@ -638,7 +638,7 @@ impl NameLinkingPolicy {
         // and we need to maintain our own `visited` map anyway
         let mut to_visit = VecDeque::new();
         if use_entrypoint {
-            to_visit.push_back(source.entrypoint());
+            to_visit.extend(used_nodes(&g, source.entrypoint()));
         } else {
             to_visit.extend(
                 source
@@ -648,23 +648,17 @@ impl NameLinkingPolicy {
         }
         let mut res = LinkActions::new();
         while let Some(sn) = to_visit.pop_front() {
-            if !(use_entrypoint && sn == source.entrypoint()) {
-                let (Entry::Vacant(ve), Some(ls)) = (res.entry(sn), link_sig(source, sn)) else {
-                    continue;
-                };
-                let act = self.action_for(&existing, sn, ls)?;
-                let LinkAction::LinkNode(dirv) = &act;
-                let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
-                ve.insert(act);
-                if !traverse {
-                    continue;
-                }
+            let Entry::Vacant(ve) = res.entry(sn) else {
+                continue; // Seen already (used by many)
+            };
+            let ls = link_sig(source, sn).expect("Only funcs/consts ever enqueued");
+            let act = self.action_for(&existing, sn, ls)?;
+            let LinkAction::LinkNode(dirv) = &act;
+            let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
+            ve.insert(act);
+            if traverse {
+                to_visit.extend(used_nodes(&g, sn));
             }
-            // For entrypoint, *just* traverse
-            to_visit.extend(g.out_edges(sn).map(|(_, nw)| match nw {
-                StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
-                _ => unreachable!("unknown / cannot call non-func entrypoint"),
-            }));
         }
         Ok(res)
     }
@@ -674,6 +668,13 @@ impl Default for NameLinkingPolicy {
     fn default() -> Self {
         Self::err_on_conflict(OnNewFunc::RaiseError)
     }
+}
+
+fn used_nodes<N: HugrNode>(g: &ModuleGraph<N>, n: N) -> impl Iterator<Item = N> + '_ {
+    g.out_edges(n).map(|(_, nw)| match nw {
+        StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
+        _ => unreachable!("unknown / cannot call non-func entrypoint"),
+    })
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
