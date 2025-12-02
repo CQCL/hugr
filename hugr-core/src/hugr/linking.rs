@@ -321,22 +321,10 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
-    /// Makes a new instance that specifies to handle
-    /// [signature conflicts](Self::on_signature_conflict) by failing with an error and
-    /// multiple [FuncDefn]s according to `multi_defn`.
-    ///
-    /// [FuncDefn]: crate::ops::FuncDefn
-    pub fn err_on_conflict(multi_defn: impl Into<OnMultiDefn>) -> Self {
-        Self {
-            multi_defn: multi_defn.into(),
-            sig_conflict: OnNewFunc::RaiseError,
-        }
-    }
-
     /// Makes a new instance that specifies to keep both decls/defns when (for the same name)
     /// they have different signatures or when both are defns. Thus, an error is never raised;
     /// a (potentially-invalid) Hugr is always produced.
-    pub fn keep_both_invalid() -> Self {
+    pub fn new_keep_both_invalid() -> Self {
         Self {
             multi_defn: OnMultiDefn::NewFunc(OnNewFunc::Add),
             sig_conflict: OnNewFunc::Add,
@@ -424,7 +412,10 @@ impl NameLinkingPolicy {
 
 impl Default for NameLinkingPolicy {
     fn default() -> Self {
-        Self::err_on_conflict(OnNewFunc::RaiseError)
+        Self {
+            sig_conflict: OnNewFunc::RaiseError,
+            multi_defn: OnNewFunc::RaiseError.into(),
+        }
     }
 }
 
@@ -1013,7 +1004,7 @@ mod test {
         let new_sig = Signature::new_endo(INT_TYPES[3].clone());
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        let pol = NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError);
+        let pol = NameLinkingPolicy::default();
         let mut host = orig_host.clone();
         let res = host.link_module_view(&inserted, &pol);
         assert_eq!(host, orig_host); // Did nothing
@@ -1059,7 +1050,7 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let pol = NameLinkingPolicy::keep_both_invalid().on_multiple_defn(multi_defn);
+        let pol = NameLinkingPolicy::new_keep_both_invalid().on_multiple_defn(multi_defn);
         let res = host.link_module(inserted, &pol);
         if multi_defn == OnNewFunc::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleDefn(n, _, _)) if n == "foo"));
