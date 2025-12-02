@@ -279,11 +279,11 @@ pub enum OnNewFunc {
 pub enum OnMultiDefn {
     /// Keep the implementation already in the target Hugr. (Edges in the source
     /// Hugr will be redirected to use the function from the target.)
-    UseExisting,
+    UseTarget,
     /// Keep the implementation in the source Hugr. (Edges in the target Hugr
     /// will be redirected to use the function from the source; the previously-existing
     /// function in the target Hugr will be removed.)
-    UseNew,
+    UseSource,
     /// Proceed as per the specified [OnNewFunc].
     NewFunc(#[from] OnNewFunc),
 }
@@ -442,8 +442,8 @@ fn directive<SN: Display, TN: HugrNode>(
             NodeLinkingDirective::replace(std::iter::once(decl).chain(decls).cloned())
         }
         (true, &Either::Left(defn)) => match multi_defn {
-            OnMultiDefn::UseExisting => NodeLinkingDirective::UseExisting(defn),
-            OnMultiDefn::UseNew => NodeLinkingDirective::replace([defn]),
+            OnMultiDefn::UseTarget => NodeLinkingDirective::UseExisting(defn),
+            OnMultiDefn::UseSource => NodeLinkingDirective::replace([defn]),
             OnMultiDefn::NewFunc(OnNewFunc::RaiseError) => {
                 return Err(NameLinkingError::MultipleDefn(name.to_owned(), new_n, defn));
             }
@@ -910,8 +910,8 @@ mod test {
         #[values(OnNewFunc::RaiseError, OnNewFunc::Add)] sig_conflict: OnNewFunc,
         #[values(
             OnNewFunc::RaiseError.into(),
-            OnMultiDefn::UseNew,
-            OnMultiDefn::UseExisting,
+            OnMultiDefn::UseSource,
+            OnMultiDefn::UseTarget,
             OnNewFunc::Add.into()
         )]
         multi_defn: OnMultiDefn,
@@ -1040,8 +1040,8 @@ mod test {
     }
 
     #[rstest]
-    #[case(OnMultiDefn::UseNew, vec![11])]
-    #[case(OnMultiDefn::UseExisting, vec![5])]
+    #[case(OnMultiDefn::UseSource, vec![11])]
+    #[case(OnMultiDefn::UseTarget, vec![5])]
     #[case(OnNewFunc::Add.into(), vec![5, 11])]
     #[case(OnNewFunc::RaiseError.into(), vec![])]
     fn impl_conflict(#[case] multi_defn: OnMultiDefn, #[case] expected: Vec<u64>) {
