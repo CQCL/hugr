@@ -533,31 +533,31 @@ impl NameLinkingPolicy {
         self.link_actions_helper(target, source, false)
     }
 
-    fn action_for<SN: Display, TN: Copy + Display + std::fmt::Debug>(
+    // Also for source constants (considered private so just added)
+    fn action_for_source_func<SN: Display, TN: Copy + Display + std::fmt::Debug>(
         &self,
-        existing: &HashMap<&str, PubFuncs<TN>>,
-        sn: SN,
+        existing_in_target: &HashMap<&str, PubFuncs<TN>>,
+        src_node: SN,
         new: LinkSig,
     ) -> Result<LinkAction<TN>, NameLinkingError<SN, TN>> {
-        let just_add = NodeLinkingDirective::add().into();
         let LinkSig::Public {
             name,
             is_defn: new_is_defn,
             sig: new_sig,
         } = new
         else {
-            return Ok(just_add);
+            return Ok(NodeLinkingDirective::add().into());
         };
         let chk_add = |onf: OnNewFunc, e| match onf {
             OnNewFunc::RaiseError => Err(e),
-            OnNewFunc::Add => Ok(just_add),
+            OnNewFunc::Add => Ok(NodeLinkingDirective::add().into()),
         };
-        let Some((existing, ex_sig)) = existing.get(name) else {
+        let Some((existing, ex_sig)) = existing_in_target.get(name) else {
             return chk_add(
                 self.new_names,
                 NameLinkingError::NoNewNames {
                     name: name.to_string(),
-                    src_node: sn,
+                    src_node,
                 },
             );
         };
@@ -566,7 +566,7 @@ impl NameLinkingPolicy {
                 self.sig_conflict,
                 NameLinkingError::SignatureConflict {
                     name: name.to_string(),
-                    src_node: sn,
+                    src_node,
                     src_sig: new_sig.clone().into(),
                     tgt_node: target_node(existing),
                     tgt_sig: (*ex_sig).clone().into(),
@@ -587,7 +587,7 @@ impl NameLinkingPolicy {
         match self.multi_defn {
             OnMultiDefn::NewFunc(nfh) => chk_add(
                 nfh,
-                NameLinkingError::MultipleDefn(name.to_string(), sn, ex_defn),
+                NameLinkingError::MultipleDefn(name.to_string(), src_node, ex_defn),
             ),
             OnMultiDefn::UseExisting => Ok(NodeLinkingDirective::UseExisting(ex_defn).into()),
             OnMultiDefn::UseNew => Ok(NodeLinkingDirective::replace([ex_defn]).into()),
@@ -632,7 +632,7 @@ impl NameLinkingPolicy {
         source: &impl HugrView<Node = SN>,
         use_entrypoint: bool,
     ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
-        let existing = gather_existing(target);
+        let in_target = gather_existing(target);
         let g = ModuleGraph::new(&source);
         // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
         // and we need to maintain our own `visited` map anyway
@@ -652,7 +652,7 @@ impl NameLinkingPolicy {
                 continue; // Seen already (used by many)
             };
             let ls = link_sig(source, sn).expect("Only funcs/consts ever enqueued");
-            let act = self.action_for(&existing, sn, ls)?;
+            let act = self.action_for_source_func(&in_target, sn, ls)?;
             let LinkAction::LinkNode(dirv) = &act;
             let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
             ve.insert(act);
