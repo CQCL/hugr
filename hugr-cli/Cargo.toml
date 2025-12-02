@@ -29,8 +29,8 @@ serde = { workspace = true, features = ["derive"] }
 clio = { workspace = true, features = ["clap-parse"] }
 anyhow.workspace = true
 thiserror.workspace = true
-tracing = { version = "0.1.41", optional = true }
-tracing-subscriber = { version = "0.3.20", features = ["fmt"], optional = true }
+tracing = { version = "0.1.43", optional = true }
+tracing-subscriber = { version = "0.3.22", features = ["fmt"], optional = true }
 tabled = "0.20.0"
 schemars = { workspace = true, features = ["derive"] }
 
