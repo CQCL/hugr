@@ -344,31 +344,35 @@ impl NameLinkingPolicy {
     }
 
     /// Sets how to behave when both target and inserted Hugr have a
-    /// [Public] function with the same name but different signatures.
+    /// ([Visibility::Public]) function with the same name but different signatures.
     ///
-    /// [Public]: crate::Visibility::Public
+    /// See [Self::get_on_signature_conflict].
     pub fn on_signature_conflict(mut self, sc: OnNewFunc) -> Self {
         self.sig_conflict = sc;
         self
     }
 
-    /// Tells how to behave when both target and inserted Hugr have a
-    /// [Public] function with the same name but different signatures.
+    /// Returns how this policy will behave when both target and inserted Hugr have a
+    /// ([Visibility::Public]) function with the same name but different signatures.
     ///
-    /// [Public]: crate::Visibility::Public
-    pub fn get_signature_conflict(&self) -> OnNewFunc {
+    /// Can be changed via [Self::on_signature_conflict].
+    pub fn get_on_signature_conflict(&self) -> OnNewFunc {
         self.sig_conflict
     }
 
     /// Sets how to behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
+    ///
+    /// See [Self::get_on_multiple_defn].
     pub fn on_multiple_defn(mut self, multi_defn: OnMultiDefn) -> Self {
         self.multi_defn = multi_defn;
         self
     }
 
-    /// Tells how to behave when both target and inserted Hugr have a
+    /// Returns how this policy will behave when both target and inserted Hugr have a
     /// [FuncDefn](crate::ops::FuncDefn) with the same name and signature.
+    ///
+    /// Can be changed via [Self::on_multiple_defn].
     pub fn get_on_multiple_defn(&self) -> OnMultiDefn {
         self.multi_defn
     }
