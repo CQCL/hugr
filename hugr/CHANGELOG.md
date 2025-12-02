@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.25.0](https://github.com/CQCL/hugr/compare/hugr-v0.24.3...hugr-v0.25.0) - 2025-12-02
+
+### Bug Fixes
+
+- *(hugr-core)* [**breaking**] Return error instead of panicking in `MakeRegisteredOp::to_extension_op()` ([#2701](https://github.com/CQCL/hugr/pull/2701))
+- register packaged extensions before model_ast import ([#2702](https://github.com/CQCL/hugr/pull/2702))
+
+### Documentation
+
+- Improve instructions for patch release ([#2720](https://github.com/CQCL/hugr/pull/2720))
+
+### New Features
+
+- *(hugr-passes)* [**breaking**] normalize_cfgs inlines entry DFG ([#2649](https://github.com/CQCL/hugr/pull/2649))
+- ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/CQCL/hugr/pull/2442))
+- return description output to python on error ([#2681](https://github.com/CQCL/hugr/pull/2681))
+- add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/CQCL/hugr/pull/2698))
+- [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/CQCL/hugr/pull/2704))
+
+### Refactor
+
+- [**breaking**] move envelope reading to dedicated module with dedicated errors ([#2689](https://github.com/CQCL/hugr/pull/2689))
+- Direct import of model representation to Python ([#2683](https://github.com/CQCL/hugr/pull/2683))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-v0.24.2...hugr-v0.24.3) - 2025-11-06
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.24.3"
+version = "0.25.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -28,7 +28,7 @@ bench = false
 name = "model"
 
 [dependencies]
-hugr-model = { version = "0.24.3", path = "../hugr-model" }
+hugr-model = { version = "0.25.0", path = "../hugr-model" }
 
 cgmath = { workspace = true, features = ["serde"] }
 delegate = { workspace = true }

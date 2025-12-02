@@ -1,6 +1,6 @@
 [package]
 name = "hugr"
-version = "0.24.3"
+version = "0.25.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -31,11 +31,11 @@ zstd = ["hugr-core/zstd"]
 persistent_unstable = ["hugr-persistent"]
 
 [dependencies]
-hugr-model = { path = "../hugr-model", version = "0.24.3" }
-hugr-core = { path = "../hugr-core", version = "0.24.3" }
-hugr-passes = { path = "../hugr-passes", version = "0.24.3" }
-hugr-llvm = { path = "../hugr-llvm", version = "0.24.3", optional = true }
-hugr-persistent = { path = "../hugr-persistent", version = "0.3.4", optional = true }
+hugr-model = { path = "../hugr-model", version = "0.25.0" }
+hugr-core = { path = "../hugr-core", version = "0.25.0" }
+hugr-passes = { path = "../hugr-passes", version = "0.25.0" }
+hugr-llvm = { path = "../hugr-llvm", version = "0.25.0", optional = true }
+hugr-persistent = { path = "../hugr-persistent", version = "0.4.0", optional = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }

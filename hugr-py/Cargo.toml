@@ -21,7 +21,7 @@ bench = false
 
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
-hugr-cli = { version = "0.24.3", path = "../hugr-cli", default-features = false }
-hugr-model = { version = "0.24.3", path = "../hugr-model", features = ["pyo3"] }
+hugr-cli = { version = "0.25.0", path = "../hugr-cli", default-features = false }
+hugr-model = { version = "0.25.0", path = "../hugr-model", features = ["pyo3"] }
 pastey.workspace = true
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py310"] }
