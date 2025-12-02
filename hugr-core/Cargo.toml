@@ -64,7 +64,7 @@ ordered-float = { workspace = true, features = ["serde"] }
 base64.workspace = true
 relrc = { workspace = true, features = ["petgraph", "serde"] }
 smallvec = { workspace = true }
-tracing = "0.1.41"
+tracing = "0.1.43"
 schemars = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
