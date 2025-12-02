@@ -1,18 +1,12 @@
 //! Directives and errors relating to linking Hugrs.
 
-use std::{
-    collections::{BTreeMap, HashMap, VecDeque, btree_map::Entry},
-    fmt::Display,
-    iter::once,
-};
+use std::collections::{BTreeMap, HashMap, VecDeque, btree_map::Entry};
+use std::{fmt::Display, iter::once};
 
 use itertools::{Either, Itertools};
 
-use crate::hugr::{
-    HugrMut,
-    hugrmut::{InsertedForest, InsertionResult},
-    internal::HugrMutInternals,
-};
+use crate::hugr::hugrmut::{InsertedForest, InsertionResult};
+use crate::hugr::{HugrMut, internal::HugrMutInternals};
 use crate::module_graph::{ModuleGraph, StaticNode};
 use crate::{Hugr, HugrView, Node, Visibility, core::HugrNode, ops::OpType, types::PolyFuncType};
 
@@ -327,8 +321,8 @@ pub enum NodeLinkingDirective<TN = Node> {
         /// to leave the newly-inserted node instead. (Typically, this `Vec` would contain
         /// at most one [FuncDefn], or perhaps-multiple, aliased, [FuncDecl]s.)
         ///
-        /// [FuncDefn]: crate::ops::FuncDefn
         /// [FuncDecl]: crate::ops::FuncDecl
+        /// [FuncDefn]: crate::ops::FuncDefn
         /// [EdgeKind::Const]: crate::types::EdgeKind::Const
         /// [EdgeKind::Function]: crate::types::EdgeKind::Function
         replace: Vec<TN>,
