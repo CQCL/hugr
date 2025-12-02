@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.24.3...hugr-llvm-v0.25.0) - 2025-12-02
+
+### New Features
+
+- *(llvm)* [**breaking**] upgrade to inkwell 0.7 ([#2695](https://github.com/CQCL/hugr/pull/2695))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.24.2...hugr-llvm-v0.24.3) - 2025-11-06
 
 ### Bug Fixes

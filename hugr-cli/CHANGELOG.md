@@ -1,6 +1,18 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.3...hugr-cli-v0.25.0) - 2025-12-02
+
+### New Features
+
+- *(cli, python)* programmatic interface to cli with python bindings ([#2677](https://github.com/CQCL/hugr/pull/2677))
+- return description output to python on error ([#2681](https://github.com/CQCL/hugr/pull/2681))
+
+### Refactor
+
+- [**breaking**] move envelope reading to dedicated module with dedicated errors ([#2689](https://github.com/CQCL/hugr/pull/2689))
+- *(cli)* [**breaking**] remove deprecated hugr_json handling ([#2690](https://github.com/CQCL/hugr/pull/2690))
+
 ## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.0...hugr-cli-v0.24.1) - 2025-11-03
 
 ### New Features

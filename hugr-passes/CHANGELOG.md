@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/CQCL/hugr/compare/hugr-passes-v0.24.3...hugr-passes-v0.25.0) - 2025-12-02
+
+### New Features
+
+- *(hugr-passes)* [**breaking**] normalize_cfgs inlines entry DFG ([#2649](https://github.com/CQCL/hugr/pull/2649))
+- add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/CQCL/hugr/pull/2698))
+- ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/CQCL/hugr/pull/2442))
+- [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/CQCL/hugr/pull/2704))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.24.2...hugr-passes-v0.24.3) - 2025-11-06
 
 ### Bug Fixes
