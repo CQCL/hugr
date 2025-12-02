@@ -41,7 +41,7 @@ too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-insta = { version = "1.43.2" }
+insta = { version = "1.44.3" }
 bitvec = "1.0.1"
 capnp = "0.23.0"
 cgmath = "0.18.0"
