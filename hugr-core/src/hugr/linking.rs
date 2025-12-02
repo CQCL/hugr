@@ -185,7 +185,7 @@ pub trait HugrLinking: HugrMut {
     /// * [NameLinkingError::AddFunctionContainingEntrypoint] if `other`'s entrypoint
     ///   calls (perhaps transitively) the function containing said entrypoint.
     ///   An exception is made if the called+containing function is public and is being replaced
-    ///   by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///   by an equivalent in `self` via [OnMultiDefn::UseTarget], in which case
     ///   the call is redirected to the existing function (the part of the new function
     ///   outside the entrypoint subtree is not inserted).
     ///
@@ -242,7 +242,7 @@ pub trait HugrLinking: HugrMut {
     /// * [NameLinkingError::AddFunctionContainingEntrypoint] if `other`'s entrypoint
     ///   calls (perhaps transitively) the function containing said entrypoint.
     ///   An exception is made if the called+containing function is public and is being replaced
-    ///   by an equivalent in `self` via [OnMultiDefn::UseExisting], in which case
+    ///   by an equivalent in `self` via [OnMultiDefn::UseTarget], in which case
     ///   the call is redirected to the existing function (the part of the new function
     ///   outside the entrypoint subtree is not inserted).
     ///
@@ -397,11 +397,11 @@ pub enum OnNewFunc {
 pub enum OnMultiDefn {
     /// Keep the implementation already in the target Hugr. (Edges in the source
     /// Hugr will be redirected to use the function from the target.)
-    UseExisting,
+    UseTarget,
     /// Keep the implementation in the source Hugr. (Edges in the target Hugr
     /// will be redirected to use the function from the source; the previously-existing
     /// function in the target Hugr will be removed.)
-    UseNew,
+    UseSource,
     /// Proceed as per the specified [OnNewFunc].
     NewFunc(#[from] OnNewFunc),
 }
@@ -448,23 +448,10 @@ pub enum NameLinkingError<SN: Display, TN: Display + std::fmt::Debug> {
 }
 
 impl NameLinkingPolicy {
-    /// Makes a new instance that specifies to handle
-    /// [signature conflicts](Self::on_signature_conflict) by failing with an error and
-    /// multiple [FuncDefn]s according to `multi_defn`.
-    ///
-    /// [FuncDefn]: crate::ops::FuncDefn
-    pub fn err_on_conflict(multi_defn: impl Into<OnMultiDefn>) -> Self {
-        Self {
-            new_names: OnNewFunc::Add,
-            multi_defn: multi_defn.into(),
-            sig_conflict: OnNewFunc::RaiseError,
-        }
-    }
-
     /// Makes a new instance that specifies to keep both decls/defns when (for the same name)
     /// they have different signatures or when both are defns. Thus, an error is never raised;
     /// a (potentially-invalid) Hugr is always produced.
-    pub fn keep_both_invalid() -> Self {
+    pub fn new_keep_both_invalid() -> Self {
         Self {
             new_names: OnNewFunc::Add,
             multi_defn: OnMultiDefn::NewFunc(OnNewFunc::Add),
@@ -589,8 +576,8 @@ impl NameLinkingPolicy {
                 nfh,
                 NameLinkingError::MultipleDefn(name.to_string(), src_node, ex_defn),
             ),
-            OnMultiDefn::UseExisting => Ok(NodeLinkingDirective::UseExisting(ex_defn).into()),
-            OnMultiDefn::UseNew => Ok(NodeLinkingDirective::replace([ex_defn]).into()),
+            OnMultiDefn::UseTarget => Ok(NodeLinkingDirective::UseExisting(ex_defn).into()),
+            OnMultiDefn::UseSource => Ok(NodeLinkingDirective::replace([ex_defn]).into()),
         }
     }
 
@@ -666,7 +653,11 @@ impl NameLinkingPolicy {
 
 impl Default for NameLinkingPolicy {
     fn default() -> Self {
-        Self::err_on_conflict(OnNewFunc::RaiseError)
+        Self {
+            sig_conflict: OnNewFunc::RaiseError,
+            multi_defn: OnNewFunc::RaiseError.into(),
+            new_names: OnNewFunc::Add,
+        }
     }
 }
 
@@ -1133,8 +1124,8 @@ mod test {
         #[values(OnNewFunc::RaiseError, OnNewFunc::Add)] sig_conflict: OnNewFunc,
         #[values(
             OnNewFunc::RaiseError.into(),
-            OnMultiDefn::UseNew,
-            OnMultiDefn::UseExisting,
+            OnMultiDefn::UseSource,
+            OnMultiDefn::UseTarget,
             OnNewFunc::Add.into()
         )]
         multi_defn: OnMultiDefn,
@@ -1188,8 +1179,11 @@ mod test {
             h
         };
 
-        let pol =
-            NameLinkingPolicy::err_on_conflict(multi_defn).on_signature_conflict(sig_conflict);
+        let pol = NameLinkingPolicy {
+            sig_conflict,
+            multi_defn,
+            new_names: OnNewFunc::RaiseError,
+        };
         // Insert def_foo into main_def_bar
         let mut has_main1 = main_def_bar.clone();
         has_main1.link_module_view(&def_foo, &pol).unwrap();
@@ -1260,7 +1254,7 @@ mod test {
         let new_sig = Signature::new_endo(INT_TYPES[3].clone());
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
-        let pol = NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError);
+        let pol = NameLinkingPolicy::default();
         let mut host = orig_host.clone();
         let res = host.link_module_view(&inserted, &pol);
         assert_eq!(host, orig_host); // Did nothing
@@ -1287,8 +1281,8 @@ mod test {
     }
 
     #[rstest]
-    #[case(OnMultiDefn::UseNew, vec![11], vec![5, 11])] // Existing constant is not removed
-    #[case(OnMultiDefn::UseExisting, vec![5], vec![5])]
+    #[case(OnMultiDefn::UseSource, vec![11], vec![5, 11])] // Existing constant is not removed
+    #[case(OnMultiDefn::UseTarget, vec![5], vec![5])]
     #[case(OnNewFunc::Add.into(), vec![5, 11], vec![5,11])]
     #[case(OnNewFunc::RaiseError.into(), vec![], vec![])]
     fn impl_conflict(
@@ -1310,11 +1304,7 @@ mod test {
         let mut host = backup.clone();
         let inserted = build_hugr(11);
 
-        let pol = NameLinkingPolicy {
-            new_names: OnNewFunc::RaiseError,
-            sig_conflict: OnNewFunc::RaiseError,
-            multi_defn,
-        };
+        let pol = NameLinkingPolicy::new_keep_both_invalid().on_multiple_defn(multi_defn);
         let res = host.link_module(inserted, &pol);
         if multi_defn == OnNewFunc::RaiseError.into() {
             assert!(matches!(res, Err(NameLinkingError::MultipleDefn(n, _, _)) if n == "foo"));
@@ -1379,7 +1369,7 @@ mod test {
         let cst = fb.add_load_value(ConstUsize::new(42));
         let mut host = fb.finish_hugr_with_outputs([cst]).unwrap();
 
-        let pol = NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError);
+        let pol = NameLinkingPolicy::default();
 
         let ins = host
             .insert_link_from_view(host.entrypoint(), &insert, &pol)
@@ -1422,7 +1412,7 @@ mod test {
             pf.finish_with_outputs([i]).unwrap();
             (mb.finish_hugr().unwrap(), bar.node())
         };
-        let pol = NameLinkingPolicy::keep_both_invalid().on_new_names(OnNewFunc::RaiseError);
+        let pol = NameLinkingPolicy::new_keep_both_invalid().on_new_names(OnNewFunc::RaiseError);
         let mut host = existing.clone();
         let res = host.link_module(insert, &pol);
         match vis {
@@ -1495,8 +1485,7 @@ mod test {
         let res = target.insert_link_hugr(
             ex_main,
             insert,
-            &NameLinkingPolicy::err_on_conflict(OnNewFunc::RaiseError)
-                .on_new_names(OnNewFunc::RaiseError),
+            &NameLinkingPolicy::default().on_new_names(OnNewFunc::RaiseError),
         );
         if call_new {
             assert_eq!(
