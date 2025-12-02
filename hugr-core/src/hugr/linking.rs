@@ -707,11 +707,9 @@ fn link_sig<H: HugrView + ?Sized>(h: &H, n: H::Node) -> Option<LinkSig<'_>> {
 fn gather_existing<'a, H: HugrView + ?Sized>(h: &'a H) -> HashMap<&'a str, PubFuncs<'a, H::Node>> {
     let left_if = |b| if b { Either::Left } else { Either::Right };
     h.children(h.module_root())
-        .filter_map(|n| {
-            link_sig(h, n).and_then(|link_sig| match link_sig {
-                LinkSig::Public { name, is_defn, sig } => Some((name, (left_if(is_defn)(n), sig))),
-                LinkSig::Private => None,
-            })
+        .filter_map(|n| match link_sig(h, n)? {
+            LinkSig::Public { name, is_defn, sig } => Some((name, (left_if(is_defn)(n), sig))),
+            LinkSig::Private => None,
         })
         .into_grouping_map()
         .aggregate(|acc: Option<PubFuncs<H::Node>>, name, (new, sig2)| {
