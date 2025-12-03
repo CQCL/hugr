@@ -615,8 +615,14 @@ impl NameLinkingPolicy {
     ) -> Result<LinkActions<SN, TN>, NameLinkingError<SN, TN>> {
         let in_target = gather_existing(target);
         let g = ModuleGraph::new(&source);
-        // Can't use petgraph Dfs as we need to avoid traversing through some nodes,
-        // and we need to maintain our own `visited` map anyway
+        fn used_nodes<N: HugrNode>(g: &ModuleGraph<N>, n: N) -> impl Iterator<Item = N> + '_ {
+            g.out_edges(n).map(|(_, nw)| match nw {
+                StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
+                _ => unreachable!("unknown / cannot call non-func entrypoint"),
+            })
+        }
+        // Can't use petgraph traversal as we need to avoid traversing through some nodes,
+        // and we need to maintain our own `res` map of visited nodes anyway
         let mut to_visit = VecDeque::new();
         if use_entrypoint {
             to_visit.extend(used_nodes(&g, source.entrypoint()));
@@ -632,7 +638,7 @@ impl NameLinkingPolicy {
             let Entry::Vacant(ve) = res.entry(sn) else {
                 continue; // Seen already (used by many)
             };
-            let ls = link_sig(source, sn).expect("Only funcs/consts ever enqueued");
+            let ls = link_sig(source, sn).expect("used_nodes returns only funcs+consts");
             let act = self.action_for_source_func(&in_target, sn, ls)?;
             let LinkAction::LinkNode(dirv) = &act;
             let traverse = matches!(dirv, NodeLinkingDirective::Add { .. });
@@ -653,13 +659,6 @@ impl Default for NameLinkingPolicy {
             new_names: OnNewFunc::Add,
         }
     }
-}
-
-fn used_nodes<N: HugrNode>(g: &ModuleGraph<N>, n: N) -> impl Iterator<Item = N> + '_ {
-    g.out_edges(n).map(|(_, nw)| match nw {
-        StaticNode::FuncDecl(n) | StaticNode::FuncDefn(n) | StaticNode::Const(n) => *n,
-        _ => unreachable!("unknown / cannot call non-func entrypoint"),
-    })
 }
 
 type PubFuncs<'a, N> = (Either<N, (N, Vec<N>)>, &'a PolyFuncType);
