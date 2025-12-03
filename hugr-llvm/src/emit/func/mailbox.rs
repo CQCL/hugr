@@ -54,6 +54,7 @@ impl<'c> ValueMailBox<'c> {
         labels: impl IntoIterator<Item = &'a str>,
     ) -> Result<BasicValueEnum<'c>> {
         let r = builder.build_load(
+            self.get_type(),
             self.ptr,
             &join_names(
                 labels

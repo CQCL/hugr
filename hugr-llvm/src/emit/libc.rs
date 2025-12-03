@@ -22,7 +22,7 @@ pub fn emit_libc_printf<H: HugrView<Node = Node>>(
     args: &[BasicMetadataValueEnum],
 ) -> Result<()> {
     let iw_ctx = context.typing_session().iw_context();
-    let str_ty = iw_ctx.i8_type().ptr_type(AddressSpace::default());
+    let str_ty = iw_ctx.ptr_type(AddressSpace::default());
     let printf_sig = iw_ctx.i32_type().fn_type(&[str_ty.into()], true);
 
     let printf = context.get_extern_func("printf", printf_sig)?;
@@ -37,7 +37,6 @@ pub fn emit_libc_malloc<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let iw_ctx = context.typing_session().iw_context();
     let malloc_sig = iw_ctx
-        .i8_type()
         .ptr_type(AddressSpace::default())
         .fn_type(&[iw_ctx.i64_type().into()], false);
     let malloc = context.get_extern_func("malloc", malloc_sig)?;
@@ -55,7 +54,7 @@ pub fn emit_libc_free<H: HugrView<Node = Node>>(
     ptr: BasicMetadataValueEnum,
 ) -> Result<()> {
     let iw_ctx = context.typing_session().iw_context();
-    let ptr_ty = iw_ctx.i8_type().ptr_type(AddressSpace::default());
+    let ptr_ty = iw_ctx.ptr_type(AddressSpace::default());
     let ptr = context
         .builder()
         .build_bit_cast(ptr.into_pointer_value(), ptr_ty, "")?;

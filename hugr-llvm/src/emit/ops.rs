@@ -10,7 +10,7 @@ use hugr_core::{
     types::{SumType, Type, TypeEnum},
 };
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, CallableValue};
+use inkwell::values::BasicValueEnum;
 use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
@@ -265,11 +265,11 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
         BasicValueEnum::PointerValue(v) => Ok(v),
         _ => Err(anyhow!("emit_call_indirect: Not a pointer")),
     }?;
-    let func =
-        CallableValue::try_from(func_ptr).expect("emit_call_indirect: Not a function pointer");
+
+    let fn_type = context.llvm_func_type(&args.node.signature)?;
     let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
     let builder = context.builder();
-    let call = builder.build_call(func, inputs.as_slice(), "")?;
+    let call = builder.build_indirect_call(fn_type, func_ptr, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
     args.outputs.finish(builder, call_results)
 }

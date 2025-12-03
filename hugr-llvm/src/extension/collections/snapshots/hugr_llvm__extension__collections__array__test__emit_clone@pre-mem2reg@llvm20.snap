@@ -1,0 +1,56 @@
+---
+source: hugr-llvm/src/extension/collections/array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private void @_hl.main.1() {
+alloca_block:
+  %"7_0" = alloca i64, align 8
+  %"5_0" = alloca i64, align 8
+  %"8_0" = alloca { ptr, i64 }, align 8
+  %"9_0" = alloca { ptr, i64 }, align 8
+  %"9_1" = alloca { ptr, i64 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store i64 2, ptr %"7_0", align 4
+  store i64 1, ptr %"5_0", align 4
+  %"5_01" = load i64, ptr %"5_0", align 4
+  %"7_02" = load i64, ptr %"7_0", align 4
+  %0 = call ptr @malloc(i64 mul (i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 2))
+  %1 = insertvalue { ptr, i64 } poison, ptr %0, 0
+  %2 = insertvalue { ptr, i64 } %1, i64 0, 1
+  %3 = getelementptr inbounds i64, ptr %0, i64 0
+  store i64 %"5_01", ptr %3, align 4
+  %4 = getelementptr inbounds i64, ptr %0, i64 1
+  store i64 %"7_02", ptr %4, align 4
+  store { ptr, i64 } %2, ptr %"8_0", align 8
+  %"8_03" = load { ptr, i64 }, ptr %"8_0", align 8
+  %array_ptr = extractvalue { ptr, i64 } %"8_03", 0
+  %array_offset = extractvalue { ptr, i64 } %"8_03", 1
+  %5 = call ptr @malloc(i64 mul (i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 2))
+  %6 = insertvalue { ptr, i64 } poison, ptr %5, 0
+  %7 = insertvalue { ptr, i64 } %6, i64 0, 1
+  %8 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset
+  call void @llvm.memcpy.p0.p0.i64(ptr %5, ptr %8, i64 mul (i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i64 2), i1 false)
+  store { ptr, i64 } %"8_03", ptr %"9_0", align 8
+  store { ptr, i64 } %7, ptr %"9_1", align 8
+  %"9_14" = load { ptr, i64 }, ptr %"9_1", align 8
+  %array_ptr5 = extractvalue { ptr, i64 } %"9_14", 0
+  call void @free(ptr %array_ptr5)
+  %"9_06" = load { ptr, i64 }, ptr %"9_0", align 8
+  %array_ptr7 = extractvalue { ptr, i64 } %"9_06", 0
+  call void @free(ptr %array_ptr7)
+  ret void
+}
+
+declare ptr @malloc(i64)
+
+; Function Attrs: nocallback nofree nounwind willreturn memory(argmem: readwrite)
+declare void @llvm.memcpy.p0.p0.i64(ptr noalias nocapture writeonly, ptr noalias nocapture readonly, i64, i1 immarg) #0
+
+declare void @free(ptr)
+
+attributes #0 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }

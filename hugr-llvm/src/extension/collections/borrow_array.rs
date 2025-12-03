@@ -36,9 +36,7 @@ use hugr_core::{HugrView, Node};
 use inkwell::builder::Builder;
 use inkwell::intrinsics::Intrinsic;
 use inkwell::types::{BasicType, BasicTypeEnum, IntType, StructType};
-use inkwell::values::{
-    BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue, StructValue,
-};
+use inkwell::values::{BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue};
 use inkwell::{AddressSpace, IntPredicate};
 use itertools::Itertools;
 
@@ -410,16 +408,22 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
 #[must_use]
 pub fn barray_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
-    elem_ty: BasicTypeEnum<'c>,
+    _elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
     let iw_ctx = session.iw_context();
     let usize_t = usize_ty(session);
     iw_ctx.struct_type(
         &[
             // Pointer to the first array element
-            elem_ty.ptr_type(AddressSpace::default()).into(),
+            session
+                .iw_context()
+                .ptr_type(AddressSpace::default())
+                .into(),
             // Pointer to the bitarray mask storing whether values have been borrowed
-            usize_t.ptr_type(AddressSpace::default()).into(),
+            session
+                .iw_context()
+                .ptr_type(AddressSpace::default())
+                .into(),
             // Offset
             usize_t.into(),
         ],
@@ -430,16 +434,14 @@ pub fn barray_fat_pointer_ty<'c>(
 /// Constructs a borrow array fat pointer value.
 pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
+    elem_ty: BasicTypeEnum<'c>,
     BArrayFatPtrComponents {
         elems_ptr,
         mask_ptr,
         offset,
     }: BArrayFatPtrComponents<'c>,
 ) -> Result<StructValue<'c>> {
-    let array_ty = barray_fat_pointer_ty(
-        &ctx.typing_session(),
-        elems_ptr.get_type().get_element_type().try_into().unwrap(),
-    );
+    let array_ty = barray_fat_pointer_ty(&ctx.typing_session(), elem_ty);
     let array_v = array_ty.get_poison();
     let array_v =
         ctx.builder()
@@ -495,7 +497,7 @@ fn alloc_typed_array<'c, H: HugrView<Node = Node>>(
     let ptr = ccg.emit_allocate_array(ctx, size)?;
     Ok((
         ctx.builder()
-            .build_bit_cast(ptr, elem_ty.ptr_type(AddressSpace::default()), "")?
+            .build_bit_cast(ptr, ctx.iw_context().ptr_type(AddressSpace::default()), "")?
             .into_pointer_value(),
         size,
     ))
@@ -525,6 +527,7 @@ pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     let offset = usize_t.const_zero();
     let array_v = build_barray_fat_pointer(
         ctx,
+        elem_ty,
         BArrayFatPtrComponents {
             elems_ptr,
             mask_ptr,
@@ -664,8 +667,8 @@ fn inspect_mask_idx_bit<'c, H: HugrView<Node = Node>>(
     let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
     let builder = ctx.builder();
     let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
-    let block_ptr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
-    let block = builder.build_load(block_ptr, "")?.into_int_value();
+    let block_ptr = unsafe { builder.build_in_bounds_gep(usize_t, mask_ptr, &[block_idx], "")? };
+    let block = builder.build_load(usize_t, block_ptr, "")?.into_int_value();
     let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
     let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
     let bit = builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
@@ -732,8 +735,10 @@ fn check_all_mask_eq<'c, H: HugrView<Node = Node>>(
         let builder = ctx.builder();
         let block_idx = builder.build_int_add(idx, start_block, "")?;
         let block_addr =
-            unsafe { builder.build_in_bounds_gep(mask_info.mask_ptr, &[block_idx], "")? };
-        let block = builder.build_load(block_addr, "")?.into_int_value();
+            unsafe { builder.build_in_bounds_gep(usize_t, mask_info.mask_ptr, &[block_idx], "")? };
+        let block = builder
+            .build_load(usize_t, block_addr, "")?
+            .into_int_value();
         let err_bb = ctx.build_positioned_new_block("mask_block_err", None, |ctx, bb| {
             let err_val = ctx.emit_custom_const(err).unwrap();
             ccg.emit_panic(ctx, err_val)?;
@@ -769,8 +774,10 @@ fn build_mask_padding1d<'c, H: HugrView<Node = Node>>(
 
     // Find the first block that contain some used bits
     let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
-    let block_addr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
-    let block = builder.build_load(block_addr, "")?.into_int_value();
+    let block_addr = unsafe { builder.build_in_bounds_gep(usize_t, mask_ptr, &[block_idx], "")? };
+    let block = builder
+        .build_load(usize_t, block_addr, "")?
+        .into_int_value();
 
     let all_ones = usize_t.const_all_ones();
     let one = usize_t.const_int(1, false);
@@ -965,7 +972,10 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
 
     let (body_start_block, body_end_block, val) =
         ctx.build_positioned_new_block("", Some(exit_block), |ctx, body_start_bb| {
-            let idx = ctx.builder().build_load(idx_ptr, "")?.into_int_value();
+            let idx = ctx
+                .builder()
+                .build_load(idx_ty, idx_ptr, "")?
+                .into_int_value();
             let val = go(ctx, idx)?;
             let builder = ctx.builder();
             let body_end_bb = builder.get_insert_block().unwrap();
@@ -977,7 +987,7 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
 
     let head_block = ctx.build_positioned_new_block("", Some(body_start_block), |ctx, bb| {
         let builder = ctx.builder();
-        let idx = builder.build_load(idx_ptr, "")?.into_int_value();
+        let idx = builder.build_load(idx_ty, idx_ptr, "")?.into_int_value();
         let cmp = builder.build_int_compare(IntPredicate::ULT, idx, iters, "")?;
         builder.build_conditional_branch(cmp, body_start_block, exit_block)?;
         Ok(bb)
@@ -1004,7 +1014,10 @@ pub fn emit_barray_value<'c, H: HugrView<Node = Node>>(
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
         let idx = ts.iw_context().i32_type().const_int(i as u64, true);
-        let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(elem_ptr, &[idx], "")? };
+        let elem_addr = unsafe {
+            ctx.builder()
+                .build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")?
+        };
         ctx.builder().build_store(elem_addr, llvm_v)?;
     }
     Ok(array_v.into())
@@ -1038,7 +1051,10 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
             let usize_t = usize_ty(&ctx.typing_session());
             for (i, v) in inputs.into_iter().enumerate() {
                 let idx = usize_t.const_int(i as u64, true);
-                let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(elem_ptr, &[idx], "")? };
+                let elem_addr = unsafe {
+                    ctx.builder()
+                        .build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")?
+                };
                 ctx.builder().build_store(elem_addr, v)?;
             }
             outputs.finish(ctx.builder(), [array_v.into()])
@@ -1061,9 +1077,11 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     .builder()
                     .build_int_add(offset, usize_t.const_int(i, false), "")?;
                 MaskCheck::CheckNotBorrowed.emit(ccg, ctx, mask_ptr, idx)?;
-                let elem_addr =
-                    unsafe { ctx.builder().build_in_bounds_gep(elems_ptr, &[idx], "")? };
-                let elem_v = ctx.builder().build_load(elem_addr, "")?;
+                let elem_addr = unsafe {
+                    ctx.builder()
+                        .build_in_bounds_gep(elem_ty, elems_ptr, &[idx], "")?
+                };
+                let elem_v = ctx.builder().build_load(elem_ty, elem_addr, "")?;
                 result.push(elem_v);
             }
 
@@ -1105,8 +1123,8 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     MaskCheck::CheckNotBorrowed.emit(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
-                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
-                    let elem_v = builder.build_load(elem_addr, "")?;
+                        unsafe { builder.build_in_bounds_gep(elem_ty, elems_ptr, &[index_v], "")? };
+                    let elem_v = builder.build_load(elem_ty, elem_addr, "")?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into(), array_v])?;
                     builder.build_unconditional_branch(exit_block)?;
@@ -1171,8 +1189,8 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     MaskCheck::CheckNotBorrowed.emit(ccg, ctx, mask_ptr, index_v)?;
                     let builder = ctx.builder();
                     let elem_addr =
-                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index_v], "")? };
-                    let elem_v = builder.build_load(elem_addr, "")?;
+                        unsafe { builder.build_in_bounds_gep(elem_ty, elems_ptr, &[index_v], "")? };
+                    let elem_v = builder.build_load(elem_ty, elem_addr, "")?;
                     builder.build_store(elem_addr, value_v)?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v, array_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into()])?;
@@ -1248,12 +1266,14 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                     MaskCheck::CheckNotBorrowed.emit(ccg, ctx, mask_ptr, index1_v)?;
                     MaskCheck::CheckNotBorrowed.emit(ccg, ctx, mask_ptr, index2_v)?;
                     let builder = ctx.builder();
-                    let elem1_addr =
-                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index1_v], "")? };
-                    let elem1_v = builder.build_load(elem1_addr, "")?;
-                    let elem2_addr =
-                        unsafe { builder.build_in_bounds_gep(elems_ptr, &[index2_v], "")? };
-                    let elem2_v = builder.build_load(elem2_addr, "")?;
+                    let elem1_addr = unsafe {
+                        builder.build_in_bounds_gep(elem_ty, elems_ptr, &[index1_v], "")?
+                    };
+                    let elem1_v = builder.build_load(elem_ty, elem1_addr, "")?;
+                    let elem2_addr = unsafe {
+                        builder.build_in_bounds_gep(elem_ty, elems_ptr, &[index2_v], "")?
+                    };
+                    let elem2_v = builder.build_load(elem_ty, elem2_addr, "")?;
                     builder.build_store(elem1_addr, elem2_v)?;
                     builder.build_store(elem2_addr, elem1_v)?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![array_v])?;
@@ -1353,7 +1373,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     let (other_ptr, other_array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let src_ptr = unsafe {
         ctx.builder()
-            .build_in_bounds_gep(elems_ptr, &[offset], "")?
+            .build_in_bounds_gep(elem_ty, elems_ptr, &[offset], "")?
     };
     let length = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let size_value = ctx
@@ -1413,11 +1433,12 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     let fp = decompose_barray_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         elem_ty.clone(),
-        borrow_array_type(size.saturating_add_signed(-1), elem_ty),
+        borrow_array_type(size.saturating_add_signed(-1), elem_ty.clone()),
     ]))?;
     if size == 0 {
         return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());
     }
+    let elem_llvm_ty = ts.llvm_type(&elem_ty)?;
     let (elem_ptr, new_array_offset) = {
         if pop_left {
             let new_array_offset = builder.build_int_add(
@@ -1428,20 +1449,24 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
             MaskCheck::CheckNotBorrowed.emit(ccg, ctx, fp.mask_ptr, fp.offset)?;
             let elem_ptr = unsafe {
                 ctx.builder()
-                    .build_in_bounds_gep(fp.elems_ptr, &[fp.offset], "")
-            }?;
+                    .build_in_bounds_gep(elem_llvm_ty, fp.elems_ptr, &[fp.offset], "")?
+            };
             (elem_ptr, new_array_offset)
         } else {
             let idx =
                 builder.build_int_add(fp.offset, usize_ty(&ts).const_int(size - 1, false), "")?;
             MaskCheck::CheckNotBorrowed.emit(ccg, ctx, fp.mask_ptr, idx)?;
-            let elem_ptr = unsafe { ctx.builder().build_in_bounds_gep(fp.elems_ptr, &[idx], "") }?;
+            let elem_ptr = unsafe {
+                ctx.builder()
+                    .build_in_bounds_gep(elem_llvm_ty, fp.elems_ptr, &[idx], "")?
+            };
             (elem_ptr, fp.offset)
         }
     };
-    let elem_v = ctx.builder().build_load(elem_ptr, "")?;
+    let elem_v = ctx.builder().build_load(elem_llvm_ty, elem_ptr, "")?;
     let new_array_v = build_barray_fat_pointer(
         ctx,
+        elem_llvm_ty,
         BArrayFatPtrComponents {
             offset: new_array_offset,
             ..fp
@@ -1463,16 +1488,16 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
     let (ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
+    let repeat_fn_ty = elem_ty.fn_type(&[], false);
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("BArrayOpDef::repeat expects a function pointer"))?;
-        let v = builder
-            .build_call(func_ptr, &[], "")?
+        let func_ptr = func.into_pointer_value();
+        let call = builder.build_indirect_call(repeat_fn_ty, func_ptr, &[], "")?;
+        let v = call
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("BArrayOpDef::repeat function must return a value"))?;
-        let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
+        let elem_addr = unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
         Ok(())
     })?;
@@ -1497,6 +1522,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     } = decompose_barray_fat_pointer(ctx.builder(), src_array_v.into())?;
     build_none_borrowed_check(ccg, ctx, src_mask_ptr, src_offset, op.size)?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
+    let src_elem_ty = ctx.llvm_type(&op.src_ty)?;
     // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
     // from `src` instead of allocating a fresh array
     let (tgt_ptr, tgt_array_v) = build_barray_alloc(ctx, ccg, tgt_elem_ty, op.size, false)?;
@@ -1515,20 +1541,35 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         builder.build_store(*ptr, *initial_val)?;
     }
 
+    let ret_struct_ty = ctx.iw_context().struct_type(
+        std::iter::once(tgt_elem_ty)
+            .chain(acc_tys.iter().copied())
+            .collect::<Vec<_>>()
+            .as_slice(),
+        false,
+    );
+    let scan_fn_ty = ret_struct_ty.fn_type(
+        std::iter::once(src_elem_ty.into())
+            .chain(acc_tys.iter().map(|t| (*t).into()))
+            .collect::<Vec<_>>()
+            .as_slice(),
+        false,
+    );
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("BArrayOpDef::scan expects a function pointer"))?;
+        let func_ptr = func.into_pointer_value();
         let src_idx = builder.build_int_add(idx, src_offset, "")?;
-        let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[src_idx], "")? };
-        let src_elem = builder.build_load(src_elem_addr, "")?;
-        let mut args = vec![src_elem.into()];
-        for ptr in &acc_ptrs {
-            args.push(builder.build_load(*ptr, "")?.into());
+        let src_elem_addr =
+            unsafe { builder.build_in_bounds_gep(src_elem_ty, src_ptr, &[src_idx], "")? };
+        let src_elem = builder.build_load(src_elem_ty, src_elem_addr, "")?;
+        let mut args: Vec<_> = vec![src_elem.into()];
+        for (i, ptr) in acc_ptrs.iter().enumerate() {
+            args.push(builder.build_load(acc_tys[i], *ptr, "")?.into());
         }
-        let call = builder.build_call(func_ptr, args.as_slice(), "")?;
+        let call = builder.build_indirect_call(scan_fn_ty, func_ptr, args.as_slice(), "")?;
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
-        let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ptr, &[idx], "")? };
+        let tgt_elem_addr =
+            unsafe { builder.build_in_bounds_gep(tgt_elem_ty, tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;
         for (ptr, next_act) in acc_ptrs.iter().zip(call_results[1..].iter()) {
             builder.build_store(*ptr, *next_act)?;
@@ -1541,7 +1582,8 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let builder = ctx.builder();
     let final_accs = acc_ptrs
         .into_iter()
-        .map(|ptr| builder.build_load(ptr, ""))
+        .enumerate()
+        .map(|(i, ptr)| builder.build_load(acc_tys[i], ptr, ""))
         .try_collect()?;
     Ok((tgt_array_v.into(), final_accs))
 }
@@ -1576,9 +1618,11 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
             MaskCheck::Borrow.emit(ccg, ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
-            let elem_addr =
-                unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
-            let elem_v = builder.build_load(elem_addr, "")?;
+            let llvm_elem_ty = ctx.llvm_type(hugr_elem_ty)?;
+            let elem_addr = unsafe {
+                builder.build_in_bounds_gep(llvm_elem_ty, elems_ptr, &[offset_index_v], "")?
+            };
+            let elem_v = builder.build_load(llvm_elem_ty, elem_addr, "")?;
             outputs.finish(builder, [array_v, elem_v])
         }
         BArrayUnsafeOpDef::r#return => {
@@ -1595,8 +1639,10 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
             MaskCheck::Return.emit(ccg, ctx, mask_ptr, offset_index_v)?;
             let builder = ctx.builder();
-            let elem_addr =
-                unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
+            let llvm_elem_ty = ctx.llvm_type(hugr_elem_ty)?;
+            let elem_addr = unsafe {
+                builder.build_in_bounds_gep(llvm_elem_ty, elems_ptr, &[offset_index_v], "")?
+            };
             builder.build_store(elem_addr, elem_v)?;
             outputs.finish(builder, [array_v])
         }
@@ -1650,7 +1696,8 @@ pub fn emit_to_array_op<'c, H: HugrView<Node = Node>>(
         offset,
     } = decompose_barray_fat_pointer(ctx.builder(), barray_v)?;
     build_none_borrowed_check(ccg, ctx, mask_ptr, offset, op.size)?;
-    Ok(build_array_fat_pointer(ctx, elems_ptr, offset)?.into())
+    let elem_ty = ctx.llvm_type(&op.elem_ty)?;
+    Ok(build_array_fat_pointer(ctx, elem_ty, elems_ptr, offset)?.into())
 }
 
 /// Emits an [`BArrayFromArray`] op.
@@ -1672,8 +1719,10 @@ pub fn emit_from_array_op<'c, H: HugrView<Node = Node>>(
     let mask_blocks = builder.build_int_add(mask_blocks, usize_t.const_int(1, false), "")?;
     let (mask_ptr, mask_size) = alloc_typed_array(ccg, ctx, usize_t.into(), mask_blocks)?;
     fill_mask(ctx, mask_ptr, mask_size, false)?;
+    let elem_ty = ctx.llvm_type(&op.elem_ty)?;
     Ok(build_barray_fat_pointer(
         ctx,
+        elem_ty,
         BArrayFatPtrComponents {
             elems_ptr: ptr,
             mask_ptr,

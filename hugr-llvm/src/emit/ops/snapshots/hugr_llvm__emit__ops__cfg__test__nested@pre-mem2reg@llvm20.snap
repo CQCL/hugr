@@ -1,0 +1,158 @@
+---
+source: hugr-llvm/src/emit/ops/cfg.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private i1 @_hl.main.1(i2 %0, i1 %1) {
+alloca_block:
+  %"0" = alloca i1, align 1
+  %"5_0" = alloca {}, align 8
+  %"2_0" = alloca i2, align 1
+  %"2_1" = alloca i1, align 1
+  %"6_0" = alloca i1, align 1
+  %"9_0" = alloca i2, align 1
+  %"9_1" = alloca i1, align 1
+  %"03" = alloca i1, align 1
+  %"11_0" = alloca i1, align 1
+  %"06" = alloca i1, align 1
+  %"20_0" = alloca i1, align 1
+  %"25_0" = alloca i1, align 1
+  %"39_0" = alloca i1, align 1
+  %"44_0" = alloca i1, align 1
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store {} undef, ptr %"5_0", align 1
+  store i2 %0, ptr %"2_0", align 1
+  store i1 %1, ptr %"2_1", align 1
+  %"2_01" = load i2, ptr %"2_0", align 1
+  %"2_12" = load i1, ptr %"2_1", align 1
+  store i2 %"2_01", ptr %"9_0", align 1
+  store i1 %"2_12", ptr %"9_1", align 1
+  br label %2
+
+2:                                                ; preds = %entry_block
+  %"9_04" = load i2, ptr %"9_0", align 1
+  %"9_15" = load i1, ptr %"9_1", align 1
+  store i2 %"9_04", ptr %"9_0", align 1
+  store i1 %"9_15", ptr %"9_1", align 1
+  br label %8
+
+3:                                                ; preds = %19
+  store i1 true, ptr %"39_0", align 1
+  %"5_025" = load {}, ptr %"5_0", align 1
+  %"39_026" = load i1, ptr %"39_0", align 1
+  store {} %"5_025", ptr %"5_0", align 1
+  store i1 %"39_026", ptr %"39_0", align 1
+  %"5_027" = load {}, ptr %"5_0", align 1
+  %"39_028" = load i1, ptr %"39_0", align 1
+  switch i1 false, label %4 [
+  ]
+
+4:                                                ; preds = %3
+  store i1 %"39_028", ptr %"03", align 1
+  br label %7
+
+5:                                                ; preds = %20
+  store i1 false, ptr %"44_0", align 1
+  %"5_029" = load {}, ptr %"5_0", align 1
+  %"44_030" = load i1, ptr %"44_0", align 1
+  store {} %"5_029", ptr %"5_0", align 1
+  store i1 %"44_030", ptr %"44_0", align 1
+  %"5_031" = load {}, ptr %"5_0", align 1
+  %"44_032" = load i1, ptr %"44_0", align 1
+  switch i1 false, label %6 [
+  ]
+
+6:                                                ; preds = %5
+  store i1 %"44_032", ptr %"03", align 1
+  br label %7
+
+7:                                                ; preds = %6, %4
+  %"024" = load i1, ptr %"03", align 1
+  store i1 %"024", ptr %"6_0", align 1
+  %"6_033" = load i1, ptr %"6_0", align 1
+  store i1 %"6_033", ptr %"0", align 1
+  %"034" = load i1, ptr %"0", align 1
+  ret i1 %"034"
+
+8:                                                ; preds = %2
+  %"9_07" = load i2, ptr %"9_0", align 1
+  store i2 %"9_07", ptr %"9_0", align 1
+  %"9_08" = load i2, ptr %"9_0", align 1
+  switch i2 %"9_08", label %9 [
+    i2 1, label %10
+    i2 -2, label %11
+  ]
+
+9:                                                ; preds = %8
+  br label %12
+
+10:                                               ; preds = %8
+  br label %14
+
+11:                                               ; preds = %8
+  br label %16
+
+12:                                               ; preds = %9
+  store i1 true, ptr %"20_0", align 1
+  %"5_010" = load {}, ptr %"5_0", align 1
+  %"20_011" = load i1, ptr %"20_0", align 1
+  store {} %"5_010", ptr %"5_0", align 1
+  store i1 %"20_011", ptr %"20_0", align 1
+  %"5_012" = load {}, ptr %"5_0", align 1
+  %"20_013" = load i1, ptr %"20_0", align 1
+  switch i1 false, label %13 [
+  ]
+
+13:                                               ; preds = %12
+  store i1 %"20_013", ptr %"06", align 1
+  br label %18
+
+14:                                               ; preds = %10
+  store i1 false, ptr %"25_0", align 1
+  %"5_014" = load {}, ptr %"5_0", align 1
+  %"25_015" = load i1, ptr %"25_0", align 1
+  store {} %"5_014", ptr %"5_0", align 1
+  store i1 %"25_015", ptr %"25_0", align 1
+  %"5_016" = load {}, ptr %"5_0", align 1
+  %"25_017" = load i1, ptr %"25_0", align 1
+  switch i1 false, label %15 [
+  ]
+
+15:                                               ; preds = %14
+  store i1 %"25_017", ptr %"06", align 1
+  br label %18
+
+16:                                               ; preds = %11
+  %"5_018" = load {}, ptr %"5_0", align 1
+  %"9_119" = load i1, ptr %"9_1", align 1
+  store {} %"5_018", ptr %"5_0", align 1
+  store i1 %"9_119", ptr %"9_1", align 1
+  %"5_020" = load {}, ptr %"5_0", align 1
+  %"9_121" = load i1, ptr %"9_1", align 1
+  switch i1 false, label %17 [
+  ]
+
+17:                                               ; preds = %16
+  store i1 %"9_121", ptr %"06", align 1
+  br label %18
+
+18:                                               ; preds = %17, %15, %13
+  %"09" = load i1, ptr %"06", align 1
+  store i1 %"09", ptr %"11_0", align 1
+  %"11_022" = load i1, ptr %"11_0", align 1
+  store i1 %"11_022", ptr %"11_0", align 1
+  %"11_023" = load i1, ptr %"11_0", align 1
+  switch i1 %"11_023", label %19 [
+    i1 true, label %20
+  ]
+
+19:                                               ; preds = %18
+  br label %3
+
+20:                                               ; preds = %18
+  br label %5
+}

@@ -1,0 +1,23 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [14 x i8] c"Hello, world!\00", align 1
+@prelude.print_template = private unnamed_addr constant [4 x i8] c"%s\0A\00", align 1
+
+define private void @_hl.main.1() {
+alloca_block:
+  %"5_0" = alloca ptr, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store ptr @0, ptr %"5_0", align 8
+  %"5_01" = load ptr, ptr %"5_0", align 8
+  %0 = call i32 (ptr, ...) @printf(ptr @prelude.print_template, ptr %"5_01")
+  ret void
+}
+
+declare i32 @printf(ptr, ...)

@@ -1,0 +1,31 @@
+---
+source: hugr-llvm/src/extension/prelude.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@0 = private unnamed_addr constant [7 x i8] c"Error!\00", align 1
+
+define private { i32, ptr } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { i32, ptr }, align 8
+  %"7_0" = alloca ptr, align 8
+  %"5_0" = alloca i64, align 8
+  %"8_0" = alloca { i32, ptr }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store ptr @0, ptr %"7_0", align 8
+  store i64 100, ptr %"5_0", align 4
+  %"5_01" = load i64, ptr %"5_0", align 4
+  %"7_02" = load ptr, ptr %"7_0", align 8
+  %0 = trunc i64 %"5_01" to i32
+  %1 = insertvalue { i32, ptr } undef, i32 %0, 0
+  %2 = insertvalue { i32, ptr } %1, ptr %"7_02", 1
+  store { i32, ptr } %2, ptr %"8_0", align 8
+  %"8_03" = load { i32, ptr }, ptr %"8_0", align 8
+  store { i32, ptr } %"8_03", ptr %"0", align 8
+  %"04" = load { i32, ptr }, ptr %"0", align 8
+  ret { i32, ptr } %"04"
+}

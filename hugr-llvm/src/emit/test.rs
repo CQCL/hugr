@@ -256,7 +256,7 @@ fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
     let global = get_global_buffer(name, size, ctx.get_current_module());
     let ptr = ctx.builder().build_bit_cast(
         global.as_pointer_value(),
-        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
+        ctx.iw_context().ptr_type(AddressSpace::default()),
         "",
     )?;
     Ok(ptr.into_pointer_value())
@@ -274,7 +274,7 @@ impl PreludeCodegen for PanicTestPreludeCodegen {
     ) -> Result<()> {
         // Emit a `panic_exit(jmp_buf, msg_buf, msg, msg_buf_len)` runtime call
         let usize_ty = self.usize_type(&ctx.typing_session());
-        let i8_ptr_ty = ctx.iw_context().i8_type().ptr_type(AddressSpace::default());
+        let i8_ptr_ty = ctx.iw_context().ptr_type(AddressSpace::default());
         let sig = ctx.iw_context().void_type().fn_type(
             &[
                 i8_ptr_ty.into(),
@@ -351,12 +351,32 @@ macro_rules! check_emission {
 
         emission.verify().unwrap();
 
-        emission.opt(|| {
-            let pb = $crate::emit::test::inkwell::passes::PassManager::create(());
-            pb.add_promote_memory_to_register_pass();
-            pb
-        });
+        // Initialize LLVM targets before using them
+        use $crate::emit::test::inkwell::targets::*;
+        Target::initialize_native(&InitializationConfig::default())
+            .expect("Failed to initialize native target");
 
+        let triple = TargetMachine::get_default_triple();
+        let target = Target::from_triple(&triple).unwrap();
+        let machine = target
+            .create_target_machine(
+                &triple,
+                &TargetMachine::get_host_cpu_name().to_str().unwrap(),
+                &TargetMachine::get_host_cpu_features().to_str().unwrap(),
+                $crate::emit::test::inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .unwrap();
+        // use new pass manager when available in inkwell
+        emission
+            .module()
+            .run_passes(
+                "mem2reg",
+                &machine,
+                $crate::emit::test::inkwell::passes::PassBuilderOptions::create(),
+            )
+            .unwrap();
         let mod_str = emission.module().to_string();
         if $snapshot_name == "" {
             $crate::emit::test::insta::assert_snapshot!(mod_str)

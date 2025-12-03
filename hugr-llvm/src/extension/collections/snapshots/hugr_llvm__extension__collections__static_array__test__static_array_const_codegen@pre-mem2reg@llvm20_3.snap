@@ -1,0 +1,22 @@
+---
+source: hugr-llvm/src/extension/collections/static_array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+@sa.d.eee08a59.0 = constant { i64, [10 x { i1, i64 }] } { i64 10, [10 x { i1, i64 }] [{ i1, i64 } { i1 true, i64 0 }, { i1, i64 } { i1 true, i64 1 }, { i1, i64 } { i1 true, i64 2 }, { i1, i64 } { i1 true, i64 3 }, { i1, i64 } { i1 true, i64 4 }, { i1, i64 } { i1 true, i64 5 }, { i1, i64 } { i1 true, i64 6 }, { i1, i64 } { i1 true, i64 7 }, { i1, i64 } { i1 true, i64 8 }, { i1, i64 } { i1 true, i64 9 }] }
+
+define private ptr @_hl.main.1() {
+alloca_block:
+  %"0" = alloca ptr, align 8
+  %"5_0" = alloca ptr, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  store ptr @sa.d.eee08a59.0, ptr %"5_0", align 8
+  %"5_01" = load ptr, ptr %"5_0", align 8
+  store ptr %"5_01", ptr %"0", align 8
+  %"02" = load ptr, ptr %"0", align 8
+  ret ptr %"02"
+}

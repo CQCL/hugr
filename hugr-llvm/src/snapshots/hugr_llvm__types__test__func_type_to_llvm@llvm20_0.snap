@@ -1,0 +1,5 @@
+---
+source: hugr-llvm/src/types.rs
+expression: "[Bool] -> []"
+---
+"void (i1)"
