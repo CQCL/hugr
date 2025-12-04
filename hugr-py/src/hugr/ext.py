@@ -37,7 +37,7 @@ class ExplicitBound:
 
     Examples:
         >>> ExplicitBound(tys.TypeBound.Copyable)
-        ExplicitBound(bound=<TypeBound.Copyable: 'C'>)
+        ExplicitBound(bound=TypeBound.Copyable)
     """
 
     bound: tys.TypeBound

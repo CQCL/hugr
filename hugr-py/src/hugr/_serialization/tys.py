@@ -441,6 +441,9 @@ class TypeBound(Enum):
             case TypeBound.Linear:
                 return "Linear"
 
+    def __repr__(self) -> str:
+        return f"TypeBound.{self}"
+
 
 class Opaque(BaseType):
     """An opaque Type that can be downcasted by the extensions that define it."""
