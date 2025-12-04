@@ -67,9 +67,9 @@ class Type(Protocol):
 
         Example:
             >>> Tuple(Bool, Bool).type_bound()
-            <TypeBound.Copyable: 'C'>
+            TypeBound.Copyable
             >>> Tuple(Qubit, Bool).type_bound()
-            <TypeBound.Linear: 'A'>
+            TypeBound.Linear
         """
         ...  # pragma: no cover
 
