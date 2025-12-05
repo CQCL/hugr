@@ -56,7 +56,7 @@ represent (typed) data or control dependencies.
   unconnected.
 - Control-flow support with ability to capture both LLVM SSACFG style
   programs and programs from future front-ends designed to target
-  HUGR. These include the [guppylang](https://github.com/CQCL/guppylang)
+  HUGR. These include the [guppylang](https://github.com/quantinuum/guppylang)
   Python eDSL for quantum-classical programming,
   and BRAT (which already uses an internal graph-like
   representation for classical functional programs and quantum
@@ -1579,7 +1579,7 @@ at the [crates.io registry](https://crates.io/crates/hugr).
 The HUGR is represented internally using structures from the `portgraph`
 crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
-implementation of this design document is [available on GitHub](https://github.com/CQCL/hugr).
+implementation of this design document is [available on GitHub](https://github.com/quantinuum/hugr).
 
 ## Standard Library
 

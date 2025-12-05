@@ -15,7 +15,7 @@ on:
 jobs:
   breaking-change-to-main:
     name: Check for breaking changes targeting main
-    uses: CQCL/hugrverse-actions/.github/workflows/breaking-change-to-main.yml@main
+    uses: quantinuum/hugrverse-actions/.github/workflows/breaking-change-to-main.yml@main
     secrets:
       GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
     with:

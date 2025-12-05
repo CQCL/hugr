@@ -45,8 +45,8 @@ docs = ["sphinx>=8.1.3,<9.0.0", "furo"]
 pytket = ["pytket >= 1.34.0"]
 
 [project.urls]
-homepage = "https://github.com/CQCL/hugr/tree/main/hugr-py"
-repository = "https://github.com/CQCL/hugr/tree/main/hugr-py"
+homepage = "https://github.com/quantinuum/hugr/tree/main/hugr-py"
+repository = "https://github.com/quantinuum/hugr/tree/main/hugr-py"
 
 [build-system]
 requires = ["maturin>=1.4,<2.0"]

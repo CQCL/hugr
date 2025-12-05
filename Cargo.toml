@@ -18,8 +18,8 @@ default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 [workspace.package]
 rust-version = "1.85"
 edition = "2024"
-homepage = "https://github.com/CQCL/hugr"
-repository = "https://github.com/CQCL/hugr"
+homepage = "https://github.com/quantinuum/hugr"
+repository = "https://github.com/quantinuum/hugr"
 license = "Apache-2.0"
 # authors
 

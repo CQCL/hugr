@@ -5,12 +5,12 @@ title: "HUGR: A Quantum-Classical Intermediate Representation"
 message: >-
   HUGR can be cited as below. For an up-to-date definition
   of the specification, see the [HUGR
-  specification](https://github.com/CQCL/hugr/blob/main/specification/hugr.md)
+  specification](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md)
 keywords:
   - quantum computing
   - compilers
-url: "https://github.com/cqcl/hugr"
-repository-code: "https://github.com/cqcl/hugr"
+url: "https://github.com/quantinuum/hugr"
+repository-code: "https://github.com/quantinuum/hugr"
 license: Apache-2.0
 date-released: 2024-01-15
 
@@ -22,7 +22,7 @@ preferred-citation:
   # These are the authors included in the publication.
   # This list is missing people that joined the project after the publication.
   #
-  # See <https://github.com/CQCL/hugr/graphs/contributors> for the full list of contributors.
+  # See <https://github.com/quantinuum/hugr/graphs/contributors> for the full list of contributors.
   authors:
     - family-names: "Koch"
       given-names: "Mark"
