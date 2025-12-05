@@ -12,7 +12,7 @@ on:
 
 jobs:
   coverage-trend:
-    uses: CQCL/hugrverse-actions/.github/workflows/coverage-trend.yml@main
+    uses: quantinuum/hugrverse-actions/.github/workflows/coverage-trend.yml@main
     secrets:
         CODECOV_GET_TOKEN: ${{ secrets.CODECOV_GET_TOKEN }}
 

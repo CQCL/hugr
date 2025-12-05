@@ -2,7 +2,7 @@
 
 This guide is intended to help you get started with developing HUGR.
 
-If you find any errors or omissions in this document, please [open an issue](https://github.com/CQCL/hugr/issues/new)!
+If you find any errors or omissions in this document, please [open an issue](https://github.com/quantinuum/hugr/issues/new)!
 
 ## #️⃣ Setting up the development environment
 
@@ -83,7 +83,7 @@ Run `just` to see all available commands.
 
 Any breaking change in the public Rust APIs will cause the next release to be a
 major version bump. You can check the next release version [draft release
-PR](https://github.com/CQCL/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
+PR](https://github.com/quantinuum/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
 github.
 
 Use `cargo semver-checks` to alert you of any problematic changes.
@@ -128,7 +128,7 @@ just fix python
 
 We run coverage checks on the CI. Once you submit a PR, you can review the
 line-by-line coverage report on
-[codecov](https://app.codecov.io/gh/CQCL/hugr/commits?branch=All%20branches).
+[codecov](https://app.codecov.io/gh/quantinuum/hugr/commits?branch=All%20branches).
 
 To run the coverage checks locally, first install `cargo-llvm-cov`.
 ```bash
@@ -147,7 +147,7 @@ and open it with your favourite coverage viewer. In VSCode, you can use
 
 ## 🌐 Contributing to HUGR
 
-We welcome contributions to HUGR! Please open [an issue](https://github.com/CQCL/hugr/issues/new) or [pull request](https://github.com/CQCL/hugr/compare) if you have any questions or suggestions.
+We welcome contributions to HUGR! Please open [an issue](https://github.com/quantinuum/hugr/issues/new) or [pull request](https://github.com/quantinuum/hugr/compare) if you have any questions or suggestions.
 
 PRs should be made against the `main` branch, and should pass all CI checks before being merged. This includes using the [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) format for the PR title.
 
@@ -247,7 +247,7 @@ the existing release PRs for examples on how to do this. Once the branch is
 ready, create a draft PR so that the release team can review it.
 
 The wheel building process and publication to PyPI is handled by the CI.
-Just create a [github release](https://github.com/CQCL/hugr/releases/new) from the **unmerged** branch.
+Just create a [github release](https://github.com/quantinuum/hugr/releases/new) from the **unmerged** branch.
 The release tag should follow the format used in the previous releases, e.g. `hugr-py-v0.1.1`.
 
 **Release-please method** Make sure the name of your branch begins `release/` so
