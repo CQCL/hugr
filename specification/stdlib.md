@@ -300,3 +300,34 @@ This extension contains the `list` type and value. Lists are dynamically sized, 
 | `set`     | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, elemty>`,  | Replace the element at the given index, and return the old value. If the index is out of bounds, return the input value as an error. |
 | `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elem_ty, ()>` | Insert an element at the given index. Elements at higher indices are shifted one position to the right. Return an error with the element if the index is out of bounds. |
 | `length`  | `list<elemty>` | `list<elemty>`, `usize` | Get the length of a list. |
+
+## Pointer Extension
+
+The `ptr` extension provides shared mutable cells. A `ptr<T>` is a linear handle
+that must be used exactly once, even when `T` is copyable. `Dup` creates another
+handle to the same cell; it does not copy the stored value. Each handle must
+ultimately be released with `Free`, which returns `Some(value)` when releasing
+the last handle and `None` otherwise. The cell may contain a linear value.
+
+Pointer handles are threaded through operations so that the operations can be
+ordered. Passing a pointer returned by one operation into the next establishes a
+dataflow dependency: the next operation waits for the first to finish. After
+`Dup`, operations on the separate handles have unspecified order unless another
+dependency orders them. Sharing the same cell does not itself establish an
+execution order.
+
+| Operation | Inputs | Outputs | Meaning |
+|-----------|--------|---------|---------|
+| `New<T>` | `T` | `ptr<T>` | Create a cell containing the input value. |
+| `Read<T>` | `ptr<T>` | `ptr<T>`, `T` | Copy the stored value. Requires copyable `T`. |
+| `Write<T>` | `ptr<T>`, `T` | `ptr<T>` | Replace and discard the old value. Requires copyable `T`. |
+| `Swap<T>` | `ptr<T>`, `T` | `ptr<T>`, `T` | Replace the stored value and return the old value. |
+| `Dup<T>` | `ptr<T>` | `ptr<T>`, `ptr<T>` | Create two handles to the same cell. |
+| `Eq<T>` | `ptr<T>`, `ptr<T>` | `ptr<T>`, `ptr<T>`, `bool` | Compare cell identity, returning both handles in input order. Does not read or compare the stored values. |
+| `Free<T>` | `ptr<T>` | `option<T>` | Release a handle and return the value if this was the last handle. |
+| `Map<T, A, B>` | `ptr<T>`, `(T, A -> T, B)`, `A` | `ptr<T>`, `B` | Apply the function to the stored value and extra inputs, store its first result, and return its remaining results. |
+
+`A` and `B` are rows of zero or more types, including linear types. `Map` preserves
+the stored value's type and must provide exclusive access to it while the callback
+runs. Operations on shared handles must not duplicate or discard a linear stored
+value. Implementations must synchronize concurrent accesses to the same cell.
