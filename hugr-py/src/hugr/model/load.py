@@ -390,7 +390,7 @@ class ModelImport:
     def import_block(self, block: model.Node, parent: Node):
         # 1. Add the DataFlowBlock node:
         match block.signature:
-            case model.Apply("core.ctrl", [ctrl_inputs, ctrl_outputs]):
+            case model.Apply("core.ctrl", [ctrl_inputs, _]):
                 pass
             case _:
                 error = f"Invalid signature for {block}."
@@ -402,32 +402,28 @@ class ModelImport:
                 error = f"DFB inputs should be singleton list: {ctrl_inputs}."
                 raise ModelImportError(error)
         assert isinstance(inputs, model.Term)
+        match block.regions:
+            case [block_region]:
+                pass
+            case _:
+                error = "DataflowBlock expects a single dataflow region."
+                raise ModelImportError(error, block)
+        signature = self.import_signature(block_region.signature)
+        match signature.output:
+            case [Sum() as sum_ty, *other_outputs]:
+                pass
+            case _:
+                error = "DataflowBlock region expects a sum as its first output type."
+                raise ModelImportError(error, block_region)
+
+        # The control signature appends shared outputs to every variant. The
+        # region signature preserves the split between the sum and shared row.
         block_node = self.add_node(
             block,
-            # TODO The translation here seems to be underdetermined. It could be
-            # DataflowBlock(
-            #     self.import_type_row(inputs),
-            #     Sum(ts),
-            #     ss,
-            # ),
-            # where the ctrl_outputs have been expressed as:
-            # [[*ts[0], *ss], [*ts[1], *ss], ...]
-            # with ss some common suffix of the lists in ctrl_outputs. But how do we
-            # decide on that common suffix? Below we take it to be empty.
-            DataflowBlock(
-                self.import_type_row(inputs),
-                Sum(
-                    [
-                        self.import_type_row(cast(model.Term, output))
-                        for output in ctrl_outputs.to_list_parts()
-                    ]
-                ),
-                [],
-            ),
+            DataflowBlock(signature.input, sum_ty, other_outputs),
             parent,
         )
         # 2. Import the dataflow region:
-        [block_region] = block.regions
         self.import_dfg_region(block_region, block_node)
 
     def import_cfg_region(
