@@ -21,7 +21,7 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--benchmark-disable --doctest-modules  --ignore=test_files"
+addopts = "--benchmark-disable --doctest-modules  --ignore=test_files --ignore=hugr-py/docs/api-docs/guide/examples"
 filterwarnings = "ignore::DeprecationWarning:lark.*"
 
 
@@ -30,6 +30,7 @@ filterwarnings = "ignore::DeprecationWarning:lark.*"
 #strict = true
 exclude = '''(?x)(
     ^test_files/  # Test files
+    | ^hugr-py/docs/api-docs/guide/examples/  # checked separately with tket/tket-exts installed
 )'''
 
 [tool.coverage.report]

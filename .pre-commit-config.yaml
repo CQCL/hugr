@@ -104,3 +104,17 @@ repos:
         language: system
         files: \.py$
         pass_filenames: false
+      - id: guide-examples-run
+        name: guide examples
+        description: Run the guide code examples with tket/tket-exts dependencies.
+        entry: bash -c 'for f in "$@"; do uv run --with tket --with tket-exts python "$f"; done' --
+        language: system
+        files: ^hugr-py/docs/api-docs/guide/examples/.*\.py$
+        pass_filenames: true
+      - id: guide-examples-mypy
+        name: guide examples mypy
+        description: Check the guide code examples with mypy, with the optional tket/tket-exts packages.
+        entry: uv run --with tket --with tket-exts mypy
+        language: system
+        files: ^hugr-py/docs/api-docs/guide/examples/.*\.py$
+        pass_filenames: true

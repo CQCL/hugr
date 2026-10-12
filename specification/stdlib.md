@@ -196,7 +196,7 @@ implementation-dependent.
 
 ### `arithmetic.math`
 
-This extension provides math operations on `arithmetic.float.types.float64`. All 
+This extension provides math operations on `arithmetic.float.types.float64`. All
 angles, including the results of inverse trigonometric operations, are in radians.
 
 | Name    | Inputs               | Outputs   | Meaning                                                                                                                                   |
