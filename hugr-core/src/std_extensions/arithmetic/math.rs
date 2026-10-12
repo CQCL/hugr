@@ -51,6 +51,11 @@ pub enum MathOps {
     /// Base-ten logarithm.
     log10,
     /// First input raised to the power of the second input.
+    ///
+    /// `pow` has the same LLVM lowering as `fpow` in the float extension. `pow` is
+    /// most appropriate to exist in the math extension, but `fpow` is retained in
+    /// the float extension to avoid unexpected breakages. They should be combined in
+    /// any future refactor.
     pow,
     /// Remainder of the first input divided by the second, truncating toward zero.
     fmod,
