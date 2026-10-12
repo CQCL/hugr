@@ -125,7 +125,7 @@ circ.track_wires([q0, q1])
 
 ![](images/basic3.svg)
 
-You can find the full example code [here](code/example-basic.py).
+You can find the full example code [here](code/example_basic.py).
 
 ## Adding control flow around dynamic measurements
 
@@ -162,6 +162,9 @@ circ.set_outputs(if_.conditional_node[0])
 Using `with` blocks is a useful way of keeping track of the hierarchy, as each block represents a new subgraph inside a node in the dataflow graph, visualized here as new regions:
 
 ![](images/control-flow1.svg)
+
+
+You can find the full example code [here](code/example_control_flow1.py).
 
 ### Loops
 
@@ -222,7 +225,7 @@ circ.set_outputs(*loop.outputs())
 
 ![](images/control-flow2.svg)
 
-You can find the full example code [here](code/example-control-flow2.py).
+You can find the full example code [here](code/example_control_flow2.py).
 
 ## Generalizing through functions and polymorphism
 
@@ -264,6 +267,8 @@ flipped = if_.call(correct.parent_node, if_.input_node[0])
 ![](images/functions1.svg)
 
 We can use this same pattern to define more complicated and useful preparation and correction gadgets in those functions.
+
+You can find the full example code [here](code/example_functions1.py).
 
 ### Polymorphism
 
@@ -362,4 +367,4 @@ if_.set_outputs(tagged_break)
 
 ![](images/functions2.svg)
 
-You can see the full example code [here](code/example-functions2.py).
+You can find the full example code [here](code/example_functions2.py).
