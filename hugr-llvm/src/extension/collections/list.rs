@@ -251,7 +251,8 @@ fn define_list_runtime<'c, H: HugrView<Node = Node>>(
             .set_linkage(inkwell::module::Linkage::External);
     }
     let buffer = inkwell::memory_buffer::MemoryBuffer::create_from_memory_range_copy(
-        include_bytes!("list_runtime.ll"),
+        // Inkwell 0.9 requires a trailing NUL; 0.10 also accepts it.
+        concat!(include_str!("list_runtime.ll"), "\0").as_bytes(),
         "hugr list runtime",
     );
     let runtime = iwc
@@ -1245,7 +1246,7 @@ mod test {
         use std::ffi::c_void;
         let context = Context::create();
         let buffer = MemoryBuffer::create_from_memory_range_copy(
-            include_bytes!("list_runtime.ll"),
+            concat!(include_str!("list_runtime.ll"), "\0").as_bytes(),
             "list runtime",
         );
         let module = context.create_module_from_ir(buffer).unwrap();
