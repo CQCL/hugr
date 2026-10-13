@@ -27,8 +27,8 @@ entry_block:                                      ; preds = %alloca_block
   store i16 %"2_23", ptr %3, align 2, !dbg !15
   %4 = call i1 @__rt__list__set(ptr %"2_01", i64 %"2_12", ptr %3), !dbg !15
   %5 = load i16, ptr %3, align 2, !dbg !15
-  %6 = insertvalue { i1, i16 } { i1 false, i16 poison }, i16 %5, 1, !dbg !15
-  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %"2_23", 1, !dbg !15
+  %6 = insertvalue { i1, i16 } { i1 false, i16 poison }, i16 %"2_23", 1, !dbg !15
+  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %5, 1, !dbg !15
   %8 = select i1 %4, { i1, i16 } %7, { i1, i16 } %6, !dbg !15
   store ptr %"2_01", ptr %"4_0", align 8, !dbg !15
   store { i1, i16 } %8, ptr %"4_1", align 2, !dbg !15

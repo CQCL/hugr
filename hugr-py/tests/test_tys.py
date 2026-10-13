@@ -221,6 +221,8 @@ def test_list():
 
     ls = List(Bool)
     assert ls.ty == Bool
+    assert ls.type_bound() == TypeBound.Linear
+    assert List(Qubit).type_bound() == TypeBound.Linear
 
     ls = List(ty_var)
     assert ls.ty == ty_var
@@ -228,6 +230,43 @@ def test_list():
     l_val = ListVal([val.TRUE, val.FALSE], Bool)
     assert l_val.v == [val.TRUE, val.FALSE]
     assert l_val.ty == List(Bool)
+
+
+def test_list_operation_schemes():
+    from hugr.std.collections.list import EXTENSION
+    from hugr.tys import FunctionType, Option, Sum, TypeTypeParam
+
+    assert str(EXTENSION.version) == "0.2.0"
+    assert set(EXTENSION.operations) == {
+        "new",
+        "discard_empty",
+        "get",
+        "pop",
+        "push",
+        "set",
+        "insert",
+        "length",
+    }
+    for name, op in EXTENSION.operations.items():
+        poly = op.signature.poly_func
+        assert poly is not None
+        bound = TypeBound.Copyable if name == "get" else TypeBound.Linear
+        assert poly.params == [TypeTypeParam(bound)]
+        elem = Variable(0, bound)
+        ls = List(elem)
+        schemes = {
+            "new": FunctionType([], [ls]),
+            "discard_empty": FunctionType([ls], []),
+            "get": FunctionType([ls, USize()], [ls, Option(elem)]),
+            "pop": FunctionType([ls], [ls, Option(elem)]),
+            "push": FunctionType([ls, elem], [ls]),
+            "set": FunctionType([ls, USize(), elem], [ls, Sum([[elem], [elem]])]),
+            "insert": FunctionType([ls, USize(), elem], [ls, Sum([[elem], []])]),
+            "length": FunctionType([ls], [ls, USize()]),
+        }
+        # Generated schemes carry opaque list references; compare their exact
+        # serialized signatures against the resolved Python list type.
+        assert poly.body._to_serial() == schemes[name]._to_serial()
 
 
 def test_array():

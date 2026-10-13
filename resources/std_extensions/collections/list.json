@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "name": "collections.list",
   "types": {
     "List": {
@@ -11,20 +11,18 @@
           "b": "A"
         }
       ],
-      "description": "Generic dynamically sized list of type T.",
+      "description": "Linear dynamically sized list of type T.",
       "bound": {
-        "b": "FromParams",
-        "indices": [
-          0
-        ]
+        "b": "Explicit",
+        "bound": "A"
       }
     }
   },
   "operations": {
-    "get": {
+    "discard_empty": {
       "extension": "collections.list",
-      "name": "get",
-      "description": "Lookup an element in a list by index. Panics if the index is out of bounds.",
+      "name": "discard_empty",
+      "description": "Consume an empty list of arbitrary elements. Panics if nonempty.",
       "signature": {
         "params": [
           {
@@ -37,7 +35,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -50,12 +48,65 @@
                 }
               ],
               "bound": "A"
+            }
+          ],
+          "output": []
+        }
+      },
+      "binary": false
+    },
+    "get": {
+      "extension": "collections.list",
+      "name": "get",
+      "description": "Copy an element by index, returning the list and an option. Returns none out of bounds.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "C"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "collections.list",
+              "extension_version": "0.2.0",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
             },
             {
               "t": "I"
             }
           ],
           "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.list",
+              "extension_version": "0.2.0",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
             {
               "t": "Sum",
               "s": "General",
@@ -65,7 +116,7 @@
                   {
                     "t": "V",
                     "i": 0,
-                    "b": "A"
+                    "b": "C"
                   }
                 ]
               ]
@@ -78,7 +129,7 @@
     "insert": {
       "extension": "collections.list",
       "name": "insert",
-      "description": "Insert an element at index `i`. Elements at higher indices are shifted one position to the right. Panics if the index is out of bounds.",
+      "description": "Insert an element at index `i`, including the end. Returns the input element as an error if i exceeds the length.",
       "signature": {
         "params": [
           {
@@ -91,7 +142,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -118,7 +169,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -143,13 +194,7 @@
                     "b": "A"
                   }
                 ],
-                [
-                  {
-                    "t": "Sum",
-                    "s": "Unit",
-                    "size": 1
-                  }
-                ]
+                []
               ]
             }
           ]
@@ -173,7 +218,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -192,7 +237,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -208,6 +253,42 @@
             },
             {
               "t": "I"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "new": {
+      "extension": "collections.list",
+      "name": "new",
+      "description": "Create an empty list",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "collections.list",
+              "extension_version": "0.2.0",
+              "id": "List",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
             }
           ]
         }
@@ -230,7 +311,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -249,7 +330,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -298,7 +379,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -322,7 +403,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -357,7 +438,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {
@@ -384,7 +465,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "List",
               "args": [
                 {

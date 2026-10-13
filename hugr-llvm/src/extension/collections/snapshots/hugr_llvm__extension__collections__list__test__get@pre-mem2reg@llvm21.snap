@@ -5,12 +5,14 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { i1, i16 } @_hl.main.1(ptr %0, i64 %1) !dbg !3 {
+define internal { ptr, { i1, i64 } } @_hl.main.1(ptr %0, i64 %1) !dbg !3 {
 alloca_block:
-  %"0" = alloca { i1, i16 }, align 8
+  %"0" = alloca ptr, align 8
+  %"1" = alloca { i1, i64 }, align 8
   %"2_0" = alloca ptr, align 8
   %"2_1" = alloca i64, align 8
-  %"4_0" = alloca { i1, i16 }, align 8
+  %"4_0" = alloca ptr, align 8
+  %"4_1" = alloca { i1, i64 }, align 8
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
@@ -18,16 +20,23 @@ entry_block:                                      ; preds = %alloca_block
   store i64 %1, ptr %"2_1", align 4
   %"2_01" = load ptr, ptr %"2_0", align 8
   %"2_12" = load i64, ptr %"2_1", align 4
-  %2 = alloca i16, align 2, !dbg !13
-  %3 = call i1 @__rt__list__get(ptr %"2_01", i64 %"2_12", ptr %2), !dbg !13
-  %4 = load i16, ptr %2, align 2, !dbg !13
-  %5 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %4, 1, !dbg !13
-  %6 = select i1 %3, { i1, i16 } %5, { i1, i16 } { i1 false, i16 poison }, !dbg !13
-  store { i1, i16 } %6, ptr %"4_0", align 2, !dbg !13
-  %"4_03" = load { i1, i16 }, ptr %"4_0", align 2
-  store { i1, i16 } %"4_03", ptr %"0", align 2
-  %"04" = load { i1, i16 }, ptr %"0", align 2
-  ret { i1, i16 } %"04"
+  %2 = alloca i64, align 8, !dbg !14
+  store i64 0, ptr %2, align 4, !dbg !14
+  %3 = call i1 @__rt__list__get(ptr %"2_01", i64 %"2_12", ptr %2), !dbg !14
+  %4 = load i64, ptr %2, align 4, !dbg !14
+  %5 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %4, 1, !dbg !14
+  %6 = select i1 %3, { i1, i64 } %5, { i1, i64 } { i1 false, i64 poison }, !dbg !14
+  store ptr %"2_01", ptr %"4_0", align 8, !dbg !14
+  store { i1, i64 } %6, ptr %"4_1", align 4, !dbg !14
+  %"4_03" = load ptr, ptr %"4_0", align 8
+  %"4_14" = load { i1, i64 }, ptr %"4_1", align 4
+  store ptr %"4_03", ptr %"0", align 8
+  store { i1, i64 } %"4_14", ptr %"1", align 4
+  %"05" = load ptr, ptr %"0", align 8
+  %"16" = load { i1, i64 }, ptr %"1", align 4
+  %mrv = insertvalue { ptr, { i1, i64 } } poison, ptr %"05", 0
+  %mrv7 = insertvalue { ptr, { i1, i64 } } %mrv, { i1, i64 } %"16", 1
+  ret { ptr, { i1, i64 } } %mrv7
 }
 
 declare i1 @__rt__list__get(ptr, i64, ptr)
@@ -41,11 +50,12 @@ declare i1 @__rt__list__get(ptr, i64, ptr)
 !3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
-!6 = !{!7, !11, !12}
-!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i16 }", file: !2, size: 16, align: 8, elements: !8)
+!6 = !{!7, !9, !13}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, { i1, i64 } }", file: !2, size: 128, align: 8, elements: !8)
 !8 = !{!9, !10}
-!9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
-!10 = !DIBasicType(name: "i16", size: 16, encoding: DW_ATE_unsigned)
-!11 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
-!12 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
-!13 = !DILocation(line: 27062, column: 402, scope: !3)
+!9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i64 }", file: !2, size: 64, align: 8, elements: !11)
+!11 = !{!12, !13}
+!12 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!13 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!14 = !DILocation(line: 27062, column: 402, scope: !3)

@@ -427,13 +427,32 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
         [BasicValueEnum<'c>; N],
     ) -> Result<Option<BasicValueEnum<'c>>>,
 ) -> Result<Option<BasicValueEnum<'c>>> {
+    let arg_tys = args.map(|v| v.get_type().into());
+    let func = get_or_define_function(ctx, func_name, &arg_tys, ret_type, go)?;
+    let call_site =
+        ctx.builder()
+            .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
+    let result = call_site.try_as_basic_value().basic();
+    Ok(result)
+}
+
+/// Define an outlined function without emitting a call (for runtime callbacks).
+pub(crate) fn get_or_define_function<'c, H: HugrView<Node = Node>, const N: usize>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    func_name: &str,
+    arg_tys: &[inkwell::types::BasicMetadataTypeEnum<'c>; N],
+    ret_type: Option<BasicTypeEnum<'c>>,
+    go: impl FnOnce(
+        &mut EmitFuncContext<'c, '_, H>,
+        [BasicValueEnum<'c>; N],
+    ) -> Result<Option<BasicValueEnum<'c>>>,
+) -> Result<FunctionValue<'c>> {
     let func = match ctx.get_current_module().get_function(func_name) {
         Some(func) => func,
         None => {
-            let arg_tys = args.iter().map(|v| v.get_type().into()).collect_vec();
             let sig = match ret_type {
-                Some(ret_ty) => ret_ty.fn_type(&arg_tys, false),
-                None => ctx.iw_context().void_type().fn_type(&arg_tys, false),
+                Some(ret_ty) => ret_ty.fn_type(arg_tys, false),
+                None => ctx.iw_context().void_type().fn_type(arg_tys, false),
             };
             let func =
                 ctx.get_current_module()
@@ -466,11 +485,7 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
             func
         }
     };
-    let call_site =
-        ctx.builder()
-            .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
-    let result = call_site.try_as_basic_value().basic();
-    Ok(result)
+    Ok(func)
 }
 
 #[cfg(test)]
