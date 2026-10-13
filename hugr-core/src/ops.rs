@@ -405,6 +405,7 @@ impl OpType {
     ///
     /// See [`OpType::value_input_ports`] and [`OpType::value_output_ports`].
     #[inline]
+    #[must_use]
     pub fn value_ports(&self, dir: Direction) -> impl DoubleEndedIterator<Item = Port> {
         (0..self.value_port_count(dir)).map(move |i| Port::new(dir, i))
     }
@@ -432,6 +433,7 @@ impl OpType {
 
     /// Return the dataflow value input ports for the given direction.
     #[inline]
+    #[must_use]
     pub fn value_input_ports(&self) -> impl DoubleEndedIterator<Item = IncomingPort> {
         self.value_ports(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
@@ -439,6 +441,7 @@ impl OpType {
 
     /// Return the dataflow value output ports for the given direction.
     #[inline]
+    #[must_use]
     pub fn value_output_ports(&self) -> impl DoubleEndedIterator<Item = OutgoingPort> {
         self.value_ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
