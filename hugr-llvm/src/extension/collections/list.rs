@@ -175,7 +175,9 @@ pub trait ListCodegen: Clone {
 ///
 /// Allocation and freeing use the ListCodegen hooks (libc by default). Every
 /// failure uses the selected PreludeCodegen; discard_empty frees empty handles
-/// of arbitrary element types. The byte-copy runtime currently uses 64-bit sizes.
+/// of arbitrary element types. The byte-copy runtime uses 64-bit sizes and indices;
+/// operation boundaries convert to the registered prelude usize type. Wider
+/// indices remain out of bounds, and unrepresentable length results panic.
 #[derive(Default, Clone)]
 pub struct DefaultListCodegen;
 
@@ -375,7 +377,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                     &[
                         iwc.i64_type().const_zero().into(),
                         elem_ty.size_of().unwrap().into(),
-                        iwc.i64_type().const_int(1, false).into(),
+                        elem_ty.get_alignment().into(),
                         iwc.ptr_type(AddressSpace::default()).const_null().into(),
                     ],
                     "",
@@ -411,6 +413,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
         }
         ListOp::get => {
             let [list, idx] = args.inputs.try_into().unwrap();
+            let idx = list_runtime_index(ctx, idx.into_int_value())?;
             let out_ptr = build_alloca_i8_ptr(ctx, elem_ty, None)?;
             let ok = ctx
                 .builder()
@@ -424,6 +427,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
         }
         ListOp::set => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
+            let idx = list_runtime_index(ctx, idx.into_int_value())?;
             let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
             let ok = ctx
                 .builder()
@@ -438,6 +442,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
         }
         ListOp::insert => {
             let [list, idx, elem] = args.inputs.try_into().unwrap();
+            let idx = list_runtime_index(ctx, idx.into_int_value())?;
             let elem_ptr = build_alloca_i8_ptr(ctx, elem_ty, Some(elem))?;
             let ok = ctx
                 .builder()
@@ -462,12 +467,79 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
                 .try_as_basic_value()
                 .unwrap_basic()
                 .into_int_value();
+            let length = list_hugr_length(ctx, ccg, length)?;
             args.outputs
                 .finish(ctx.builder(), vec![list, length.into()])?;
         }
         _ => bail!("Collections: unimplemented op: {}", op.op_id()),
     }
     Ok(())
+}
+
+// The runtime ABI uses i64 independently of the configured prelude usize.
+// Saturate wider indices: high bits must not wrap an invalid index into the list.
+fn list_runtime_index<'c, H: HugrView<Node = Node>>(
+    ctx: &EmitFuncContext<'c, '_, H>,
+    index: IntValue<'c>,
+) -> Result<IntValue<'c>> {
+    let ty = ctx.iw_context().i64_type();
+    let converted = ctx
+        .builder()
+        .build_int_cast_sign_flag(index, ty, false, "")?;
+    if index.get_type().get_bit_width() <= 64 {
+        return Ok(converted);
+    }
+    let restored = ctx
+        .builder()
+        .build_int_z_extend(converted, index.get_type(), "")?;
+    let fits = ctx
+        .builder()
+        .build_int_compare(inkwell::IntPredicate::EQ, index, restored, "")?;
+    Ok(ctx
+        .builder()
+        .build_select(fits, converted, ty.const_int(u64::MAX, false), "")?
+        .into_int_value())
+}
+
+// Narrow length results only when representable, using the selected panic
+// implementation rather than silently wrapping the observable length.
+fn list_hugr_length<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    ccg: &impl ListCodegen,
+    length: IntValue<'c>,
+) -> Result<IntValue<'c>> {
+    use crate::extension::prelude::PreludeCodegen;
+    let ty = ctx
+        .llvm_type(&hugr_core::extension::prelude::usize_t())?
+        .into_int_type();
+    let converted = ctx
+        .builder()
+        .build_int_cast_sign_flag(length, ty, false, "")?;
+    if ty.get_bit_width() < 64 {
+        let restored = ctx
+            .builder()
+            .build_int_z_extend(converted, length.get_type(), "")?;
+        let fits =
+            ctx.builder()
+                .build_int_compare(inkwell::IntPredicate::EQ, length, restored, "")?;
+        let done = ctx.new_basic_block("list.length.fits", None);
+        let failure = ctx.new_basic_block("list.length.overflow", None);
+        ctx.builder()
+            .build_conditional_branch(fits, done, failure)?;
+        ctx.builder().position_at_end(failure);
+        let pcg = ccg.prelude_codegen();
+        let error = pcg.emit_const_error(
+            ctx,
+            &hugr_core::extension::prelude::ConstError::new(
+                1,
+                "List length does not fit prelude usize",
+            ),
+        )?;
+        pcg.emit_panic(ctx, error)?;
+        ctx.builder().build_unreachable()?;
+        ctx.builder().position_at_end(done);
+    }
+    Ok(converted)
 }
 
 fn emit_list_value<'c, H: HugrView<Node = Node>>(
@@ -481,7 +553,7 @@ fn emit_list_value<'c, H: HugrView<Node = Node>>(
         .i64_type()
         .const_int(val.get_contents().len() as u64, false);
     let elem_size = elem_ty.size_of().unwrap();
-    let alignment = iwc.i64_type().const_int(8, false);
+    let alignment = elem_ty.get_alignment();
     // Empty disposal needs no element destructor. Elements must be transferred
     // explicitly before discarding the emptied handle.
     let destructor = iwc.ptr_type(AddressSpace::default()).const_null();
@@ -669,6 +741,7 @@ mod test {
         #[case] initial_len: u64,
         #[case] observe_list: bool,
         #[case] expected: u64,
+        #[values(32, 64, 128)] usize_bits: u32,
     ) {
         use hugr_core::extension::prelude::{either_type, option_type};
         let hugr = SimpleHugrConfig::new()
@@ -762,11 +835,138 @@ mod test {
                 .unwrap();
                 b.finish_hugr_with_outputs([out]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| {
-            cge.add_default_prelude_extensions()
+        exec_ctx.add_extensions(move |cge| {
+            cge.add_prelude_extensions(SizedPreludeCodegen(usize_bits))
                 .add_default_list_extensions()
         });
-        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), expected);
+        match usize_bits {
+            32 => assert_eq!(exec_ctx.exec_hugr::<u32>(hugr, "main"), expected as u32),
+            64 => assert_eq!(exec_ctx.exec_hugr::<u64>(hugr, "main"), expected),
+            128 => assert_eq!(exec_ctx.exec_hugr::<u128>(hugr, "main"), expected as u128),
+            _ => unreachable!(),
+        }
+    }
+
+    // An external runtime exposes the constructor's alignment argument through
+    // length, so this exercises the call ABI without relying on the byte runtime.
+    #[derive(Clone)]
+    struct AlignmentListCodegen;
+
+    impl super::ListCodegen for AlignmentListCodegen {
+        fn define_runtime<'c, H: hugr_core::HugrView<Node = hugr_core::Node>>(
+            &self,
+            ctx: &mut crate::emit::EmitFuncContext<'c, '_, H>,
+        ) -> anyhow::Result<()> {
+            use super::ListRtFunc;
+            use crate::emit::func::get_or_define_function;
+            let iwc = ctx.iw_context();
+            let ptr = iwc.ptr_type(inkwell::AddressSpace::default());
+            get_or_define_function(
+                ctx,
+                &self.rt_func_name(ListRtFunc::New),
+                &[
+                    iwc.i64_type().into(),
+                    iwc.i64_type().into(),
+                    iwc.i64_type().into(),
+                    ptr.into(),
+                ],
+                Some(ptr.into()),
+                |ctx, [_, _, alignment, _]| {
+                    Ok(Some(
+                        ctx.builder()
+                            .build_int_to_ptr(alignment.into_int_value(), ptr, "")?
+                            .into(),
+                    ))
+                },
+            )?;
+            get_or_define_function(
+                ctx,
+                &self.rt_func_name(ListRtFunc::Length),
+                &[ptr.into()],
+                Some(iwc.i64_type().into()),
+                |ctx, [list]| {
+                    Ok(Some(
+                        ctx.builder()
+                            .build_ptr_to_int(list.into_pointer_value(), iwc.i64_type(), "")?
+                            .into(),
+                    ))
+                },
+            )?;
+            get_or_define_function(
+                ctx,
+                &self.rt_func_name(ListRtFunc::DiscardEmpty),
+                &[ptr.into()],
+                None,
+                |_, [_]| Ok(None),
+            )?;
+            Ok(())
+        }
+    }
+
+    #[rstest]
+    #[case::usize(usize_t(), 8)]
+    #[case::qubit(qb_t(), 2)]
+    #[case::unit(hugr_core::types::Type::new_tuple([]), 1)]
+    fn exec_constructor_alignment(
+        mut exec_ctx: TestContext,
+        #[case] ty: hugr_core::types::Type,
+        #[case] alignment: u64,
+        #[values(false, true)] constant: bool,
+    ) {
+        let hugr = SimpleHugrConfig::new()
+            .with_outs([usize_t()])
+            .finish(|mut b| {
+                let list = if constant {
+                    b.add_load_value(ListValue::new_empty(ty.clone()))
+                } else {
+                    b.add_dataflow_op(
+                        ListOp::new.with_type(ty.clone()).to_extension_op().unwrap(),
+                        [],
+                    )
+                    .unwrap()
+                    .out_wire(0)
+                };
+                let result = b
+                    .add_dataflow_op(
+                        ListOp::length
+                            .with_type(ty.clone())
+                            .to_extension_op()
+                            .unwrap(),
+                        [list],
+                    )
+                    .unwrap();
+                b.add_dataflow_op(
+                    ListOp::discard_empty
+                        .with_type(ty)
+                        .to_extension_op()
+                        .unwrap(),
+                    [result.out_wire(0)],
+                )
+                .unwrap();
+                b.finish_hugr_with_outputs([result.out_wire(1)]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_list_extensions(AlignmentListCodegen)
+        });
+        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), alignment);
+    }
+
+    #[derive(Clone)]
+    struct SizedPreludeCodegen(u32);
+
+    impl crate::extension::prelude::PreludeCodegen for SizedPreludeCodegen {
+        fn usize_type<'c>(
+            &self,
+            session: &crate::types::TypingSession<'c, '_>,
+        ) -> inkwell::types::IntType<'c> {
+            match self.0 {
+                32 => session.iw_context().i32_type(),
+                64 => session.iw_context().i64_type(),
+                128 => session.iw_context().i128_type(),
+                _ => unreachable!(),
+            }
+        }
     }
 
     #[derive(Clone)]
@@ -1052,6 +1252,121 @@ mod test {
     }
 
     #[rstest]
+    fn exec_narrow_length_overflow(mut exec_ctx: TestContext) {
+        use crate::emit::{EmitFuncContext, test::Emission};
+        exec_ctx.add_extensions(|cge| cge.add_prelude_extensions(SizedPreludeCodegen(32)));
+        let module_ctx = exec_ctx.get_emit_module_context();
+        let iwc = exec_ctx.iw_context();
+        let main =
+            module_ctx
+                .module()
+                .add_function("main", iwc.i64_type().fn_type(&[], false), None);
+        let mut ctx = EmitFuncContext::new(module_ctx, main).unwrap();
+        // A runtime length just beyond i32 must use the selected panic callback,
+        // rather than report an empty list by truncating it to zero.
+        super::list_hugr_length(
+            &mut ctx,
+            &ConfiguredListCodegen {
+                fail_at: 0,
+                verify_counts: false,
+            },
+            iwc.i64_type().const_int(1 << 32, false),
+        )
+        .unwrap();
+        ctx.builder()
+            .build_return(Some(&iwc.i64_type().const_zero()))
+            .unwrap();
+        let (module_ctx, _) = ctx.finish().unwrap();
+        let (module, _) = module_ctx.finish();
+        let emission = Emission::new(module);
+        emission.verify().unwrap();
+        assert_eq!(
+            emission.exec_panicking("main").unwrap(),
+            "List length does not fit prelude usize"
+        );
+    }
+
+    #[rstest]
+    #[case::first([0, 0], true)]
+    #[case::end([1, 0], false)]
+    #[case::large([0, 1], false)]
+    #[case::large_low_bits([0, u64::MAX], false)]
+    fn exec_wide_index(mut exec_ctx: TestContext, #[case] words: [u64; 2], #[case] expected: bool) {
+        use super::{ListCodegen, ListRtFunc};
+        use crate::emit::{EmitFuncContext, test::Emission};
+        exec_ctx.add_extensions(|cge| cge.add_default_prelude_extensions());
+        let module_ctx = exec_ctx.get_emit_module_context();
+        let iwc = exec_ctx.iw_context();
+        let main =
+            module_ctx
+                .module()
+                .add_function("main", iwc.i64_type().fn_type(&[], false), None);
+        let mut ctx = EmitFuncContext::new(module_ctx, main).unwrap();
+        let ccg = super::DefaultListCodegen;
+        ccg.define_runtime(&mut ctx).unwrap();
+        let new = ListRtFunc::New.get_extern(&ctx, &ccg).unwrap();
+        let list = ctx
+            .builder()
+            .build_call(
+                new,
+                &[
+                    iwc.i64_type().const_int(1, false).into(),
+                    iwc.i64_type().const_int(1, false).into(),
+                    iwc.i64_type().const_int(1, false).into(),
+                    iwc.ptr_type(inkwell::AddressSpace::default())
+                        .const_null()
+                        .into(),
+                ],
+                "",
+            )
+            .unwrap()
+            .try_as_basic_value()
+            .unwrap_basic();
+        let element = super::build_alloca_i8_ptr(
+            &mut ctx,
+            iwc.i8_type().into(),
+            Some(iwc.i8_type().const_int(42, false).into()),
+        )
+        .unwrap();
+        let push = ListRtFunc::Push.get_extern(&ctx, &ccg).unwrap();
+        ctx.builder()
+            .build_call(push, &[list.into(), element.into()], "")
+            .unwrap();
+        let index =
+            super::list_runtime_index(&ctx, iwc.i128_type().const_int_arbitrary_precision(&words))
+                .unwrap();
+        let get = ListRtFunc::Get.get_extern(&ctx, &ccg).unwrap();
+        let found = ctx
+            .builder()
+            .build_call(get, &[list.into(), index.into(), element.into()], "")
+            .unwrap()
+            .try_as_basic_value()
+            .unwrap_basic()
+            .into_int_value();
+        let pop = ListRtFunc::Pop.get_extern(&ctx, &ccg).unwrap();
+        ctx.builder()
+            .build_call(pop, &[list.into(), element.into()], "")
+            .unwrap();
+        let discard = ListRtFunc::DiscardEmpty.get_extern(&ctx, &ccg).unwrap();
+        ctx.builder()
+            .build_call(discard, &[list.into()], "")
+            .unwrap();
+        let result = ctx
+            .builder()
+            .build_int_z_extend(found, iwc.i64_type(), "")
+            .unwrap();
+        ctx.builder().build_return(Some(&result)).unwrap();
+        let (module_ctx, _) = ctx.finish().unwrap();
+        let (module, _) = module_ctx.finish();
+        let emission = Emission::new(module);
+        emission.verify().unwrap();
+        assert_eq!(
+            emission.jit_exec::<u64>("main").unwrap(),
+            u64::from(expected)
+        );
+    }
+
+    #[rstest]
     #[case::byte_size(false)]
     #[case::capacity_doubling(true)]
     fn exec_capacity_panic(mut exec_ctx: TestContext, #[case] growth: bool) {
@@ -1196,7 +1511,7 @@ mod test {
     }
 
     #[rstest]
-    fn exec_const_list(mut exec_ctx: TestContext) {
+    fn exec_const_list(mut exec_ctx: TestContext, #[values(32, 64, 128)] usize_bits: u32) {
         let hugr = SimpleHugrConfig::new()
             .with_outs([usize_t()])
             .finish(|mut b| {
@@ -1233,11 +1548,16 @@ mod test {
                 .unwrap();
                 b.finish_hugr_with_outputs([result.out_wire(1)]).unwrap()
             });
-        exec_ctx.add_extensions(|cge| {
-            cge.add_default_prelude_extensions()
+        exec_ctx.add_extensions(move |cge| {
+            cge.add_prelude_extensions(SizedPreludeCodegen(usize_bits))
                 .add_default_list_extensions()
         });
-        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), 2);
+        match usize_bits {
+            32 => assert_eq!(exec_ctx.exec_hugr::<u32>(hugr, "main"), 2),
+            64 => assert_eq!(exec_ctx.exec_hugr::<u64>(hugr, "main"), 2),
+            128 => assert_eq!(exec_ctx.exec_hugr::<u128>(hugr, "main"), 2),
+            _ => unreachable!(),
+        }
     }
 
     #[test]

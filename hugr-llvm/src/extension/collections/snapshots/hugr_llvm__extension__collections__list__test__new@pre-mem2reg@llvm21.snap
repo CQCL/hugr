@@ -12,7 +12,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = call ptr @__rt__list__new(i64 0, i64 ptrtoint (ptr getelementptr (i16, ptr null, i32 1) to i64), i64 1, ptr null), !dbg !8
+  %0 = call ptr @__rt__list__new(i64 0, i64 ptrtoint (ptr getelementptr (i16, ptr null, i32 1) to i64), i64 ptrtoint (ptr getelementptr ({ i1, i16 }, ptr null, i64 0, i32 1) to i64), ptr null), !dbg !8
   store ptr %0, ptr %"4_0", align 8, !dbg !8
   %"4_01" = load ptr, ptr %"4_0", align 8
   store ptr %"4_01", ptr %"0", align 8

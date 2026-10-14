@@ -565,6 +565,23 @@ mod test {
     }
 
     #[test]
+    fn new_folds_only_concrete_element_types() {
+        for bound in [TypeBound::Copyable, TypeBound::Linear] {
+            let var = Type::new_var_use(0, bound);
+            for ty in [var.clone(), Type::new_tuple([var.clone()]), list_type(var)] {
+                let op = ListOp::new.with_type(ty).to_extension_op().unwrap();
+                assert_eq!(op.constant_fold(&[]), None);
+            }
+        }
+        for ty in [usize_t(), qb_t(), Type::new_tuple([usize_t(), qb_t()])] {
+            let op = ListOp::new.with_type(ty.clone()).to_extension_op().unwrap();
+            let folded = op.constant_fold(&[]).unwrap();
+            assert_eq!(folded, vec![(0.into(), ListValue::new_empty(ty).into())]);
+            folded[0].1.get_type().validate(&[]).unwrap();
+        }
+    }
+
+    #[test]
     fn discard_empty_folds_only_empty_lists() {
         for ty in [usize_t(), qb_t()] {
             let op = ListOp::discard_empty

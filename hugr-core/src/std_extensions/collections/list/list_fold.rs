@@ -36,10 +36,10 @@ impl ConstFold for NewFold {
         if !inputs.is_empty() {
             return None;
         }
-        Some(vec![(
-            0.into(),
-            ListValue::new_empty(ty.clone().try_into().ok()?).into(),
-        )])
+        let ty: crate::types::Type = ty.clone().try_into().ok()?;
+        // Constants have no type-variable scope, including inside nested types.
+        ty.validate(&[]).ok()?;
+        Some(vec![(0.into(), ListValue::new_empty(ty).into())])
     }
 }
 
