@@ -21,7 +21,7 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--benchmark-disable --doctest-modules  --ignore=test_files --ignore=hugr-py/docs"
+addopts = "--benchmark-disable --doctest-modules  --ignore=test_files"
 filterwarnings = "ignore::DeprecationWarning:lark.*"
 
 
