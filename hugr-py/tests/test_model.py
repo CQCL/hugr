@@ -1,6 +1,10 @@
+import pytest
 from semver import Version
 
-from hugr import model
+from hugr import model, tys
+from hugr.build.cfg import Cfg
+from hugr.model.load import ModelImportError
+from hugr.package import Package
 
 
 def test_symbol_version_text():
@@ -58,3 +62,40 @@ def test_apply_escaped_name_text_roundtrip():
 
     assert parsed == term
     assert parsed.symbol == name
+
+
+@pytest.fixture
+def block_model() -> tuple[model.Package, model.Node]:
+    cfg = Cfg(tys.Qubit)
+    entry = cfg.add_entry()
+    entry.set_single_succ_outputs(*entry.inputs())
+    cfg.branch_exit(entry[0])
+    package = cfg.hugr.to_package().to_model()
+    function = package.modules[0].root.children[0]
+    cfg_node = function.regions[0].children[0]
+    block = cfg_node.regions[0].children[0]
+    return package, block
+
+
+@pytest.mark.parametrize("region_count", [0, 2])
+def test_block_import_requires_one_region(block_model, region_count: int):
+    package, block = block_model
+    block.regions = list(block.regions) * region_count
+    with pytest.raises(ModelImportError, match="expects a single dataflow region"):
+        Package.from_model(package)
+
+
+@pytest.mark.parametrize("outputs", [[], [tys.Qubit]])
+def test_block_import_requires_sum_output(block_model, outputs: list[tys.Type]):
+    package, block = block_model
+    block.regions[0].signature = model.Apply(
+        "core.fn",
+        [
+            model.List([tys.Qubit.to_model()]),
+            model.List([t.to_model() for t in outputs]),
+        ],
+    )
+    with pytest.raises(
+        ModelImportError, match="expects a sum as its first output type"
+    ):
+        Package.from_model(package)
