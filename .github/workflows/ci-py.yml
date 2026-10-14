@@ -66,6 +66,40 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check
 
+  # The guide code examples are excluded from the general `check`/`test` jobs since they
+  # depend on `tket`/`tket-exts` (which would be circular). They have their own uv project
+  # (hugr-py/docs/api-docs/guide/examples/python_examples) pinning those dependencies.
+  guide-examples:
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
+    name: Check guide code examples
+    runs-on: ubuntu-latest
+    env:
+      GUIDE_EXAMPLES: hugr-py/docs/api-docs/guide/examples/python_examples
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Run the guide code examples
+        run: |
+          for f in $(find "$GUIDE_EXAMPLES" -name '*.py' -not -path '*/.venv/*'); do
+            echo "::group::Running $f"
+            uv run --project "$GUIDE_EXAMPLES" "$f"
+            echo "::endgroup::"
+          done
+
+      - name: Type check the guide code examples with mypy
+        run: |
+          find "$GUIDE_EXAMPLES" -name '*.py' -not -path '*/.venv/*' -print0 \
+            | xargs -0 uv run --project "$GUIDE_EXAMPLES" --with mypy mypy
+
   test:
     needs: [changes]
     if: ${{ needs.changes.outputs.python == 'true' }}
@@ -211,7 +245,7 @@ jobs:
   # even if they are skipped due to no changes in the relevant files.
   required-checks:
     name: Required checks 🐍
-    needs: [changes, check, test, serialization-schema, extension-versions, hugr-import-tests]
+    needs: [changes, check, test, guide-examples, serialization-schema, extension-versions, hugr-import-tests]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -224,6 +258,7 @@ jobs:
           needs.changes.result == 'failure' || needs.changes.result == 'cancelled' ||
           needs.check.result == 'failure' || needs.check.result == 'cancelled' ||
           needs.test.result == 'failure' || needs.test.result == 'cancelled' ||
+          needs.guide-examples.result == 'failure' || needs.guide-examples.result == 'cancelled' ||
           needs.serialization-schema.result == 'failure' || needs.serialization-schema.result == 'cancelled' ||
           needs.extension-versions.result == 'failure' || needs.extension-versions.result == 'cancelled' ||
           needs.hugr-import-tests.result == 'failure' || needs.hugr-import-tests.result == 'cancelled'

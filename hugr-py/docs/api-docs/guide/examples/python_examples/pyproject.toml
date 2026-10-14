@@ -1,0 +1,12 @@
+[project]
+name = "hugr-guide-examples"
+version = "0"
+requires-python = ">=3.10"
+# Pinned to a current compatible release; bump alongside the guide examples.
+dependencies = ["hugr", "tket==0.15.11", "tket-exts==0.14.3"]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+hugr = { path = "../../../../..", editable = true }
