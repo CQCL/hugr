@@ -67,12 +67,15 @@ jobs:
         run: uv run ruff check
 
   # The guide code examples are excluded from the general `check`/`test` jobs since they
-  # depend on `tket`/`tket-exts` (which would be circular). Run and type-check them here instead.
+  # depend on `tket`/`tket-exts` (which would be circular). They have their own uv project
+  # (hugr-py/docs/api-docs/guide/examples/python_examples) pinning those dependencies.
   guide-examples:
     needs: changes
     if: ${{ needs.changes.outputs.python == 'true' }}
     name: Check guide code examples
     runs-on: ubuntu-latest
+    env:
+      GUIDE_EXAMPLES: hugr-py/docs/api-docs/guide/examples/python_examples
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
@@ -84,21 +87,18 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
 
-      - name: Setup dependencies.
-        run: uv sync
-
       - name: Run the guide code examples
         run: |
-          for f in $(find hugr-py/docs/api-docs/guide/examples -name '*.py'); do
+          for f in $(find "$GUIDE_EXAMPLES" -name '*.py' -not -path '*/.venv/*'); do
             echo "::group::Running $f"
-            uv run --with tket --with tket-exts python "$f"
+            uv run --project "$GUIDE_EXAMPLES" "$f"
             echo "::endgroup::"
           done
 
       - name: Type check the guide code examples with mypy
         run: |
-          find hugr-py/docs/api-docs/guide/examples -name '*.py' -print0 \
-            | xargs -0 uv run --with tket --with tket-exts mypy
+          find "$GUIDE_EXAMPLES" -name '*.py' -not -path '*/.venv/*' -print0 \
+            | xargs -0 uv run --project "$GUIDE_EXAMPLES" --with mypy mypy
 
   test:
     needs: [changes]
