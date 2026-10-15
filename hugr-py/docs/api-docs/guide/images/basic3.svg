@@ -1,0 +1,220 @@
+<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="509pt" height="558pt" viewBox="0.00 0.00 509 558">
+<g id="graph0" class="graph" transform="translate(36.81733763689556,522.8496206300879) scale(0.8913104958969703)" data-name="">
+<polygon fill="white" stroke="none" points="-4,4 -4,-554 505,-554 505,4 -4,4"/>
+<g id="clust1" class="cluster" data-name="cluster0">
+
+<polygon fill="white" stroke="#1cade4" points="8,-8 8,-542 493,-542 493,-8 8,-8"/>
+</g>
+<g id="clust2" class="cluster" data-name="cluster1">
+
+<polygon fill="white" stroke="#1cade4" points="78,-18 78,-532 483,-532 483,-18 78,-18"/>
+</g>
+<g id="clust3" class="cluster" data-name="cluster4">
+
+<polygon fill="white" stroke="#f4a261" stroke-width="2" points="241,-28 241,-522 415,-522 415,-28 241,-28"/>
+</g>
+<!-- 2 -->
+<g id="node1" class="node" pointer-events="visible" data-name="2">
+
+<polygon fill="#accbf9" stroke="none" points="191,-470.5 191,-497.5 231,-497.5 231,-470.5 191,-470.5"/>
+<text text-anchor="start" x="197.85" y="-481.1" font-family="monospace" font-weight="bold" font-size="11.00">Input</text>
+<polygon fill="none" stroke="white" points="191,-470.5 191,-497.5 231,-497.5 231,-470.5 191,-470.5"/>
+</g>
+<!-- 4 -->
+<g id="node11" class="node" pointer-events="visible" data-name="4">
+
+<polygon fill="#1cade4" stroke="none" points="308,-456 308,-512 354,-512 354,-456 308,-456"/>
+<polygon fill="white" stroke="none" points="315,-463 315,-481 330,-481 330,-463 315,-463"/>
+<polygon fill="none" stroke="#1cade4" points="315,-463 315,-481 330,-481 330,-463 315,-463"/>
+<text text-anchor="start" x="315.73" y="-495.1" font-family="monospace" font-size="11" font-weight="bold">[DFG]</text>
+<polygon fill="white" stroke="none" points="333,-463 333,-481 347,-481 347,-463 333,-463"/>
+<polygon fill="none" stroke="#1cade4" points="333,-463 333,-481 347,-481 347,-463 333,-463"/>
+<text text-anchor="start" x="320" y="-469" font-family="monospace" font-size="10.00">0</text>
+<text text-anchor="start" x="337.5" y="-469" font-family="monospace" font-size="10">1</text>
+<polygon fill="none" stroke="#f4a261" stroke-width="2" points="309,-457 309,-511 353,-511 353,-457 309,-457"/>
+</g>
+<!-- 2&#45;&gt;4 -->
+
+<!-- 2&#45;&gt;4 -->
+
+<!-- 3 -->
+<g id="node2" class="node" pointer-events="visible" data-name="3">
+
+<polygon fill="#accbf9" stroke="none" points="425,-380.5 425,-434.5 473,-434.5 473,-380.5 425,-380.5"/>
+<polygon fill="white" stroke="none" points="431,-410.5 431,-428.5 448,-428.5 448,-410.5 431,-410.5"/>
+<polygon fill="none" stroke="#1cade4" points="431,-410.5 431,-428.5 448,-428.5 448,-410.5 431,-410.5"/>
+<text text-anchor="start" x="437" y="-416.5" font-family="monospace" font-size="10.00">0</text>
+<polygon fill="white" stroke="none" points="451,-410.5 451,-428.5 467,-428.5 467,-410.5 451,-410.5"/>
+<polygon fill="none" stroke="#1cade4" points="451,-410.5 451,-428.5 467,-428.5 467,-410.5 451,-410.5"/>
+<text text-anchor="start" x="456.5" y="-416.5" font-family="monospace" font-size="10.00">1</text>
+<text text-anchor="start" x="431.88" y="-391.6" font-family="monospace" font-weight="bold" font-size="11.00">Output</text>
+<polygon fill="none" stroke="white" points="425,-380.5 425,-434.5 473,-434.5 473,-380.5 425,-380.5"/>
+</g>
+<!-- 5 -->
+<g id="node3" class="node" pointer-events="visible" data-name="5">
+
+<polygon fill="#accbf9" stroke="none" points="365,-470.5 365,-497.5 405,-497.5 405,-470.5 365,-470.5"/>
+<text text-anchor="start" x="371.85" y="-481.1" font-family="monospace" font-weight="bold" font-size="11.00">Input</text>
+<polygon fill="none" stroke="white" points="365,-470.5 365,-497.5 405,-497.5 405,-470.5 365,-470.5"/>
+</g>
+<!-- 6 -->
+<g id="node4" class="node" pointer-events="visible" data-name="6">
+
+<polygon fill="#accbf9" stroke="none" points="304,-38 304,-92 352,-92 352,-38 304,-38"/>
+<polygon fill="white" stroke="none" points="310,-68 310,-86 327,-86 327,-68 310,-68"/>
+<polygon fill="none" stroke="#1cade4" points="310,-68 310,-86 327,-86 327,-68 310,-68"/>
+<text text-anchor="start" x="316" y="-74" font-family="monospace" font-size="10.00">0</text>
+<polygon fill="white" stroke="none" points="330,-68 330,-86 346,-86 346,-68 330,-68"/>
+<polygon fill="none" stroke="#1cade4" points="330,-68 330,-86 346,-86 346,-68 330,-68"/>
+<text text-anchor="start" x="335.5" y="-74" font-family="monospace" font-size="10.00">1</text>
+<text text-anchor="start" x="310.88" y="-49.1" font-family="monospace" font-weight="bold" font-size="11.00">Output</text>
+<polygon fill="none" stroke="white" points="304,-38 304,-92 352,-92 352,-38 304,-38"/>
+</g><g id="node5" class="node" pointer-events="visible" data-name="7" data-comment="6">
+
+<polygon fill="#accbf9" stroke="none" points="251,-457 251,-511 297,-511 297,-457 251,-457"/>
+<polygon fill="white" stroke="none" points="257,-463 257,-481 291,-481 291,-463 257,-463"/>
+<polygon fill="none" stroke="#1cade4" points="257,-463 257,-481 291,-481 291,-463 257,-463"/>
+<text text-anchor="start" x="257.5" y="-495.1" font-family="monospace" font-size="11" font-weight="bold">QAlloc</text>
+<text text-anchor="start" x="271.5" y="-469" font-family="monospace" font-size="10">0</text>
+<polygon fill="none" stroke="white" points="251,-457 251,-511 297,-511 297,-457 251,-457"/>
+</g><g id="edge1" class="edge" data-name="7:out.0-&gt;9:in.0" data-comment="6">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M274,-462C274,-453.33 274,-451.17 274,-442.5" style=""/>
+<text text-anchor="middle" x="284.25" y="-444.15" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 5&#45;&gt;6 -->
+
+<!-- 5&#45;&gt;6 -->
+<g id="node6" class="node" pointer-events="visible" data-name="8" data-comment="5-&gt;6">
+
+<polygon fill="#accbf9" stroke="none" points="296,-380.5 296,-434.5 342,-434.5 342,-380.5 296,-380.5"/>
+<polygon fill="white" stroke="none" points="302,-386.5 302,-404.5 336,-404.5 336,-386.5 302,-386.5"/>
+<polygon fill="none" stroke="#1cade4" points="302,-386.5 302,-404.5 336,-404.5 336,-386.5 302,-386.5"/>
+<text text-anchor="start" x="302.5" y="-418.6" font-family="monospace" font-size="11" font-weight="bold">QAlloc</text>
+<polygon fill="none" stroke="white" points="296,-380.5 296,-434.5 342,-434.5 342,-380.5 296,-380.5"/>
+
+<text text-anchor="start" x="316.5" y="-392.5" font-family="monospace" font-size="10.00">0</text></g>
+<!-- 4&#45;&gt;3 -->
+<!-- 9 -->
+<g id="node7" class="node" pointer-events="visible" data-name="9">
+
+<polygon fill="#accbf9" stroke="none" points="261.5,-367 261.5,-448 284.5,-448 284.5,-367 261.5,-367"/>
+<polygon fill="white" stroke="none" points="268,-423.5 268,-441.5 279,-441.5 279,-423.5 268,-423.5"/>
+<polygon fill="none" stroke="#1cade4" points="268,-423.5 268,-441.5 279,-441.5 279,-423.5 268,-423.5"/>
+<text text-anchor="start" x="271" y="-429.5" font-family="monospace" font-size="10.00">0</text>
+<text text-anchor="start" x="269.22" y="-404.6" font-family="monospace" font-weight="bold" font-size="11.00">H</text>
+<polygon fill="white" stroke="none" points="268,-372.5 268,-390.5 279,-390.5 279,-372.5 268,-372.5"/>
+<polygon fill="none" stroke="#1cade4" points="268,-372.5 268,-390.5 279,-390.5 279,-372.5 268,-372.5"/>
+<text text-anchor="start" x="271" y="-378.5" font-family="monospace" font-size="10.00">0</text>
+<polygon fill="none" stroke="white" points="261.5,-367 261.5,-448 284.5,-448 284.5,-367 261.5,-367"/>
+</g><g id="edge4" class="edge" data-name="10:out.0-&gt;11:in.0" data-comment="9">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M300,-282.5C300,-274.3 296,-272.7 296,-264.5" style=""/>
+<text text-anchor="middle" x="287.75" y="-276.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 8&#45;&gt;9 -->
+<g id="node10" class="node" pointer-events="visible" data-name="12" data-comment="8-&gt;9">
+
+<polygon fill="#accbf9" stroke="none" points="284,-100 284,-181 322,-181 322,-100 284,-100" style=""/>
+<polygon fill="white" stroke="none" points="290,-156.5 290,-174.5 316,-174.5 316,-156.5 290,-156.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="290,-156.5 290,-174.5 316,-174.5 316,-156.5 290,-156.5" style=""/>
+<text text-anchor="start" x="300.5" y="-162.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="290.78" y="-137.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Read</text>
+<polygon fill="white" stroke="none" points="290,-105.5 290,-123.5 316,-123.5 316,-105.5 290,-105.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="290,-105.5 290,-123.5 316,-123.5 316,-105.5 290,-105.5" style=""/>
+<text text-anchor="start" x="300.5" y="-111.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="284,-100 284,-181 322,-181 322,-100 284,-100" style=""/>
+</g>
+<!-- 10 -->
+<g id="node8" class="node" pointer-events="visible" data-name="10">
+
+<polygon fill="#accbf9" stroke="none" points="288.5,-278 288.5,-359 325.5,-359 325.5,-278 288.5,-278"/>
+<polygon fill="white" stroke="none" points="295,-334.5 295,-352.5 306,-352.5 306,-334.5 295,-334.5"/>
+<polygon fill="none" stroke="#1cade4" points="295,-334.5 295,-352.5 306,-352.5 306,-334.5 295,-334.5"/>
+<text text-anchor="start" x="298" y="-340.5" font-family="monospace" font-size="10.00">0</text>
+<text text-anchor="start" x="312" y="-340.5" font-family="monospace" font-size="10">1</text>
+<polygon fill="white" stroke="none" points="309,-334.5 309,-352.5 320,-352.5 320,-334.5 309,-334.5"/>
+<polygon fill="none" stroke="#1cade4" points="309,-334.5 309,-352.5 320,-352.5 320,-334.5 309,-334.5"/>
+<text text-anchor="start" x="299.56" y="-315.6" font-family="monospace" font-size="11" font-weight="bold">CX</text>
+<polygon fill="white" stroke="none" points="295,-283.5 295,-301.5 306,-301.5 306,-283.5 295,-283.5"/>
+<polygon fill="none" stroke="#1cade4" points="295,-283.5 295,-301.5 306,-301.5 306,-283.5 295,-283.5" style=""/>
+<text text-anchor="start" x="298" y="-289.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="white" stroke="none" points="309,-283.5 309,-301.5 320,-301.5 320,-283.5 309,-283.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="309,-283.5 309,-301.5 320,-301.5 320,-283.5 309,-283.5" style=""/>
+<text text-anchor="start" x="312" y="-289.5" font-family="monospace" font-size="10.00" style="">1</text>
+<polygon fill="none" stroke="white" points="288.5,-278 288.5,-359 325.5,-359 325.5,-278 288.5,-278" style=""/>
+</g><g id="edge5" class="edge" data-name="11:out.0-&gt;12:in.0" data-comment="10">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M296,-193.5C296,-184.92 303,-184.08 303,-175.5" style=""/>
+<text text-anchor="middle" x="275.01" y="-176.4" font-family="monospace" font-size="9.00" style="">Measurement</text>
+</g>
+<!-- 9&#45;&gt;10 -->
+<g id="edge2" class="edge" data-name="9:out.0-&gt;10:in.0" data-comment="9-&gt;10">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M274,-371.5C274,-357.45 300,-367.55 300,-353.5"/>
+<text text-anchor="middle" x="276.75" y="-354.4" font-family="monospace" font-size="9.00">Qubit</text>
+</g><g id="edge6" class="edge" data-name="12:out.0-&gt;6:in.0" data-comment="9-&gt;10">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M303,-104.5C303,-94.26 318,-97.24 318,-87" style=""/>
+<text text-anchor="middle" x="301.75" y="-87.65" font-family="monospace" font-size="9.00" style="">Bool</text>
+</g>
+<!-- 10&#45;&gt;6 -->
+
+<!-- 4&#45;&gt;3 -->
+<g id="edge8" class="edge" data-name="4:out.0-&gt;3:in.0" data-comment="4-&gt;3">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M322,-462C322,-440.66 399.9,-460.76 417,-448 428.16,-439.67 416.08,-419.5 430,-419.5"/>
+<text text-anchor="middle" x="367.11" y="-454.98" font-family="monospace" font-size="9.00">Bool</text>
+</g><g id="edge3" class="edge" data-name="8:out.0-&gt;10:in.1" data-comment="4-&gt;3">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M319,-385.5C319,-371.17 315,-367.83 315,-353.5" style=""/>
+<text text-anchor="middle" x="306.75" y="-372.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 4&#45;&gt;3 -->
+
+<!-- 4&#45;&gt;3 -->
+<g id="edge9" class="edge" data-name="4:out.1-&gt;3:in.1" data-comment="4-&gt;3">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M348,-472C356.89,-472 352.35,-460.52 360,-456 399.22,-432.84 459,-475.05 459,-429.5"/>
+<text text-anchor="middle" x="393.19" y="-451.69" font-family="monospace" font-size="9.00">Qubit</text>
+</g>
+<!-- 1 -->
+
+<!-- 1 -->
+<g id="node12" class="node" pointer-events="visible" data-name="1">
+
+<polygon fill="#1cade4" stroke="none" points="88.5,-457 88.5,-511 179.5,-511 179.5,-457 88.5,-457"/>
+<text text-anchor="start" x="95.7" y="-495.1" font-family="monospace" font-weight="bold" font-size="11.00">FuncDefn(main)</text>
+<polygon fill="white" stroke="none" points="95,-463 95,-481 174,-481 174,-463 95,-463"/>
+<polygon fill="none" stroke="#1cade4" points="95,-463 95,-481 174,-481 174,-463 95,-463"/>
+<text text-anchor="start" x="132" y="-469" font-family="monospace" font-size="10.00">0</text>
+<polygon fill="none" stroke="#1cade4" points="88.5,-457 88.5,-511 179.5,-511 179.5,-457 88.5,-457"/>
+</g><g id="edge7" class="edge" data-name="10:out.1-&gt;6:in.1" data-comment="1">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M315,-282.5C315,-270.08 333.47,-280.57 340,-270 342.68,-265.67 338,-102.68 338,-87" style=""/>
+<text text-anchor="middle" x="350.28" y="-186.98" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 0 -->
+
+<!-- 0 -->
+<g id="node13" class="node" pointer-events="visible" data-name="0">
+
+<polygon fill="#1cade4" stroke="none" points="18,-470.5 18,-497.5 68,-497.5 68,-470.5 18,-470.5"/>
+<text text-anchor="start" x="24.97" y="-481.1" font-family="monospace" font-weight="bold" font-size="11.00">Module</text>
+<polygon fill="none" stroke="#1cade4" points="18,-470.5 18,-497.5 68,-497.5 68,-470.5 18,-470.5"/>
+</g><g id="node9" class="node" pointer-events="visible" data-name="11" data-comment="0">
+
+<polygon fill="#accbf9" stroke="none" points="258,-189 258,-270 334,-270 334,-189 258,-189" style=""/>
+<polygon fill="white" stroke="none" points="264,-245.5 264,-263.5 328,-263.5 328,-245.5 264,-245.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="264,-245.5 264,-263.5 328,-263.5 328,-245.5 264,-245.5" style=""/>
+<text text-anchor="start" x="293.5" y="-251.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="264.85" y="-226.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">MeasureFree</text>
+<polygon fill="white" stroke="none" points="264,-194.5 264,-212.5 328,-212.5 328,-194.5 264,-194.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="264,-194.5 264,-212.5 328,-212.5 328,-194.5 264,-194.5" style=""/>
+<text text-anchor="start" x="293.5" y="-200.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="258,-189 258,-270 334,-270 334,-189 258,-189" style=""/>
+</g>
+
+</g>
+</svg>

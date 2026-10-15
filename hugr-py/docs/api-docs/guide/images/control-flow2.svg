@@ -1,0 +1,411 @@
+<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="843pt" height="964pt" viewBox="0.00 0.00 843.00 964.00">
+<g id="graph0" class="graph" transform="translate(4,960) scale(1)" data-name="">
+<polygon fill="white" stroke="none" points="-4,4 -4,-960 839,-960 839,4 -4,4" style=""/>
+<g id="clust1" class="cluster" data-name="cluster0">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="8,-8 8,-948 827,-948 827,-8 8,-8" style=""/>
+</g>
+<g id="clust2" class="cluster" data-name="cluster1">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="78,-18 78,-938 817,-938 817,-18 78,-18" style=""/>
+</g>
+<g id="clust3" class="cluster" data-name="cluster4">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(253,245,239)" stroke-width="2" points="241,-28 241,-928 749,-928 749,-28 241,-28" style=""/>
+</g>
+<g id="clust4" class="cluster" data-name="cluster8">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="251,-38 251,-854 681,-854 681,-38 251,-38" style=""/>
+</g>
+<g id="clust5" class="cluster" data-name="cluster16">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="261,-48 261,-399 613,-399 613,-48 261,-48" style=""/>
+</g>
+<g id="clust6" class="cluster" data-name="cluster17">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="402,-133.5 402,-385.5 523,-385.5 523,-133.5 402,-133.5" style=""/>
+</g>
+<g id="clust7" class="cluster" data-name="cluster20">
+
+<polygon fill="rgb(255,255,255)" stroke="rgb(232,246,252)" points="271,-58 271,-385.5 392,-385.5 392,-58 271,-58" style=""/>
+</g>
+<!-- 2 -->
+<g id="node1" class="node" pointer-events="visible" data-name="2">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="191,-876.5 191,-903.5 231,-903.5 231,-876.5 191,-876.5" style=""/>
+<text text-anchor="start" x="197.85" y="-887.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">Input</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="191,-876.5 191,-903.5 231,-903.5 231,-876.5 191,-876.5" style=""/>
+</g>
+<!-- 3 -->
+<g id="node2" class="node" pointer-events="visible" data-name="3">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="759,-776.5 759,-830.5 807,-830.5 807,-776.5 759,-776.5" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="765,-806.5 765,-824.5 801,-824.5 801,-806.5 765,-806.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="765,-806.5 765,-824.5 801,-824.5 801,-806.5 765,-806.5" style=""/>
+<text text-anchor="start" x="780.5" y="-812.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="765.88" y="-787.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Output</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="759,-776.5 759,-830.5 807,-830.5 807,-776.5 759,-776.5" style=""/>
+</g>
+<!-- 5 -->
+<g id="node3" class="node" pointer-events="visible" data-name="5">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="699,-876.5 699,-903.5 739,-903.5 739,-876.5 699,-876.5" style=""/>
+<text text-anchor="start" x="705.85" y="-887.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">Input</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="699,-876.5 699,-903.5 739,-903.5 739,-876.5 699,-876.5" style=""/>
+</g>
+<!-- 6 -->
+<g id="node4" class="node" pointer-events="visible" data-name="6">
+
+<polygon fill="#accbf9" stroke="none" points="691,-687.5 691,-741.5 739,-741.5 739,-687.5 691,-687.5" style=""/>
+<polygon fill="white" stroke="none" points="697,-717.5 697,-735.5 733,-735.5 733,-717.5 697,-717.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="697,-717.5 697,-735.5 733,-735.5 733,-717.5 697,-717.5" style=""/>
+<text text-anchor="start" x="712.5" y="-723.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="697.88" y="-698.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Output</text>
+<polygon fill="none" stroke="white" points="691,-687.5 691,-741.5 739,-741.5 739,-687.5 691,-687.5" style=""/>
+</g>
+<!-- 7 -->
+<g id="node5" class="node" pointer-events="visible" data-name="7">
+
+<polygon fill="#accbf9" stroke="none" points="585,-863 585,-917 631,-917 631,-863 585,-863" style=""/>
+<text text-anchor="start" x="591.5" y="-901.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">QAlloc</text>
+<polygon fill="white" stroke="none" points="591,-869 591,-887 625,-887 625,-869 591,-869" style=""/>
+<polygon fill="none" stroke="#1cade4" points="591,-869 591,-887 625,-887 625,-869 591,-869" style=""/>
+<text text-anchor="start" x="605.5" y="-875" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="585,-863 585,-917 631,-917 631,-863 585,-863" style=""/>
+</g>
+<!-- 8 -->
+<g id="node23" class="node" pointer-events="visible" data-name="8">
+
+<polygon fill="#1cade4" stroke="none" points="592.5,-763 592.5,-844 649.5,-844 649.5,-763 592.5,-763" style=""/>
+<polygon fill="white" stroke="none" points="599,-819.5 599,-837.5 644,-837.5 644,-819.5 599,-819.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="599,-819.5 599,-837.5 644,-837.5 644,-819.5 599,-819.5" style=""/>
+<text text-anchor="start" x="619" y="-825.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="599.8" y="-800.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">TailLoop</text>
+<polygon fill="white" stroke="none" points="599,-768.5 599,-786.5 644,-786.5 644,-768.5 599,-768.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="599,-768.5 599,-786.5 644,-786.5 644,-768.5 599,-768.5" style=""/>
+<text text-anchor="start" x="619" y="-774.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="#1cade4" points="592.5,-763 592.5,-844 649.5,-844 649.5,-763 592.5,-763" style=""/>
+</g>
+<!-- 7&#45;&gt;8 -->
+<g id="edge1" class="edge" data-name="7:out.0-&gt;8:in.0" data-comment="7-&gt;8">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M608,-868C608,-853.49 622,-853.01 622,-838.5" style=""/>
+<text text-anchor="middle" x="625.25" y="-855.95" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 9 -->
+<g id="node6" class="node" pointer-events="visible" data-name="9">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="488,-687.5 488,-741.5 528,-741.5 528,-687.5 488,-687.5" style=""/>
+<text text-anchor="start" x="494.85" y="-725.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Input</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="494,-693.5 494,-711.5 522,-711.5 522,-693.5 494,-693.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="494,-693.5 494,-711.5 522,-711.5 522,-693.5 494,-693.5" style=""/>
+<text text-anchor="start" x="505.5" y="-699.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="488,-687.5 488,-741.5 528,-741.5 528,-687.5 488,-687.5" style=""/>
+</g>
+<!-- 13 -->
+<g id="node10" class="node" pointer-events="visible" data-name="13">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="510.5,-585 510.5,-666 547.5,-666 547.5,-585 510.5,-585" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="517,-641.5 517,-659.5 528,-659.5 528,-641.5 517,-641.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="517,-641.5 517,-659.5 528,-659.5 528,-641.5 517,-641.5" style=""/>
+<text text-anchor="start" x="520" y="-647.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="531,-641.5 531,-659.5 542,-659.5 542,-641.5 531,-641.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="531,-641.5 531,-659.5 542,-659.5 542,-641.5 531,-641.5" style=""/>
+<text text-anchor="start" x="534" y="-647.5" font-family="monospace" font-size="10.00" style="">1</text>
+<text text-anchor="start" x="521.56" y="-622.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">CX</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="517,-590.5 517,-608.5 528,-608.5 528,-590.5 517,-590.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="517,-590.5 517,-608.5 528,-608.5 528,-590.5 517,-590.5" style=""/>
+<text text-anchor="start" x="520" y="-596.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="531,-590.5 531,-608.5 542,-608.5 542,-590.5 531,-590.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="531,-590.5 531,-608.5 542,-608.5 542,-590.5 531,-590.5" style=""/>
+<text text-anchor="start" x="534" y="-596.5" font-family="monospace" font-size="10.00" style="">1</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="510.5,-585 510.5,-666 547.5,-666 547.5,-585 510.5,-585" style=""/>
+</g>
+<!-- 9&#45;&gt;13 -->
+<g id="edge3" class="edge" data-name="9:out.0-&gt;13:in.0" data-comment="9-&gt;13">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M508,-692.5C508,-676.98 522,-676.02 522,-660.5" style=""/>
+<text text-anchor="middle" x="504.75" y="-679.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 10 -->
+<g id="node7" class="node" pointer-events="visible" data-name="10">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="623,-232.5 623,-286.5 671,-286.5 671,-232.5 623,-232.5" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="629,-262.5 629,-280.5 665,-280.5 665,-262.5 629,-262.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="629,-262.5 629,-280.5 665,-280.5 665,-262.5 629,-262.5" style=""/>
+<text text-anchor="start" x="644.5" y="-268.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="629.88" y="-243.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Output</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="623,-232.5 623,-286.5 671,-286.5 671,-232.5 623,-232.5" style=""/>
+</g>
+<!-- 11 -->
+<g id="node8" class="node" pointer-events="visible" data-name="11">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="529,-776.5 529,-830.5 575,-830.5 575,-776.5 529,-776.5" style=""/>
+<text text-anchor="start" x="535.5" y="-814.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">QAlloc</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="535,-782.5 535,-800.5 569,-800.5 569,-782.5 535,-782.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="535,-782.5 535,-800.5 569,-800.5 569,-782.5 535,-782.5" style=""/>
+<text text-anchor="start" x="549.5" y="-788.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="529,-776.5 529,-830.5 575,-830.5 575,-776.5 529,-776.5" style=""/>
+</g>
+<!-- 12 -->
+<g id="node9" class="node" pointer-events="visible" data-name="12">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="539.5,-674 539.5,-755 562.5,-755 562.5,-674 539.5,-674" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="546,-730.5 546,-748.5 557,-748.5 557,-730.5 546,-730.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="546,-730.5 546,-748.5 557,-748.5 557,-730.5 546,-730.5" style=""/>
+<text text-anchor="start" x="549" y="-736.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="547.22" y="-711.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">H</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="546,-679.5 546,-697.5 557,-697.5 557,-679.5 546,-679.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="546,-679.5 546,-697.5 557,-697.5 557,-679.5 546,-679.5" style=""/>
+<text text-anchor="start" x="549" y="-685.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="539.5,-674 539.5,-755 562.5,-755 562.5,-674 539.5,-674" style=""/>
+</g>
+<!-- 11&#45;&gt;12 -->
+<g id="edge2" class="edge" data-name="11:out.0-&gt;12:in.0" data-comment="11-&gt;12">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M552,-781.5C552,-767.28 552,-763.72 552,-749.5" style=""/>
+<text text-anchor="middle" x="541.75" y="-768.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 12&#45;&gt;13 -->
+<g id="edge4" class="edge" data-name="12:out.0-&gt;13:in.1" data-comment="12-&gt;13">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M552,-678.5C552,-668.09 537,-670.91 537,-660.5" style=""/>
+<text text-anchor="middle" x="554.75" y="-661.4" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 14 -->
+<g id="node11" class="node" pointer-events="visible" data-name="14">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="531,-496 531,-577 607,-577 607,-496 531,-496" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="537,-552.5 537,-570.5 601,-570.5 601,-552.5 537,-552.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="537,-552.5 537,-570.5 601,-570.5 601,-552.5 537,-552.5" style=""/>
+<text text-anchor="start" x="566.5" y="-558.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="537.85" y="-533.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">MeasureFree</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="537,-501.5 537,-519.5 601,-519.5 601,-501.5 537,-501.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="537,-501.5 537,-519.5 601,-519.5 601,-501.5 537,-501.5" style=""/>
+<text text-anchor="start" x="566.5" y="-507.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="531,-496 531,-577 607,-577 607,-496 531,-496" style=""/>
+</g>
+<!-- 13&#45;&gt;14 -->
+<g id="edge5" class="edge" data-name="13:out.1-&gt;14:in.0" data-comment="13-&gt;14">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M537,-589.5C537,-577.05 523.55,-561.5 536,-561.5" style=""/>
+<text text-anchor="middle" x="521.58" y="-573.53" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 16 -->
+<g id="node22" class="node" pointer-events="visible" data-name="16">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="533.5,-308 533.5,-389 602.5,-389 602.5,-308 533.5,-308" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="540,-364.5 540,-382.5 567,-382.5 567,-364.5 540,-364.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="540,-364.5 540,-382.5 567,-382.5 567,-364.5 540,-364.5" style=""/>
+<text text-anchor="start" x="551" y="-370.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="570,-364.5 570,-382.5 597,-382.5 597,-364.5 570,-364.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="570,-364.5 570,-382.5 597,-382.5 597,-364.5 570,-364.5" style=""/>
+<text text-anchor="start" x="581" y="-370.5" font-family="monospace" font-size="10.00" style="">1</text>
+<text text-anchor="start" x="540.69" y="-345.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Conditional</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="540,-313.5 540,-331.5 597,-331.5 597,-313.5 540,-313.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="540,-313.5 540,-331.5 597,-331.5 597,-313.5 540,-313.5" style=""/>
+<text text-anchor="start" x="566" y="-319.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(232,246,252)" points="533.5,-308 533.5,-389 602.5,-389 602.5,-308 533.5,-308" style=""/>
+</g>
+<!-- 13&#45;&gt;16 -->
+<g id="edge8" class="edge" data-name="13:out.0-&gt;16:in.1" data-comment="13-&gt;16">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M522,-589.5C522,-508.18 488.27,-473.55 535,-407 548.88,-387.23 584,-407.65 584,-383.5" style=""/>
+<text text-anchor="middle" x="500.45" y="-492.24" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 15 -->
+<g id="node12" class="node" pointer-events="visible" data-name="15">
+
+<polygon fill="rgb(246,249,254)" stroke="none" points="540,-407 540,-488 578,-488 578,-407 540,-407" style=""/>
+<polygon fill="rgb(255,255,255)" stroke="none" points="546,-463.5 546,-481.5 572,-481.5 572,-463.5 546,-463.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="546,-463.5 546,-481.5 572,-481.5 572,-463.5 546,-463.5" style=""/>
+<text text-anchor="start" x="556.5" y="-469.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="546.78" y="-444.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Read</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="546,-412.5 546,-430.5 572,-430.5 572,-412.5 546,-412.5" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="546,-412.5 546,-430.5 572,-430.5 572,-412.5 546,-412.5" style=""/>
+<text text-anchor="start" x="556.5" y="-418.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(255,255,255)" points="540,-407 540,-488 578,-488 578,-407 540,-407" style=""/>
+</g>
+<!-- 14&#45;&gt;15 -->
+<g id="edge6" class="edge" data-name="14:out.0-&gt;15:in.0" data-comment="14-&gt;15">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M569,-500.5C569,-491.35 559,-491.65 559,-482.5" style=""/>
+<text text-anchor="middle" x="588.49" y="-483.4" font-family="monospace" font-size="9.00" style="">Measurement</text>
+</g>
+<!-- 15&#45;&gt;16 -->
+<g id="edge7" class="edge" data-name="15:out.0-&gt;16:in.0" data-comment="15-&gt;16">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M559,-411.5C559,-398.77 553,-396.23 553,-383.5" style=""/>
+<text text-anchor="middle" x="547.25" y="-400.2" font-family="monospace" font-size="9.00" style="">Bool</text>
+</g>
+<!-- 18 -->
+<g id="node13" class="node" pointer-events="visible" data-name="18">
+
+<polygon fill="#accbf9" stroke="none" points="473,-321.5 473,-375.5 513,-375.5 513,-321.5 473,-321.5" style=""/>
+<text text-anchor="start" x="479.85" y="-359.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Input</text>
+<polygon fill="white" stroke="none" points="479,-327.5 479,-345.5 507,-345.5 507,-327.5 479,-327.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="479,-327.5 479,-345.5 507,-345.5 507,-327.5 479,-327.5" style=""/>
+<text text-anchor="start" x="490.5" y="-333.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="473,-321.5 473,-375.5 513,-375.5 513,-321.5 473,-321.5" style=""/>
+</g>
+<!-- 25 -->
+<g id="node15" class="node" pointer-events="visible" data-name="25">
+
+<polygon fill="#accbf9" stroke="none" points="473.5,-219 473.5,-300 506.5,-300 506.5,-219 473.5,-219" style=""/>
+<polygon fill="white" stroke="none" points="480,-275.5 480,-293.5 501,-293.5 501,-275.5 480,-275.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="480,-275.5 480,-293.5 501,-293.5 501,-275.5 480,-275.5" style=""/>
+<text text-anchor="start" x="488" y="-281.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="480.73" y="-256.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Left</text>
+<polygon fill="white" stroke="none" points="480,-224.5 480,-242.5 501,-242.5 501,-224.5 480,-224.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="480,-224.5 480,-242.5 501,-242.5 501,-224.5 480,-224.5" style=""/>
+<text text-anchor="start" x="488" y="-230.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="473.5,-219 473.5,-300 506.5,-300 506.5,-219 473.5,-219" style=""/>
+</g>
+<!-- 18&#45;&gt;25 -->
+<g id="edge12" class="edge" data-name="18:out.0-&gt;25:in.0" data-comment="18-&gt;25">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M493,-326.5C493,-312.25 491,-308.75 491,-294.5" style=""/>
+<text text-anchor="middle" x="481.75" y="-313.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 19 -->
+<g id="node14" class="node" pointer-events="visible" data-name="19">
+
+<polygon fill="#accbf9" stroke="none" points="465,-143.5 465,-197.5 513,-197.5 513,-143.5 465,-143.5" style=""/>
+<polygon fill="white" stroke="none" points="471,-173.5 471,-191.5 507,-191.5 507,-173.5 471,-173.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="471,-173.5 471,-191.5 507,-191.5 507,-173.5 471,-173.5" style=""/>
+<text text-anchor="start" x="486.5" y="-179.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="471.88" y="-154.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Output</text>
+<polygon fill="none" stroke="white" points="465,-143.5 465,-197.5 513,-197.5 513,-143.5 465,-143.5" style=""/>
+</g>
+<!-- 25&#45;&gt;19 -->
+<g id="edge13" class="edge" data-name="25:out.0-&gt;19:in.0" data-comment="25-&gt;19">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M491,-223.5C491,-209.69 489,-206.31 489,-192.5" style=""/>
+<text text-anchor="middle" x="453.26" y="-210.7" font-family="monospace" font-size="9.00" style="">Either(Qubit, Qubit)</text>
+</g>
+<!-- 17 -->
+<g id="node16" class="node" pointer-events="visible" data-name="17">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="412.5,-335 412.5,-362 461.5,-362 461.5,-335 412.5,-335" style=""/>
+<text text-anchor="start" x="419.78" y="-345.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Case[0]</text>
+<polygon fill="none" stroke="rgb(232,246,252)" points="412.5,-335 412.5,-362 461.5,-362 461.5,-335 412.5,-335" style=""/>
+</g>
+<!-- 21 -->
+<g id="node17" class="node" pointer-events="visible" data-name="21">
+
+<polygon fill="#accbf9" stroke="none" points="342,-321.5 342,-375.5 382,-375.5 382,-321.5 342,-321.5" style=""/>
+<text text-anchor="start" x="348.85" y="-359.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Input</text>
+<polygon fill="white" stroke="none" points="348,-327.5 348,-345.5 376,-345.5 376,-327.5 348,-327.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="348,-327.5 348,-345.5 376,-345.5 376,-327.5 348,-327.5" style=""/>
+<text text-anchor="start" x="359.5" y="-333.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="342,-321.5 342,-375.5 382,-375.5 382,-321.5 342,-321.5" style=""/>
+</g>
+<!-- 23 -->
+<g id="node19" class="node" pointer-events="visible" data-name="23">
+
+<polygon fill="#accbf9" stroke="none" points="348.5,-219 348.5,-300 371.5,-300 371.5,-219 348.5,-219" style=""/>
+<polygon fill="white" stroke="none" points="355,-275.5 355,-293.5 366,-293.5 366,-275.5 355,-275.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="355,-275.5 355,-293.5 366,-293.5 366,-275.5 355,-275.5" style=""/>
+<text text-anchor="start" x="358" y="-281.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="356.53" y="-256.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">X</text>
+<polygon fill="white" stroke="none" points="355,-224.5 355,-242.5 366,-242.5 366,-224.5 355,-224.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="355,-224.5 355,-242.5 366,-242.5 366,-224.5 355,-224.5" style=""/>
+<text text-anchor="start" x="358" y="-230.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="348.5,-219 348.5,-300 371.5,-300 371.5,-219 348.5,-219" style=""/>
+</g>
+<!-- 21&#45;&gt;23 -->
+<g id="edge9" class="edge" data-name="21:out.0-&gt;23:in.0" data-comment="21-&gt;23">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M362,-326.5C362,-312.27 361,-308.73 361,-294.5" style=""/>
+<text text-anchor="middle" x="351.25" y="-313.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 22 -->
+<g id="node18" class="node" pointer-events="visible" data-name="22">
+
+<polygon fill="#accbf9" stroke="none" points="334,-68 334,-122 382,-122 382,-68 334,-68" style=""/>
+<polygon fill="white" stroke="none" points="340,-98 340,-116 376,-116 376,-98 340,-98" style=""/>
+<polygon fill="none" stroke="#1cade4" points="340,-98 340,-116 376,-116 376,-98 340,-98" style=""/>
+<text text-anchor="start" x="355.5" y="-104" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="340.88" y="-79.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">Output</text>
+<polygon fill="none" stroke="white" points="334,-68 334,-122 382,-122 382,-68 334,-68" style=""/>
+</g>
+<!-- 24 -->
+<g id="node20" class="node" pointer-events="visible" data-name="24">
+
+<polygon fill="#accbf9" stroke="none" points="340,-130 340,-211 380,-211 380,-130 340,-130" style=""/>
+<polygon fill="white" stroke="none" points="346,-186.5 346,-204.5 374,-204.5 374,-186.5 346,-186.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="346,-186.5 346,-204.5 374,-204.5 374,-186.5 346,-186.5" style=""/>
+<text text-anchor="start" x="357.5" y="-192.5" font-family="monospace" font-size="10.00" style="">0</text>
+<text text-anchor="start" x="346.86" y="-167.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Right</text>
+<polygon fill="white" stroke="none" points="346,-135.5 346,-153.5 374,-153.5 374,-135.5 346,-135.5" style=""/>
+<polygon fill="none" stroke="#1cade4" points="346,-135.5 346,-153.5 374,-153.5 374,-135.5 346,-135.5" style=""/>
+<text text-anchor="start" x="357.5" y="-141.5" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="white" points="340,-130 340,-211 380,-211 380,-130 340,-130" style=""/>
+</g>
+<!-- 23&#45;&gt;24 -->
+<g id="edge10" class="edge" data-name="23:out.0-&gt;24:in.0" data-comment="23-&gt;24">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M361,-223.5C361,-215.49 360,-213.51 360,-205.5" style=""/>
+<text text-anchor="middle" x="370.75" y="-217.2" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 24&#45;&gt;22 -->
+<g id="edge11" class="edge" data-name="24:out.0-&gt;22:in.0" data-comment="24-&gt;22">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M360,-134.5C360,-126.67 358,-124.83 358,-117" style=""/>
+<text text-anchor="middle" x="322.26" y="-128.45" font-family="monospace" font-size="9.00" style="">Either(Qubit, Qubit)</text>
+</g>
+<!-- 20 -->
+<g id="node21" class="node" pointer-events="visible" data-name="20">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="281.5,-335 281.5,-362 330.5,-362 330.5,-335 281.5,-335" style=""/>
+<text text-anchor="start" x="288.78" y="-345.6" font-family="monospace" font-weight="bold" font-size="11.00" style="">Case[1]</text>
+<polygon fill="none" stroke="rgb(232,246,252)" points="281.5,-335 281.5,-362 330.5,-362 330.5,-335 281.5,-335" style=""/>
+</g>
+<!-- 16&#45;&gt;10 -->
+<g id="edge14" class="edge" data-name="16:out.0-&gt;10:in.0" data-comment="16-&gt;10">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M598,-322.5C624.3,-322.5 601.7,-271.5 628,-271.5" style=""/>
+<text text-anchor="middle" x="576.26" y="-299.7" font-family="monospace" font-size="9.00" style="">Either(Qubit, Qubit)</text>
+</g>
+<!-- 8&#45;&gt;6 -->
+<g id="edge15" class="edge" data-name="8:out.0-&gt;6:in.0" data-comment="8-&gt;6">
+
+<path fill="none" stroke="#1cade4" stroke-width="1.5" d="M645,-777.5C652.58,-777.5 647.93,-767.54 654,-763 664.71,-754.99 672.83,-763.67 683,-755 693.59,-745.97 682.08,-726.5 696,-726.5" style=""/>
+<text text-anchor="middle" x="660.19" y="-761.97" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 4 -->
+<g id="node24" class="node" pointer-events="visible" data-name="4">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="642,-862 642,-918 688,-918 688,-862 642,-862" style=""/>
+<text text-anchor="start" x="649.73" y="-901.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">[DFG]</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="649,-869 649,-887 681,-887 681,-869 649,-869" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="649,-869 649,-887 681,-887 681,-869 649,-869" style=""/>
+<text text-anchor="start" x="662.5" y="-875" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(253,245,239)" stroke-width="2" points="643,-863 643,-917 687,-917 687,-863 643,-863" style=""/>
+</g>
+<!-- 4&#45;&gt;3 -->
+<g id="edge16" class="edge" data-name="4:out.0-&gt;3:in.0" data-comment="4-&gt;3">
+
+<path fill="none" stroke="rgb(232,246,252)" stroke-width="1.5" d="M682,-878C690.89,-878 687.54,-868.1 694,-862 721.15,-836.35 726.65,-815.5 764,-815.5" style=""/>
+<text text-anchor="middle" x="704.94" y="-842.06" font-family="monospace" font-size="9.00" style="">Qubit</text>
+</g>
+<!-- 1 -->
+<g id="node25" class="node" pointer-events="visible" data-name="1">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="88.5,-863 88.5,-917 179.5,-917 179.5,-863 88.5,-863" style=""/>
+<text text-anchor="start" x="95.7" y="-901.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">FuncDefn(main)</text>
+<polygon fill="rgb(255,255,255)" stroke="none" points="95,-869 95,-887 174,-887 174,-869 95,-869" style=""/>
+<polygon fill="none" stroke="rgb(232,246,252)" points="95,-869 95,-887 174,-887 174,-869 95,-869" style=""/>
+<text text-anchor="start" x="132" y="-875" font-family="monospace" font-size="10.00" style="">0</text>
+<polygon fill="none" stroke="rgb(232,246,252)" points="88.5,-863 88.5,-917 179.5,-917 179.5,-863 88.5,-863" style=""/>
+</g>
+<!-- 0 -->
+<g id="node26" class="node" pointer-events="visible" data-name="0">
+
+<polygon fill="rgb(232,246,252)" stroke="none" points="18,-876.5 18,-903.5 68,-903.5 68,-876.5 18,-876.5" style=""/>
+<text text-anchor="start" x="24.97" y="-887.1" font-family="monospace" font-weight="bold" font-size="11.00" style="">Module</text>
+<polygon fill="none" stroke="rgb(232,246,252)" points="18,-876.5 18,-903.5 68,-903.5 68,-876.5 18,-876.5" style=""/>
+</g>
+</g>
+</svg>
