@@ -29,6 +29,8 @@ fn emit_math_op<'c, H: HugrView<Node = Node>>(
                     .as_basic_value_enum(),
             ])
         }),
+        // `pow` and the float extension's `fpow` have the same LLVM lowering to
+        // `llvm.pow.f64`. Their lowerings could be shared in a future refactor.
         MathOps::pow | MathOps::atan2 => {
             emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
                 let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();

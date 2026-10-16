@@ -51,6 +51,9 @@ pub enum MathOps {
     /// Base-ten logarithm.
     log10,
     /// First input raised to the power of the second input.
+    ///
+    /// `pow` fits most naturally the math extension, but `fpow` is retained in the
+    /// float extension to avoid unexpected breakages.
     pow,
     /// Remainder of the first input divided by the second, truncating toward zero.
     fmod,
