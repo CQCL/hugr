@@ -5,5 +5,6 @@ pub mod int;
 pub mod logic;
 pub mod math;
 pub mod prelude;
+pub mod ptr;
 
 pub use prelude::{DefaultPreludeCodegen, PreludeCodegen, PreludeCodegenExtension};
