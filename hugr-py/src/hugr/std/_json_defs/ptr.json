@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.2.0",
   "name": "ptr",
   "types": {
     "ptr": {
@@ -8,17 +8,337 @@
       "params": [
         {
           "tp": "Type",
-          "b": "C"
+          "b": "A"
         }
       ],
-      "description": "Standard extension pointer type.",
+      "description": "Linear handle to a shared mutable cell.",
       "bound": {
         "b": "Explicit",
-        "bound": "C"
+        "bound": "A"
       }
     }
   },
   "operations": {
+    "Dup": {
+      "extension": "ptr",
+      "name": "Dup",
+      "description": "Return two handles to the same cell without copying the stored value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Eq": {
+      "extension": "ptr",
+      "name": "Eq",
+      "description": "Compare cell identity without reading the stored values, returning both handles in input order and a boolean.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Free": {
+      "extension": "ptr",
+      "name": "Free",
+      "description": "Release a handle, returning Some(value) for the last handle and None otherwise.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Sum",
+              "s": "General",
+              "rows": [
+                [],
+                [
+                  {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                ]
+              ]
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "Map": {
+      "extension": "ptr",
+      "name": "Map",
+      "description": "Apply a function to the stored value and extra inputs, replacing the stored value and returning the pointer and extra outputs.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          },
+          {
+            "tp": "List",
+            "param": {
+              "tp": "Type",
+              "b": "A"
+            }
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "G",
+              "input": [
+                {
+                  "t": "V",
+                  "i": 0,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 1,
+                  "b": "A"
+                }
+              ],
+              "output": [
+                {
+                  "t": "V",
+                  "i": 0,
+                  "b": "A"
+                },
+                {
+                  "t": "R",
+                  "i": 2,
+                  "b": "A"
+                }
+              ]
+            },
+            {
+              "t": "R",
+              "i": 1,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "R",
+              "i": 2,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "New": {
       "extension": "ptr",
       "name": "New",
@@ -27,7 +347,7 @@
         "params": [
           {
             "tp": "Type",
-            "b": "C"
+            "b": "A"
           }
         ],
         "body": {
@@ -35,14 +355,14 @@
             {
               "t": "V",
               "i": 0,
-              "b": "C"
+              "b": "A"
             }
           ],
           "output": [
             {
               "t": "Opaque",
               "extension": "ptr",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "ptr",
               "args": [
                 {
@@ -50,11 +370,11 @@
                   "ty": {
                     "t": "V",
                     "i": 0,
-                    "b": "C"
+                    "b": "A"
                   }
                 }
               ],
-              "bound": "C"
+              "bound": "A"
             }
           ]
         }
@@ -64,7 +384,7 @@
     "Read": {
       "extension": "ptr",
       "name": "Read",
-      "description": "Read a value from a pointer.",
+      "description": "Copy the stored value and return the pointer.",
       "signature": {
         "params": [
           {
@@ -77,7 +397,7 @@
             {
               "t": "Opaque",
               "extension": "ptr",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "ptr",
               "args": [
                 {
@@ -89,10 +409,27 @@
                   }
                 }
               ],
-              "bound": "C"
+              "bound": "A"
             }
           ],
           "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
             {
               "t": "V",
               "i": 0,
@@ -103,10 +440,74 @@
       },
       "binary": false
     },
+    "Swap": {
+      "extension": "ptr",
+      "name": "Swap",
+      "description": "Exchange the stored value, returning the pointer and old value.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "V",
+              "i": 0,
+              "b": "A"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "Write": {
       "extension": "ptr",
       "name": "Write",
-      "description": "Write a value to a pointer, overwriting existing value.",
+      "description": "Replace a copyable stored value and return the pointer.",
       "signature": {
         "params": [
           {
@@ -119,7 +520,7 @@
             {
               "t": "Opaque",
               "extension": "ptr",
-              "extension_version": "0.1.1",
+              "extension_version": "0.2.0",
               "id": "ptr",
               "args": [
                 {
@@ -131,7 +532,7 @@
                   }
                 }
               ],
-              "bound": "C"
+              "bound": "A"
             },
             {
               "t": "V",
@@ -139,7 +540,25 @@
               "b": "C"
             }
           ],
-          "output": []
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "C"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ]
         }
       },
       "binary": false

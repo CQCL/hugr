@@ -18,7 +18,7 @@ PTR_T_DEF = EXTENSION.types["ptr"]
 
 @dataclass(eq=False)
 class Ptr(tys.ExtType):
-    """Pointer type with a fixed element type."""
+    """Linear handle to a shared mutable cell with a fixed element type."""
 
     def __init__(self, ty: tys.Type) -> None:
         ty_arg = tys.TypeTypeArg(ty)
