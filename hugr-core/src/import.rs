@@ -2263,6 +2263,7 @@ impl<'a> Context<'a> {
             }
 
             table::Term::Literal(model::Literal::Nat(n)) => Ok(ConstUsize::new(*n).into()),
+            table::Term::Literal(model::Literal::Float(n)) => Ok(ConstF64::new((*n).into()).into()),
 
             table::Term::List { .. } | table::Term::Tuple(_) | table::Term::Literal(_) => {
                 Err(error_invalid!("expected constant"))
