@@ -85,3 +85,30 @@ def test_val_static_array():
     )
     h.set_outputs(load)
     validate(h.hugr)
+
+
+@pytest.mark.parametrize("contents", [[], [TRUE, FALSE]])
+def test_val_list(contents):
+    from hugr.std.collections.list import ListVal
+
+    value = ListVal(contents, tys.Bool)
+    assert value.to_value().val == [
+        [v._to_serial_root() for v in contents],
+        tys.Bool._to_serial_root(),
+    ]
+    h = dfg.Dfg()
+    loaded = h.load(value)
+    h.set_outputs(loaded)
+    validate(h.hugr)
+
+
+def test_val_list_rejects_wrong_element_type():
+    from hugr.cli import HugrCliError
+    from hugr.std.collections.list import ListVal
+    from hugr.std.float import FLOAT_T
+
+    h = dfg.Dfg()
+    loaded = h.load(ListVal([TRUE], FLOAT_T))
+    h.set_outputs(loaded)
+    with pytest.raises(HugrCliError):
+        validate(h.hugr)

@@ -6,7 +6,6 @@ use crate::extension::prelude::{
 };
 use crate::extension::{ConstFold, ConstFoldResult, OpDef};
 use crate::ops::Value;
-use crate::types::Type;
 use crate::types::type_param::TypeArg;
 use crate::utils::sorted_consts;
 
@@ -14,12 +13,33 @@ use super::{ListOp, ListValue};
 
 pub(super) fn set_fold(op: &ListOp, def: &mut OpDef) {
     match op {
+        ListOp::new => def.set_constant_folder(NewFold),
+        ListOp::discard_empty => def.set_constant_folder(|inputs: &[(IncomingPort, Value)]| {
+            let [(_, value)] = inputs else { return None };
+            let list = value.get_custom_value::<ListValue>()?;
+            list.get_contents().is_empty().then_some(vec![])
+        }),
         ListOp::pop => def.set_constant_folder(PopFold),
         ListOp::push => def.set_constant_folder(PushFold),
         ListOp::get => def.set_constant_folder(GetFold),
         ListOp::set => def.set_constant_folder(SetFold),
         ListOp::insert => def.set_constant_folder(InsertFold),
         ListOp::length => def.set_constant_folder(LengthFold),
+    }
+}
+
+pub struct NewFold;
+
+impl ConstFold for NewFold {
+    fn fold(&self, args: &[TypeArg], inputs: &[(IncomingPort, Value)]) -> ConstFoldResult {
+        let [ty] = args else { return None };
+        if !inputs.is_empty() {
+            return None;
+        }
+        let ty: crate::types::Type = ty.clone().try_into().ok()?;
+        // Constants have no type-variable scope, including inside nested types.
+        ty.validate(&[]).ok()?;
+        Some(vec![(0.into(), ListValue::new_empty(ty).into())])
     }
 }
 
@@ -73,10 +93,11 @@ impl ConstFold for GetFold {
         let index: &ConstUsize = index.get_custom_value()?;
         let idx = index.value() as usize;
 
-        match list.0.get(idx) {
-            Some(elem) => Some(vec![(0.into(), const_some(elem.clone()))]),
-            None => Some(vec![(0.into(), const_none([list.1.clone()]))]),
-        }
+        let result = match list.0.get(idx) {
+            Some(elem) => const_some(elem.clone()),
+            None => const_none([list.1.clone()]),
+        };
+        Some(vec![(0.into(), list.clone().into()), (1.into(), result)])
     }
 }
 
@@ -115,11 +136,11 @@ impl ConstFold for InsertFold {
 
         let mut list = list.clone();
         let elem = elem.clone();
-        let res_elem: Value = if list.0.len() > idx {
+        let res_elem: Value = if list.0.len() >= idx {
             list.0.insert(idx, elem);
             const_ok_tuple([], [list.1.clone()])
         } else {
-            const_fail(elem, [Type::UNIT])
+            const_fail(elem, [])
         };
         Some(vec![(0.into(), list.into()), (1.into(), res_elem)])
     }
@@ -133,6 +154,9 @@ impl ConstFold for LengthFold {
         let list: &ListValue = list.get_custom_value()?;
         let len = list.0.len();
 
-        Some(vec![(0.into(), ConstUsize::new(len as u64).into())])
+        Some(vec![
+            (0.into(), list.clone().into()),
+            (1.into(), ConstUsize::new(len as u64).into()),
+        ])
     }
 }

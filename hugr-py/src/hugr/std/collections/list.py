@@ -18,7 +18,7 @@ EXTENSION = _load_extension("collections.list")
 
 @dataclass(eq=False)
 class List(tys.ExtType):
-    """List type with a fixed element type."""
+    """Linear list type with a fixed element type."""
 
     def __init__(self, ty: tys.Type) -> None:
         ty_arg = tys.TypeTypeArg(ty)
@@ -35,7 +35,7 @@ class List(tys.ExtType):
         return self.args[0].ty
 
     def type_bound(self) -> tys.TypeBound:
-        return self.ty.type_bound()
+        return tys.TypeBound.Linear
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -71,7 +71,8 @@ class ListVal(val.ExtensionValue):
         # `Extension` value would not be serializable.
         vs = [v._to_serial_root() for v in self.v]
         element_ty = self.ty.ty._to_serial_root()
-        serial_val = {"values": vs, "typ": element_ty}
+        # Rust ListValue is a tuple struct (contents, element type).
+        serial_val = [vs, element_ty]
         return val.Extension(name, typ=self.ty, val=serial_val)
 
     def __str__(self) -> str:

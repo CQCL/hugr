@@ -689,10 +689,12 @@ fn resolve_hugr_extensions() {
         &Arc::downgrade(&PRELUDE),
 )))]
 fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
-    let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], vec![])).unwrap();
-    dfg_builder.add_load_const(Value::extension(custom_const));
+    // Return the loaded value so linear constants, including lists, are consumed.
+    let ty = custom_const.get_type();
+    let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], vec![ty])).unwrap();
+    let value = dfg_builder.add_load_const(Value::extension(custom_const));
     let hugr = dfg_builder
-        .finish_hugr_with_outputs([])
+        .finish_hugr_with_outputs([value])
         .unwrap_or_else(|e| panic!("{e}"));
 
     check_extension_resolution(hugr);

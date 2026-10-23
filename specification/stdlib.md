@@ -290,13 +290,15 @@ This extension contains the `static_array` type and value for modelling constant
 
 ### `collections.list`
 
-This extension contains the `list` type and value. Lists are dynamically sized, with all elements having the same type.
+This extension contains the `list` type and value. Lists are dynamically sized, with all elements having the same type. A list is always linear, including when its elements are copyable. Every operation consumes its list input; operations that preserve the list return its handle. `new`, `push`, `pop`, `set`, `insert`, and `length` support arbitrary element types. `get` requires copyable element types and copies an element. `discard_empty` accepts arbitrary element types, including noncopyable elements, and consumes the empty list; it panics if the list is nonempty. After popping and consuming all elements, the remaining empty handle can therefore be disposed of regardless of its element type.
 
 | Operation | Inputs | Outputs | Meaning |
 |-----------|--------|---------|---------|
+| `new`     | | `list<elemty>` | Create an empty list. |
+| `discard_empty` | `list<elemty>` | | Consume an empty list of arbitrary elements. Panic if nonempty. |
 | `pop`     | `list<elemty>` | `list<elemty>`, `option<elemty>` | Pop from the end of a list. Return the new list and the popped value (or none if the list was empty). |
 | `push`    | `list<elemty>`, `elemty` | `list<elemty>` | Push to the end of a list. Return the new list. |
-| `get`     | `list<elemty>`, `usize` | `option<elemty>` | Look up an element in a list by index. |
+| `get`     | `list<elemty>`, `usize` | `list<elemty>`, `option<elemty>` | Copy an element by index, returning none out of bounds. |
 | `set`     | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, elemty>`,  | Replace the element at the given index, and return the old value. If the index is out of bounds, return the input value as an error. |
-| `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elem_ty, ()>` | Insert an element at the given index. Elements at higher indices are shifted one position to the right. Return an error with the element if the index is out of bounds. |
+| `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, ()>` | Insert an element at the given index, allowing insertion at the length (append). Elements at higher indices are shifted one position to the right. Return an error with the element if the index exceeds the length. |
 | `length`  | `list<elemty>` | `list<elemty>`, `usize` | Get the length of a list. |

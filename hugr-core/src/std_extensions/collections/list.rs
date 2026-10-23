@@ -40,7 +40,7 @@ pub const LIST_TYPENAME: TypeName = TypeName::new_inline("List");
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.list");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.
@@ -150,7 +150,7 @@ pub enum ListOp {
     pop,
     /// Push to end of list. Return the new list.
     push,
-    /// Lookup an element in a list by index.
+    /// Copy an element by index, returning the list and an optional element.
     get,
     /// Replace the element at index `i` with value `v`, and return the old value.
     ///
@@ -163,11 +163,22 @@ pub enum ListOp {
     insert,
     /// Get the length of a list.
     length,
+    /// Create an empty list, including lists of noncopyable elements.
+    new,
+    /// Consume an empty list of arbitrary elements. Panics if nonempty.
+    discard_empty,
 }
 
 impl ListOp {
     /// Type parameter used in the list types.
     const TP: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
+
+    fn element_bound(self) -> TypeBound {
+        match self {
+            Self::get => TypeBound::Copyable,
+            _ => TypeBound::Linear,
+        }
+    }
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]
@@ -180,16 +191,21 @@ impl ListOp {
 
     /// Compute the signature of the operation, given the list type definition.
     fn compute_signature(self, list_type_def: &TypeDef) -> SignatureFunc {
-        use ListOp::{get, insert, length, pop, push, set};
-        let e = Type::new_var_use(0, TypeBound::Linear);
+        use ListOp::{discard_empty, get, insert, length, new, pop, push, set};
+        let e = Type::new_var_use(0, self.element_bound());
         let l = self.list_type(list_type_def, 0);
         match self {
+            new => self.list_polytype(vec![], vec![l]).into(),
+            discard_empty => self.list_polytype(vec![l], vec![]).into(),
             pop => self
                 .list_polytype(vec![l.clone()], vec![l, Type::from(option_type([e]))])
                 .into(),
             push => self.list_polytype(vec![l.clone(), e], vec![l]).into(),
             get => self
-                .list_polytype(vec![l, usize_t()], vec![Type::from(option_type([e]))])
+                .list_polytype(
+                    vec![l.clone(), usize_t()],
+                    vec![l, Type::from(option_type([e]))],
+                )
                 .into(),
             set => self
                 .list_polytype(
@@ -200,7 +216,7 @@ impl ListOp {
             insert => self
                 .list_polytype(
                     vec![l.clone(), usize_t(), e.clone()],
-                    vec![l, either_type([e], [Type::UNIT]).into()],
+                    vec![l, either_type([e], []).into()],
                 )
                 .into(),
             length => self
@@ -215,14 +231,17 @@ impl ListOp {
         input: impl Into<TypeRowRV>,
         output: impl Into<TypeRowRV>,
     ) -> PolyFuncTypeRV {
-        PolyFuncTypeRV::new(vec![Self::TP], FuncValueType::new(input, output))
+        PolyFuncTypeRV::new(
+            vec![self.element_bound().into()],
+            FuncValueType::new(input, output),
+        )
     }
 
     /// Returns the type of a generic list, associated with the element type parameter at index `idx`.
     fn list_type(self, list_type_def: &TypeDef, idx: usize) -> Type {
         Type::new_extension(
             list_type_def
-                .instantiate(vec![TypeArg::new_var_use(idx, Self::TP)])
+                .instantiate(vec![TypeArg::new_var_use(idx, self.element_bound())])
                 .unwrap(),
         )
     }
@@ -271,11 +290,13 @@ impl MakeOpDef for ListOp {
         use ListOp::*;
 
         match self {
+            new => "Create an empty list",
+            discard_empty => "Consume an empty list of arbitrary elements. Panics if nonempty.",
             pop => "Pop from the back of list. Returns an optional value.",
             push => "Push to the back of list",
-            get => "Lookup an element in a list by index. Panics if the index is out of bounds.",
+            get => "Copy an element by index, returning the list and an option. Returns none out of bounds.",
             set => "Replace the element at index `i` with value `v`.",
-            insert => "Insert an element at index `i`. Elements at higher indices are shifted one position to the right. Panics if the index is out of bounds.",
+            insert => "Insert an element at index `i`, including the end. Returns the input element as an error if i exceeds the length.",
             length => "Get the length of a list",
         }
         .into()
@@ -293,8 +314,8 @@ pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             .add_type(
                 LIST_TYPENAME,
                 vec![ListOp::TP],
-                "Generic dynamically sized list of type T.".into(),
-                TypeDefBound::from_params(vec![0]),
+                "Linear dynamically sized list of type T.".into(),
+                TypeDefBound::any(),
                 extension_ref,
             )
             .unwrap();
@@ -384,8 +405,8 @@ mod test {
     use crate::extension::prelude::{
         ConstUsize, const_fail_tuple, const_none, const_ok_tuple, const_some_tuple, qb_t, usize_t,
     };
-    use crate::ops::OpTrait;
     use crate::ops::constant::CustomSerialized;
+    use crate::ops::{DataflowOpTrait, OpTrait};
     use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use crate::type_row;
     use crate::types::TypeRow;
@@ -447,6 +468,138 @@ mod test {
         assert_eq!(push_sig.output(), &just_list_row);
     }
 
+    #[test]
+    fn exact_signatures_and_bounds() {
+        let e = usize_t();
+        let l = list_type(e.clone());
+        assert_eq!(l.least_upper_bound(), TypeBound::Linear);
+        assert_eq!(list_type(qb_t()).least_upper_bound(), TypeBound::Linear);
+        let cases = [
+            (ListOp::new, vec![], vec![l.clone()]),
+            (ListOp::discard_empty, vec![l.clone()], vec![]),
+            (ListOp::push, vec![l.clone(), e.clone()], vec![l.clone()]),
+            (
+                ListOp::pop,
+                vec![l.clone()],
+                vec![l.clone(), option_type([e.clone()]).into()],
+            ),
+            (
+                ListOp::get,
+                vec![l.clone(), usize_t()],
+                vec![l.clone(), option_type([e.clone()]).into()],
+            ),
+            (
+                ListOp::set,
+                vec![l.clone(), usize_t(), e.clone()],
+                vec![l.clone(), either_type([e.clone()], [e.clone()]).into()],
+            ),
+            (
+                ListOp::insert,
+                vec![l.clone(), usize_t(), e.clone()],
+                vec![l.clone(), either_type([e.clone()], []).into()],
+            ),
+            (ListOp::length, vec![l.clone()], vec![l, usize_t()]),
+        ];
+        assert_eq!(cases.len(), ListOp::iter().count());
+        for (op, input, output) in cases {
+            let ext_op = op.with_type(e.clone()).to_extension_op().unwrap();
+            assert_eq!(
+                ext_op.signature().as_ref(),
+                &crate::types::Signature::new(input, output)
+            );
+            let bound = if matches!(op, ListOp::get) {
+                TypeBound::Copyable
+            } else {
+                TypeBound::Linear
+            };
+            let SignatureFunc::PolyFuncType(poly) = op.init_signature(&Arc::downgrade(&EXTENSION))
+            else {
+                panic!("expected polymorphic signature")
+            };
+            assert_eq!(poly.params(), &[TypeParam::from(bound)]);
+            assert_eq!(
+                op.with_type(qb_t()).to_extension_op().is_some(),
+                bound == TypeBound::Linear
+            );
+        }
+    }
+
+    #[test]
+    fn list_handles_cannot_be_implicitly_copied_or_dropped() {
+        use crate::builder::{Dataflow, DataflowHugr, FunctionBuilder};
+        use crate::types::Signature;
+        for duplicate in [false, true] {
+            let mut builder = FunctionBuilder::new("main", Signature::new(vec![], vec![])).unwrap();
+            let list = builder
+                .add_dataflow_op(
+                    ListOp::new.with_type(usize_t()).to_extension_op().unwrap(),
+                    [],
+                )
+                .unwrap()
+                .out_wire(0);
+            if duplicate {
+                builder
+                    .add_dataflow_op(
+                        ListOp::discard_empty
+                            .with_type(usize_t())
+                            .to_extension_op()
+                            .unwrap(),
+                        [list],
+                    )
+                    .unwrap();
+                assert!(
+                    builder
+                        .add_dataflow_op(
+                            ListOp::discard_empty
+                                .with_type(usize_t())
+                                .to_extension_op()
+                                .unwrap(),
+                            [list],
+                        )
+                        .is_err()
+                );
+                continue;
+            }
+            assert!(builder.finish_hugr_with_outputs([]).is_err());
+        }
+    }
+
+    #[test]
+    fn new_folds_only_concrete_element_types() {
+        for bound in [TypeBound::Copyable, TypeBound::Linear] {
+            let var = Type::new_var_use(0, bound);
+            for ty in [var.clone(), Type::new_tuple([var.clone()]), list_type(var)] {
+                let op = ListOp::new.with_type(ty).to_extension_op().unwrap();
+                assert_eq!(op.constant_fold(&[]), None);
+            }
+        }
+        for ty in [usize_t(), qb_t(), Type::new_tuple([usize_t(), qb_t()])] {
+            let op = ListOp::new.with_type(ty.clone()).to_extension_op().unwrap();
+            let folded = op.constant_fold(&[]).unwrap();
+            assert_eq!(folded, vec![(0.into(), ListValue::new_empty(ty).into())]);
+            folded[0].1.get_type().validate(&[]).unwrap();
+        }
+    }
+
+    #[test]
+    fn discard_empty_folds_only_empty_lists() {
+        for ty in [usize_t(), qb_t()] {
+            let op = ListOp::discard_empty
+                .with_type(ty.clone())
+                .to_extension_op()
+                .unwrap();
+            let empty = Value::extension(ListValue::new_empty(ty));
+            assert_eq!(op.constant_fold(&[(0.into(), empty)]), Some(vec![]));
+        }
+        let op = ListOp::discard_empty
+            .with_type(usize_t())
+            .to_extension_op()
+            .unwrap();
+        let nonempty = Value::extension(ListValue::new(usize_t(), [ConstUsize::new(1).into()]));
+        assert_eq!(op.constant_fold(&[(0.into(), nonempty)]), None);
+        assert!(EXTENSION.get_op("discard").is_none());
+    }
+
     /// Values used in the `list_fold` test cases.
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum TestVal {
@@ -489,16 +642,20 @@ mod test {
     }
 
     #[rstest]
+    #[case::new(ListOp::new, &[], &[TestVal::List(vec![])])]
+    #[case::discard_empty(ListOp::discard_empty, &[TestVal::List(vec![])], &[])]
+    #[case::insert_end(ListOp::insert, &[TestVal::List(vec![77]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99]), TestVal::Ok(vec![], vec![usize_t()].into())])]
+    #[case::insert_empty(ListOp::insert, &[TestVal::List(vec![]), TestVal::Idx(0), TestVal::Elem(99)], &[TestVal::List(vec![99]), TestVal::Ok(vec![], vec![usize_t()].into())])]
     #[case::pop(ListOp::pop, &[TestVal::List(vec![77,88, 42])], &[TestVal::List(vec![77,88]), TestVal::Some(vec![TestVal::Elem(42)])])]
     #[case::pop_empty(ListOp::pop, &[TestVal::List(vec![])], &[TestVal::List(vec![]), TestVal::None(vec![usize_t()].into())])]
     #[case::push(ListOp::push, &[TestVal::List(vec![77,88]), TestVal::Elem(42)], &[TestVal::List(vec![77,88,42])])]
     #[case::set(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,42]), TestVal::Ok(vec![TestVal::Elem(88)], vec![usize_t()].into())])]
     #[case::set_invalid(ListOp::set, &[TestVal::List(vec![77,88,42]), TestVal::Idx(123), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(vec![usize_t()].into(), vec![TestVal::Elem(99)])])]
-    #[case::get(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1)], &[TestVal::Some(vec![TestVal::Elem(88)])])]
-    #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::None(vec![usize_t()].into())])]
+    #[case::get(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1)], &[TestVal::List(vec![77,88,42]), TestVal::Some(vec![TestVal::Elem(88)])])]
+    #[case::get_invalid(ListOp::get, &[TestVal::List(vec![77,88,42]), TestVal::Idx(99)], &[TestVal::List(vec![77,88,42]), TestVal::None(vec![usize_t()].into())])]
     #[case::insert(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(1), TestVal::Elem(99)], &[TestVal::List(vec![77,99,88,42]), TestVal::Ok(vec![], vec![usize_t()].into())])]
-    #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(type_row![Type::UNIT], vec![TestVal::Elem(99)])])]
-    #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::Elem(3)])]
+    #[case::insert_invalid(ListOp::insert, &[TestVal::List(vec![77,88,42]), TestVal::Idx(52), TestVal::Elem(99)], &[TestVal::List(vec![77,88,42]), TestVal::Err(type_row![], vec![TestVal::Elem(99)])])]
+    #[case::length(ListOp::length, &[TestVal::List(vec![77,88,42])], &[TestVal::List(vec![77,88,42]), TestVal::Elem(3)])]
     fn list_fold(#[case] op: ListOp, #[case] inputs: &[TestVal], #[case] outputs: &[TestVal]) {
         let consts: Vec<_> = inputs
             .iter()
@@ -513,6 +670,16 @@ mod test {
             .constant_fold(&consts)
             .unwrap();
 
+        assert_eq!(res.len(), outputs.len());
+        let sig = op
+            .with_type(usize_t())
+            .to_extension_op()
+            .unwrap()
+            .signature()
+            .into_owned();
+        for (port, value) in &res {
+            assert_eq!(&value.get_type(), &sig.output()[port.index()]);
+        }
         for (i, expected) in outputs.iter().enumerate() {
             let expected = expected.to_value();
             let res_val = res
@@ -550,6 +717,9 @@ mod test {
 
             let res = op.to_extension_op().unwrap().constant_fold(&consts);
 
+            if opdef == ListOp::new {
+                continue; // new has no opaque inputs.
+            }
             // Nothing got folded.
             assert_eq!(
                 res,

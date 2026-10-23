@@ -11,6 +11,7 @@ alloca_block:
 
 entry_block:                                      ; preds = %alloca_block
   %1 = alloca i16, align 2, !dbg !14
+  store i16 0, ptr %1, align 2, !dbg !14
   %2 = call i1 @__rt__list__pop(ptr %0, ptr %1), !dbg !14
   %3 = load i16, ptr %1, align 2, !dbg !14
   %4 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %3, 1, !dbg !14
