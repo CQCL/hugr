@@ -62,9 +62,6 @@ jobs:
         run: cargo fmt -- --check
       - name: Install LLVM and Clang
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
@@ -113,9 +110,6 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Build with all features
         run: cargo nextest r --verbose --no-run --all-features
@@ -164,9 +158,6 @@ jobs:
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
@@ -206,9 +197,6 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Install LLVM and Clang
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-minimal-versions
@@ -314,9 +302,6 @@ jobs:
           components: llvm-tools-preview
       - name: Install LLVM and Clang
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
-          sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
