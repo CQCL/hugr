@@ -43,8 +43,24 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.li
 pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(from = "ListValueWire")]
 /// Dynamically sized list of values, all of the same type.
 pub struct ListValue(Vec<Value>, Type);
+
+/// Accept the older Python payload format as well as the canonical `[values, typ]` sequence.
+///
+/// Serde's struct deserializer accepts both maps and sequences in field order.
+#[derive(Deserialize)]
+struct ListValueWire {
+    values: Vec<Value>,
+    typ: Type,
+}
+
+impl From<ListValueWire> for ListValue {
+    fn from(value: ListValueWire) -> Self {
+        Self(value.values, value.typ)
+    }
+}
 
 impl ListValue {
     /// Create a new [`CustomConst`] for a list of values of type `typ`.
@@ -392,6 +408,29 @@ mod test {
     use crate::{IncomingPort, PortIndex};
 
     use super::*;
+
+    /// Accept both list payload formats and retain the canonical sequence on write.
+    #[rstest]
+    #[case::empty(vec![])]
+    #[case::populated(vec![ConstUsize::new(42).into()])]
+    fn wire_format(#[case] contents: Vec<Value>, #[values(false, true)] named: bool) {
+        let expected = ListValue::new(usize_t(), contents.clone());
+        let payload = if named {
+            serde_json::json!({"values": contents, "typ": usize_t()})
+        } else {
+            serde_json::json!([contents, usize_t()])
+        };
+        let serialized = CustomSerialized::new(
+            expected.get_type(),
+            serde_json::json!({"c": "ListValue", "v": payload}),
+        );
+        let value = serialized.into_custom_const_box();
+        assert_eq!(value.downcast_ref::<ListValue>(), Some(&expected));
+        assert_eq!(
+            serde_json::to_value(value).unwrap(),
+            serde_json::json!({"c": "ListValue", "v": [contents, usize_t()]}),
+        );
+    }
 
     #[test]
     fn test_extension() {

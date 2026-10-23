@@ -230,6 +230,17 @@ def test_list():
     assert l_val.ty == List(Bool)
 
 
+@pytest.mark.parametrize("contents", [[], [val.TRUE, val.FALSE]])
+def test_list_serialization(contents):
+    # Rust's ListValue tuple struct expects [values, element_type].
+    serialized = ListVal(contents, Bool).to_value()
+    assert serialized.name == "ListValue"
+    assert serialized.val == [
+        [v._to_serial_root() for v in contents],
+        Bool._to_serial_root(),
+    ]
+
+
 def test_array():
     ty_var = Variable(0, TypeBound.Copyable)
     len_var = VariableArg(1, BoundedNatParam())
