@@ -8,7 +8,7 @@ ecosystem.
 It provides a high-fidelity representation of operations, that facilitates
 compilation and encodes runnable programs.
 
-HUGR guide
+HUGR guides
 ----------
 
 This is a collection of informal, conceptual guides to HUGR aimed at those who wish to
