@@ -1,6 +1,6 @@
 [package]
 name = "hugr-persistent"
-version = "0.7.12"
+version = "0.7.13"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -16,7 +16,7 @@ categories = ["compilers", "science::quantum-computing"]
 name = "persistent_walker_example"
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.30.3" }
+hugr-core = { path = "../hugr-core", version = "0.30.4" }
 
 derive_more = { workspace = true, features = [
     "display",
