@@ -84,4 +84,4 @@ jobs:
 
         [Please investigate](https://github.com/quantinuum/hugr/actions/runs/${{ github.run_id }}).
       unique-label: "X-unsoundness-checks"
-      other-labels: "C-bugfix, A-rust"
+      other-labels: "C-bugfix,A-rust"
