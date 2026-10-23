@@ -21,9 +21,9 @@ bench = false
 
 [dependencies]
 bumpalo = { workspace = true, features = ["collections"] }
-hugr-core = { version = "0.30.3", path = "../hugr-core", default-features = false }
-hugr-cli = { version = "0.30.3", path = "../hugr-cli", default-features = false }
-hugr-model = { version = "0.30.3", path = "../hugr-model", default-features = false, features = [
+hugr-core = { version = "0.30.4", path = "../hugr-core", default-features = false }
+hugr-cli = { version = "0.30.4", path = "../hugr-cli", default-features = false }
+hugr-model = { version = "0.30.4", path = "../hugr-model", default-features = false, features = [
     "pyo3",
 ] }
 derive_more = { workspace = true }
