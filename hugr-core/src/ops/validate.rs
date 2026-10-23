@@ -10,7 +10,7 @@ use itertools::Itertools;
 use thiserror::Error;
 
 use crate::core::HugrNode;
-use crate::types::TypeRow;
+use crate::types::{Signature, TypeRow};
 use crate::{Node, Port, PortIndex};
 
 use super::dataflow::{DataflowOpTrait, DataflowParent};
@@ -103,7 +103,9 @@ impl ValidateOp for super::Conditional {
             if sig.input != self.case_input_row(i).unwrap() || sig.output != self.outputs {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
-                    optype: Box::new(optype.clone()),
+                    case: i,
+                    cond_sig: (*self.signature()).clone(),
+                    child_sig: sig.clone().into_owned(),
                 });
             }
         }
@@ -192,8 +194,15 @@ pub enum ChildrenValidationError<N: HugrNode> {
         container_desc: &'static str,
     },
     /// The signature of a child case in a conditional operation does not match the container's signature.
-    #[error("A conditional case has optype {sig}, which differs from the signature of Conditional container", sig=optype.dataflow_signature().unwrap_or_default())]
-    ConditionalCaseSignature { child: N, optype: Box<OpType> },
+    #[error(
+        "Case {case} in a conditional has signature `{child_sig}`, which differs from the signature of Conditional container: `{cond_sig}`"
+    )]
+    ConditionalCaseSignature {
+        child: N,
+        case: usize,
+        cond_sig: Signature,
+        child_sig: Signature,
+    },
     /// The conditional container's branching value does not match the number of children.
     #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
         actual_sum_rows.len())]
