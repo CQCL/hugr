@@ -263,7 +263,41 @@ class OpDef(ExtensionObject):
             args: Type arguments corresponding to the type parameters of the definition.
             concrete_signature: Concrete function type of the operation, only required
                 if the operation is polymorphic.
+
+        Raises:
+            ValueError: if a `concrete_signature` arg is not provided to a `OpDef`
+                which requires type parameters, or if the wrong number of args are
+                provided for the `OpDef`.
+
         """
+        num_args = len(args) if args else 0
+        if self.signature.poly_func is not None:
+            params = self.signature.poly_func.params
+            if num_args > len(params):
+                msg = (
+                    f"Too many args: Op {self.qualified_name()} takes {len(params)}"
+                    f" args, but was given {num_args}"
+                )
+                raise ValueError(msg)
+            elif len(params) > num_args:
+                msg = (
+                    f"Not enough args: Op {self.qualified_name()} takes {len(params)}"
+                    f" args, but was given {num_args}"
+                )
+                raise ValueError(msg)
+
+        if num_args > 0 and concrete_signature is None:
+            url_base = "https://quantinuum.github.io/hugr/generated"
+            url = f"{url_base}/hugr.ext.OpDef.html#hugr.ext.OpDef.instantiate"
+            msg = (
+                f"Signature not provided:\n"
+                f"  Concrete signature required for polymorphic Op "
+                f"`{self.qualified_name()}`.\n"
+                f"  See documentation for `OpDef.instantiate`:\n"
+                f"  {url}"
+            )
+            raise ValueError(msg)
+
         return ops.ExtOp(self, concrete_signature, list(args or []))
 
 

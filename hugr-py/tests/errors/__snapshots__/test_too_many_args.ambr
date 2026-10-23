@@ -1,0 +1,4 @@
+# serializer version: 1
+# name: test_too_many_args_err
+  'Too many args: Op arithmetic.int.ineg takes 1 args, but was given 2'
+# ---
