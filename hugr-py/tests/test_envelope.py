@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 import semver
 
-from hugr import ops, tys
+from hugr import cli, ops, tys
+from hugr.build.cfg import Cfg
 from hugr.build.dfg import Dfg
 from hugr.build.function import Module
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
@@ -91,3 +92,51 @@ def test_model_import_with_ext():
     data1 = pkg1.to_bytes(config=EnvelopeConfig.BINARY)
     pkg2 = Package.from_bytes(data1)
     assert pkg2.modules[0].num_nodes() == 8
+
+
+@pytest.mark.parametrize(
+    ("sum_ty", "shared_outputs"),
+    [
+        (tys.Bool, []),
+        (tys.Bool, [tys.Qubit]),
+        (tys.Sum([[tys.Qubit], [tys.Qubit]]), []),
+        (tys.Sum([[tys.Qubit], [tys.Qubit]]), [tys.Bool, tys.Qubit]),
+    ],
+    ids=["no-payload", "shared-linear", "variant-linear", "variant-and-shared"],
+)
+@pytest.mark.parametrize(
+    "format",
+    [
+        EnvelopeFormat.JSON,
+        EnvelopeFormat.MODEL,
+        EnvelopeFormat.MODEL_WITH_EXTS,
+        EnvelopeFormat.S_EXPRESSION_WITH_EXTS,
+    ],
+)
+def test_cfg_block_output_roundtrip(
+    sum_ty: tys.Sum, shared_outputs: list[tys.Type], format: EnvelopeFormat
+):
+    cfg = Cfg(sum_ty, *shared_outputs)
+    entry = cfg.add_entry()
+    entry.set_outputs(*entry.inputs())
+    for branch in range(len(sum_ty.variant_rows)):
+        successor = cfg.add_successor(entry[branch])
+        successor.set_single_succ_outputs(*successor.inputs())
+        cfg.branch_exit(successor[0])
+    original = cfg.hugr.to_package()
+
+    def block_signatures(package: Package):
+        return [
+            (data.op.inputs, data.op.sum_ty, data.op.other_outputs)
+            for _, data in package.modules[0].nodes()
+            if isinstance(data.op, ops.DataflowBlock)
+        ]
+
+    encoded = original.to_bytes(EnvelopeConfig(format=format))
+    decoded = Package.from_bytes(encoded)
+    assert block_signatures(decoded) == block_signatures(original)
+    # JSON preserves the imported operation rather than recovering its signature
+    # again through Rust model import, so it exposes any mismatch with the body.
+    json_config = EnvelopeConfig(format=EnvelopeFormat.JSON)
+    cli.validate(original.to_bytes(json_config))
+    cli.validate(decoded.to_bytes(json_config))
